@@ -1,0 +1,22 @@
+---
+- name: deploy safenode to remaining nodes
+  hosts: all
+  become: False
+  vars:
+    is_genesis: False
+  roles:
+    - role: prerequisites
+      become: True
+    - {
+        role: format_disk,
+        become: True,
+        block_device: "{{ block_device }}",
+        mount_info:
+          { name: "{{ node_data_mount_path }}", owner: "root", group: "root", mode: 0755 },
+        when: provider == "aws"
+      }
+    - node
+    - role: resource_usage
+      become: True
+    - role: log_forwarding
+      become: True

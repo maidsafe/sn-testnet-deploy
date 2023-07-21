@@ -1,0 +1,10 @@
+[Unit]
+Description=Resource Usage
+
+[Service]
+User=safe
+ExecStart=/home/safe/resource-usage.sh
+NetworkAccess=yes
+
+[Install]
+WantedBy=multi-user.target

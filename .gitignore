@@ -1,1 +1,6 @@
+ansible/inventory/.*
+ansible/extra_vars/.*
+resources/**/.terraform/
+.env
 /target
+safenode_rpc_client
