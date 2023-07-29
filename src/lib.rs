@@ -209,7 +209,7 @@ mod test {
     const RPC_CLIENT_BIN_NAME: &str = "safenode_rpc_client";
 
     fn setup_working_directory() -> Result<(TempDir, ChildPath)> {
-        let tmp_dir = assert_fs::TempDir::new()?.into_persistent();
+        let tmp_dir = assert_fs::TempDir::new()?;
         let working_dir = tmp_dir.child("work");
         working_dir.create_dir_all()?;
         working_dir.copy_from("resources/", &["**"])?;
@@ -272,7 +272,7 @@ mod test {
 
     #[tokio::test]
     async fn init_should_create_a_new_workspace() -> Result<()> {
-        let (_, working_dir) = setup_working_directory()?;
+        let (tmp_dir, working_dir) = setup_working_directory()?;
         let mut terraform_runner = MockTerraformRunnerInterface::new();
         terraform_runner.expect_init().times(1).returning(|| Ok(()));
         terraform_runner
@@ -292,13 +292,14 @@ mod test {
             s3_repository,
         );
         testnet.init("beta").await?;
+        drop(tmp_dir);
         Ok(())
     }
 
     #[tokio::test]
     async fn init_should_not_create_a_new_workspace_when_one_with_the_same_name_exists(
     ) -> Result<()> {
-        let (_, working_dir) = setup_working_directory()?;
+        let (tmp_dir, working_dir) = setup_working_directory()?;
         let mut terraform_runner = MockTerraformRunnerInterface::new();
         terraform_runner.expect_init().times(1).returning(|| Ok(()));
         terraform_runner
@@ -325,12 +326,13 @@ mod test {
             s3_repository,
         );
         testnet.init("alpha").await?;
+        drop(tmp_dir);
         Ok(())
     }
 
     #[tokio::test]
     async fn init_should_download_and_extract_the_rpc_client() -> Result<()> {
-        let (_, working_dir) = setup_working_directory()?;
+        let (tmp_dir, working_dir) = setup_working_directory()?;
         let temp_archive_dir = working_dir.child("setup_archive");
 
         // Create an archive containing a fake rpc client exe, to be returned by the mock HTTP
@@ -381,12 +383,13 @@ mod test {
         let metadata = std::fs::metadata(extracted_rpc_client_bin.path())?;
         let permissions = metadata.permissions();
         assert!(permissions.mode() & 0o100 > 0, "File is not executable");
+        drop(tmp_dir);
         Ok(())
     }
 
     #[tokio::test]
     async fn init_should_not_download_the_rpc_client_if_it_already_exists() -> Result<()> {
-        let (_, working_dir) = setup_working_directory()?;
+        let (tmp_dir, working_dir) = setup_working_directory()?;
         let fake_rpc_client_bin = working_dir.child(RPC_CLIENT_BIN_NAME);
         fake_rpc_client_bin.write_binary(b"fake code")?;
 
@@ -416,13 +419,14 @@ mod test {
         testnet.init("alpha").await?;
 
         mock.assert_hits(0);
+        drop(tmp_dir);
         Ok(())
     }
 
     #[tokio::test]
     async fn init_should_generate_ansible_inventory_for_digital_ocean_for_the_new_testnet(
     ) -> Result<()> {
-        let (_, working_dir) = setup_working_directory()?;
+        let (tmp_dir, working_dir) = setup_working_directory()?;
         let s3_repository = setup_default_s3_repository(&working_dir)?;
         let terraform_runner = setup_default_terraform_runner();
 
@@ -447,12 +451,13 @@ mod test {
             assert!(contents.contains("alpha"));
             assert!(contents.contains(inventory_type));
         }
+        drop(tmp_dir);
         Ok(())
     }
 
     #[tokio::test]
     async fn init_should_not_overwrite_generated_inventory() -> Result<()> {
-        let (_, working_dir) = setup_working_directory()?;
+        let (tmp_dir, working_dir) = setup_working_directory()?;
         let s3_repository = setup_default_s3_repository(&working_dir)?;
         let mut terraform_runner = MockTerraformRunnerInterface::new();
         let mut seq = Sequence::new();
@@ -502,6 +507,7 @@ mod test {
             assert!(contents.contains("alpha"));
             assert!(contents.contains(inventory_type));
         }
+        drop(tmp_dir);
         Ok(())
     }
 }

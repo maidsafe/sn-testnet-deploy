@@ -1,5 +1,5 @@
-ansible/inventory/.*
-ansible/extra_vars/.*
+resources/ansible/inventory/.*
+resources/ansible/extra_vars/.*
 resources/**/.terraform/
 .env
 /target
