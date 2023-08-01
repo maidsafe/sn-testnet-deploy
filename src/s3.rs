@@ -1,10 +1,8 @@
-// Copyright 2023 MaidSafe.net limited.
+// Copyright (c) 2023, MaidSafe.
+// All rights reserved.
 //
-// This SAFE Network Software is licensed to you under The General Public License (GPL), version 3.
-// Unless required by applicable law or agreed to in writing, the SAFE Network Software distributed
-// under the GPL Licence is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
-// KIND, either express or implied. Please review the Licences for the specific language governing
-// permissions and limitations relating to use of the SAFE Network Software.
+// This SAFE Network Software is licensed under the BSD-3-Clause license.
+// Please see the LICENSE file for more details.
 
 use crate::error::{Error, Result};
 use indicatif::{ProgressBar, ProgressStyle};
