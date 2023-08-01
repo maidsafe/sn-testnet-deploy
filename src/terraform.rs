@@ -14,9 +14,11 @@ use std::process::{Command, Stdio};
 /// calling the Terraform process.
 #[cfg_attr(test, automock)]
 pub trait TerraformRunnerInterface {
+    fn apply(&self, vars: Vec<(String, String)>) -> Result<()>;
     fn init(&self) -> Result<()>;
     fn workspace_list(&self) -> Result<Vec<String>>;
     fn workspace_new(&self, name: &str) -> Result<()>;
+    fn workspace_select(&self, name: &str) -> Result<()>;
 }
 
 pub struct TerraformRunner {
@@ -27,6 +29,16 @@ pub struct TerraformRunner {
 }
 
 impl TerraformRunnerInterface for TerraformRunner {
+    fn apply(&self, vars: Vec<(String, String)>) -> Result<()> {
+        let mut args = vec!["apply".to_string(), "-auto-approve".to_string()];
+        for var in vars.iter() {
+            args.push("-var".to_string());
+            args.push(format!("{}={}", var.0, var.1));
+        }
+        self.run_terraform_command(args, false)?;
+        Ok(())
+    }
+
     fn init(&self) -> Result<()> {
         let args = vec![
             "init".to_string(),
@@ -51,6 +63,18 @@ impl TerraformRunnerInterface for TerraformRunner {
     fn workspace_new(&self, name: &str) -> Result<()> {
         self.run_terraform_command(
             vec!["workspace".to_string(), "new".to_string(), name.to_string()],
+            false,
+        )?;
+        Ok(())
+    }
+
+    fn workspace_select(&self, name: &str) -> Result<()> {
+        self.run_terraform_command(
+            vec![
+                "workspace".to_string(),
+                "select".to_string(),
+                name.to_string(),
+            ],
             false,
         )?;
         Ok(())
