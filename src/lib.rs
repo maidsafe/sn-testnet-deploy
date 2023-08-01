@@ -2,9 +2,9 @@ pub mod error;
 pub mod s3;
 pub mod terraform;
 
+use crate::error::{Error, Result};
 use crate::s3::S3AssetRepository;
 use crate::terraform::{TerraformRunner, TerraformRunnerInterface};
-use color_eyre::{eyre::eyre, Result};
 use flate2::read::GzDecoder;
 use std::fs::File;
 use std::io::BufWriter;
@@ -197,11 +197,9 @@ impl TestnetDeploy {
     ) -> Result<()> {
         if (repo_owner.is_some() && branch.is_none()) || (branch.is_some() && repo_owner.is_none())
         {
-            return Err(eyre!(
-                "Both the repository owner and branch name must be supplied if either are used"
-            ));
+            return Err(Error::CustomBinConfigError);
         }
-        println!("Will select {name} as workspace...");
+        println!("Selecting {name} workspace...");
         self.terraform_runner.workspace_select(name)?;
         let args = vec![
             ("node_count".to_string(), node_count.to_string()),
@@ -212,6 +210,37 @@ impl TestnetDeploy {
         ];
         println!("Running terraform apply...");
         self.terraform_runner.apply(args)?;
+        Ok(())
+    }
+
+    pub async fn clean(&self, name: &str) -> Result<()> {
+        let workspaces = self.terraform_runner.workspace_list()?;
+        if !workspaces.contains(&name.to_string()) {
+            return Err(Error::EnvironmentDoesNotExist(name.to_string()));
+        }
+        self.terraform_runner.workspace_select(name)?;
+        println!("Selected {name} workspace");
+        self.terraform_runner.destroy()?;
+        // The 'dev' workspace is one we always expect to exist, for admin purposes.
+        // You can't delete a workspace while it is selected, so we select 'dev' before we delete
+        // the current workspace.
+        self.terraform_runner.workspace_select("dev")?;
+        self.terraform_runner.workspace_delete(name)?;
+        println!("Deleted {name} workspace");
+
+        let inventory_types = ["build", "genesis", "node"];
+        for inventory_type in inventory_types.iter() {
+            let inventory_file_path = self
+                .working_directory_path
+                .join("ansible")
+                .join("inventory")
+                .join(format!(
+                    ".{}_{}_inventory_digital_ocean.yml",
+                    name, inventory_type
+                ));
+            std::fs::remove_file(inventory_file_path)?;
+        }
+        println!("Deleted Ansible inventory for {name}");
         Ok(())
     }
 }
@@ -686,6 +715,107 @@ mod test {
                     e.to_string(),
                     "Both the repository owner and branch name must be supplied if either are used"
                 );
+                drop(tmp_dir);
+                Ok(())
+            }
+        }
+    }
+
+    #[tokio::test]
+    async fn clean_should_run_terraform_destroy_and_delete_workspace_and_delete_inventory_files(
+    ) -> Result<()> {
+        let (tmp_dir, working_dir) = setup_working_directory()?;
+        let s3_repository = setup_default_s3_repository(&working_dir)?;
+        let mut terraform_runner = setup_default_terraform_runner();
+        let mut seq = Sequence::new();
+        terraform_runner
+            .expect_workspace_list()
+            .times(1)
+            .returning(|| {
+                Ok(vec![
+                    "alpha".to_string(),
+                    "default".to_string(),
+                    "dev".to_string(),
+                ])
+            });
+        terraform_runner
+            .expect_workspace_select()
+            .times(1)
+            .in_sequence(&mut seq)
+            .with(eq("alpha".to_string()))
+            .returning(|_| Ok(()));
+        terraform_runner
+            .expect_destroy()
+            .times(1)
+            .returning(|| Ok(()));
+        terraform_runner
+            .expect_workspace_select()
+            .times(1)
+            .in_sequence(&mut seq)
+            .with(eq("dev".to_string()))
+            .returning(|_| Ok(()));
+        terraform_runner
+            .expect_workspace_delete()
+            .times(1)
+            .with(eq("alpha".to_string()))
+            .returning(|_| Ok(()));
+
+        let testnet = TestnetDeploy::new(
+            Box::new(terraform_runner),
+            working_dir.to_path_buf(),
+            CloudProvider::DigitalOcean,
+            s3_repository,
+        );
+
+        // Calling init will create the Ansible inventory files, which we want to be removed by
+        // the clean operation.
+        testnet.init("alpha").await?;
+        testnet.clean("alpha").await?;
+
+        let inventory_types = ["build", "genesis", "node"];
+        for inventory_type in inventory_types.iter() {
+            let inventory_file = working_dir.child(format!(
+                "ansible/inventory/.{}_{}_inventory_digital_ocean.yml",
+                "alpha", inventory_type
+            ));
+            inventory_file.assert(predicates::path::missing());
+        }
+
+        drop(tmp_dir);
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn clean_with_invalid_name_should_return_an_error() -> Result<()> {
+        let (tmp_dir, working_dir) = setup_working_directory()?;
+        let s3_repository = setup_default_s3_repository(&working_dir)?;
+        let mut terraform_runner = MockTerraformRunnerInterface::new();
+        terraform_runner
+            .expect_workspace_list()
+            .times(1)
+            .returning(|| {
+                Ok(vec![
+                    "alpha".to_string(),
+                    "default".to_string(),
+                    "dev".to_string(),
+                ])
+            });
+
+        let testnet = TestnetDeploy::new(
+            Box::new(terraform_runner),
+            working_dir.to_path_buf(),
+            CloudProvider::DigitalOcean,
+            s3_repository,
+        );
+
+        let result = testnet.clean("beta").await;
+        match result {
+            Ok(()) => {
+                drop(tmp_dir);
+                Err(eyre!("deploy should have returned an error"))
+            }
+            Err(e) => {
+                assert_eq!(e.to_string(), "The 'beta' environment does not exist");
                 drop(tmp_dir);
                 Ok(())
             }

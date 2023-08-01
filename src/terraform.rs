@@ -10,12 +10,14 @@ use std::process::{Command, Stdio};
 ///
 /// To keep things simple, each subcommand will be its own function.
 ///
-/// This trait exists for unit testing: it enables the testing of behaviour without actually
-/// calling the Terraform process.
+/// This trait exists for unit testing: it enables testing behaviour without actually calling the
+/// Terraform process.
 #[cfg_attr(test, automock)]
 pub trait TerraformRunnerInterface {
     fn apply(&self, vars: Vec<(String, String)>) -> Result<()>;
+    fn destroy(&self) -> Result<()>;
     fn init(&self) -> Result<()>;
+    fn workspace_delete(&self, name: &str) -> Result<()>;
     fn workspace_list(&self) -> Result<Vec<String>>;
     fn workspace_new(&self, name: &str) -> Result<()>;
     fn workspace_select(&self, name: &str) -> Result<()>;
@@ -39,6 +41,14 @@ impl TerraformRunnerInterface for TerraformRunner {
         Ok(())
     }
 
+    fn destroy(&self) -> Result<()> {
+        self.run_terraform_command(
+            vec!["destroy".to_string(), "-auto-approve".to_string()],
+            false,
+        )?;
+        Ok(())
+    }
+
     fn init(&self) -> Result<()> {
         let args = vec![
             "init".to_string(),
@@ -46,6 +56,18 @@ impl TerraformRunnerInterface for TerraformRunner {
             format!("bucket={}", self.state_bucket_name),
         ];
         self.run_terraform_command(args, false)?;
+        Ok(())
+    }
+
+    fn workspace_delete(&self, name: &str) -> Result<()> {
+        self.run_terraform_command(
+            vec![
+                "workspace".to_string(),
+                "delete".to_string(),
+                name.to_string(),
+            ],
+            true,
+        )?;
         Ok(())
     }
 

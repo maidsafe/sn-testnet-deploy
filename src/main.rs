@@ -23,6 +23,15 @@ struct Opt {
 
 #[derive(Subcommand, Debug)]
 enum Commands {
+    /// Clean a deployed testnet environment.
+    Clean {
+        /// The name of the environment.
+        #[arg(short = 'n', long)]
+        name: String,
+        /// The cloud provider for the environment.
+        #[clap(long, value_parser = parse_provider, verbatim_doc_comment)]
+        provider: CloudProvider,
+    },
     /// Deploy a new testnet environment using the latest version of the safenode binary.
     Deploy {
         /// Optionally supply the name of a branch on the Github repository to be used for the
@@ -59,6 +68,11 @@ async fn main() -> Result<()> {
 
     let opt = Opt::parse();
     match opt.command {
+        Some(Commands::Clean { name, provider }) => {
+            let testnet_deploy = TestnetDeployBuilder::default().provider(provider).build()?;
+            testnet_deploy.clean(&name).await?;
+            Ok(())
+        }
         Some(Commands::Deploy {
             branch,
             name,
