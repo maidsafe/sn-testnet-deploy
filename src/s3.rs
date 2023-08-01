@@ -6,7 +6,7 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use color_eyre::{eyre::eyre, Result};
+use crate::error::{Error, Result};
 use indicatif::{ProgressBar, ProgressStyle};
 use std::io::Write;
 use std::path::PathBuf;
@@ -46,7 +46,7 @@ impl S3AssetRepository {
             .await?;
         let content_len = response
             .content_length()
-            .ok_or_else(|| eyre!("Could not determine content length for asset"))?;
+            .ok_or_else(|| Error::AssetContentLengthUndetermined)?;
 
         let pb = ProgressBar::new(content_len);
         pb.set_style(
