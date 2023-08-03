@@ -11,12 +11,16 @@ pub type Result<T, E = Error> = std::result::Result<T, E>;
 #[derive(Debug, Error)]
 #[allow(missing_docs)]
 pub enum Error {
+    #[error(transparent)]
+    AddrParseError(#[from] std::net::AddrParseError),
     #[error("Could not determine content length for asset")]
     AssetContentLengthUndetermined,
     #[error("Both the repository owner and branch name must be supplied if either are used")]
     CustomBinConfigError,
     #[error("The '{0}' environment does not exist")]
     EnvironmentDoesNotExist(String),
+    #[error("To provision the remaining nodes the multiaddr of the genesis node must be supplied")]
+    GenesisMultiAddrNotSupplied,
     #[error(transparent)]
     Io(#[from] std::io::Error),
     #[error(transparent)]
@@ -27,4 +31,6 @@ pub enum Error {
     ExternalCommandRunFailed(String),
     #[error(transparent)]
     VarError(#[from] std::env::VarError),
+    #[error(transparent)]
+    SerdeJson(#[from] serde_json::Error),
 }

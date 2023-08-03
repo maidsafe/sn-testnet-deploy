@@ -1912,6 +1912,8 @@ dependencies = [
  "mockall",
  "predicates 2.1.5",
  "reqwest",
+ "serde",
+ "serde_json",
  "tar",
  "thiserror",
  "tokio",

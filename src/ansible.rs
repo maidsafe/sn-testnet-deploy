@@ -8,6 +8,8 @@ use crate::run_external_command;
 use crate::CloudProvider;
 #[cfg(test)]
 use mockall::automock;
+use serde::Deserialize;
+use std::collections::HashMap;
 use std::path::PathBuf;
 
 /// Ansible has multiple 'binaries', e.g., `ansible-playbook`, `ansible-inventory` etc. that are
@@ -38,6 +40,7 @@ impl std::fmt::Display for AnsibleBinary {
 /// Ansible process.
 #[cfg_attr(test, automock)]
 pub trait AnsibleRunnerInterface {
+    fn inventory_list(&self, inventory_path: PathBuf) -> Result<Vec<(String, String)>>;
     fn run_playbook(
         &self,
         playbook_path: PathBuf,
@@ -70,7 +73,52 @@ impl AnsibleRunner {
     }
 }
 
+// The following three structs are utilities that are used to parse the output of the
+// `ansible-inventory` command.
+#[derive(Debug, Deserialize)]
+struct HostVars {
+    ansible_host: String,
+}
+#[derive(Debug, Deserialize)]
+struct Meta {
+    hostvars: HashMap<String, HostVars>,
+}
+#[derive(Debug, Deserialize)]
+struct Output {
+    _meta: Meta,
+}
+
 impl AnsibleRunnerInterface for AnsibleRunner {
+    fn inventory_list(&self, inventory_path: PathBuf) -> Result<Vec<(String, String)>> {
+        let output = run_external_command(
+            PathBuf::from(AnsibleBinary::AnsibleInventory.to_string()),
+            self.working_directory_path.clone(),
+            vec![
+                "--inventory".to_string(),
+                inventory_path.to_string_lossy().to_string(),
+                "--list".to_string(),
+            ],
+            false,
+        )?;
+
+        let mut output_string = output
+            .into_iter()
+            .skip_while(|line| !line.starts_with('{'))
+            .collect::<Vec<String>>()
+            .join("\n");
+        if let Some(end_index) = output_string.rfind('}') {
+            output_string.truncate(end_index + 1);
+        }
+        let parsed: Output = serde_json::from_str(&output_string)?;
+        let inventory: Vec<(String, String)> = parsed
+            ._meta
+            .hostvars
+            .into_iter()
+            .map(|(name, vars)| (name, vars.ansible_host))
+            .collect();
+        Ok(inventory)
+    }
+
     fn run_playbook(
         &self,
         playbook_path: PathBuf,

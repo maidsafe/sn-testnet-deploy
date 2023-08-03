@@ -6,6 +6,7 @@
 
 pub mod ansible;
 pub mod error;
+pub mod rpc_client;
 pub mod s3;
 pub mod terraform;
 
@@ -14,6 +15,7 @@ mod tests;
 
 use crate::ansible::{AnsibleRunner, AnsibleRunnerInterface};
 use crate::error::{Error, Result};
+use crate::rpc_client::{RpcClient, RpcClientInterface};
 use crate::s3::S3AssetRepository;
 use crate::terraform::{TerraformRunner, TerraformRunnerInterface};
 use flate2::read::GzDecoder;
@@ -129,11 +131,16 @@ impl TestnetDeployBuilder {
             ssh_secret_key_path,
             vault_password_path,
         );
+        let rpc_client = RpcClient::new(
+            PathBuf::from("./safenode_rpc_client"),
+            working_directory_path.clone(),
+        );
         let s3_repository = S3AssetRepository::new("https://sn-testnet.s3.eu-west-2.amazonaws.com");
 
         let testnet = TestnetDeploy::new(
             Box::new(terraform_runner),
             Box::new(ansible_runner),
+            Box::new(rpc_client),
             working_directory_path,
             provider.clone(),
             s3_repository,
@@ -146,6 +153,7 @@ impl TestnetDeployBuilder {
 pub struct TestnetDeploy {
     pub terraform_runner: Box<dyn TerraformRunnerInterface>,
     pub ansible_runner: Box<dyn AnsibleRunnerInterface>,
+    pub rpc_client: Box<dyn RpcClientInterface>,
     pub working_directory_path: PathBuf,
     pub cloud_provider: CloudProvider,
     pub s3_repository: S3AssetRepository,
@@ -156,6 +164,7 @@ impl TestnetDeploy {
     pub fn new(
         terraform_runner: Box<dyn TerraformRunnerInterface>,
         ansible_runner: Box<dyn AnsibleRunnerInterface>,
+        rpc_client: Box<dyn RpcClientInterface>,
         working_directory_path: PathBuf,
         cloud_provider: CloudProvider,
         s3_repository: S3AssetRepository,
@@ -167,6 +176,7 @@ impl TestnetDeploy {
         TestnetDeploy {
             terraform_runner,
             ansible_runner,
+            rpc_client,
             working_directory_path,
             cloud_provider,
             s3_repository,
@@ -267,9 +277,36 @@ impl TestnetDeploy {
             PathBuf::from("genesis_node.yml"),
             PathBuf::from("inventory").join(format!(".{name}_genesis_inventory_digital_ocean.yml")),
             "root".to_string(),
-            Some(self.build_extra_vars_doc(name, true)),
+            Some(self.build_extra_vars_doc(name, true, None)?),
         )?;
         Ok(())
+    }
+
+    pub async fn provision_remaining_nodes(
+        &self,
+        name: &str,
+        genesis_multiaddr: String,
+    ) -> Result<()> {
+        println!("Running ansible against remaining nodes...");
+        self.ansible_runner.run_playbook(
+            PathBuf::from("nodes.yml"),
+            PathBuf::from("inventory").join(format!(".{name}_node_inventory_digital_ocean.yml")),
+            "root".to_string(),
+            Some(self.build_extra_vars_doc(name, false, Some(genesis_multiaddr))?),
+        )?;
+        Ok(())
+    }
+
+    pub async fn get_genesis_multiaddr(&self, name: &str) -> Result<String> {
+        let genesis_inventory = self.ansible_runner.inventory_list(
+            PathBuf::from("inventory").join(format!(".{name}_genesis_inventory_digital_ocean.yml")),
+        )?;
+        let genesis_ip = genesis_inventory[0].1.clone();
+        let node_info = self
+            .rpc_client
+            .get_info(format!("{}:12001", genesis_ip).parse()?)?;
+        let multiaddr = format!("/ip4/{}/tcp/12000/p2p/{}", genesis_ip, node_info.peer_id);
+        Ok(multiaddr)
     }
 
     pub async fn deploy(
@@ -283,6 +320,9 @@ impl TestnetDeploy {
             .await?;
         self.provision_genesis_node(name, repo_owner, branch)
             .await?;
+        let multiaddr = self.get_genesis_multiaddr(name).await?;
+        println!("Obtained multiaddr for genesis node: {multiaddr}");
+        self.provision_remaining_nodes(name, multiaddr).await?;
         Ok(())
     }
 
@@ -317,14 +357,31 @@ impl TestnetDeploy {
         Ok(())
     }
 
-    fn build_extra_vars_doc(&self, name: &str, is_genesis: bool) -> String {
-        let extra_vars = r#"
-        {
-          "is_genesis": "__IS_GENESIS__",
-          "provider": "__PROVIDER__",
-          "testnet_name": "__TESTNET_NAME__"
-        }"#;
-        let extra_vars = extra_vars.replace("__IS_GENESIS__", is_genesis.to_string().as_str());
+    fn build_extra_vars_doc(
+        &self,
+        name: &str,
+        is_genesis: bool,
+        genesis_multiaddr: Option<String>,
+    ) -> Result<String> {
+        // Note: the `is_genesis` variable itself is assigned in the playbook.
+        let extra_vars = if is_genesis {
+            r#"
+            {
+              "provider": "__PROVIDER__",
+              "testnet_name": "__TESTNET_NAME__"
+            }"#
+            .to_string()
+        } else {
+            let multiaddr = genesis_multiaddr.ok_or_else(|| Error::GenesisMultiAddrNotSupplied)?;
+            let extra_vars = r#"
+            {
+              "genesis_multiaddr": "__MULTIADDR__",
+              "provider": "__PROVIDER__",
+              "testnet_name": "__TESTNET_NAME__"
+            }"#;
+            let extra_vars = extra_vars.replace("__MULTIADDR__", &multiaddr);
+            extra_vars
+        };
         let extra_vars =
             extra_vars.replace("__PROVIDER__", self.cloud_provider.to_string().as_str());
         let extra_vars = extra_vars.replace("__TESTNET_NAME__", name);
@@ -336,7 +393,7 @@ impl TestnetDeploy {
             .split_whitespace()
             .collect::<Vec<&str>>()
             .join(" ");
-        extra_vars
+        Ok(extra_vars)
     }
 }
 
