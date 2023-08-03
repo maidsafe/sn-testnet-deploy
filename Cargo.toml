@@ -11,6 +11,7 @@ name="testnet-deploy"
 [dependencies]
 clap = { version = "4.2.1", features = ["derive"] }
 color-eyre = "0.6.2"
+dirs-next = "2.0.0"
 dotenv = "0.15.0"
 flate2 = "1.0"
 indicatif = "0.17.3"

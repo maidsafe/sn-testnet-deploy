@@ -1904,6 +1904,7 @@ dependencies = [
  "assert_fs",
  "clap",
  "color-eyre",
+ "dirs-next",
  "dotenv",
  "flate2",
  "httpmock",
