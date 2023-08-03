@@ -4,18 +4,21 @@
 // This SAFE Network Software is licensed under the BSD-3-Clause license.
 // Please see the LICENSE file for more details.
 
+pub mod ansible;
 pub mod error;
 pub mod s3;
 pub mod terraform;
 
+use crate::ansible::{AnsibleRunner, AnsibleRunnerInterface};
 use crate::error::{Error, Result};
 use crate::s3::S3AssetRepository;
 use crate::terraform::{TerraformRunner, TerraformRunnerInterface};
 use flate2::read::GzDecoder;
 use std::fs::File;
-use std::io::BufWriter;
+use std::io::{BufRead, BufReader, BufWriter};
 use std::os::unix::fs::PermissionsExt;
 use std::path::PathBuf;
+use std::process::{Command, Stdio};
 use tar::Archive;
 
 #[derive(Debug, Clone)]
@@ -38,7 +41,10 @@ pub struct TestnetDeployBuilder {
     provider: Option<CloudProvider>,
     state_bucket_name: Option<String>,
     terraform_binary_path: Option<PathBuf>,
+    ansible_binary_path: Option<PathBuf>,
     working_directory_path: Option<PathBuf>,
+    ssh_secret_key_path: Option<PathBuf>,
+    vault_password_path: Option<PathBuf>,
 }
 
 impl TestnetDeployBuilder {
@@ -66,6 +72,16 @@ impl TestnetDeployBuilder {
         self
     }
 
+    pub fn ssh_secret_key_path(&mut self, ssh_secret_key_path: PathBuf) -> &mut Self {
+        self.ssh_secret_key_path = Some(ssh_secret_key_path);
+        self
+    }
+
+    pub fn vault_password_path(&mut self, vault_password_path: PathBuf) -> &mut Self {
+        self.vault_password_path = Some(vault_password_path);
+        self
+    }
+
     pub fn build(&self) -> Result<TestnetDeploy> {
         let provider = self
             .provider
@@ -75,14 +91,26 @@ impl TestnetDeployBuilder {
             Some(ref bucket_name) => bucket_name.clone(),
             None => std::env::var("TERRAFORM_STATE_BUCKET_NAME")?,
         };
+
         let default_terraform_bin_path = PathBuf::from("terraform");
         let terraform_binary_path = self
             .terraform_binary_path
             .as_ref()
             .unwrap_or(&default_terraform_bin_path);
+
         let working_directory_path = match self.working_directory_path {
             Some(ref work_dir_path) => work_dir_path.clone(),
             None => std::env::current_dir()?.join("resources"),
+        };
+
+        let ssh_secret_key_path = match self.ssh_secret_key_path {
+            Some(ref ssh_sk_path) => ssh_sk_path.clone(),
+            None => PathBuf::from(std::env::var("SSH_KEY_PATH")?),
+        };
+
+        let vault_password_path = match self.vault_password_path {
+            Some(ref vault_pw_path) => vault_pw_path.clone(),
+            None => PathBuf::from(std::env::var("ANSIBLE_VAULT_PASSWORD_PATH")?),
         };
 
         let terraform_runner = TerraformRunner::new(
@@ -93,10 +121,17 @@ impl TestnetDeployBuilder {
             provider.clone(),
             &state_bucket_name,
         );
-
+        let ansible_runner = AnsibleRunner::new(
+            working_directory_path.join("ansible"),
+            provider.clone(),
+            ssh_secret_key_path,
+            vault_password_path,
+        );
         let s3_repository = S3AssetRepository::new("https://sn-testnet.s3.eu-west-2.amazonaws.com");
+
         let testnet = TestnetDeploy::new(
             Box::new(terraform_runner),
+            Box::new(ansible_runner),
             working_directory_path,
             provider.clone(),
             s3_repository,
@@ -108,6 +143,7 @@ impl TestnetDeployBuilder {
 
 pub struct TestnetDeploy {
     pub terraform_runner: Box<dyn TerraformRunnerInterface>,
+    pub ansible_runner: Box<dyn AnsibleRunnerInterface>,
     pub working_directory_path: PathBuf,
     pub cloud_provider: CloudProvider,
     pub s3_repository: S3AssetRepository,
@@ -117,15 +153,18 @@ pub struct TestnetDeploy {
 impl TestnetDeploy {
     pub fn new(
         terraform_runner: Box<dyn TerraformRunnerInterface>,
+        ansible_runner: Box<dyn AnsibleRunnerInterface>,
         working_directory_path: PathBuf,
         cloud_provider: CloudProvider,
         s3_repository: S3AssetRepository,
     ) -> TestnetDeploy {
-        let inventory_file_path = working_directory_path.join(PathBuf::from(
-            "ansible/inventory/dev_inventory_digital_ocean.yml",
-        ));
+        let inventory_file_path = working_directory_path
+            .join("ansible")
+            .join("inventory")
+            .join("dev_inventory_digital_ocean.yml");
         TestnetDeploy {
             terraform_runner,
+            ansible_runner,
             working_directory_path,
             cloud_provider,
             s3_repository,
@@ -216,6 +255,13 @@ impl TestnetDeploy {
         ];
         println!("Running terraform apply...");
         self.terraform_runner.apply(args)?;
+        println!("Running ansible against genesis node...");
+        self.ansible_runner.run_playbook(
+            PathBuf::from("genesis_node.yml"),
+            PathBuf::from("inventory").join(format!(".{name}_genesis_inventory_digital_ocean.yml")),
+            "root".to_string(),
+            Some(self.build_extra_vars_doc(name, true)),
+        )?;
         Ok(())
     }
 
@@ -249,11 +295,82 @@ impl TestnetDeploy {
         println!("Deleted Ansible inventory for {name}");
         Ok(())
     }
+
+    fn build_extra_vars_doc(&self, name: &str, is_genesis: bool) -> String {
+        let extra_vars = r#"
+        {
+          "is_genesis": "__IS_GENESIS__",
+          "provider": "__PROVIDER__",
+          "testnet_name": "__TESTNET_NAME__"
+        }"#;
+        let extra_vars = extra_vars.replace("__IS_GENESIS__", is_genesis.to_string().as_str());
+        let extra_vars =
+            extra_vars.replace("__PROVIDER__", self.cloud_provider.to_string().as_str());
+        let extra_vars = extra_vars.replace("__TESTNET_NAME__", name);
+
+        // Return the document back as a single line string for use as an argument to Ansible.
+        // It's defined as a multiline string just for human readability.
+        let extra_vars = extra_vars.replace("\n", "").replace("\r", "");
+        let extra_vars = extra_vars
+            .split_whitespace()
+            .collect::<Vec<&str>>()
+            .join(" ");
+        extra_vars
+    }
+}
+
+pub fn run_external_command(
+    binary_path: PathBuf,
+    working_directory_path: PathBuf,
+    args: Vec<String>,
+    suppress_output: bool,
+) -> Result<Vec<String>> {
+    let mut command = Command::new(binary_path.clone());
+    for arg in args {
+        command.arg(arg);
+    }
+    command.stdout(Stdio::piped());
+    command.stderr(Stdio::piped());
+    command.current_dir(working_directory_path);
+    let mut child = command.spawn()?;
+    let mut output_lines = Vec::new();
+
+    if let Some(ref mut stdout) = child.stdout {
+        let reader = BufReader::new(stdout);
+        for line in reader.lines() {
+            let line = line?;
+            if !suppress_output {
+                println!("{}", &line);
+            }
+            output_lines.push(line);
+        }
+    }
+
+    if let Some(ref mut stderr) = child.stderr {
+        let reader = BufReader::new(stderr);
+        for line in reader.lines() {
+            let line = line?;
+            if !suppress_output {
+                println!("{}", &line);
+            }
+            output_lines.push(line);
+        }
+    }
+
+    let output = child.wait()?;
+    if !output.success() {
+        // Using `unwrap` here avoids introducing another error variant, which seems excessive.
+        let binary_path = binary_path.to_str().unwrap();
+        return Err(Error::ExternalCommandRunFailed(binary_path.to_string()));
+    }
+
+    Ok(output_lines)
 }
 
 #[cfg(test)]
 mod test {
     use super::*;
+    use crate::ansible::MockAnsibleRunnerInterface;
     use crate::s3::S3AssetRepository;
     use crate::terraform::MockTerraformRunnerInterface;
     use assert_fs::fixture::ChildPath;
@@ -297,7 +414,25 @@ mod test {
         Ok((rpc_client_archive, rpc_client_archive_metadata))
     }
 
-    fn setup_default_terraform_runner() -> MockTerraformRunnerInterface {
+    fn setup_default_ansible_runner(name: &str) -> MockAnsibleRunnerInterface {
+        let mut ansible_runner = MockAnsibleRunnerInterface::new();
+        ansible_runner
+            .expect_run_playbook()
+            .times(1)
+            .with(
+                eq(PathBuf::from("genesis_node.yml")),
+                eq(PathBuf::from("inventory")
+                    .join(format!(".{name}_genesis_inventory_digital_ocean.yml"))),
+                eq("root".to_string()),
+                eq(Some(
+                    "{ \"is_genesis\": \"True\", \"provider\": \"digital-ocean\" }".to_string(),
+                )),
+            )
+            .returning(|_, _, _, _| Ok(()));
+        ansible_runner
+    }
+
+    fn setup_default_terraform_runner(name: &str) -> MockTerraformRunnerInterface {
         let mut terraform_runner = MockTerraformRunnerInterface::new();
         terraform_runner.expect_init().times(1).returning(|| Ok(()));
         terraform_runner
@@ -307,7 +442,7 @@ mod test {
         terraform_runner
             .expect_workspace_new()
             .times(1)
-            .with(eq("alpha".to_string()))
+            .with(eq(name.to_string()))
             .returning(|_| Ok(()));
         terraform_runner
     }
@@ -349,6 +484,7 @@ mod test {
         let s3_repository = setup_default_s3_repository(&working_dir)?;
         let testnet = TestnetDeploy::new(
             Box::new(terraform_runner),
+            Box::new(MockAnsibleRunnerInterface::new()),
             working_dir.to_path_buf(),
             CloudProvider::DigitalOcean,
             s3_repository,
@@ -383,6 +519,7 @@ mod test {
         let s3_repository = setup_default_s3_repository(&working_dir)?;
         let testnet = TestnetDeploy::new(
             Box::new(terraform_runner),
+            Box::new(MockAnsibleRunnerInterface::new()),
             working_dir.to_path_buf(),
             CloudProvider::DigitalOcean,
             s3_repository,
@@ -429,9 +566,10 @@ mod test {
 
         let extracted_rpc_client_bin = working_dir.child(RPC_CLIENT_BIN_NAME);
         let s3_repository = S3AssetRepository::new(&asset_server.base_url());
-        let terraform_runner = setup_default_terraform_runner();
+        let terraform_runner = setup_default_terraform_runner("alpha");
         let testnet = TestnetDeploy::new(
             Box::new(terraform_runner),
+            Box::new(MockAnsibleRunnerInterface::new()),
             working_dir.to_path_buf(),
             CloudProvider::DigitalOcean,
             s3_repository,
@@ -471,9 +609,10 @@ mod test {
         });
         let s3_repository = S3AssetRepository::new(&asset_server.base_url());
 
-        let terraform_runner = setup_default_terraform_runner();
+        let terraform_runner = setup_default_terraform_runner("alpha");
         let testnet = TestnetDeploy::new(
             Box::new(terraform_runner),
+            Box::new(MockAnsibleRunnerInterface::new()),
             working_dir.to_path_buf(),
             CloudProvider::DigitalOcean,
             s3_repository,
@@ -490,10 +629,11 @@ mod test {
     ) -> Result<()> {
         let (tmp_dir, working_dir) = setup_working_directory()?;
         let s3_repository = setup_default_s3_repository(&working_dir)?;
-        let terraform_runner = setup_default_terraform_runner();
+        let terraform_runner = setup_default_terraform_runner("alpha");
 
         let testnet = TestnetDeploy::new(
             Box::new(terraform_runner),
+            Box::new(MockAnsibleRunnerInterface::new()),
             working_dir.to_path_buf(),
             CloudProvider::DigitalOcean,
             s3_repository,
@@ -549,6 +689,7 @@ mod test {
 
         let testnet = TestnetDeploy::new(
             Box::new(terraform_runner),
+            Box::new(MockAnsibleRunnerInterface::new()),
             working_dir.to_path_buf(),
             CloudProvider::DigitalOcean,
             s3_repository,
@@ -594,6 +735,7 @@ mod test {
 
         let testnet = TestnetDeploy::new(
             Box::new(terraform_runner),
+            Box::new(setup_default_ansible_runner("beta")),
             working_dir.to_path_buf(),
             CloudProvider::DigitalOcean,
             s3_repository,
@@ -627,6 +769,7 @@ mod test {
 
         let testnet = TestnetDeploy::new(
             Box::new(terraform_runner),
+            Box::new(setup_default_ansible_runner("beta")),
             working_dir.to_path_buf(),
             CloudProvider::DigitalOcean,
             s3_repository,
@@ -661,6 +804,7 @@ mod test {
 
         let testnet = TestnetDeploy::new(
             Box::new(terraform_runner),
+            Box::new(MockAnsibleRunnerInterface::new()),
             working_dir.to_path_buf(),
             CloudProvider::DigitalOcean,
             s3_repository,
@@ -702,6 +846,7 @@ mod test {
 
         let testnet = TestnetDeploy::new(
             Box::new(terraform_runner),
+            Box::new(MockAnsibleRunnerInterface::new()),
             working_dir.to_path_buf(),
             CloudProvider::DigitalOcean,
             s3_repository,
@@ -728,11 +873,58 @@ mod test {
     }
 
     #[tokio::test]
+    async fn deploy_should_run_ansible_against_genesis_then_remaining_nodes() -> Result<()> {
+        let (tmp_dir, working_dir) = setup_working_directory()?;
+        let s3_repository = setup_default_s3_repository(&working_dir)?;
+        let mut terraform_runner = setup_default_terraform_runner("beta");
+        terraform_runner
+            .expect_workspace_select()
+            .times(1)
+            .with(eq("beta".to_string()))
+            .returning(|_| Ok(()));
+        terraform_runner
+            .expect_apply()
+            .times(1)
+            .with(eq(vec![
+                ("node_count".to_string(), "30".to_string()),
+                ("use_custom_bin".to_string(), "false".to_string()),
+            ]))
+            .returning(|_| Ok(()));
+        let mut ansible_runner = MockAnsibleRunnerInterface::new();
+        ansible_runner
+            .expect_run_playbook()
+            .times(1)
+            .with(
+                eq(PathBuf::from("genesis_node.yml")),
+                eq(PathBuf::from("inventory").join(".beta_genesis_inventory_digital_ocean.yml")),
+                eq("root".to_string()),
+                eq(Some(
+                    "{ \"is_genesis\": \"true\", \"provider\": \"digital-ocean\" }".to_string(),
+                )),
+            )
+            .returning(|_, _, _, _| Ok(()));
+
+        let testnet = TestnetDeploy::new(
+            Box::new(terraform_runner),
+            Box::new(ansible_runner),
+            working_dir.to_path_buf(),
+            CloudProvider::DigitalOcean,
+            s3_repository,
+        );
+
+        testnet.init("beta").await?;
+        testnet.deploy("beta", 30, None, None).await?;
+
+        drop(tmp_dir);
+        Ok(())
+    }
+
+    #[tokio::test]
     async fn clean_should_run_terraform_destroy_and_delete_workspace_and_delete_inventory_files(
     ) -> Result<()> {
         let (tmp_dir, working_dir) = setup_working_directory()?;
         let s3_repository = setup_default_s3_repository(&working_dir)?;
-        let mut terraform_runner = setup_default_terraform_runner();
+        let mut terraform_runner = setup_default_terraform_runner("alpha");
         let mut seq = Sequence::new();
         terraform_runner
             .expect_workspace_list()
@@ -768,6 +960,7 @@ mod test {
 
         let testnet = TestnetDeploy::new(
             Box::new(terraform_runner),
+            Box::new(MockAnsibleRunnerInterface::new()),
             working_dir.to_path_buf(),
             CloudProvider::DigitalOcean,
             s3_repository,
@@ -809,6 +1002,7 @@ mod test {
 
         let testnet = TestnetDeploy::new(
             Box::new(terraform_runner),
+            Box::new(MockAnsibleRunnerInterface::new()),
             working_dir.to_path_buf(),
             CloudProvider::DigitalOcean,
             s3_repository,

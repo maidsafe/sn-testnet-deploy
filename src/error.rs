@@ -23,8 +23,8 @@ pub enum Error {
     Reqwest(#[from] reqwest::Error),
     #[error(transparent)]
     TemplateError(#[from] indicatif::style::TemplateError),
-    #[error("Terraform run failed")]
-    TerraformRunFailed,
+    #[error("Command executed with {0} failed. See output for details.")]
+    ExternalCommandRunFailed(String),
     #[error(transparent)]
     VarError(#[from] std::env::VarError),
 }
