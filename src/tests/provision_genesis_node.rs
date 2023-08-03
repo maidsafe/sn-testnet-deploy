@@ -1,6 +1,7 @@
 use super::super::{CloudProvider, TestnetDeploy};
 use super::setup::*;
 use crate::ansible::MockAnsibleRunnerInterface;
+use crate::rpc_client::MockRpcClientInterface;
 use crate::terraform::MockTerraformRunnerInterface;
 use color_eyre::{eyre::eyre, Result};
 use mockall::predicate::*;
@@ -19,7 +20,7 @@ async fn should_run_ansible_against_genesis() -> Result<()> {
             eq(PathBuf::from("inventory").join(".beta_genesis_inventory_digital_ocean.yml")),
             eq("root".to_string()),
             eq(Some(
-                "{ \"is_genesis\": \"true\", \"provider\": \"digital-ocean\", \"testnet_name\": \"beta\" }".to_string(),
+                "{ \"provider\": \"digital-ocean\", \"testnet_name\": \"beta\" }".to_string(),
             )),
         )
         .returning(|_, _, _, _| Ok(()));
@@ -27,6 +28,7 @@ async fn should_run_ansible_against_genesis() -> Result<()> {
     let testnet = TestnetDeploy::new(
         Box::new(setup_default_terraform_runner("beta")),
         Box::new(ansible_runner),
+        Box::new(MockRpcClientInterface::new()),
         working_dir.to_path_buf(),
         CloudProvider::DigitalOcean,
         s3_repository,
@@ -47,6 +49,7 @@ async fn should_ensure_branch_is_set_if_repo_owner_is_used() -> Result<()> {
     let testnet = TestnetDeploy::new(
         Box::new(MockTerraformRunnerInterface::new()),
         Box::new(MockAnsibleRunnerInterface::new()),
+        Box::new(MockRpcClientInterface::new()),
         working_dir.to_path_buf(),
         CloudProvider::DigitalOcean,
         s3_repository,
@@ -80,6 +83,7 @@ async fn should_ensure_repo_owner_is_set_if_branch_is_used() -> Result<()> {
     let testnet = TestnetDeploy::new(
         Box::new(MockTerraformRunnerInterface::new()),
         Box::new(MockAnsibleRunnerInterface::new()),
+        Box::new(MockRpcClientInterface::new()),
         working_dir.to_path_buf(),
         CloudProvider::DigitalOcean,
         s3_repository,

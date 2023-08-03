@@ -1,5 +1,4 @@
 use super::*;
-use crate::ansible::MockAnsibleRunnerInterface;
 use crate::s3::S3AssetRepository;
 use crate::terraform::MockTerraformRunnerInterface;
 use assert_fs::fixture::ChildPath;
@@ -11,7 +10,6 @@ use flate2::Compression;
 use httpmock::prelude::*;
 use mockall::predicate::*;
 use std::fs::{File, Metadata};
-use std::path::PathBuf;
 
 pub fn setup_working_directory() -> Result<(TempDir, ChildPath)> {
     let tmp_dir = assert_fs::TempDir::new()?;
@@ -38,24 +36,6 @@ pub fn create_fake_rpc_client_archive(working_dir: &ChildPath) -> Result<(ChildP
     let rpc_client_archive_metadata = std::fs::metadata(rpc_client_archive.path())?;
 
     Ok((rpc_client_archive, rpc_client_archive_metadata))
-}
-
-pub fn setup_default_ansible_runner(name: &str) -> MockAnsibleRunnerInterface {
-    let mut ansible_runner = MockAnsibleRunnerInterface::new();
-    ansible_runner
-        .expect_run_playbook()
-        .times(1)
-        .with(
-            eq(PathBuf::from("genesis_node.yml")),
-            eq(PathBuf::from("inventory")
-                .join(format!(".{name}_genesis_inventory_digital_ocean.yml"))),
-            eq("root".to_string()),
-            eq(Some(format!(
-                "{{ \"is_genesis\": \"true\", \"provider\": \"digital-ocean\", \"testnet_name\": \"{name}\" }}"
-            ))),
-        )
-        .returning(|_, _, _, _| Ok(()));
-    ansible_runner
 }
 
 pub fn setup_default_terraform_runner(name: &str) -> MockTerraformRunnerInterface {
