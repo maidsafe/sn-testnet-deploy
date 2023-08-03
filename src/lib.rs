@@ -235,10 +235,26 @@ impl TestnetDeploy {
         Ok(())
     }
 
-    pub async fn deploy(
+    pub async fn create_infra(
         &self,
         name: &str,
-        node_count: u16,
+        vm_count: u16,
+        enable_build_vm: bool,
+    ) -> Result<()> {
+        println!("Selecting {name} workspace...");
+        self.terraform_runner.workspace_select(name)?;
+        let args = vec![
+            ("node_count".to_string(), vm_count.to_string()),
+            ("use_custom_bin".to_string(), enable_build_vm.to_string()),
+        ];
+        println!("Running terraform apply...");
+        self.terraform_runner.apply(args)?;
+        Ok(())
+    }
+
+    pub async fn provision_genesis_node(
+        &self,
+        name: &str,
         repo_owner: Option<String>,
         branch: Option<String>,
     ) -> Result<()> {
@@ -246,17 +262,6 @@ impl TestnetDeploy {
         {
             return Err(Error::CustomBinConfigError);
         }
-        println!("Selecting {name} workspace...");
-        self.terraform_runner.workspace_select(name)?;
-        let args = vec![
-            ("node_count".to_string(), node_count.to_string()),
-            (
-                "use_custom_bin".to_string(),
-                repo_owner.is_some().to_string(),
-            ),
-        ];
-        println!("Running terraform apply...");
-        self.terraform_runner.apply(args)?;
         println!("Running ansible against genesis node...");
         self.ansible_runner.run_playbook(
             PathBuf::from("genesis_node.yml"),
@@ -264,6 +269,20 @@ impl TestnetDeploy {
             "root".to_string(),
             Some(self.build_extra_vars_doc(name, true)),
         )?;
+        Ok(())
+    }
+
+    pub async fn deploy(
+        &self,
+        name: &str,
+        node_count: u16,
+        repo_owner: Option<String>,
+        branch: Option<String>,
+    ) -> Result<()> {
+        self.create_infra(name, node_count, repo_owner.is_some())
+            .await?;
+        self.provision_genesis_node(name, repo_owner, branch)
+            .await?;
         Ok(())
     }
 
