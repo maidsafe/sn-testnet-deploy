@@ -55,6 +55,9 @@ enum Commands {
         /// The name of the environment
         #[arg(short = 'n', long)]
         name: String,
+        /// The number of safenode processes to run on each VM.
+        #[clap(long, default_value = "20")]
+        node_count: u16,
         /// The cloud provider to deploy to.
         ///
         /// Valid values are "aws" or "digital-ocean".
@@ -63,7 +66,7 @@ enum Commands {
         /// The number of node VMs to create.
         ///
         /// Each VM will run many safenode processes.
-        #[clap(short = 'c', long, default_value = "10")]
+        #[clap(long, default_value = "10")]
         vm_count: u16,
     },
 }
@@ -82,6 +85,7 @@ async fn main() -> Result<()> {
         Some(Commands::Deploy {
             branch,
             name,
+            node_count,
             provider,
             repo_owner,
             vm_count,
@@ -89,7 +93,7 @@ async fn main() -> Result<()> {
             let testnet_deploy = TestnetDeployBuilder::default().provider(provider).build()?;
             testnet_deploy.init(&name).await?;
             testnet_deploy
-                .deploy(&name, vm_count, branch, repo_owner)
+                .deploy(&name, vm_count, node_count, branch, repo_owner)
                 .await?;
             Ok(())
         }
