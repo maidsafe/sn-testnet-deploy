@@ -19,6 +19,8 @@ pub enum Error {
     CustomBinConfigError,
     #[error("The '{0}' environment does not exist")]
     EnvironmentDoesNotExist(String),
+    #[error("Command executed with {0} failed. See output for details.")]
+    ExternalCommandRunFailed(String),
     #[error("To provision the remaining nodes the multiaddr of the genesis node must be supplied")]
     GenesisMultiAddrNotSupplied,
     #[error(transparent)]
@@ -27,10 +29,10 @@ pub enum Error {
     Reqwest(#[from] reqwest::Error),
     #[error(transparent)]
     TemplateError(#[from] indicatif::style::TemplateError),
-    #[error("Command executed with {0} failed. See output for details.")]
-    ExternalCommandRunFailed(String),
-    #[error(transparent)]
-    VarError(#[from] std::env::VarError),
     #[error(transparent)]
     SerdeJson(#[from] serde_json::Error),
+    #[error("After several retry attempts an SSH connection could not be established")]
+    SshUnavailable,
+    #[error(transparent)]
+    VarError(#[from] std::env::VarError),
 }

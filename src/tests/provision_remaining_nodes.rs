@@ -2,6 +2,7 @@ use super::super::{CloudProvider, TestnetDeploy};
 use super::setup::*;
 use crate::ansible::MockAnsibleRunnerInterface;
 use crate::rpc_client::MockRpcClientInterface;
+use crate::ssh::MockSshClientInterface;
 use color_eyre::Result;
 use mockall::predicate::*;
 use std::path::PathBuf;
@@ -28,6 +29,7 @@ async fn should_run_ansible_against_the_remaining_nodes() -> Result<()> {
         Box::new(setup_default_terraform_runner("beta")),
         Box::new(ansible_runner),
         Box::new(MockRpcClientInterface::new()),
+        Box::new(MockSshClientInterface::new()),
         working_dir.to_path_buf(),
         CloudProvider::DigitalOcean,
         s3_repository,

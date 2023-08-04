@@ -8,6 +8,7 @@ pub mod ansible;
 pub mod error;
 pub mod rpc_client;
 pub mod s3;
+pub mod ssh;
 pub mod terraform;
 
 #[cfg(test)]
@@ -17,6 +18,7 @@ use crate::ansible::{AnsibleRunner, AnsibleRunnerInterface};
 use crate::error::{Error, Result};
 use crate::rpc_client::{RpcClient, RpcClientInterface};
 use crate::s3::S3AssetRepository;
+use crate::ssh::{SshClient, SshClientInterface};
 use crate::terraform::{TerraformRunner, TerraformRunnerInterface};
 use flate2::read::GzDecoder;
 use std::fs::File;
@@ -128,7 +130,7 @@ impl TestnetDeployBuilder {
         let ansible_runner = AnsibleRunner::new(
             working_directory_path.join("ansible"),
             provider.clone(),
-            ssh_secret_key_path,
+            ssh_secret_key_path.clone(),
             vault_password_path,
         );
         let rpc_client = RpcClient::new(
@@ -141,6 +143,7 @@ impl TestnetDeployBuilder {
             Box::new(terraform_runner),
             Box::new(ansible_runner),
             Box::new(rpc_client),
+            Box::new(SshClient::new(ssh_secret_key_path)),
             working_directory_path,
             provider.clone(),
             s3_repository,
@@ -154,6 +157,7 @@ pub struct TestnetDeploy {
     pub terraform_runner: Box<dyn TerraformRunnerInterface>,
     pub ansible_runner: Box<dyn AnsibleRunnerInterface>,
     pub rpc_client: Box<dyn RpcClientInterface>,
+    pub ssh_client: Box<dyn SshClientInterface>,
     pub working_directory_path: PathBuf,
     pub cloud_provider: CloudProvider,
     pub s3_repository: S3AssetRepository,
@@ -165,6 +169,7 @@ impl TestnetDeploy {
         terraform_runner: Box<dyn TerraformRunnerInterface>,
         ansible_runner: Box<dyn AnsibleRunnerInterface>,
         rpc_client: Box<dyn RpcClientInterface>,
+        ssh_client: Box<dyn SshClientInterface>,
         working_directory_path: PathBuf,
         cloud_provider: CloudProvider,
         s3_repository: S3AssetRepository,
@@ -177,6 +182,7 @@ impl TestnetDeploy {
             terraform_runner,
             ansible_runner,
             rpc_client,
+            ssh_client,
             working_directory_path,
             cloud_provider,
             s3_repository,
@@ -272,6 +278,14 @@ impl TestnetDeploy {
         {
             return Err(Error::CustomBinConfigError);
         }
+
+        let genesis_inventory = self.ansible_runner.inventory_list(
+            PathBuf::from("inventory").join(format!(".{name}_genesis_inventory_digital_ocean.yml")),
+        )?;
+        let genesis_ip = genesis_inventory[0].1.clone();
+        self.ssh_client
+            .wait_for_ssh_availability(&genesis_ip, "root")?;
+
         println!("Running ansible against genesis node...");
         self.ansible_runner.run_playbook(
             PathBuf::from("genesis_node.yml"),
@@ -395,6 +409,8 @@ impl TestnetDeploy {
             .join(" ");
         Ok(extra_vars)
     }
+
+    // fn wait_for_ssh()
 }
 
 pub fn run_external_command(
