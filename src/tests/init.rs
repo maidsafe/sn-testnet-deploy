@@ -4,6 +4,7 @@ use super::RPC_CLIENT_BIN_NAME;
 use crate::ansible::MockAnsibleRunnerInterface;
 use crate::rpc_client::MockRpcClientInterface;
 use crate::s3::S3AssetRepository;
+use crate::ssh::MockSshClientInterface;
 use crate::terraform::MockTerraformRunnerInterface;
 use assert_fs::prelude::*;
 use color_eyre::Result;
@@ -34,6 +35,7 @@ async fn should_create_a_new_workspace() -> Result<()> {
         Box::new(terraform_runner),
         Box::new(MockAnsibleRunnerInterface::new()),
         Box::new(MockRpcClientInterface::new()),
+        Box::new(MockSshClientInterface::new()),
         working_dir.to_path_buf(),
         CloudProvider::DigitalOcean,
         s3_repository,
@@ -69,6 +71,7 @@ async fn should_not_create_a_new_workspace_when_one_with_the_same_name_exists() 
         Box::new(terraform_runner),
         Box::new(MockAnsibleRunnerInterface::new()),
         Box::new(MockRpcClientInterface::new()),
+        Box::new(MockSshClientInterface::new()),
         working_dir.to_path_buf(),
         CloudProvider::DigitalOcean,
         s3_repository,
@@ -120,6 +123,7 @@ async fn should_download_and_extract_the_rpc_client() -> Result<()> {
         Box::new(terraform_runner),
         Box::new(MockAnsibleRunnerInterface::new()),
         Box::new(MockRpcClientInterface::new()),
+        Box::new(MockSshClientInterface::new()),
         working_dir.to_path_buf(),
         CloudProvider::DigitalOcean,
         s3_repository,
@@ -164,6 +168,7 @@ async fn should_not_download_the_rpc_client_if_it_already_exists() -> Result<()>
         Box::new(terraform_runner),
         Box::new(MockAnsibleRunnerInterface::new()),
         Box::new(MockRpcClientInterface::new()),
+        Box::new(MockSshClientInterface::new()),
         working_dir.to_path_buf(),
         CloudProvider::DigitalOcean,
         s3_repository,
@@ -185,6 +190,7 @@ async fn should_generate_ansible_inventory_for_digital_ocean_for_the_new_testnet
         Box::new(terraform_runner),
         Box::new(MockAnsibleRunnerInterface::new()),
         Box::new(MockRpcClientInterface::new()),
+        Box::new(MockSshClientInterface::new()),
         working_dir.to_path_buf(),
         CloudProvider::DigitalOcean,
         s3_repository,
@@ -242,6 +248,7 @@ async fn should_not_overwrite_generated_inventory() -> Result<()> {
         Box::new(terraform_runner),
         Box::new(MockAnsibleRunnerInterface::new()),
         Box::new(MockRpcClientInterface::new()),
+        Box::new(MockSshClientInterface::new()),
         working_dir.to_path_buf(),
         CloudProvider::DigitalOcean,
         s3_repository,

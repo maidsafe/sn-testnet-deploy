@@ -2,6 +2,7 @@ use super::super::{CloudProvider, TestnetDeploy};
 use super::setup::*;
 use crate::ansible::MockAnsibleRunnerInterface;
 use crate::rpc_client::{MockRpcClientInterface, NodeInfo};
+use crate::ssh::MockSshClientInterface;
 use crate::terraform::MockTerraformRunnerInterface;
 use color_eyre::Result;
 use mockall::predicate::*;
@@ -40,6 +41,7 @@ async fn should_return_the_genesis_multiaddr() -> Result<()> {
         Box::new(MockTerraformRunnerInterface::new()),
         Box::new(ansible_runner),
         Box::new(rpc_client),
+        Box::new(MockSshClientInterface::new()),
         working_dir.to_path_buf(),
         CloudProvider::DigitalOcean,
         s3_repository,

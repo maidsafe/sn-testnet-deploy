@@ -2,6 +2,7 @@ use super::super::{CloudProvider, TestnetDeploy};
 use super::setup::*;
 use crate::ansible::MockAnsibleRunnerInterface;
 use crate::rpc_client::MockRpcClientInterface;
+use crate::ssh::MockSshClientInterface;
 use crate::terraform::MockTerraformRunnerInterface;
 use color_eyre::Result;
 use mockall::predicate::*;
@@ -29,6 +30,7 @@ async fn should_run_terraform_apply() -> Result<()> {
         Box::new(terraform_runner),
         Box::new(MockAnsibleRunnerInterface::new()),
         Box::new(MockRpcClientInterface::new()),
+        Box::new(MockSshClientInterface::new()),
         working_dir.to_path_buf(),
         CloudProvider::DigitalOcean,
         s3_repository,
@@ -63,6 +65,7 @@ async fn should_run_terraform_apply_with_custom_bin_set_when_repo_is_supplied() 
         Box::new(terraform_runner),
         Box::new(MockAnsibleRunnerInterface::new()),
         Box::new(MockRpcClientInterface::new()),
+        Box::new(MockSshClientInterface::new()),
         working_dir.to_path_buf(),
         CloudProvider::DigitalOcean,
         s3_repository,
