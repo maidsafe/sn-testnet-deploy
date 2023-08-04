@@ -291,7 +291,7 @@ impl TestnetDeploy {
             PathBuf::from("genesis_node.yml"),
             PathBuf::from("inventory").join(format!(".{name}_genesis_inventory_digital_ocean.yml")),
             "root".to_string(),
-            Some(self.build_extra_vars_doc(name, true, None)?),
+            Some(self.build_extra_vars_doc(name, true, None, None)?),
         )?;
         Ok(())
     }
@@ -300,13 +300,19 @@ impl TestnetDeploy {
         &self,
         name: &str,
         genesis_multiaddr: String,
+        node_instance_count: u16,
     ) -> Result<()> {
         println!("Running ansible against remaining nodes...");
         self.ansible_runner.run_playbook(
             PathBuf::from("nodes.yml"),
             PathBuf::from("inventory").join(format!(".{name}_node_inventory_digital_ocean.yml")),
             "root".to_string(),
-            Some(self.build_extra_vars_doc(name, false, Some(genesis_multiaddr))?),
+            Some(self.build_extra_vars_doc(
+                name,
+                false,
+                Some(genesis_multiaddr),
+                Some(node_instance_count),
+            )?),
         )?;
         Ok(())
     }
@@ -326,17 +332,19 @@ impl TestnetDeploy {
     pub async fn deploy(
         &self,
         name: &str,
-        node_count: u16,
+        vm_count: u16,
+        node_instance_count: u16,
         repo_owner: Option<String>,
         branch: Option<String>,
     ) -> Result<()> {
-        self.create_infra(name, node_count, repo_owner.is_some())
+        self.create_infra(name, vm_count, repo_owner.is_some())
             .await?;
         self.provision_genesis_node(name, repo_owner, branch)
             .await?;
         let multiaddr = self.get_genesis_multiaddr(name).await?;
         println!("Obtained multiaddr for genesis node: {multiaddr}");
-        self.provision_remaining_nodes(name, multiaddr).await?;
+        self.provision_remaining_nodes(name, multiaddr, node_instance_count)
+            .await?;
         Ok(())
     }
 
@@ -376,6 +384,7 @@ impl TestnetDeploy {
         name: &str,
         is_genesis: bool,
         genesis_multiaddr: Option<String>,
+        node_instance_count: Option<u16>,
     ) -> Result<String> {
         // Note: the `is_genesis` variable itself is assigned in the playbook.
         let extra_vars = if is_genesis {
@@ -390,10 +399,15 @@ impl TestnetDeploy {
             let extra_vars = r#"
             {
               "genesis_multiaddr": "__MULTIADDR__",
+              "node_instance_count": "__NODE_INSTANCE_COUNT__",
               "provider": "__PROVIDER__",
               "testnet_name": "__TESTNET_NAME__"
             }"#;
             let extra_vars = extra_vars.replace("__MULTIADDR__", &multiaddr);
+            let extra_vars = extra_vars.replace(
+                "__NODE_INSTANCE_COUNT__",
+                &node_instance_count.unwrap_or(20).to_string(),
+            );
             extra_vars
         };
         let extra_vars =
@@ -409,8 +423,6 @@ impl TestnetDeploy {
             .join(" ");
         Ok(extra_vars)
     }
-
-    // fn wait_for_ssh()
 }
 
 pub fn run_external_command(

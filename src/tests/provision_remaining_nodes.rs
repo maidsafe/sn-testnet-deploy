@@ -20,7 +20,7 @@ async fn should_run_ansible_against_the_remaining_nodes() -> Result<()> {
             eq(PathBuf::from("inventory").join(".beta_node_inventory_digital_ocean.yml")),
             eq("root".to_string()),
             eq(Some(
-                "{ \"genesis_multiaddr\": \"/ip4/10.0.0.10/tcp/12000/p2p/12D3KooWLvmkUDQRthtZv9CrzozRLk9ZVEHXgmx6UxVMiho5aded\", \"provider\": \"digital-ocean\", \"testnet_name\": \"beta\" }".to_string(),
+                "{ \"genesis_multiaddr\": \"/ip4/10.0.0.10/tcp/12000/p2p/12D3KooWLvmkUDQRthtZv9CrzozRLk9ZVEHXgmx6UxVMiho5aded\", \"node_instance_count\": \"30\", \"provider\": \"digital-ocean\", \"testnet_name\": \"beta\" }".to_string(),
             )),
         )
         .returning(|_, _, _, _| Ok(()));
@@ -41,6 +41,7 @@ async fn should_run_ansible_against_the_remaining_nodes() -> Result<()> {
             "beta",
             "/ip4/10.0.0.10/tcp/12000/p2p/12D3KooWLvmkUDQRthtZv9CrzozRLk9ZVEHXgmx6UxVMiho5aded"
                 .to_string(),
+            30,
         )
         .await?;
 
