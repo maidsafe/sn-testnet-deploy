@@ -93,7 +93,7 @@ async fn main() -> Result<()> {
             let testnet_deploy = TestnetDeployBuilder::default().provider(provider).build()?;
             testnet_deploy.init(&name).await?;
             testnet_deploy
-                .deploy(&name, vm_count, node_count, branch, repo_owner)
+                .deploy(&name, vm_count, node_count, repo_owner, branch)
                 .await?;
             Ok(())
         }

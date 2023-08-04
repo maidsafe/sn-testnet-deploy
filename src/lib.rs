@@ -268,30 +268,53 @@ impl TestnetDeploy {
         Ok(())
     }
 
+    pub async fn build_custom_safenode(
+        &self,
+        name: &str,
+        repo_owner: &str,
+        branch: &str,
+    ) -> Result<()> {
+        let build_inventory = self.ansible_runner.inventory_list(
+            PathBuf::from("inventory").join(format!(".{name}_build_inventory_digital_ocean.yml")),
+        )?;
+        let build_ip = build_inventory[0].1.clone();
+        self.ssh_client
+            .wait_for_ssh_availability(&build_ip, "root")?;
+
+        println!("Running ansible against build VM...");
+        self.ansible_runner.run_playbook(
+            PathBuf::from("build.yml"),
+            PathBuf::from("inventory").join(format!(".{name}_build_inventory_digital_ocean.yml")),
+            "root".to_string(),
+            Some(format!(
+                "{{ \"branch\": \"{branch}\", \"org\": \"{repo_owner}\", \"provider\": \"{}\" }}",
+                self.cloud_provider
+            )),
+        )?;
+        Ok(())
+    }
+
     pub async fn provision_genesis_node(
         &self,
         name: &str,
         repo_owner: Option<String>,
         branch: Option<String>,
     ) -> Result<()> {
-        if (repo_owner.is_some() && branch.is_none()) || (branch.is_some() && repo_owner.is_none())
-        {
-            return Err(Error::CustomBinConfigError);
-        }
-
         let genesis_inventory = self.ansible_runner.inventory_list(
             PathBuf::from("inventory").join(format!(".{name}_genesis_inventory_digital_ocean.yml")),
         )?;
         let genesis_ip = genesis_inventory[0].1.clone();
         self.ssh_client
             .wait_for_ssh_availability(&genesis_ip, "root")?;
-
+        let extra_vars =
+            self.build_extra_vars_doc(name, None, None, repo_owner.clone(), branch.clone())?;
+        println!("{extra_vars}");
         println!("Running ansible against genesis node...");
         self.ansible_runner.run_playbook(
             PathBuf::from("genesis_node.yml"),
             PathBuf::from("inventory").join(format!(".{name}_genesis_inventory_digital_ocean.yml")),
             "root".to_string(),
-            Some(self.build_extra_vars_doc(name, true, None, None)?),
+            Some(self.build_extra_vars_doc(name, None, None, repo_owner, branch)?),
         )?;
         Ok(())
     }
@@ -301,6 +324,8 @@ impl TestnetDeploy {
         name: &str,
         genesis_multiaddr: String,
         node_instance_count: u16,
+        repo_owner: Option<String>,
+        branch: Option<String>,
     ) -> Result<()> {
         println!("Running ansible against remaining nodes...");
         self.ansible_runner.run_playbook(
@@ -309,9 +334,10 @@ impl TestnetDeploy {
             "root".to_string(),
             Some(self.build_extra_vars_doc(
                 name,
-                false,
                 Some(genesis_multiaddr),
                 Some(node_instance_count),
+                repo_owner,
+                branch,
             )?),
         )?;
         Ok(())
@@ -337,13 +363,26 @@ impl TestnetDeploy {
         repo_owner: Option<String>,
         branch: Option<String>,
     ) -> Result<()> {
+        if (repo_owner.is_some() && branch.is_none()) || (branch.is_some() && repo_owner.is_none())
+        {
+            return Err(Error::CustomBinConfigError);
+        }
+
         self.create_infra(name, vm_count, repo_owner.is_some())
             .await?;
-        self.provision_genesis_node(name, repo_owner, branch)
+        if repo_owner.is_some() {
+            self.build_custom_safenode(
+                name,
+                &repo_owner.as_ref().unwrap(),
+                &branch.as_ref().unwrap(),
+            )
+            .await?;
+        }
+        self.provision_genesis_node(name, repo_owner.clone(), branch.clone())
             .await?;
         let multiaddr = self.get_genesis_multiaddr(name).await?;
         println!("Obtained multiaddr for genesis node: {multiaddr}");
-        self.provision_remaining_nodes(name, multiaddr, node_instance_count)
+        self.provision_remaining_nodes(name, multiaddr, node_instance_count, repo_owner, branch)
             .await?;
         Ok(())
     }
@@ -382,46 +421,51 @@ impl TestnetDeploy {
     fn build_extra_vars_doc(
         &self,
         name: &str,
-        is_genesis: bool,
         genesis_multiaddr: Option<String>,
         node_instance_count: Option<u16>,
+        repo_owner: Option<String>,
+        branch: Option<String>,
     ) -> Result<String> {
-        // Note: the `is_genesis` variable itself is assigned in the playbook.
-        let extra_vars = if is_genesis {
-            r#"
-            {
-              "provider": "__PROVIDER__",
-              "testnet_name": "__TESTNET_NAME__"
-            }"#
-            .to_string()
-        } else {
-            let multiaddr = genesis_multiaddr.ok_or_else(|| Error::GenesisMultiAddrNotSupplied)?;
-            let extra_vars = r#"
-            {
-              "genesis_multiaddr": "__MULTIADDR__",
-              "node_instance_count": "__NODE_INSTANCE_COUNT__",
-              "provider": "__PROVIDER__",
-              "testnet_name": "__TESTNET_NAME__"
-            }"#;
-            let extra_vars = extra_vars.replace("__MULTIADDR__", &multiaddr);
-            let extra_vars = extra_vars.replace(
-                "__NODE_INSTANCE_COUNT__",
+        let mut extra_vars = String::new();
+        extra_vars.push_str("{ ");
+        Self::add_value(
+            &mut extra_vars,
+            "provider",
+            &self.cloud_provider.to_string(),
+        );
+        Self::add_value(&mut extra_vars, "testnet_name", name);
+        if genesis_multiaddr.is_some() {
+            Self::add_value(
+                &mut extra_vars,
+                "genesis_multiaddr",
+                &genesis_multiaddr.ok_or_else(|| Error::GenesisMultiAddrNotSupplied)?,
+            );
+        }
+        if node_instance_count.is_some() {
+            Self::add_value(
+                &mut extra_vars,
+                "node_instance_count",
                 &node_instance_count.unwrap_or(20).to_string(),
             );
-            extra_vars
-        };
-        let extra_vars =
-            extra_vars.replace("__PROVIDER__", self.cloud_provider.to_string().as_str());
-        let extra_vars = extra_vars.replace("__TESTNET_NAME__", name);
+        }
+        if repo_owner.is_some() {
+            Self::add_value(
+                &mut extra_vars,
+                "node_archive_url",
+                &format!(
+                    "https://sn-node.s3.eu-west-2.amazonaws.com/{}/{}/safenode-latest-x86_64-unknown-linux-musl.tar.gz",
+                    repo_owner.unwrap(),
+                    branch.unwrap()),
+            );
+        }
 
-        // Return the document back as a single line string for use as an argument to Ansible.
-        // It's defined as a multiline string just for human readability.
-        let extra_vars = extra_vars.replace("\n", "").replace("\r", "");
-        let extra_vars = extra_vars
-            .split_whitespace()
-            .collect::<Vec<&str>>()
-            .join(" ");
+        let mut extra_vars = extra_vars.strip_suffix(", ").unwrap().to_string();
+        extra_vars.push_str(" }");
         Ok(extra_vars)
+    }
+
+    fn add_value(document: &mut String, name: &str, value: &str) {
+        document.push_str(&format!("\"{name}\": \"{value}\", "))
     }
 }
 
