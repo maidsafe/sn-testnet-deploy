@@ -70,6 +70,14 @@ enum Commands {
         #[clap(long, default_value = "10")]
         vm_count: u16,
     },
+    Inventory {
+        /// The name of the environment
+        #[arg(short = 'n', long)]
+        name: String,
+        /// The cloud provider that was used.
+        #[clap(long, default_value_t = CloudProvider::DigitalOcean, value_parser = parse_provider, verbatim_doc_comment)]
+        provider: CloudProvider,
+    },
     Setup {},
 }
 
@@ -97,6 +105,11 @@ async fn main() -> Result<()> {
             testnet_deploy
                 .deploy(&name, vm_count, node_count, repo_owner, branch)
                 .await?;
+            Ok(())
+        }
+        Some(Commands::Inventory { name, provider }) => {
+            let testnet_deploy = TestnetDeployBuilder::default().provider(provider).build()?;
+            testnet_deploy.list_inventory(&name).await?;
             Ok(())
         }
         Some(Commands::Setup {}) => {

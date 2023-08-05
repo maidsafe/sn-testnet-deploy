@@ -316,9 +316,6 @@ impl TestnetDeploy {
         let genesis_ip = genesis_inventory[0].1.clone();
         self.ssh_client
             .wait_for_ssh_availability(&genesis_ip, &self.cloud_provider.get_ssh_user())?;
-        let extra_vars =
-            self.build_extra_vars_doc(name, None, None, repo_owner.clone(), branch.clone())?;
-        println!("{extra_vars}");
         println!("Running ansible against genesis node...");
         self.ansible_runner.run_playbook(
             PathBuf::from("genesis_node.yml"),
@@ -385,8 +382,8 @@ impl TestnetDeploy {
             // in a valid state.
             self.build_custom_safenode(
                 name,
-                &repo_owner.as_ref().unwrap(),
-                &branch.as_ref().unwrap(),
+                repo_owner.as_ref().unwrap(),
+                branch.as_ref().unwrap(),
             )
             .await?;
         }
@@ -396,6 +393,27 @@ impl TestnetDeploy {
         println!("Obtained multiaddr for genesis node: {multiaddr}");
         self.provision_remaining_nodes(name, multiaddr, node_instance_count, repo_owner, branch)
             .await?;
+        Ok(())
+    }
+
+    pub async fn list_inventory(&self, name: &str) -> Result<()> {
+        let genesis_inventory = self.ansible_runner.inventory_list(
+            PathBuf::from("inventory").join(format!(".{name}_genesis_inventory_digital_ocean.yml")),
+        )?;
+        let build_inventory = self.ansible_runner.inventory_list(
+            PathBuf::from("inventory").join(format!(".{name}_build_inventory_digital_ocean.yml")),
+        )?;
+        let remaining_nodes_inventory = self.ansible_runner.inventory_list(
+            PathBuf::from("inventory").join(format!(".{name}_node_inventory_digital_ocean.yml")),
+        )?;
+        println!("{}: {}", genesis_inventory[0].0, genesis_inventory[0].1);
+        if !build_inventory.is_empty() {
+            println!("{}: {}", build_inventory[0].0, build_inventory[0].1);
+        }
+        for entry in remaining_nodes_inventory.iter() {
+            println!("{}: {}", entry.0, entry.1);
+        }
+        println!("SSH user: {}", self.cloud_provider.get_ssh_user());
         Ok(())
     }
 

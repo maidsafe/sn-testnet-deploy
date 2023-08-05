@@ -98,7 +98,7 @@ impl AnsibleRunnerInterface for AnsibleRunner {
                 inventory_path.to_string_lossy().to_string(),
                 "--list".to_string(),
             ],
-            false,
+            true,
         )?;
 
         let mut output_string = output

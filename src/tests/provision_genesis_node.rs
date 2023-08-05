@@ -3,8 +3,7 @@ use super::setup::*;
 use crate::ansible::MockAnsibleRunnerInterface;
 use crate::rpc_client::MockRpcClientInterface;
 use crate::ssh::MockSshClientInterface;
-use crate::terraform::MockTerraformRunnerInterface;
-use color_eyre::{eyre::eyre, Result};
+use color_eyre::Result;
 use mockall::predicate::*;
 use std::path::PathBuf;
 
