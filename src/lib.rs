@@ -381,6 +381,8 @@ impl TestnetDeploy {
         self.create_infra(name, vm_count, repo_owner.is_some())
             .await?;
         if repo_owner.is_some() {
+            // I think the use of `unwrap` here is justified because we've already checked they are
+            // in a valid state.
             self.build_custom_safenode(
                 name,
                 &repo_owner.as_ref().unwrap(),
