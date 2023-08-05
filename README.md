@@ -42,11 +42,16 @@ You may want to deploy a custom version of the `safenode` binary. To do so, use 
 cargo run -- deploy --name beta --vm-count 100 --node-count 30 --repo-owner jacderida --branch custom_branch 
 ```
 
+To get a list of the machines that are available for SSH access, run:
+```
+cargo run -- inventory --name beta --provider digital-ocean
+```
+
 ## Clean Up
 
 To remove the testnet, use the following command:
 ```
-cargo run -- clean --name beta --provider "digital-ocean"
+cargo run -- clean --name beta --provider digital-ocean
 ```
 
 This will use Terraform to tear down all the droplets it created.
