@@ -24,15 +24,19 @@ pub enum Error {
     #[error("To provision the remaining nodes the multiaddr of the genesis node must be supplied")]
     GenesisMultiAddrNotSupplied,
     #[error(transparent)]
+    InquireError(#[from] inquire::InquireError),
+    #[error(transparent)]
     Io(#[from] std::io::Error),
     #[error(transparent)]
     Reqwest(#[from] reqwest::Error),
     #[error(transparent)]
-    TemplateError(#[from] indicatif::style::TemplateError),
-    #[error(transparent)]
     SerdeJson(#[from] serde_json::Error),
+    #[error("An unexpected error occurred during the setup process")]
+    SetupError,
     #[error("After several retry attempts an SSH connection could not be established")]
     SshUnavailable,
+    #[error(transparent)]
+    TemplateError(#[from] indicatif::style::TemplateError),
     #[error(transparent)]
     VarError(#[from] std::env::VarError),
 }

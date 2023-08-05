@@ -8,6 +8,7 @@ pub mod ansible;
 pub mod error;
 pub mod rpc_client;
 pub mod s3;
+pub mod setup;
 pub mod ssh;
 pub mod terraform;
 
@@ -39,6 +40,15 @@ impl std::fmt::Display for CloudProvider {
         match self {
             CloudProvider::Aws => write!(f, "aws"),
             CloudProvider::DigitalOcean => write!(f, "digital-ocean"),
+        }
+    }
+}
+
+impl CloudProvider {
+    pub fn get_ssh_user(&self) -> String {
+        match self {
+            CloudProvider::Aws => "ubuntu".to_string(),
+            CloudProvider::DigitalOcean => "root".to_string(),
         }
     }
 }
@@ -279,13 +289,13 @@ impl TestnetDeploy {
         )?;
         let build_ip = build_inventory[0].1.clone();
         self.ssh_client
-            .wait_for_ssh_availability(&build_ip, "root")?;
+            .wait_for_ssh_availability(&build_ip, &self.cloud_provider.get_ssh_user())?;
 
         println!("Running ansible against build VM...");
         self.ansible_runner.run_playbook(
             PathBuf::from("build.yml"),
             PathBuf::from("inventory").join(format!(".{name}_build_inventory_digital_ocean.yml")),
-            "root".to_string(),
+            self.cloud_provider.get_ssh_user(),
             Some(format!(
                 "{{ \"branch\": \"{branch}\", \"org\": \"{repo_owner}\", \"provider\": \"{}\" }}",
                 self.cloud_provider
@@ -305,7 +315,7 @@ impl TestnetDeploy {
         )?;
         let genesis_ip = genesis_inventory[0].1.clone();
         self.ssh_client
-            .wait_for_ssh_availability(&genesis_ip, "root")?;
+            .wait_for_ssh_availability(&genesis_ip, &self.cloud_provider.get_ssh_user())?;
         let extra_vars =
             self.build_extra_vars_doc(name, None, None, repo_owner.clone(), branch.clone())?;
         println!("{extra_vars}");
@@ -313,7 +323,7 @@ impl TestnetDeploy {
         self.ansible_runner.run_playbook(
             PathBuf::from("genesis_node.yml"),
             PathBuf::from("inventory").join(format!(".{name}_genesis_inventory_digital_ocean.yml")),
-            "root".to_string(),
+            self.cloud_provider.get_ssh_user(),
             Some(self.build_extra_vars_doc(name, None, None, repo_owner, branch)?),
         )?;
         Ok(())
@@ -331,7 +341,7 @@ impl TestnetDeploy {
         self.ansible_runner.run_playbook(
             PathBuf::from("nodes.yml"),
             PathBuf::from("inventory").join(format!(".{name}_node_inventory_digital_ocean.yml")),
-            "root".to_string(),
+            self.cloud_provider.get_ssh_user(),
             Some(self.build_extra_vars_doc(
                 name,
                 Some(genesis_multiaddr),
