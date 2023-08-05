@@ -7,6 +7,7 @@
 use clap::{Parser, Subcommand};
 use color_eyre::{eyre::eyre, Result};
 use dotenv::dotenv;
+use sn_testnet_deploy::setup::setup_dotenv_file;
 use sn_testnet_deploy::CloudProvider;
 use sn_testnet_deploy::TestnetDeployBuilder;
 
@@ -69,6 +70,7 @@ enum Commands {
         #[clap(long, default_value = "10")]
         vm_count: u16,
     },
+    Setup {},
 }
 
 #[tokio::main]
@@ -95,6 +97,10 @@ async fn main() -> Result<()> {
             testnet_deploy
                 .deploy(&name, vm_count, node_count, repo_owner, branch)
                 .await?;
+            Ok(())
+        }
+        Some(Commands::Setup {}) => {
+            setup_dotenv_file()?;
             Ok(())
         }
         None => Ok(()),
