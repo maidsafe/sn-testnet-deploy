@@ -103,6 +103,22 @@ impl TestnetDeployBuilder {
             .provider
             .as_ref()
             .unwrap_or(&CloudProvider::DigitalOcean);
+        match provider {
+            CloudProvider::DigitalOcean => {
+                let digital_ocean_pat = std::env::var("DO_PAT").map_err(|_| {
+                    Error::CloudProviderCredentialsNotSupplied("DO_PAT".to_string())
+                })?;
+                // The DO_PAT variable is not actually read by either Terraform or Ansible.
+                // Each tool uses a different variable, so instead we set each of those variables
+                // to the value of DO_PAT. This means the user only needs to set one variable.
+                std::env::set_var("DIGITALOCEAN_TOKEN", digital_ocean_pat.clone());
+                std::env::set_var("DO_API_TOKEN", digital_ocean_pat);
+            }
+            _ => {
+                return Err(Error::CloudProviderNotSupported(provider.to_string()));
+            }
+        }
+
         let state_bucket_name = match self.state_bucket_name {
             Some(ref bucket_name) => bucket_name.clone(),
             None => std::env::var("TERRAFORM_STATE_BUCKET_NAME")?,
@@ -397,15 +413,40 @@ impl TestnetDeploy {
     }
 
     pub async fn list_inventory(&self, name: &str) -> Result<()> {
-        let genesis_inventory = self.ansible_runner.inventory_list(
-            PathBuf::from("inventory").join(format!(".{name}_genesis_inventory_digital_ocean.yml")),
-        )?;
-        let build_inventory = self.ansible_runner.inventory_list(
-            PathBuf::from("inventory").join(format!(".{name}_build_inventory_digital_ocean.yml")),
-        )?;
-        let remaining_nodes_inventory = self.ansible_runner.inventory_list(
-            PathBuf::from("inventory").join(format!(".{name}_node_inventory_digital_ocean.yml")),
-        )?;
+        let environments = self.terraform_runner.workspace_list()?;
+        if !environments.contains(&name.to_string()) {
+            return Err(Error::EnvironmentDoesNotExist(name.to_string()));
+        }
+
+        // Somehow it might be possible that the workspace wasn't cleared out, but the environment
+        // was actually torn down and the generated inventory files were deleted. If the files
+        // don't exist, we can reasonably consider the environment non-existent.
+        let genesis_inventory_path =
+            PathBuf::from("inventory").join(format!(".{name}_genesis_inventory_digital_ocean.yml"));
+        let build_inventory_path =
+            PathBuf::from("inventory").join(format!(".{name}_build_inventory_digital_ocean.yml"));
+        let remaining_nodes_inventory_path =
+            PathBuf::from("inventory").join(format!(".{name}_node_inventory_digital_ocean.yml"));
+        if !genesis_inventory_path.exists()
+            || !build_inventory_path.exists()
+            || !remaining_nodes_inventory_path.exists()
+        {
+            return Err(Error::EnvironmentDoesNotExist(name.to_string()));
+        }
+
+        let genesis_inventory = self.ansible_runner.inventory_list(genesis_inventory_path)?;
+        let build_inventory = self.ansible_runner.inventory_list(build_inventory_path)?;
+        let remaining_nodes_inventory = self
+            .ansible_runner
+            .inventory_list(remaining_nodes_inventory_path)?;
+
+        // It also seems to be possible for a workspace and inventory files to still exist, but
+        // there to be no inventory items returned. Perhaps someone deleted the VMs manually. We
+        // only need to test the genesis node in this case, since that must always exist.
+        if genesis_inventory.is_empty() {
+            return Err(Error::EnvironmentDoesNotExist(name.to_string()));
+        }
+
         println!("{}: {}", genesis_inventory[0].0, genesis_inventory[0].1);
         if !build_inventory.is_empty() {
             println!("{}: {}", build_inventory[0].0, build_inventory[0].1);

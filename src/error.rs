@@ -15,6 +15,10 @@ pub enum Error {
     AddrParseError(#[from] std::net::AddrParseError),
     #[error("Could not determine content length for asset")]
     AssetContentLengthUndetermined,
+    #[error("The {0} environment variable must be set to use your cloud provider")]
+    CloudProviderCredentialsNotSupplied(String),
+    #[error("The {0} cloud provider is not supported yet")]
+    CloudProviderNotSupported(String),
     #[error("Both the repository owner and branch name must be supplied if either are used")]
     CustomBinConfigError,
     #[error("The '{0}' environment does not exist")]
