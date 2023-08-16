@@ -11,7 +11,7 @@ terraform {
 }
 
 resource "digitalocean_droplet" "genesis" {
-  image    = var.droplet_image
+  image    = var.node_droplet_image
   name     = "${terraform.workspace}-genesis"
   region   = var.region
   size     = var.droplet_size
@@ -21,7 +21,7 @@ resource "digitalocean_droplet" "genesis" {
 
 resource "digitalocean_droplet" "node" {
   count    = var.node_count
-  image    = var.droplet_image
+  image    = var.node_droplet_image
   name     = "${terraform.workspace}-node-${count.index + 1}"
   region   = var.region
   size     = var.droplet_size
@@ -31,7 +31,7 @@ resource "digitalocean_droplet" "node" {
 
 resource "digitalocean_droplet" "build" {
   count    = var.use_custom_bin ? 1 : 0
-  image    = var.droplet_image
+  image    = var.build_droplet_image_id
   name     = "${terraform.workspace}-build"
   region   = var.region
   size     = var.build_machine_size

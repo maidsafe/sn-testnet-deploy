@@ -9,31 +9,31 @@
     version: "{{ branch }}"
     dest: "{{ ansible_env.HOME }}/safe_network"
 
-- name: build safenode
+- name: "build {{ bin_name }} binary"
   ansible.builtin.shell: |
     source $HOME/.cargo/env
-    cargo build --target x86_64-unknown-linux-musl --release --bin safenode
+    cargo build --target x86_64-unknown-linux-musl --release --bin {{bin_name}}
   args:
     chdir: "{{ ansible_env.HOME }}/safe_network"
-    creates: "{{ ansible_env.HOME }}/safe_network/target/x86_64-unknown-linux-musl/release/safenode"
+    creates: "{{ ansible_env.HOME }}/safe_network/target/x86_64-unknown-linux-musl/release/{{bin_name}}"
     executable: /bin/bash
 
-- name: copy safenode binary to tmp directory
+- name: copy binary to tmp directory
   ansible.builtin.command:
     chdir: "{{ ansible_env.HOME }}/safe_network/target/x86_64-unknown-linux-musl/release"
-    cmd: cp safenode /tmp/
+    cmd: cp {{bin_name}} /tmp/
 
 - name: archive binary
   ansible.builtin.command:
     chdir: /tmp/
-    cmd: tar -zcvf {{ node_archive_filename }} safenode
+    cmd: tar -zcvf {{ bin_archive_filename }} {{ bin_name }}
 
-- name: upload safenode archive to S3
+- name: upload archive to S3
   amazon.aws.s3_object:
     access_key: AKIAVVODCRMSELAPBQHK
     secret_key: "{{ aws_secret_key }}"
     bucket: sn-node
-    object: /{{ org }}/{{ branch }}/{{ node_archive_filename }}
-    src: /tmp/{{ node_archive_filename }}
+    object: /{{ org }}/{{ branch }}/{{ bin_archive_filename }}
+    src: /tmp/{{ bin_archive_filename }}
     mode: put
     permission: public-read

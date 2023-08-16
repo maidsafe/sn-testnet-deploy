@@ -1,0 +1,31 @@
+---
+- name: get the faucet archive
+  ansible.builtin.get_url:
+    url: "{{ faucet_archive_url }}"
+    dest: /tmp/{{ faucet_archive_filename }}
+
+- name: extract the node binary
+  become: True
+  ansible.builtin.unarchive:
+    src: "/tmp/{{ faucet_archive_filename }}"
+    dest: "{{ faucet_archive_dest_path }}"
+    remote_src: True
+
+- name: copy service file
+  become: True
+  template:
+    src: faucet.service.j2
+    dest: /etc/systemd/system/faucet.service
+  register: service_template_created
+
+- name: reload the system manager configuration
+  become: True
+  command: systemctl daemon-reload
+  when: service_template_created.changed
+
+- name: start the faucet service
+  become: True
+  systemd:
+    name: faucet
+    state: started
+    enabled: yes

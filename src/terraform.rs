@@ -4,9 +4,9 @@
 // This SAFE Network Software is licensed under the BSD-3-Clause license.
 // Please see the LICENSE file for more details.
 
-use crate::error::Result;
-use crate::run_external_command;
+use crate::error::{Error, Result};
 use crate::CloudProvider;
+use crate::{is_binary_on_path, run_external_command};
 #[cfg(test)]
 use mockall::automock;
 use std::path::PathBuf;
@@ -136,12 +136,20 @@ impl TerraformRunner {
         working_directory: PathBuf,
         provider: CloudProvider,
         state_bucket_name: &str,
-    ) -> TerraformRunner {
-        TerraformRunner {
+    ) -> Result<TerraformRunner> {
+        if !binary_path.exists() {
+            // Try the path as a single binary name.
+            let bin_name = binary_path.to_string_lossy().to_string();
+            if !is_binary_on_path(&binary_path.to_string_lossy().to_string()) {
+                return Err(Error::ToolBinaryNotFound(bin_name));
+            }
+        }
+        let runner = TerraformRunner {
             binary_path,
             working_directory_path: working_directory,
             provider,
             state_bucket_name: state_bucket_name.to_string(),
-        }
+        };
+        Ok(runner)
     }
 }

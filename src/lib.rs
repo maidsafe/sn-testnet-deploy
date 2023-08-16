@@ -152,7 +152,7 @@ impl TestnetDeployBuilder {
                 .join(provider.to_string()),
             provider.clone(),
             &state_bucket_name,
-        );
+        )?;
         let ansible_runner = AnsibleRunner::new(
             working_directory_path.join("ansible"),
             provider.clone(),
@@ -294,12 +294,13 @@ impl TestnetDeploy {
         Ok(())
     }
 
-    pub async fn build_custom_safenode(
+    pub async fn build_safe_network_binaries(
         &self,
         name: &str,
-        repo_owner: &str,
-        branch: &str,
+        repo_owner: Option<String>,
+        branch: Option<String>,
     ) -> Result<()> {
+        println!("Obtaining IP address for build VM...");
         let build_inventory = self.ansible_runner.inventory_list(
             PathBuf::from("inventory").join(format!(".{name}_build_inventory_digital_ocean.yml")),
         )?;
@@ -308,14 +309,12 @@ impl TestnetDeploy {
             .wait_for_ssh_availability(&build_ip, &self.cloud_provider.get_ssh_user())?;
 
         println!("Running ansible against build VM...");
+        let extra_vars = self.build_binaries_extra_vars_doc(name, repo_owner, branch)?;
         self.ansible_runner.run_playbook(
             PathBuf::from("build.yml"),
             PathBuf::from("inventory").join(format!(".{name}_build_inventory_digital_ocean.yml")),
             self.cloud_provider.get_ssh_user(),
-            Some(format!(
-                "{{ \"branch\": \"{branch}\", \"org\": \"{repo_owner}\", \"provider\": \"{}\" }}",
-                self.cloud_provider
-            )),
+            Some(extra_vars),
         )?;
         Ok(())
     }
@@ -337,7 +336,24 @@ impl TestnetDeploy {
             PathBuf::from("genesis_node.yml"),
             PathBuf::from("inventory").join(format!(".{name}_genesis_inventory_digital_ocean.yml")),
             self.cloud_provider.get_ssh_user(),
-            Some(self.build_extra_vars_doc(name, None, None, repo_owner, branch)?),
+            Some(self.build_node_extra_vars_doc(name, None, None, repo_owner, branch)?),
+        )?;
+        Ok(())
+    }
+
+    pub async fn provision_faucet(
+        &self,
+        name: &str,
+        genesis_multiaddr: &str,
+        repo_owner: Option<String>,
+        branch: Option<String>,
+    ) -> Result<()> {
+        println!("Running ansible against genesis node to deploy faucet...");
+        self.ansible_runner.run_playbook(
+            PathBuf::from("faucet.yml"),
+            PathBuf::from("inventory").join(format!(".{name}_genesis_inventory_digital_ocean.yml")),
+            self.cloud_provider.get_ssh_user(),
+            Some(self.build_faucet_extra_vars_doc(name, genesis_multiaddr, repo_owner, branch)?),
         )?;
         Ok(())
     }
@@ -355,7 +371,7 @@ impl TestnetDeploy {
             PathBuf::from("nodes.yml"),
             PathBuf::from("inventory").join(format!(".{name}_node_inventory_digital_ocean.yml")),
             self.cloud_provider.get_ssh_user(),
-            Some(self.build_extra_vars_doc(
+            Some(self.build_node_extra_vars_doc(
                 name,
                 Some(genesis_multiaddr),
                 Some(node_instance_count),
@@ -366,7 +382,7 @@ impl TestnetDeploy {
         Ok(())
     }
 
-    pub async fn get_genesis_multiaddr(&self, name: &str) -> Result<String> {
+    pub async fn get_genesis_multiaddr(&self, name: &str) -> Result<(String, String)> {
         let genesis_inventory = self.ansible_runner.inventory_list(
             PathBuf::from("inventory").join(format!(".{name}_genesis_inventory_digital_ocean.yml")),
         )?;
@@ -375,7 +391,9 @@ impl TestnetDeploy {
             .rpc_client
             .get_info(format!("{}:12001", genesis_ip).parse()?)?;
         let multiaddr = format!("/ip4/{}/tcp/12000/p2p/{}", genesis_ip, node_info.peer_id);
-        Ok(multiaddr)
+        // The genesis_ip is obviously inside the multiaddr, but it's just being returned as a
+        // separate item for convenience.
+        Ok((multiaddr, genesis_ip))
     }
 
     pub async fn deploy(
@@ -391,24 +409,25 @@ impl TestnetDeploy {
             return Err(Error::CustomBinConfigError);
         }
 
-        self.create_infra(name, vm_count, repo_owner.is_some())
+        self.create_infra(name, vm_count, true).await?;
+        self.build_safe_network_binaries(name, repo_owner.clone(), branch.clone())
             .await?;
-        if repo_owner.is_some() {
-            // I think the use of `unwrap` here is justified because we've already checked they are
-            // in a valid state.
-            self.build_custom_safenode(
-                name,
-                repo_owner.as_ref().unwrap(),
-                branch.as_ref().unwrap(),
-            )
-            .await?;
-        }
         self.provision_genesis_node(name, repo_owner.clone(), branch.clone())
             .await?;
-        let multiaddr = self.get_genesis_multiaddr(name).await?;
+        let (multiaddr, genesis_ip) = self.get_genesis_multiaddr(name).await?;
         println!("Obtained multiaddr for genesis node: {multiaddr}");
+        self.provision_faucet(name, &multiaddr, repo_owner.clone(), branch.clone())
+            .await?;
         self.provision_remaining_nodes(name, multiaddr, node_instance_count, repo_owner, branch)
             .await?;
+        // For reasons not known, the faucet service needs to be 'nudged' with a restart.
+        // It seems to work fine after this.
+        self.ssh_client.run_command(
+            &genesis_ip,
+            &self.cloud_provider.get_ssh_user(),
+            "systemctl restart faucet",
+        )?;
+        self.list_inventory(name).await?;
         Ok(())
     }
 
@@ -417,6 +436,11 @@ impl TestnetDeploy {
         if !environments.contains(&name.to_string()) {
             return Err(Error::EnvironmentDoesNotExist(name.to_string()));
         }
+
+        // The ansible runner will have its working directory set to this location. We need the
+        // same here to test the inventory paths, which are relative to the `ansible` directory.
+        let ansible_dir_path = self.working_directory_path.join("ansible");
+        std::env::set_current_dir(ansible_dir_path.clone())?;
 
         // Somehow it might be possible that the workspace wasn't cleared out, but the environment
         // was actually torn down and the generated inventory files were deleted. If the files
@@ -447,7 +471,14 @@ impl TestnetDeploy {
             return Err(Error::EnvironmentDoesNotExist(name.to_string()));
         }
 
-        println!("{}: {}", genesis_inventory[0].0, genesis_inventory[0].1);
+        println!("**************************************");
+        println!("*                                    *");
+        println!("*          Inventory Report          *");
+        println!("*                                    *");
+        println!("**************************************");
+
+        let genesis_ip = &genesis_inventory[0].1;
+        println!("{}: {}", genesis_inventory[0].0, genesis_ip);
         if !build_inventory.is_empty() {
             println!("{}: {}", build_inventory[0].0, build_inventory[0].1);
         }
@@ -455,6 +486,12 @@ impl TestnetDeploy {
             println!("{}: {}", entry.0, entry.1);
         }
         println!("SSH user: {}", self.cloud_provider.get_ssh_user());
+        let (genesis_multiaddr, _) = self.get_genesis_multiaddr(name).await?;
+        println!("Genesis multiaddr: {}", genesis_multiaddr);
+        println!("Faucet address: {}:8000", genesis_ip);
+
+        println!("Check the faucet:");
+        println!("safe --peer {genesis_multiaddr} wallet get-faucet {genesis_ip}:8000");
         Ok(())
     }
 
@@ -489,7 +526,7 @@ impl TestnetDeploy {
         Ok(())
     }
 
-    fn build_extra_vars_doc(
+    fn build_node_extra_vars_doc(
         &self,
         name: &str,
         genesis_multiaddr: Option<String>,
@@ -524,11 +561,65 @@ impl TestnetDeploy {
                 &mut extra_vars,
                 "node_archive_url",
                 &format!(
-                    "https://sn-node.s3.eu-west-2.amazonaws.com/{}/{}/safenode-latest-x86_64-unknown-linux-musl.tar.gz",
+                    "https://sn-node.s3.eu-west-2.amazonaws.com/{}/{}/safenode-{}-x86_64-unknown-linux-musl.tar.gz",
                     repo_owner.unwrap(),
-                    branch.unwrap()),
+                    branch.unwrap(),
+                    name),
             );
         }
+
+        let mut extra_vars = extra_vars.strip_suffix(", ").unwrap().to_string();
+        extra_vars.push_str(" }");
+        Ok(extra_vars)
+    }
+
+    fn build_faucet_extra_vars_doc(
+        &self,
+        name: &str,
+        genesis_multiaddr: &str,
+        repo_owner: Option<String>,
+        branch: Option<String>,
+    ) -> Result<String> {
+        let mut extra_vars = String::new();
+        extra_vars.push_str("{ ");
+        Self::add_value(
+            &mut extra_vars,
+            "provider",
+            &self.cloud_provider.to_string(),
+        );
+        Self::add_value(&mut extra_vars, "testnet_name", name);
+        Self::add_value(&mut extra_vars, "genesis_multiaddr", genesis_multiaddr);
+        if branch.is_some() {
+            Self::add_value(&mut extra_vars, "branch", &branch.unwrap());
+        }
+        if repo_owner.is_some() {
+            Self::add_value(&mut extra_vars, "org", &repo_owner.unwrap());
+        }
+
+        let mut extra_vars = extra_vars.strip_suffix(", ").unwrap().to_string();
+        extra_vars.push_str(" }");
+        Ok(extra_vars)
+    }
+
+    fn build_binaries_extra_vars_doc(
+        &self,
+        name: &str,
+        repo_owner: Option<String>,
+        branch: Option<String>,
+    ) -> Result<String> {
+        let mut extra_vars = String::new();
+        extra_vars.push_str("{ ");
+
+        if branch.is_some() {
+            Self::add_value(&mut extra_vars, "custom_safenode", "true");
+            Self::add_value(&mut extra_vars, "branch", &branch.unwrap());
+        } else {
+            Self::add_value(&mut extra_vars, "custom_safenode", "false");
+        }
+        if repo_owner.is_some() {
+            Self::add_value(&mut extra_vars, "org", &repo_owner.unwrap());
+        }
+        Self::add_value(&mut extra_vars, "testnet_name", name);
 
         let mut extra_vars = extra_vars.strip_suffix(", ").unwrap().to_string();
         extra_vars.push_str(" }");
@@ -586,4 +677,17 @@ pub fn run_external_command(
     }
 
     Ok(output_lines)
+}
+
+pub fn is_binary_on_path(binary_name: &str) -> bool {
+    if let Ok(path) = std::env::var("PATH") {
+        for dir in path.split(':') {
+            let mut full_path = PathBuf::from(dir);
+            full_path.push(binary_name);
+            if full_path.exists() {
+                return true;
+            }
+        }
+    }
+    false
 }

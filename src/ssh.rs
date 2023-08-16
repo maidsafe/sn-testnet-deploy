@@ -17,6 +17,7 @@ use std::path::PathBuf;
 #[cfg_attr(test, automock)]
 pub trait SshClientInterface {
     fn wait_for_ssh_availability(&self, ip_address: &str, user: &str) -> Result<()>;
+    fn run_command(&self, ip_address: &str, user: &str, command: &str) -> Result<()>;
 }
 
 pub struct SshClient {
@@ -65,5 +66,40 @@ impl SshClientInterface for SshClient {
 
         println!("The maximum number of connection retry attempts has been exceeded.");
         Err(Error::SshUnavailable)
+    }
+
+    fn run_command(&self, ip_address: &str, user: &str, command: &str) -> Result<()> {
+        println!(
+            "Running command '{}' on {}@{}...",
+            command, user, ip_address
+        );
+
+        let command_args: Vec<String> = command.split_whitespace().map(String::from).collect();
+        let mut args = vec![
+            "-i".to_string(),
+            self.private_key_path.to_string_lossy().to_string(),
+            "-q".to_string(),
+            "-o".to_string(),
+            "BatchMode=yes".to_string(),
+            "-o".to_string(),
+            "ConnectTimeout=5".to_string(),
+            "-o".to_string(),
+            "StrictHostKeyChecking=no".to_string(),
+            format!("{}@{}", user, ip_address),
+        ];
+        args.extend(command_args);
+
+        let result =
+            run_external_command(PathBuf::from("ssh"), std::env::current_dir()?, args, false);
+        match result {
+            Ok(_) => {
+                println!("Successfully executed command via SSH.");
+                Ok(())
+            }
+            Err(e) => {
+                println!("Failed to execute command: {:?}", e);
+                Err(Error::SshCommandFailed(command.to_string()))
+            }
+        }
     }
 }

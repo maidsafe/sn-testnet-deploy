@@ -1,0 +1,13 @@
+[Unit]
+Description=Safe Faucet Service
+
+[Service]
+ExecStart={{ faucet_archive_dest_path }}/faucet \
+  --peer {{ genesis_multiaddr }} \
+  server
+StandardOutput=journal
+StandardError=inherit
+User=safe
+
+[Install]
+WantedBy=multi-user.target

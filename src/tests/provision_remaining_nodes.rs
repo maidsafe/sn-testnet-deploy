@@ -13,7 +13,7 @@ use color_eyre::Result;
 use mockall::predicate::*;
 use std::path::PathBuf;
 
-const CUSTOM_BIN_URL: &str = "https://sn-node.s3.eu-west-2.amazonaws.com/maidsafe/custom_branch/safenode-latest-x86_64-unknown-linux-musl.tar.gz";
+const CUSTOM_BIN_URL: &str = "https://sn-node.s3.eu-west-2.amazonaws.com/maidsafe/custom_branch/safenode-beta-x86_64-unknown-linux-musl.tar.gz";
 
 #[tokio::test]
 async fn should_run_ansible_against_the_remaining_nodes() -> Result<()> {
