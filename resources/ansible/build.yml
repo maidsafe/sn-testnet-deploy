@@ -1,9 +1,15 @@
 ---
-- name: build a custom node binary
+# We always build the faucet binary, but safenode only applies for using a custom branch.
+- name: build binaries
   hosts: all
   become: False
   roles:
-    - role: prerequisites
-      become: True
-    - role: rust
-    - role: build_node
+    - {
+        role: build_safe_network_binary,
+        bin_name: "faucet"
+      }
+    - {
+        role: build_safe_network_binary,
+        bin_name: "safenode",
+        when: custom_safenode == "true"
+      }

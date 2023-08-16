@@ -37,10 +37,16 @@ pub enum Error {
     SerdeJson(#[from] serde_json::Error),
     #[error("An unexpected error occurred during the setup process")]
     SetupError,
+    #[error("SSH command failed: {0}")]
+    SshCommandFailed(String),
     #[error("After several retry attempts an SSH connection could not be established")]
     SshUnavailable,
     #[error(transparent)]
     TemplateError(#[from] indicatif::style::TemplateError),
+    #[error(
+        "The '{0}' binary was not found. It is required for the deploy process. Make sure it is installed."
+    )]
+    ToolBinaryNotFound(String),
     #[error(transparent)]
     VarError(#[from] std::env::VarError),
 }

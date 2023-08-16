@@ -3,9 +3,9 @@
 //
 // This SAFE Network Software is licensed under the BSD-3-Clause license.
 // Please see the LICENSE file for more details.
-use crate::error::Result;
-use crate::run_external_command;
+use crate::error::{Error, Result};
 use crate::CloudProvider;
+use crate::{is_binary_on_path, run_external_command};
 #[cfg(test)]
 use mockall::automock;
 use serde::Deserialize;
@@ -31,6 +31,16 @@ impl std::fmt::Display for AnsibleBinary {
             AnsibleBinary::AnsibleInventory => write!(f, "ansible-inventory"),
             AnsibleBinary::Ansible => write!(f, "ansible"),
         }
+    }
+}
+
+impl AnsibleBinary {
+    pub fn get_binary_path(&self) -> Result<PathBuf> {
+        let bin_name = self.to_string();
+        if !is_binary_on_path(&bin_name) {
+            return Err(Error::ToolBinaryNotFound(bin_name));
+        }
+        Ok(PathBuf::from(bin_name.clone()))
     }
 }
 
@@ -91,7 +101,7 @@ struct Output {
 impl AnsibleRunnerInterface for AnsibleRunner {
     fn inventory_list(&self, inventory_path: PathBuf) -> Result<Vec<(String, String)>> {
         let output = run_external_command(
-            PathBuf::from(AnsibleBinary::AnsibleInventory.to_string()),
+            AnsibleBinary::AnsibleInventory.get_binary_path()?,
             self.working_directory_path.clone(),
             vec![
                 "--inventory".to_string(),

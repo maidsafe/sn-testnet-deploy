@@ -13,7 +13,7 @@ variable "droplet_ssh_keys" {
     30878672, # Chris O'Neil
     31216015, # QA
     34183228, # GH Actions Automation
-    38596814 # sn-testnet-workflows automation
+    38596814  # sn-testnet-workflows automation
   ]
 }
 
@@ -25,7 +25,12 @@ variable "build_machine_size" {
   default = "s-8vcpu-16gb"
 }
 
-variable "droplet_image" {
+# This corresponds to the 'safe_network-build-1692211486' image/snapshot.
+variable "build_droplet_image_id" {
+  default = "138592390"
+}
+
+variable "node_droplet_image" {
   default = "ubuntu-22-10-x64"
 }
 

@@ -53,12 +53,13 @@ async fn should_return_the_genesis_multiaddr() -> Result<()> {
         s3_repository,
     );
 
-    let multiaddr = testnet.get_genesis_multiaddr("beta").await?;
+    let (multiaddr, genesis_ip) = testnet.get_genesis_multiaddr("beta").await?;
 
     assert_eq!(
         multiaddr,
         "/ip4/10.0.0.10/tcp/12000/p2p/12D3KooWLvmkUDQRthtZv9CrzozRLk9ZVEHXgmx6UxVMiho5aded"
     );
+    assert_eq!(genesis_ip, "10.0.0.10");
 
     drop(tmp_dir);
     Ok(())
