@@ -67,8 +67,8 @@ async fn should_run_ansible_against_the_remaining_nodes_with_a_custom_binary() -
             eq(PathBuf::from("faucet.yml")),
             eq(PathBuf::from("inventory").join(".beta_genesis_inventory_digital_ocean.yml")),
             eq("root".to_string()),
-            eq(Some(format!(
-                "{{ \"provider\": \"digital-ocean\", \"testnet_name\": \"beta\", \"genesis_multiaddr\": \"/ip4/10.0.0.10/tcp/12000/p2p/12D3KooWLvmkUDQRthtZv9CrzozRLk9ZVEHXgmx6UxVMiho5aded\", \"branch\": \"custom_branch\", \"org\": \"maidsafe\" }}")
+            eq(Some(
+                "{ \"provider\": \"digital-ocean\", \"testnet_name\": \"beta\", \"genesis_multiaddr\": \"/ip4/10.0.0.10/tcp/12000/p2p/12D3KooWLvmkUDQRthtZv9CrzozRLk9ZVEHXgmx6UxVMiho5aded\", \"branch\": \"custom_branch\", \"org\": \"maidsafe\" }".to_string()
             )),
         )
         .returning(|_, _, _, _| Ok(()));

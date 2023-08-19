@@ -488,8 +488,22 @@ impl TestnetDeploy {
         println!("SSH user: {}", self.cloud_provider.get_ssh_user());
         let (genesis_multiaddr, _) = self.get_genesis_multiaddr(name).await?;
         println!("Genesis multiaddr: {}", genesis_multiaddr);
-        println!("Faucet address: {}:8000", genesis_ip);
+        println!();
 
+        // The scripts are relative to the `resources` directory, so we need to change the current
+        // working directory back to that location first.
+        std::env::set_current_dir(self.working_directory_path.clone())?;
+        println!("Sample peers:");
+        for (_, ip_address) in remaining_nodes_inventory {
+            self.ssh_client.run_script(
+                &ip_address,
+                "safe",
+                PathBuf::from("scripts").join("get_peer_multiaddr.sh"),
+            )?;
+        }
+        println!();
+
+        println!("Faucet address: {}:8000", genesis_ip);
         println!("Check the faucet:");
         println!("safe --peer {genesis_multiaddr} wallet get-faucet {genesis_ip}:8000");
         Ok(())
@@ -589,11 +603,11 @@ impl TestnetDeploy {
         );
         Self::add_value(&mut extra_vars, "testnet_name", name);
         Self::add_value(&mut extra_vars, "genesis_multiaddr", genesis_multiaddr);
-        if branch.is_some() {
-            Self::add_value(&mut extra_vars, "branch", &branch.unwrap());
+        if let Some(branch) = branch {
+            Self::add_value(&mut extra_vars, "branch", &branch);
         }
-        if repo_owner.is_some() {
-            Self::add_value(&mut extra_vars, "org", &repo_owner.unwrap());
+        if let Some(repo_owner) = repo_owner {
+            Self::add_value(&mut extra_vars, "org", &repo_owner);
         }
 
         let mut extra_vars = extra_vars.strip_suffix(", ").unwrap().to_string();
@@ -610,14 +624,14 @@ impl TestnetDeploy {
         let mut extra_vars = String::new();
         extra_vars.push_str("{ ");
 
-        if branch.is_some() {
+        if let Some(branch) = branch {
             Self::add_value(&mut extra_vars, "custom_safenode", "true");
-            Self::add_value(&mut extra_vars, "branch", &branch.unwrap());
+            Self::add_value(&mut extra_vars, "branch", &branch);
         } else {
             Self::add_value(&mut extra_vars, "custom_safenode", "false");
         }
-        if repo_owner.is_some() {
-            Self::add_value(&mut extra_vars, "org", &repo_owner.unwrap());
+        if let Some(repo_owner) = repo_owner {
+            Self::add_value(&mut extra_vars, "org", &repo_owner);
         }
         Self::add_value(&mut extra_vars, "testnet_name", name);
 

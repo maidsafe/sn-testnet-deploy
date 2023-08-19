@@ -140,7 +140,7 @@ impl TerraformRunner {
         if !binary_path.exists() {
             // Try the path as a single binary name.
             let bin_name = binary_path.to_string_lossy().to_string();
-            if !is_binary_on_path(&binary_path.to_string_lossy().to_string()) {
+            if !is_binary_on_path(&binary_path.to_string_lossy()) {
                 return Err(Error::ToolBinaryNotFound(bin_name));
             }
         }
