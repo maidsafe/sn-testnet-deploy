@@ -17,7 +17,8 @@ use std::path::PathBuf;
 #[cfg_attr(test, automock)]
 pub trait SshClientInterface {
     fn wait_for_ssh_availability(&self, ip_address: &str, user: &str) -> Result<()>;
-    fn run_command(&self, ip_address: &str, user: &str, command: &str) -> Result<()>;
+    fn run_command(&self, ip_address: &str, user: &str, command: &str) -> Result<Vec<String>>;
+    fn run_script(&self, ip_address: &str, user: &str, script: PathBuf) -> Result<Vec<String>>;
 }
 
 pub struct SshClient {
@@ -68,7 +69,7 @@ impl SshClientInterface for SshClient {
         Err(Error::SshUnavailable)
     }
 
-    fn run_command(&self, ip_address: &str, user: &str, command: &str) -> Result<()> {
+    fn run_command(&self, ip_address: &str, user: &str, command: &str) -> Result<Vec<String>> {
         println!(
             "Running command '{}' on {}@{}...",
             command, user, ip_address
@@ -89,17 +90,58 @@ impl SshClientInterface for SshClient {
         ];
         args.extend(command_args);
 
-        let result =
-            run_external_command(PathBuf::from("ssh"), std::env::current_dir()?, args, false);
-        match result {
-            Ok(_) => {
-                println!("Successfully executed command via SSH.");
-                Ok(())
-            }
-            Err(e) => {
-                println!("Failed to execute command: {:?}", e);
-                Err(Error::SshCommandFailed(command.to_string()))
-            }
-        }
+        let output =
+            run_external_command(PathBuf::from("ssh"), std::env::current_dir()?, args, false)
+                .map_err(|_| Error::SshCommandFailed(command.to_string()))?;
+        Ok(output)
+    }
+
+    fn run_script(&self, ip_address: &str, user: &str, script: PathBuf) -> Result<Vec<String>> {
+        let file_name = script
+            .file_name()
+            .ok_or_else(|| {
+                Error::SshCommandFailed("Could not obtain file name from script path".to_string())
+            })?
+            .to_string_lossy()
+            .to_string();
+        let args = vec![
+            "-i".to_string(),
+            self.private_key_path.to_string_lossy().to_string(),
+            "-q".to_string(),
+            "-o".to_string(),
+            "BatchMode=yes".to_string(),
+            "-o".to_string(),
+            "ConnectTimeout=5".to_string(),
+            "-o".to_string(),
+            "StrictHostKeyChecking=no".to_string(),
+            script.to_string_lossy().to_string(),
+            format!("{}@{}:/tmp/{}", user, ip_address, file_name),
+        ];
+        run_external_command(PathBuf::from("scp"), std::env::current_dir()?, args, false).map_err(
+            |_| Error::SshCommandFailed("Failed to copy script file to remote host".to_string()),
+        )?;
+
+        let args = vec![
+            "-i".to_string(),
+            self.private_key_path.to_string_lossy().to_string(),
+            "-q".to_string(),
+            "-o".to_string(),
+            "BatchMode=yes".to_string(),
+            "-o".to_string(),
+            "ConnectTimeout=5".to_string(),
+            "-o".to_string(),
+            "StrictHostKeyChecking=no".to_string(),
+            format!("{user}@{ip_address}"),
+            "bash".to_string(),
+            format!("/tmp/{file_name}"),
+        ];
+        let output =
+            run_external_command(PathBuf::from("ssh"), std::env::current_dir()?, args, false)
+                .map_err(|e| {
+                    Error::SshCommandFailed(format!(
+                        "Failed to execute command on remote host: {e}"
+                    ))
+                })?;
+        Ok(output)
     }
 }
