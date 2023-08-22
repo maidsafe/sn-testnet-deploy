@@ -30,8 +30,8 @@ variable "build_droplet_image_id" {
   default = "138592390"
 }
 
-variable "node_droplet_image" {
-  default = "ubuntu-22-10-x64"
+variable "node_droplet_image_id" {
+  default = "138988250"
 }
 
 variable "region" {

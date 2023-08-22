@@ -83,7 +83,7 @@ impl SshClientInterface for SshClient {
             "-o".to_string(),
             "BatchMode=yes".to_string(),
             "-o".to_string(),
-            "ConnectTimeout=5".to_string(),
+            "ConnectTimeout=30".to_string(),
             "-o".to_string(),
             "StrictHostKeyChecking=no".to_string(),
             format!("{}@{}", user, ip_address),
@@ -111,14 +111,14 @@ impl SshClientInterface for SshClient {
             "-o".to_string(),
             "BatchMode=yes".to_string(),
             "-o".to_string(),
-            "ConnectTimeout=5".to_string(),
+            "ConnectTimeout=30".to_string(),
             "-o".to_string(),
             "StrictHostKeyChecking=no".to_string(),
             script.to_string_lossy().to_string(),
             format!("{}@{}:/tmp/{}", user, ip_address, file_name),
         ];
         run_external_command(PathBuf::from("scp"), std::env::current_dir()?, args, false).map_err(
-            |_| Error::SshCommandFailed("Failed to copy script file to remote host".to_string()),
+            |e| Error::SshCommandFailed(format!("Failed to copy script file to remote host: {e}")),
         )?;
 
         let args = vec![
@@ -128,7 +128,7 @@ impl SshClientInterface for SshClient {
             "-o".to_string(),
             "BatchMode=yes".to_string(),
             "-o".to_string(),
-            "ConnectTimeout=5".to_string(),
+            "ConnectTimeout=30".to_string(),
             "-o".to_string(),
             "StrictHostKeyChecking=no".to_string(),
             format!("{user}@{ip_address}"),

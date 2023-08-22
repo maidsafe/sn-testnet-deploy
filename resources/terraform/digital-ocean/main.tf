@@ -11,7 +11,7 @@ terraform {
 }
 
 resource "digitalocean_droplet" "genesis" {
-  image    = var.node_droplet_image
+  image    = var.node_droplet_image_id
   name     = "${terraform.workspace}-genesis"
   region   = var.region
   size     = var.droplet_size
@@ -21,7 +21,7 @@ resource "digitalocean_droplet" "genesis" {
 
 resource "digitalocean_droplet" "node" {
   count    = var.node_count
-  image    = var.node_droplet_image
+  image    = var.node_droplet_image_id
   name     = "${terraform.workspace}-node-${count.index + 1}"
   region   = var.region
   size     = var.droplet_size
