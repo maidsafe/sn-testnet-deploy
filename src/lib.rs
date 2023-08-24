@@ -6,6 +6,7 @@
 
 pub mod ansible;
 pub mod error;
+pub mod logs;
 pub mod rpc_client;
 pub mod s3;
 pub mod setup;
@@ -18,15 +19,17 @@ mod tests;
 use crate::ansible::{AnsibleRunner, AnsibleRunnerInterface};
 use crate::error::{Error, Result};
 use crate::rpc_client::{RpcClient, RpcClientInterface};
-use crate::s3::{S3AssetRepository, S3RepositoryInterface};
+use crate::s3::{S3Repository, S3RepositoryInterface};
 use crate::ssh::{SshClient, SshClientInterface};
 use crate::terraform::{TerraformRunner, TerraformRunnerInterface};
 use flate2::read::GzDecoder;
+use log::debug;
 use std::fs::File;
 use std::io::{BufRead, BufReader, BufWriter};
 use std::os::unix::fs::PermissionsExt;
 use std::path::PathBuf;
 use std::process::{Command, Stdio};
+use std::time::{Duration, Instant};
 use tar::Archive;
 
 #[derive(Debug, Clone)]
@@ -163,7 +166,7 @@ impl TestnetDeployBuilder {
             PathBuf::from("./safenode_rpc_client"),
             working_directory_path.clone(),
         );
-        let s3_repository = S3AssetRepository::new("sn-testnet");
+        let s3_repository = S3Repository::new("sn-testnet");
 
         let testnet = TestnetDeploy::new(
             Box::new(terraform_runner),
@@ -283,6 +286,7 @@ impl TestnetDeploy {
         vm_count: u16,
         enable_build_vm: bool,
     ) -> Result<()> {
+        let start = Instant::now();
         println!("Selecting {name} workspace...");
         self.terraform_runner.workspace_select(name)?;
         let args = vec![
@@ -291,6 +295,7 @@ impl TestnetDeploy {
         ];
         println!("Running terraform apply...");
         self.terraform_runner.apply(args)?;
+        print_duration(start.elapsed());
         Ok(())
     }
 
@@ -300,6 +305,7 @@ impl TestnetDeploy {
         repo_owner: Option<String>,
         branch: Option<String>,
     ) -> Result<()> {
+        let start = Instant::now();
         println!("Obtaining IP address for build VM...");
         let build_inventory = self.ansible_runner.inventory_list(
             PathBuf::from("inventory").join(format!(".{name}_build_inventory_digital_ocean.yml")),
@@ -316,6 +322,7 @@ impl TestnetDeploy {
             self.cloud_provider.get_ssh_user(),
             Some(extra_vars),
         )?;
+        print_duration(start.elapsed());
         Ok(())
     }
 
@@ -325,6 +332,7 @@ impl TestnetDeploy {
         repo_owner: Option<String>,
         branch: Option<String>,
     ) -> Result<()> {
+        let start = Instant::now();
         let genesis_inventory = self.ansible_runner.inventory_list(
             PathBuf::from("inventory").join(format!(".{name}_genesis_inventory_digital_ocean.yml")),
         )?;
@@ -338,6 +346,7 @@ impl TestnetDeploy {
             self.cloud_provider.get_ssh_user(),
             Some(self.build_node_extra_vars_doc(name, None, None, repo_owner, branch)?),
         )?;
+        print_duration(start.elapsed());
         Ok(())
     }
 
@@ -348,6 +357,7 @@ impl TestnetDeploy {
         repo_owner: Option<String>,
         branch: Option<String>,
     ) -> Result<()> {
+        let start = Instant::now();
         println!("Running ansible against genesis node to deploy faucet...");
         self.ansible_runner.run_playbook(
             PathBuf::from("faucet.yml"),
@@ -355,6 +365,7 @@ impl TestnetDeploy {
             self.cloud_provider.get_ssh_user(),
             Some(self.build_faucet_extra_vars_doc(name, genesis_multiaddr, repo_owner, branch)?),
         )?;
+        print_duration(start.elapsed());
         Ok(())
     }
 
@@ -366,6 +377,7 @@ impl TestnetDeploy {
         repo_owner: Option<String>,
         branch: Option<String>,
     ) -> Result<()> {
+        let start = Instant::now();
         println!("Running ansible against remaining nodes...");
         self.ansible_runner.run_playbook(
             PathBuf::from("nodes.yml"),
@@ -379,6 +391,7 @@ impl TestnetDeploy {
                 branch,
             )?),
         )?;
+        print_duration(start.elapsed());
         Ok(())
     }
 
@@ -704,4 +717,11 @@ pub fn is_binary_on_path(binary_name: &str) -> bool {
         }
     }
     false
+}
+
+fn print_duration(duration: Duration) {
+    let total_seconds = duration.as_secs();
+    let minutes = total_seconds / 60;
+    let seconds = total_seconds % 60;
+    debug!("Time taken: {} minutes and {} seconds", minutes, seconds);
 }

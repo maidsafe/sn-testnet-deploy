@@ -3,4 +3,6 @@ resources/ansible/extra_vars/.*
 resources/**/.terraform/
 .env
 /target
+/logs
 safenode_rpc_client
+*.orig

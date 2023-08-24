@@ -15,6 +15,8 @@ pub enum Error {
     AddrParseError(#[from] std::net::AddrParseError),
     #[error("Could not determine content length for asset")]
     AssetContentLengthUndetermined,
+    #[error(transparent)]
+    AwsS3Error(#[from] aws_sdk_s3::Error),
     #[error("The {0} environment variable must be set to use your cloud provider")]
     CloudProviderCredentialsNotSupplied(String),
     #[error("The {0} cloud provider is not supported yet")]
@@ -30,9 +32,15 @@ pub enum Error {
     #[error("Failed to retrieve '{0}' from '{1}")]
     GetS3ObjectError(String, String),
     #[error(transparent)]
+    FsExtraError(#[from] fs_extra::error::Error),
+    #[error(transparent)]
     InquireError(#[from] inquire::InquireError),
     #[error(transparent)]
     Io(#[from] std::io::Error),
+    #[error("Failed to list objects in S3 bucket with '{0}' prefix")]
+    ListS3ObjectsError(String),
+    #[error("Logs have not been retrieved for the '{0}' environment.")]
+    LogsNotRetrievedError(String),
     #[error("Error in byte stream when attempting to retrieve S3 object")]
     S3ByteStreamError,
     #[error(transparent)]
@@ -43,6 +51,8 @@ pub enum Error {
     SshCommandFailed(String),
     #[error("After several retry attempts an SSH connection could not be established")]
     SshUnavailable,
+    #[error(transparent)]
+    StripPrefixError(#[from] std::path::StripPrefixError),
     #[error(transparent)]
     TemplateError(#[from] indicatif::style::TemplateError),
     #[error(
