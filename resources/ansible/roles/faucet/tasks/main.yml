@@ -4,7 +4,7 @@
     url: "{{ faucet_archive_url }}"
     dest: /tmp/{{ faucet_archive_filename }}
 
-- name: extract the node binary
+- name: extract the faucet binary
   become: True
   ansible.builtin.unarchive:
     src: "/tmp/{{ faucet_archive_filename }}"

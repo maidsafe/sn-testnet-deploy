@@ -58,18 +58,18 @@ This will use Terraform to tear down all the droplets it created.
 
 ## Building VM Images
 
-This repository also contains a [Packer](https://www.packer.io/) template for constructing a VM image that has tools on it for building Rust code. With the tools preinstalled, the time to deploy the testnet is significantly reduced.
+This repository also contains [Packer](https://www.packer.io/) templates for building VM images. With the tools preinstalled, the time to deploy the testnet is significantly reduced.
 
 Regenerating the image should be something that's infrequent, so as of yet there's no command in the deploy binary for generating it. However, it's a simple process. First, install Packer on your system; like Terraform, it's widely available in package managers. Then after that:
 
 ```
 export DIGITALOCEAN_TOKEN=<your PAT>
 cd resources/packer
-packer init
+packer init .
 packer build build.pkr.hcl
 ```
 
-This will produce a VM image that can now be launched as a droplet.
+This will produce a VM image that can now be launched as a droplet. There is also another template, `node.pkr.hcl`.
 
 ## License
 
