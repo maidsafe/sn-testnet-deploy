@@ -78,12 +78,40 @@ enum Commands {
         #[clap(long, default_value_t = CloudProvider::DigitalOcean, value_parser = parse_provider, verbatim_doc_comment)]
         provider: CloudProvider,
     },
+    #[clap(name = "logs", subcommand)]
+    Logs(LogCommands),
     Setup {},
+}
+
+#[derive(Subcommand, Debug)]
+enum LogCommands {
+    /// Retrieve the logs for a given environment from S3.
+    ///
+    /// This will write the logs to 'logs/<name>', relative to the current directory.
+    Get {
+        /// The name of the environment
+        #[arg(short = 'n', long)]
+        name: String,
+    },
+    /// Reassemble retrieved logs from their parts.
+    ///
+    /// The logs must have already been retrieved using the 'get' command and be present at
+    /// 'logs/<name>'.
+    ///
+    /// This will write the logs to 'logs/<name>-reassembled', relative to the current directory.
+    ///
+    /// The original logs are left intact so you can sync again if need be.
+    Reassemble {
+        /// The name of the environment for which logs have already been retrieved
+        #[arg(short = 'n', long)]
+        name: String,
+    },
 }
 
 #[tokio::main]
 async fn main() -> Result<()> {
     dotenv().ok();
+    env_logger::init();
 
     let opt = Opt::parse();
     match opt.command {
@@ -112,6 +140,16 @@ async fn main() -> Result<()> {
             testnet_deploy.list_inventory(&name).await?;
             Ok(())
         }
+        Some(Commands::Logs(log_cmd)) => match log_cmd {
+            LogCommands::Get { name } => {
+                sn_testnet_deploy::logs::get_logs(&name).await?;
+                Ok(())
+            }
+            LogCommands::Reassemble { name } => {
+                sn_testnet_deploy::logs::reassemble_logs(&name).await?;
+                Ok(())
+            }
+        },
         Some(Commands::Setup {}) => {
             setup_dotenv_file()?;
             Ok(())

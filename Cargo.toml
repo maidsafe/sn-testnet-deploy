@@ -9,14 +9,18 @@ path="src/main.rs"
 name="testnet-deploy"
 
 [dependencies]
+async-recursion = "1.0.4"
+async-trait = "0.1"
 aws-config = "0.56.0"
 aws-sdk-s3 = "0.29.0"
-async-trait = "0.1"
 clap = { version = "4.2.1", features = ["derive"] }
 color-eyre = "0.6.2"
 dirs-next = "2.0.0"
 dotenv = "0.15.0"
+env_logger = "0.10.0"
 flate2 = "1.0"
+fs_extra = "1.2.0"
+log = "0.4"
 indicatif = "0.17.3"
 inquire = "0.6.2"
 serde = { version = "1.0", features = ["derive"] }

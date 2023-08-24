@@ -35,10 +35,12 @@ output {
       region => "{{ aws_region }}"
       bucket => "{{ aws_bucket }}"
       canned_acl => "public-read"
-      time_file => 10
+      time_file => 30
       rotation_strategy => "time"
       prefix => "testnet-logs/{{ testnet_name }}/%{[host][name]}/%{filename}"
-      codec => plain
+      codec => plain {
+        format => "%{message}\n"
+      }
     }
   }
   if [type] == "safenode-log" {
@@ -48,10 +50,12 @@ output {
       region => "{{ aws_region }}"
       bucket => "{{ aws_bucket }}"
       canned_acl => "public-read"
-      time_file => 10
+      time_file => 30
       rotation_strategy => "time"
       prefix => "testnet-logs/{{ testnet_name }}/%{[host][name]}/%{filename}"
-      codec => plain
+      codec => plain {
+        format => "%{message}\n"
+      }
     }
   }
 }
