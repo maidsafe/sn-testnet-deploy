@@ -1,0 +1,30 @@
+---
+- name: fetch logs from remote machines
+  hosts: all
+  tasks:
+    # Due to the logs being continually written to, they must first be copied to a temp directory.
+    # Otherwise the `fetch` task will produce checksum errors.
+    - name: create temporary directory for logs
+      command: mktemp -d
+      register: temp_dir
+    - name: copy logs to temporary directory
+      shell: cp -r /home/safe/.local/share/safe/node/* {{ temp_dir.stdout }}
+
+    - name: retrieve list of files from temporary directory
+      shell: find {{ temp_dir.stdout }} -name "*.log"
+      register: find_result
+    - name: fetch each file
+      fetch:
+        src: "{{ item }}"
+        dest: "../../logs/{{env_name}}/"
+        flat: no
+      with_items: "{{ find_result.stdout_lines }}"
+
+    - name: remove temporary directory
+      command: rm -rf {{ temp_dir.stdout }}
+
+- name: reorganise local log files
+  hosts: localhost
+  tasks:
+    - name: reorganise local log files
+      command: python ../scripts/reorganise_logs.py "{{ env_name }}"
