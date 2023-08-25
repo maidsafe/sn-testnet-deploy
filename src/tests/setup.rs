@@ -5,7 +5,7 @@
 // Please see the LICENSE file for more details.
 
 use super::*;
-use crate::s3::S3AssetRepository;
+use crate::s3::MockS3RepositoryInterface;
 use crate::terraform::MockTerraformRunnerInterface;
 use assert_fs::fixture::ChildPath;
 use assert_fs::prelude::*;
@@ -13,9 +13,8 @@ use assert_fs::TempDir;
 use color_eyre::Result;
 use flate2::write::GzEncoder;
 use flate2::Compression;
-use httpmock::prelude::*;
 use mockall::predicate::*;
-use std::fs::{File, Metadata};
+use std::fs::File;
 
 pub fn setup_working_directory() -> Result<(TempDir, ChildPath)> {
     let tmp_dir = assert_fs::TempDir::new()?;
@@ -25,7 +24,7 @@ pub fn setup_working_directory() -> Result<(TempDir, ChildPath)> {
     Ok((tmp_dir, working_dir))
 }
 
-pub fn create_fake_rpc_client_archive(working_dir: &ChildPath) -> Result<(ChildPath, Metadata)> {
+pub fn create_fake_rpc_client_archive(working_dir: &ChildPath) -> Result<ChildPath> {
     let temp_archive_dir = working_dir.child("setup_archive");
     let rpc_client_archive = temp_archive_dir.child("rpc_client.tar.gz");
     let fake_rpc_client_bin = temp_archive_dir.child(RPC_CLIENT_BIN_NAME);
@@ -39,9 +38,8 @@ pub fn create_fake_rpc_client_archive(working_dir: &ChildPath) -> Result<(ChildP
     let mut builder = tar::Builder::new(gz_encoder);
     builder.append_file(RPC_CLIENT_BIN_NAME, &mut fake_rpc_client_bin_file)?;
     builder.into_inner()?;
-    let rpc_client_archive_metadata = std::fs::metadata(rpc_client_archive.path())?;
 
-    Ok((rpc_client_archive, rpc_client_archive_metadata))
+    Ok(rpc_client_archive)
 }
 
 pub fn setup_default_terraform_runner(name: &str) -> MockTerraformRunnerInterface {
@@ -59,22 +57,22 @@ pub fn setup_default_terraform_runner(name: &str) -> MockTerraformRunnerInterfac
     terraform_runner
 }
 
-pub fn setup_default_s3_repository(working_dir: &ChildPath) -> Result<S3AssetRepository> {
-    let (rpc_client_archive, rpc_client_archive_metadata) =
-        create_fake_rpc_client_archive(working_dir)?;
-    let asset_server = MockServer::start();
-    asset_server.mock(|when, then| {
-        when.method(GET)
-            .path("/rpc_client-latest-x86_64-unknown-linux-musl.tar.gz");
-        then.status(200)
-            .header(
-                "Content-Length",
-                rpc_client_archive_metadata.len().to_string(),
-            )
-            .header("Content-Type", "application/gzip")
-            .body_from_file(rpc_client_archive.path().to_str().unwrap());
-    });
-
-    let s3_repository = S3AssetRepository::new(&asset_server.base_url());
+pub fn setup_default_s3_repository(working_dir: &ChildPath) -> Result<MockS3RepositoryInterface> {
+    let saved_archive_path = working_dir
+        .to_path_buf()
+        .join("rpc_client-latest-x86_64-unknown-linux-musl.tar.gz");
+    let rpc_client_archive_path = create_fake_rpc_client_archive(working_dir)?;
+    let mut s3_repository = MockS3RepositoryInterface::new();
+    s3_repository
+        .expect_download_object()
+        .with(
+            eq("rpc_client-latest-x86_64-unknown-linux-musl.tar.gz"),
+            eq(saved_archive_path),
+        )
+        .times(1)
+        .returning(move |_object_path, archive_path| {
+            std::fs::copy(&rpc_client_archive_path, archive_path)?;
+            Ok(())
+        });
     Ok(s3_repository)
 }

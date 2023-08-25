@@ -9,17 +9,13 @@ use super::setup::*;
 use super::RPC_CLIENT_BIN_NAME;
 use crate::ansible::MockAnsibleRunnerInterface;
 use crate::rpc_client::MockRpcClientInterface;
-use crate::s3::S3AssetRepository;
+use crate::s3::MockS3RepositoryInterface;
 use crate::ssh::MockSshClientInterface;
 use crate::terraform::MockTerraformRunnerInterface;
 use assert_fs::prelude::*;
 use color_eyre::Result;
-use flate2::write::GzEncoder;
-use flate2::Compression;
-use httpmock::prelude::*;
 use mockall::predicate::*;
 use mockall::Sequence;
-use std::fs::File;
 use std::os::unix::fs::PermissionsExt;
 
 #[tokio::test]
@@ -44,7 +40,7 @@ async fn should_create_a_new_workspace() -> Result<()> {
         Box::new(MockSshClientInterface::new()),
         working_dir.to_path_buf(),
         CloudProvider::DigitalOcean,
-        s3_repository,
+        Box::new(s3_repository),
     );
     testnet.init("beta").await?;
     drop(tmp_dir);
@@ -80,7 +76,7 @@ async fn should_not_create_a_new_workspace_when_one_with_the_same_name_exists() 
         Box::new(MockSshClientInterface::new()),
         working_dir.to_path_buf(),
         CloudProvider::DigitalOcean,
-        s3_repository,
+        Box::new(s3_repository),
     );
     testnet.init("alpha").await?;
     drop(tmp_dir);
@@ -90,40 +86,11 @@ async fn should_not_create_a_new_workspace_when_one_with_the_same_name_exists() 
 #[tokio::test]
 async fn should_download_and_extract_the_rpc_client() -> Result<()> {
     let (tmp_dir, working_dir) = setup_working_directory()?;
-    let temp_archive_dir = working_dir.child("setup_archive");
-
-    // Create an archive containing a fake rpc client exe, to be returned by the mock HTTP
-    // server.
-    let rpc_client_archive = temp_archive_dir.child("rpc_client.tar.gz");
-    let fake_rpc_client_bin = temp_archive_dir.child(RPC_CLIENT_BIN_NAME);
-    fake_rpc_client_bin.write_binary(b"fake code")?;
-    let mut fake_rpc_client_bin_file = File::open(fake_rpc_client_bin.path())?;
-    let gz_encoder = GzEncoder::new(
-        File::create(rpc_client_archive.path())?,
-        Compression::default(),
-    );
-    let mut builder = tar::Builder::new(gz_encoder);
-    builder.append_file(RPC_CLIENT_BIN_NAME, &mut fake_rpc_client_bin_file)?;
-    builder.into_inner()?;
-    let rpc_client_archive_metadata = std::fs::metadata(rpc_client_archive.path())?;
-
-    let asset_server = MockServer::start();
-    asset_server.mock(|when, then| {
-        when.method(GET)
-            .path("/rpc_client-latest-x86_64-unknown-linux-musl.tar.gz");
-        then.status(200)
-            .header(
-                "Content-Length",
-                rpc_client_archive_metadata.len().to_string(),
-            )
-            .header("Content-Type", "application/gzip")
-            .body_from_file(rpc_client_archive.path().to_str().unwrap());
-    });
     let downloaded_safe_archive =
         working_dir.child("rpc_client-latest-x86_64-unknown-linux-musl.tar.gz");
 
     let extracted_rpc_client_bin = working_dir.child(RPC_CLIENT_BIN_NAME);
-    let s3_repository = S3AssetRepository::new(&asset_server.base_url());
+    let s3_repository = setup_default_s3_repository(&working_dir)?;
     let terraform_runner = setup_default_terraform_runner("alpha");
     let testnet = TestnetDeploy::new(
         Box::new(terraform_runner),
@@ -132,7 +99,7 @@ async fn should_download_and_extract_the_rpc_client() -> Result<()> {
         Box::new(MockSshClientInterface::new()),
         working_dir.to_path_buf(),
         CloudProvider::DigitalOcean,
-        s3_repository,
+        Box::new(s3_repository),
     );
 
     testnet.init("alpha").await?;
@@ -153,21 +120,8 @@ async fn should_not_download_the_rpc_client_if_it_already_exists() -> Result<()>
     let fake_rpc_client_bin = working_dir.child(RPC_CLIENT_BIN_NAME);
     fake_rpc_client_bin.write_binary(b"fake code")?;
 
-    let (rpc_client_archive, rpc_client_archive_metadata) =
-        create_fake_rpc_client_archive(&working_dir)?;
-    let asset_server = MockServer::start();
-    let mock = asset_server.mock(|when, then| {
-        when.method(GET)
-            .path("/rpc_client-latest-x86_64-unknown-linux-musl.tar.gz");
-        then.status(200)
-            .header(
-                "Content-Length",
-                rpc_client_archive_metadata.len().to_string(),
-            )
-            .header("Content-Type", "application/gzip")
-            .body_from_file(rpc_client_archive.path().to_str().unwrap());
-    });
-    let s3_repository = S3AssetRepository::new(&asset_server.base_url());
+    let mut s3_repository = MockS3RepositoryInterface::new();
+    s3_repository.expect_download_object().times(0);
 
     let terraform_runner = setup_default_terraform_runner("alpha");
     let testnet = TestnetDeploy::new(
@@ -177,11 +131,10 @@ async fn should_not_download_the_rpc_client_if_it_already_exists() -> Result<()>
         Box::new(MockSshClientInterface::new()),
         working_dir.to_path_buf(),
         CloudProvider::DigitalOcean,
-        s3_repository,
+        Box::new(s3_repository),
     );
     testnet.init("alpha").await?;
 
-    mock.assert_hits(0);
     drop(tmp_dir);
     Ok(())
 }
@@ -199,7 +152,7 @@ async fn should_generate_ansible_inventory_for_digital_ocean_for_the_new_testnet
         Box::new(MockSshClientInterface::new()),
         working_dir.to_path_buf(),
         CloudProvider::DigitalOcean,
-        s3_repository,
+        Box::new(s3_repository),
     );
 
     testnet.init("alpha").await?;
@@ -257,7 +210,7 @@ async fn should_not_overwrite_generated_inventory() -> Result<()> {
         Box::new(MockSshClientInterface::new()),
         working_dir.to_path_buf(),
         CloudProvider::DigitalOcean,
-        s3_repository,
+        Box::new(s3_repository),
     );
 
     testnet.init("alpha").await?;

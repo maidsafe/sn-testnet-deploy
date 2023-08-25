@@ -27,12 +27,14 @@ pub enum Error {
     ExternalCommandRunFailed(String),
     #[error("To provision the remaining nodes the multiaddr of the genesis node must be supplied")]
     GenesisMultiAddrNotSupplied,
+    #[error("Failed to retrieve '{0}' from '{1}")]
+    GetS3ObjectError(String, String),
     #[error(transparent)]
     InquireError(#[from] inquire::InquireError),
     #[error(transparent)]
     Io(#[from] std::io::Error),
-    #[error(transparent)]
-    Reqwest(#[from] reqwest::Error),
+    #[error("Error in byte stream when attempting to retrieve S3 object")]
+    S3ByteStreamError,
     #[error(transparent)]
     SerdeJson(#[from] serde_json::Error),
     #[error("An unexpected error occurred during the setup process")]

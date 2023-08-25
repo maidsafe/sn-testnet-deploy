@@ -8,6 +8,7 @@ use super::super::{CloudProvider, TestnetDeploy};
 use super::setup::*;
 use crate::ansible::MockAnsibleRunnerInterface;
 use crate::rpc_client::MockRpcClientInterface;
+use crate::s3::MockS3RepositoryInterface;
 use crate::ssh::MockSshClientInterface;
 use crate::terraform::MockTerraformRunnerInterface;
 use assert_fs::prelude::*;
@@ -61,7 +62,7 @@ async fn should_run_terraform_destroy_and_delete_workspace_and_delete_inventory_
         Box::new(MockSshClientInterface::new()),
         working_dir.to_path_buf(),
         CloudProvider::DigitalOcean,
-        s3_repository,
+        Box::new(s3_repository),
     );
 
     // Calling init will create the Ansible inventory files, which we want to be removed by
@@ -85,7 +86,8 @@ async fn should_run_terraform_destroy_and_delete_workspace_and_delete_inventory_
 #[tokio::test]
 async fn should_return_an_error_when_invalid_name_is_supplied() -> Result<()> {
     let (tmp_dir, working_dir) = setup_working_directory()?;
-    let s3_repository = setup_default_s3_repository(&working_dir)?;
+    let mut s3_repository = MockS3RepositoryInterface::new();
+    s3_repository.expect_download_object().times(0);
     let mut terraform_runner = MockTerraformRunnerInterface::new();
     terraform_runner
         .expect_workspace_list()
@@ -105,7 +107,7 @@ async fn should_return_an_error_when_invalid_name_is_supplied() -> Result<()> {
         Box::new(MockSshClientInterface::new()),
         working_dir.to_path_buf(),
         CloudProvider::DigitalOcean,
-        s3_repository,
+        Box::new(s3_repository),
     );
 
     let result = testnet.clean("beta").await;

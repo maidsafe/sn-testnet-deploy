@@ -8,6 +8,7 @@ use super::super::{CloudProvider, TestnetDeploy};
 use super::setup::*;
 use crate::ansible::MockAnsibleRunnerInterface;
 use crate::rpc_client::MockRpcClientInterface;
+use crate::s3::MockS3RepositoryInterface;
 use crate::ssh::MockSshClientInterface;
 use crate::terraform::MockTerraformRunnerInterface;
 use color_eyre::Result;
@@ -19,7 +20,8 @@ use mockall::predicate::*;
 #[tokio::test]
 async fn should_run_terraform_apply_with_custom_bin_set() -> Result<()> {
     let (tmp_dir, working_dir) = setup_working_directory()?;
-    let s3_repository = setup_default_s3_repository(&working_dir)?;
+    let mut s3_repository = MockS3RepositoryInterface::new();
+    s3_repository.expect_download_object().times(0);
     let mut terraform_runner = MockTerraformRunnerInterface::new();
     terraform_runner
         .expect_workspace_select()
@@ -42,7 +44,7 @@ async fn should_run_terraform_apply_with_custom_bin_set() -> Result<()> {
         Box::new(MockSshClientInterface::new()),
         working_dir.to_path_buf(),
         CloudProvider::DigitalOcean,
-        s3_repository,
+        Box::new(s3_repository),
     );
 
     testnet.create_infra("beta", 30, true).await?;
