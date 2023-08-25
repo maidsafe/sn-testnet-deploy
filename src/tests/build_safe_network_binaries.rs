@@ -52,7 +52,7 @@ async fn should_run_ansible_to_build_faucet() -> Result<()> {
         Box::new(ssh_client),
         working_dir.to_path_buf(),
         CloudProvider::DigitalOcean,
-        s3_repository,
+        Box::new(s3_repository),
     );
 
     testnet.init("beta").await?;
@@ -103,7 +103,7 @@ async fn should_run_ansible_to_build_faucet_and_custom_safenode_bin() -> Result<
         Box::new(ssh_client),
         working_dir.to_path_buf(),
         CloudProvider::DigitalOcean,
-        s3_repository,
+        Box::new(s3_repository),
     );
 
     testnet.init("beta").await?;

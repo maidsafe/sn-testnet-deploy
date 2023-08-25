@@ -18,7 +18,7 @@ mod tests;
 use crate::ansible::{AnsibleRunner, AnsibleRunnerInterface};
 use crate::error::{Error, Result};
 use crate::rpc_client::{RpcClient, RpcClientInterface};
-use crate::s3::S3AssetRepository;
+use crate::s3::{S3AssetRepository, S3RepositoryInterface};
 use crate::ssh::{SshClient, SshClientInterface};
 use crate::terraform::{TerraformRunner, TerraformRunnerInterface};
 use flate2::read::GzDecoder;
@@ -163,7 +163,7 @@ impl TestnetDeployBuilder {
             PathBuf::from("./safenode_rpc_client"),
             working_directory_path.clone(),
         );
-        let s3_repository = S3AssetRepository::new("https://sn-testnet.s3.eu-west-2.amazonaws.com");
+        let s3_repository = S3AssetRepository::new("sn-testnet");
 
         let testnet = TestnetDeploy::new(
             Box::new(terraform_runner),
@@ -172,7 +172,7 @@ impl TestnetDeployBuilder {
             Box::new(SshClient::new(ssh_secret_key_path)),
             working_directory_path,
             provider.clone(),
-            s3_repository,
+            Box::new(s3_repository),
         );
 
         Ok(testnet)
@@ -186,7 +186,7 @@ pub struct TestnetDeploy {
     pub ssh_client: Box<dyn SshClientInterface>,
     pub working_directory_path: PathBuf,
     pub cloud_provider: CloudProvider,
-    pub s3_repository: S3AssetRepository,
+    pub s3_repository: Box<dyn S3RepositoryInterface>,
     pub inventory_file_path: PathBuf,
 }
 
@@ -198,7 +198,7 @@ impl TestnetDeploy {
         ssh_client: Box<dyn SshClientInterface>,
         working_directory_path: PathBuf,
         cloud_provider: CloudProvider,
-        s3_repository: S3AssetRepository,
+        s3_repository: Box<dyn S3RepositoryInterface>,
     ) -> TestnetDeploy {
         let inventory_file_path = working_directory_path
             .join("ansible")
@@ -231,7 +231,7 @@ impl TestnetDeploy {
             let asset_name = "rpc_client-latest-x86_64-unknown-linux-musl.tar.gz";
             let archive_path = self.working_directory_path.join(asset_name);
             self.s3_repository
-                .download_asset(asset_name, &archive_path)
+                .download_object(asset_name, &archive_path)
                 .await?;
             let archive_file = File::open(archive_path.clone())?;
             let decoder = GzDecoder::new(archive_file);

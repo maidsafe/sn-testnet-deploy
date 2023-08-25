@@ -54,7 +54,7 @@ async fn should_run_ansible_against_genesis() -> Result<()> {
         Box::new(ssh_client),
         working_dir.to_path_buf(),
         CloudProvider::DigitalOcean,
-        s3_repository,
+        Box::new(s3_repository),
     );
 
     testnet.init("beta").await?;
@@ -105,7 +105,7 @@ async fn should_run_ansible_against_genesis_with_a_custom_binary() -> Result<()>
         Box::new(ssh_client),
         working_dir.to_path_buf(),
         CloudProvider::DigitalOcean,
-        s3_repository,
+        Box::new(s3_repository),
     );
 
     testnet.init("beta").await?;

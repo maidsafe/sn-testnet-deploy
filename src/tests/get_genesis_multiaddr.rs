@@ -8,6 +8,7 @@ use super::super::{CloudProvider, TestnetDeploy};
 use super::setup::*;
 use crate::ansible::MockAnsibleRunnerInterface;
 use crate::rpc_client::{MockRpcClientInterface, NodeInfo};
+use crate::s3::MockS3RepositoryInterface;
 use crate::ssh::MockSshClientInterface;
 use crate::terraform::MockTerraformRunnerInterface;
 use color_eyre::Result;
@@ -18,7 +19,8 @@ use std::path::PathBuf;
 #[tokio::test]
 async fn should_return_the_genesis_multiaddr() -> Result<()> {
     let (tmp_dir, working_dir) = setup_working_directory()?;
-    let s3_repository = setup_default_s3_repository(&working_dir)?;
+    let mut s3_repository = MockS3RepositoryInterface::new();
+    s3_repository.expect_download_object().times(0);
     let mut ansible_runner = MockAnsibleRunnerInterface::new();
     ansible_runner
         .expect_inventory_list()
@@ -50,7 +52,7 @@ async fn should_return_the_genesis_multiaddr() -> Result<()> {
         Box::new(MockSshClientInterface::new()),
         working_dir.to_path_buf(),
         CloudProvider::DigitalOcean,
-        s3_repository,
+        Box::new(s3_repository),
     );
 
     let (multiaddr, genesis_ip) = testnet.get_genesis_multiaddr("beta").await?;

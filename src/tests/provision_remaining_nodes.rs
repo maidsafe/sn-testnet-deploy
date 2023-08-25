@@ -40,7 +40,7 @@ async fn should_run_ansible_against_the_remaining_nodes() -> Result<()> {
         Box::new(MockSshClientInterface::new()),
         working_dir.to_path_buf(),
         CloudProvider::DigitalOcean,
-        s3_repository,
+        Box::new(s3_repository),
     );
 
     testnet.init("beta").await?;
@@ -84,7 +84,7 @@ async fn should_run_ansible_against_the_remaining_nodes_with_a_custom_binary() -
         Box::new(MockSshClientInterface::new()),
         working_dir.to_path_buf(),
         CloudProvider::DigitalOcean,
-        s3_repository,
+        Box::new(s3_repository),
     );
 
     testnet.init("beta").await?;
