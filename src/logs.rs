@@ -1,9 +1,34 @@
 use crate::error::{Error, Result};
 use crate::s3::{S3Repository, S3RepositoryInterface};
+use crate::TestnetDeploy;
 use fs_extra::dir::{copy, remove, CopyOptions};
 use std::fs::File;
 use std::io::{Cursor, Read};
 use std::path::{Path, PathBuf};
+
+impl TestnetDeploy {
+    /// Run an Ansible playbook to copy the logs from all the machines in the inventory.
+    ///
+    /// It needs to be part of `TestnetDeploy` because the Ansible runner is already setup in that
+    /// context.
+    pub async fn copy_logs(&self, name: &str) -> Result<()> {
+        let dest = PathBuf::from(".").join("logs").join(format!("{name}"));
+        if dest.exists() {
+            println!("Removing existing {} directory", dest.to_string_lossy());
+            remove(dest.clone())?;
+        }
+        std::fs::create_dir_all(&dest)?;
+        // The logs destination does not get passed to Ansible because the playbook assumes it's at
+        // a relative location.
+        self.ansible_runner.run_playbook(
+            PathBuf::from("logs.yml"),
+            PathBuf::from("inventory").join(format!(".{name}_node_inventory_digital_ocean.yml")),
+            self.cloud_provider.get_ssh_user(),
+            Some(format!("{{ \"env_name\": \"{name}\" }}")),
+        )?;
+        Ok(())
+    }
+}
 
 pub async fn get_logs(name: &str) -> Result<()> {
     let dest_path = std::env::current_dir()?.join("logs").join(name);

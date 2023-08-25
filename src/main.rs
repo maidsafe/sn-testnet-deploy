@@ -85,6 +85,17 @@ enum Commands {
 
 #[derive(Subcommand, Debug)]
 enum LogCommands {
+    /// Retrieve the logs for a given environment by copying them from all the VMs.
+    ///
+    /// This will write the logs to 'logs/<name>', relative to the current directory.
+    Copy {
+        /// The name of the environment
+        #[arg(short = 'n', long)]
+        name: String,
+        /// The cloud provider that was used.
+        #[clap(long, default_value_t = CloudProvider::DigitalOcean, value_parser = parse_provider, verbatim_doc_comment)]
+        provider: CloudProvider,
+    },
     /// Retrieve the logs for a given environment from S3.
     ///
     /// This will write the logs to 'logs/<name>', relative to the current directory.
@@ -141,6 +152,11 @@ async fn main() -> Result<()> {
             Ok(())
         }
         Some(Commands::Logs(log_cmd)) => match log_cmd {
+            LogCommands::Copy { name, provider } => {
+                let testnet_deploy = TestnetDeployBuilder::default().provider(provider).build()?;
+                testnet_deploy.copy_logs(&name).await?;
+                Ok(())
+            }
             LogCommands::Get { name } => {
                 sn_testnet_deploy::logs::get_logs(&name).await?;
                 Ok(())
