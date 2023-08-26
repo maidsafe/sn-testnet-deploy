@@ -16,13 +16,15 @@ pub enum Error {
     #[error("Could not determine content length for asset")]
     AssetContentLengthUndetermined,
     #[error(transparent)]
-    AwsS3Error(#[from] aws_sdk_s3::Error),
+    AwsS3Error(#[from] Box<aws_sdk_s3::Error>),
     #[error("The {0} environment variable must be set to use your cloud provider")]
     CloudProviderCredentialsNotSupplied(String),
     #[error("The {0} cloud provider is not supported yet")]
     CloudProviderNotSupported(String),
     #[error("Both the repository owner and branch name must be supplied if either are used")]
     CustomBinConfigError,
+    #[error("Failed to delete '{0}' from '{1}")]
+    DeleteS3ObjectError(String, String),
     #[error("The '{0}' environment does not exist")]
     EnvironmentDoesNotExist(String),
     #[error("Command executed with {0} failed. See output for details.")]
@@ -39,6 +41,8 @@ pub enum Error {
     Io(#[from] std::io::Error),
     #[error("Failed to list objects in S3 bucket with '{0}' prefix")]
     ListS3ObjectsError(String),
+    #[error("Logs for a '{0}' testnet already exist")]
+    LogsForPreviousTestnetExist(String),
     #[error("Logs have not been retrieved for the '{0}' environment.")]
     LogsNotRetrievedError(String),
     #[error("Error in byte stream when attempting to retrieve S3 object")]

@@ -57,7 +57,10 @@ pub fn setup_default_terraform_runner(name: &str) -> MockTerraformRunnerInterfac
     terraform_runner
 }
 
-pub fn setup_default_s3_repository(working_dir: &ChildPath) -> Result<MockS3RepositoryInterface> {
+pub fn setup_default_s3_repository(
+    env_name: &str,
+    working_dir: &ChildPath,
+) -> Result<MockS3RepositoryInterface> {
     let saved_archive_path = working_dir
         .to_path_buf()
         .join("rpc_client-latest-x86_64-unknown-linux-musl.tar.gz");
@@ -74,5 +77,10 @@ pub fn setup_default_s3_repository(working_dir: &ChildPath) -> Result<MockS3Repo
             std::fs::copy(&rpc_client_archive_path, archive_path)?;
             Ok(())
         });
+    s3_repository
+        .expect_folder_exists()
+        .with(eq(format!("testnet-logs/{env_name}")))
+        .times(1)
+        .returning(|_| Ok(false));
     Ok(s3_repository)
 }
