@@ -1,3 +1,9 @@
+// Copyright (c) 2023, MaidSafe.
+// All rights reserved.
+//
+// This SAFE Network Software is licensed under the BSD-3-Clause license.
+// Please see the LICENSE file for more details.
+
 use crate::error::{Error, Result};
 use crate::s3::{S3Repository, S3RepositoryInterface};
 use crate::TestnetDeploy;
@@ -12,7 +18,7 @@ impl TestnetDeploy {
     /// It needs to be part of `TestnetDeploy` because the Ansible runner is already setup in that
     /// context.
     pub async fn copy_logs(&self, name: &str) -> Result<()> {
-        let dest = PathBuf::from(".").join("logs").join(format!("{name}"));
+        let dest = PathBuf::from(".").join("logs").join(name);
         if dest.exists() {
             println!("Removing existing {} directory", dest.to_string_lossy());
             remove(dest.clone())?;
@@ -59,6 +65,14 @@ pub async fn reassemble_logs(name: &str) -> Result<()> {
     copy(src.clone(), dest.clone(), &options)?;
 
     visit_dirs(&dest, &process_part_files, &src, &dest)?;
+    Ok(())
+}
+
+pub async fn rm_logs(name: &str) -> Result<()> {
+    let s3_repository = S3Repository::new("sn-testnet");
+    s3_repository
+        .delete_folder(&format!("testnet-logs/{name}"))
+        .await?;
     Ok(())
 }
 

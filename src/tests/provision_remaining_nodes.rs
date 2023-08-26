@@ -18,7 +18,7 @@ const CUSTOM_BIN_URL: &str = "https://sn-node.s3.eu-west-2.amazonaws.com/maidsaf
 #[tokio::test]
 async fn should_run_ansible_against_the_remaining_nodes() -> Result<()> {
     let (tmp_dir, working_dir) = setup_working_directory()?;
-    let s3_repository = setup_default_s3_repository(&working_dir)?;
+    let s3_repository = setup_default_s3_repository("beta", &working_dir)?;
     let mut ansible_runner = MockAnsibleRunnerInterface::new();
     ansible_runner
         .expect_run_playbook()
@@ -62,7 +62,7 @@ async fn should_run_ansible_against_the_remaining_nodes() -> Result<()> {
 #[tokio::test]
 async fn should_run_ansible_against_the_remaining_nodes_with_a_custom_binary() -> Result<()> {
     let (tmp_dir, working_dir) = setup_working_directory()?;
-    let s3_repository = setup_default_s3_repository(&working_dir)?;
+    let s3_repository = setup_default_s3_repository("beta", &working_dir)?;
     let mut ansible_runner = MockAnsibleRunnerInterface::new();
     ansible_runner
         .expect_run_playbook()

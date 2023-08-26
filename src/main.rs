@@ -5,8 +5,9 @@
 // Please see the LICENSE file for more details.
 
 use clap::{Parser, Subcommand};
-use color_eyre::{eyre::eyre, Result};
+use color_eyre::{eyre::eyre, Help, Result};
 use dotenv::dotenv;
+use sn_testnet_deploy::error::Error;
 use sn_testnet_deploy::setup::setup_dotenv_file;
 use sn_testnet_deploy::CloudProvider;
 use sn_testnet_deploy::TestnetDeployBuilder;
@@ -117,10 +118,17 @@ enum LogCommands {
         #[arg(short = 'n', long)]
         name: String,
     },
+    /// Remove the logs from a given environment from the bucket on S3.
+    Rm {
+        /// The name of the environment for which logs have already been retrieved
+        #[arg(short = 'n', long)]
+        name: String,
+    },
 }
 
 #[tokio::main]
 async fn main() -> Result<()> {
+    color_eyre::install()?;
     dotenv().ok();
     env_logger::init();
 
@@ -140,7 +148,29 @@ async fn main() -> Result<()> {
             vm_count,
         }) => {
             let testnet_deploy = TestnetDeployBuilder::default().provider(provider).build()?;
-            testnet_deploy.init(&name).await?;
+            let result = testnet_deploy.init(&name).await;
+            match result {
+                Ok(_) => {}
+                Err(e) => match e {
+                    Error::LogsForPreviousTestnetExist(_) => {
+                        return Err(eyre!(e)
+                            .wrap_err(format!(
+                                "Logs already exist for a previous testnet with the \
+                                    name '{name}'"
+                            ))
+                            .suggestion(
+                                "If you wish to keep them, retrieve the logs with the 'logs get' \
+                                command, then remove them with 'logs rm'. If you don't need them, \
+                                simply run 'logs rm'. Then you can proceed with deploying your \
+                                new testnet.",
+                            ));
+                    }
+                    _ => {
+                        return Err(eyre!(e));
+                    }
+                },
+            }
+
             testnet_deploy
                 .deploy(&name, vm_count, node_count, repo_owner, branch)
                 .await?;
@@ -163,6 +193,10 @@ async fn main() -> Result<()> {
             }
             LogCommands::Reassemble { name } => {
                 sn_testnet_deploy::logs::reassemble_logs(&name).await?;
+                Ok(())
+            }
+            LogCommands::Rm { name } => {
+                sn_testnet_deploy::logs::rm_logs(&name).await?;
                 Ok(())
             }
         },

@@ -220,6 +220,14 @@ impl TestnetDeploy {
     }
 
     pub async fn init(&self, name: &str) -> Result<()> {
+        if self
+            .s3_repository
+            .folder_exists(&format!("testnet-logs/{name}"))
+            .await?
+        {
+            return Err(Error::LogsForPreviousTestnetExist(name.to_string()));
+        }
+
         self.terraform_runner.init()?;
         let workspaces = self.terraform_runner.workspace_list()?;
         if !workspaces.contains(&name.to_string()) {
