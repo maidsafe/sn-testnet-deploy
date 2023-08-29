@@ -6,6 +6,7 @@
 use crate::error::{Error, Result};
 use crate::CloudProvider;
 use crate::{is_binary_on_path, run_external_command};
+use log::debug;
 #[cfg(test)]
 use mockall::automock;
 use serde::Deserialize;
@@ -111,6 +112,8 @@ impl AnsibleRunnerInterface for AnsibleRunner {
             true,
         )?;
 
+        debug!("Inventory list output:");
+        debug!("{output:#?}");
         let mut output_string = output
             .into_iter()
             .skip_while(|line| !line.starts_with('{'))

@@ -23,6 +23,7 @@ async fn should_run_terraform_destroy_and_delete_workspace_and_delete_inventory_
     let s3_repository = setup_default_s3_repository("alpha", &working_dir)?;
     let mut terraform_runner = setup_default_terraform_runner("alpha");
     let mut seq = Sequence::new();
+    terraform_runner.expect_init().times(1).returning(|| Ok(()));
     terraform_runner
         .expect_workspace_list()
         .times(1)
@@ -89,6 +90,7 @@ async fn should_return_an_error_when_invalid_name_is_supplied() -> Result<()> {
     let mut s3_repository = MockS3RepositoryInterface::new();
     s3_repository.expect_download_object().times(0);
     let mut terraform_runner = MockTerraformRunnerInterface::new();
+    terraform_runner.expect_init().times(1).returning(|| Ok(()));
     terraform_runner
         .expect_workspace_list()
         .times(1)
@@ -120,6 +122,70 @@ async fn should_return_an_error_when_invalid_name_is_supplied() -> Result<()> {
             assert_eq!(e.to_string(), "The 'beta' environment does not exist");
             drop(tmp_dir);
             Ok(())
+        }
+    }
+}
+
+#[tokio::test]
+async fn should_not_error_when_inventory_does_not_exist() -> Result<()> {
+    let (tmp_dir, working_dir) = setup_working_directory()?;
+    let mut seq = Sequence::new();
+    let mut terraform_runner = MockTerraformRunnerInterface::new();
+    terraform_runner.expect_init().times(1).returning(|| Ok(()));
+    terraform_runner
+        .expect_workspace_list()
+        .times(1)
+        .returning(|| {
+            Ok(vec![
+                "alpha".to_string(),
+                "default".to_string(),
+                "dev".to_string(),
+            ])
+        });
+    terraform_runner
+        .expect_workspace_select()
+        .times(1)
+        .in_sequence(&mut seq)
+        .with(eq("alpha".to_string()))
+        .returning(|_| Ok(()));
+    terraform_runner
+        .expect_destroy()
+        .times(1)
+        .returning(|| Ok(()));
+    terraform_runner
+        .expect_workspace_select()
+        .times(1)
+        .in_sequence(&mut seq)
+        .with(eq("dev".to_string()))
+        .returning(|_| Ok(()));
+    terraform_runner
+        .expect_workspace_delete()
+        .times(1)
+        .with(eq("alpha".to_string()))
+        .returning(|_| Ok(()));
+
+    let testnet = TestnetDeploy::new(
+        Box::new(terraform_runner),
+        Box::new(MockAnsibleRunnerInterface::new()),
+        Box::new(MockRpcClientInterface::new()),
+        Box::new(MockSshClientInterface::new()),
+        working_dir.to_path_buf(),
+        CloudProvider::DigitalOcean,
+        Box::new(MockS3RepositoryInterface::new()),
+    );
+
+    // Do not call the `init` command, which will be the case in the remote GHA workflow
+    // environment. In this case, the process should still complete without an error. It should not
+    // attempt to remove inventory files that don't exist.
+    let result = testnet.clean("alpha").await;
+    match result {
+        Ok(()) => {
+            drop(tmp_dir);
+            Ok(())
+        }
+        Err(_) => {
+            drop(tmp_dir);
+            Err(eyre!("clean should run without error"))
         }
     }
 }

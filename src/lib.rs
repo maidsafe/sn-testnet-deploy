@@ -283,6 +283,7 @@ impl TestnetDeploy {
             contents = contents.replace("env_value", name);
             contents = contents.replace("type_value", inventory_type);
             std::fs::write(&dest_path, contents)?;
+            debug!("Created inventory file at {dest_path:#?}");
         }
 
         Ok(())
@@ -531,6 +532,7 @@ impl TestnetDeploy {
     }
 
     pub async fn clean(&self, name: &str) -> Result<()> {
+        self.terraform_runner.init()?;
         let workspaces = self.terraform_runner.workspace_list()?;
         if !workspaces.contains(&name.to_string()) {
             return Err(Error::EnvironmentDoesNotExist(name.to_string()));
@@ -555,7 +557,10 @@ impl TestnetDeploy {
                     ".{}_{}_inventory_digital_ocean.yml",
                     name, inventory_type
                 ));
-            std::fs::remove_file(inventory_file_path)?;
+            if inventory_file_path.exists() {
+                debug!("Removing inventory file at {inventory_file_path:#?}");
+                std::fs::remove_file(inventory_file_path)?;
+            }
         }
         println!("Deleted Ansible inventory for {name}");
         Ok(())
@@ -673,12 +678,15 @@ pub fn run_external_command(
     suppress_output: bool,
 ) -> Result<Vec<String>> {
     let mut command = Command::new(binary_path.clone());
-    for arg in args {
+    for arg in &args {
         command.arg(arg);
     }
     command.stdout(Stdio::piped());
     command.stderr(Stdio::piped());
-    command.current_dir(working_directory_path);
+    command.current_dir(working_directory_path.clone());
+    debug!("Running {binary_path:#?} with args {args:#?}");
+    debug!("Working directory set to {working_directory_path:#?}");
+
     let mut child = command.spawn()?;
     let mut output_lines = Vec::new();
 

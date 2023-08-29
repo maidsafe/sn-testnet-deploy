@@ -184,6 +184,7 @@ async fn main() -> Result<()> {
         Some(Commands::Logs(log_cmd)) => match log_cmd {
             LogCommands::Copy { name, provider } => {
                 let testnet_deploy = TestnetDeployBuilder::default().provider(provider).build()?;
+                testnet_deploy.init(&name).await?;
                 testnet_deploy.copy_logs(&name).await?;
                 Ok(())
             }
