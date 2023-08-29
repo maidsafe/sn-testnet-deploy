@@ -27,7 +27,7 @@ pub enum Error {
     DeleteS3ObjectError(String, String),
     #[error("The '{0}' environment does not exist")]
     EnvironmentDoesNotExist(String),
-    #[error("Command executed with {0} failed. See output for details.")]
+    #[error("Command that executed with {0} failed. See output for details.")]
     ExternalCommandRunFailed(String),
     #[error("To provision the remaining nodes the multiaddr of the genesis node must be supplied")]
     GenesisMultiAddrNotSupplied,

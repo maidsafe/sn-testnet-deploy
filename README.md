@@ -14,6 +14,8 @@ The tool makes use of Terraform to create either droplets on Digital Ocean or EC
 
 We make use of Ansible for provisioning the VMs. Since Ansible is a Python application, it is advisable to install it in a virtualenv. If this sounds unfamiliar, I would recommend asking ChatGPT something along the lines of, "How can I install Ansible in a virtualenv created and managed by virtualenvwrapper?" The virtualenv must be activated any time you use the tool.
 
+August 2023 update: please pin to Ansible version 8.2.0, using `pip install ansible==8.2.0`. There is an issue with the newer version not correctly reading the Digital Ocean environment variables for the dynamic inventory.
+
 After you've installed these tools, run our `setup` command:
 ```
 cargo run -- setup
