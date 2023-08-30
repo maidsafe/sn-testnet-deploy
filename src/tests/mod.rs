@@ -9,6 +9,7 @@ mod clean;
 mod create_infra;
 mod get_genesis_multiaddr;
 mod init;
+mod logstash;
 mod provision_faucet;
 mod provision_genesis_node;
 mod provision_remaining_nodes;

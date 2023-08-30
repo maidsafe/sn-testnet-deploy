@@ -6,3 +6,4 @@ resources/**/.terraform/
 /logs
 safenode_rpc_client
 *.orig
+*.key

@@ -73,6 +73,24 @@ packer build build.pkr.hcl
 
 This will produce a VM image that can now be launched as a droplet. There is also another template, `node.pkr.hcl`.
 
+## Logging Infrastructure
+
+We forward the logs for our testnets to an S3 bucket, which requires some infrastructure.
+
+The VMs hosting our nodes are small machines with about 2GB of RAM. They use Filebeat to forward the logs to a dedicated Logstash stack, which then forwards them on to S3. For Logstash, right now, we only have one stack and a single machine in the stack, but we've designed to accommodate having many.
+
+This Logstash stack will serve all testnets. To bring the stack up, use this command:
+```
+cargo run -- logstash deploy --name main --provider digital-ocean
+```
+
+To tear it down:
+```
+cargo run -- logstash clean --name main --provider digital-ocean
+```
+
+By default, all deployed testnets will point to this `main` stack. However, it's possible to create another one with a different name, and supply the name of that stack on the main `deploy` command, using the `--logstash-stack-name` argument.
+
 ## License
 
 This repository is licensed under the BSD-3-Clause license.

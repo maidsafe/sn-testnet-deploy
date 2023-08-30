@@ -1,4 +1,14 @@
 ---
+- name: copy logstash certificate to nodes
+  hosts: all
+  become: False
+  tasks:
+    - name: copy public logstash certificate to node
+      copy:
+        src: logstash-{{ logstash_stack_name }}-public.crt
+        dest: /tmp/logstash-{{ logstash_stack_name }}-public.crt
+        mode: 0644
+
 - name: deploy safenode to remaining nodes
   hosts: all
   become: False
@@ -18,5 +28,5 @@
     - node
     - role: resource_usage
       become: True
-    - role: log_forwarding
+    - role: filebeat
       become: True
