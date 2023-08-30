@@ -5,8 +5,10 @@
 // Please see the LICENSE file for more details.
 
 pub mod ansible;
+pub mod digital_ocean;
 pub mod error;
 pub mod logs;
+pub mod logstash;
 pub mod rpc_client;
 pub mod s3;
 pub mod setup;
@@ -26,6 +28,7 @@ use flate2::read::GzDecoder;
 use log::debug;
 use std::fs::File;
 use std::io::{BufRead, BufReader, BufWriter};
+use std::net::SocketAddr;
 use std::os::unix::fs::PermissionsExt;
 use std::path::PathBuf;
 use std::process::{Command, Stdio};
@@ -152,6 +155,7 @@ impl TestnetDeployBuilder {
             terraform_binary_path.to_path_buf(),
             working_directory_path
                 .join("terraform")
+                .join("testnet")
                 .join(provider.to_string()),
             provider.clone(),
             &state_bucket_name,
@@ -338,6 +342,8 @@ impl TestnetDeploy {
     pub async fn provision_genesis_node(
         &self,
         name: &str,
+        logstash_stack_name: &str,
+        logstash_hosts: &[SocketAddr],
         repo_owner: Option<String>,
         branch: Option<String>,
     ) -> Result<()> {
@@ -353,7 +359,15 @@ impl TestnetDeploy {
             PathBuf::from("genesis_node.yml"),
             PathBuf::from("inventory").join(format!(".{name}_genesis_inventory_digital_ocean.yml")),
             self.cloud_provider.get_ssh_user(),
-            Some(self.build_node_extra_vars_doc(name, None, None, repo_owner, branch)?),
+            Some(self.build_node_extra_vars_doc(
+                name,
+                None,
+                None,
+                repo_owner,
+                branch,
+                logstash_stack_name,
+                logstash_hosts,
+            )?),
         )?;
         print_duration(start.elapsed());
         Ok(())
@@ -381,6 +395,8 @@ impl TestnetDeploy {
     pub async fn provision_remaining_nodes(
         &self,
         name: &str,
+        logstash_stack_name: &str,
+        logstash_hosts: &[SocketAddr],
         genesis_multiaddr: String,
         node_instance_count: u16,
         repo_owner: Option<String>,
@@ -398,6 +414,8 @@ impl TestnetDeploy {
                 Some(node_instance_count),
                 repo_owner,
                 branch,
+                logstash_stack_name,
+                logstash_hosts,
             )?),
         )?;
         print_duration(start.elapsed());
@@ -421,6 +439,8 @@ impl TestnetDeploy {
     pub async fn deploy(
         &self,
         name: &str,
+        logstash_stack_name: &str,
+        logstash_hosts: &[SocketAddr],
         vm_count: u16,
         node_instance_count: u16,
         repo_owner: Option<String>,
@@ -434,14 +454,28 @@ impl TestnetDeploy {
         self.create_infra(name, vm_count, true).await?;
         self.build_safe_network_binaries(name, repo_owner.clone(), branch.clone())
             .await?;
-        self.provision_genesis_node(name, repo_owner.clone(), branch.clone())
-            .await?;
+        self.provision_genesis_node(
+            name,
+            logstash_stack_name,
+            logstash_hosts,
+            repo_owner.clone(),
+            branch.clone(),
+        )
+        .await?;
         let (multiaddr, genesis_ip) = self.get_genesis_multiaddr(name).await?;
         println!("Obtained multiaddr for genesis node: {multiaddr}");
         self.provision_faucet(name, &multiaddr, repo_owner.clone(), branch.clone())
             .await?;
-        self.provision_remaining_nodes(name, multiaddr, node_instance_count, repo_owner, branch)
-            .await?;
+        self.provision_remaining_nodes(
+            name,
+            logstash_stack_name,
+            logstash_hosts,
+            multiaddr,
+            node_instance_count,
+            repo_owner,
+            branch,
+        )
+        .await?;
         // For reasons not known, the faucet service needs to be 'nudged' with a restart.
         // It seems to work fine after this.
         self.ssh_client.run_command(
@@ -532,38 +566,16 @@ impl TestnetDeploy {
     }
 
     pub async fn clean(&self, name: &str) -> Result<()> {
-        self.terraform_runner.init()?;
-        let workspaces = self.terraform_runner.workspace_list()?;
-        if !workspaces.contains(&name.to_string()) {
-            return Err(Error::EnvironmentDoesNotExist(name.to_string()));
-        }
-        self.terraform_runner.workspace_select(name)?;
-        println!("Selected {name} workspace");
-        self.terraform_runner.destroy()?;
-        // The 'dev' workspace is one we always expect to exist, for admin purposes.
-        // You can't delete a workspace while it is selected, so we select 'dev' before we delete
-        // the current workspace.
-        self.terraform_runner.workspace_select("dev")?;
-        self.terraform_runner.workspace_delete(name)?;
-        println!("Deleted {name} workspace");
-
-        let inventory_types = ["build", "genesis", "node"];
-        for inventory_type in inventory_types.iter() {
-            let inventory_file_path = self
-                .working_directory_path
-                .join("ansible")
-                .join("inventory")
-                .join(format!(
-                    ".{}_{}_inventory_digital_ocean.yml",
-                    name, inventory_type
-                ));
-            if inventory_file_path.exists() {
-                debug!("Removing inventory file at {inventory_file_path:#?}");
-                std::fs::remove_file(inventory_file_path)?;
-            }
-        }
-        println!("Deleted Ansible inventory for {name}");
-        Ok(())
+        do_clean(
+            name,
+            self.working_directory_path.clone(),
+            &*self.terraform_runner,
+            vec![
+                "build".to_string(),
+                "genesis".to_string(),
+                "node".to_string(),
+            ],
+        )
     }
 
     fn build_node_extra_vars_doc(
@@ -573,6 +585,8 @@ impl TestnetDeploy {
         node_instance_count: Option<u16>,
         repo_owner: Option<String>,
         branch: Option<String>,
+        logstash_stack_name: &str,
+        logstash_hosts: &[SocketAddr],
     ) -> Result<String> {
         let mut extra_vars = String::new();
         extra_vars.push_str("{ ");
@@ -607,9 +621,13 @@ impl TestnetDeploy {
                     name),
             );
         }
-
+        Self::add_value(&mut extra_vars, "logstash_stack_name", logstash_stack_name);
+        extra_vars.push_str("\"logstash_hosts\": [");
+        for host in logstash_hosts.iter() {
+            extra_vars.push_str(&format!("\"{}\", ", host));
+        }
         let mut extra_vars = extra_vars.strip_suffix(", ").unwrap().to_string();
-        extra_vars.push_str(" }");
+        extra_vars.push_str("] }");
         Ok(extra_vars)
     }
 
@@ -663,6 +681,7 @@ impl TestnetDeploy {
 
         let mut extra_vars = extra_vars.strip_suffix(", ").unwrap().to_string();
         extra_vars.push_str(" }");
+
         Ok(extra_vars)
     }
 
@@ -733,6 +752,44 @@ pub fn is_binary_on_path(binary_name: &str) -> bool {
         }
     }
     false
+}
+
+pub fn do_clean(
+    name: &str,
+    working_directory_path: PathBuf,
+    terraform_runner: &dyn TerraformRunnerInterface,
+    inventory_types: Vec<String>,
+) -> Result<()> {
+    terraform_runner.init()?;
+    let workspaces = terraform_runner.workspace_list()?;
+    if !workspaces.contains(&name.to_string()) {
+        return Err(Error::EnvironmentDoesNotExist(name.to_string()));
+    }
+    terraform_runner.workspace_select(name)?;
+    println!("Selected {name} workspace");
+    terraform_runner.destroy()?;
+    // The 'dev' workspace is one we always expect to exist, for admin purposes.
+    // You can't delete a workspace while it is selected, so we select 'dev' before we delete
+    // the current workspace.
+    terraform_runner.workspace_select("dev")?;
+    terraform_runner.workspace_delete(name)?;
+    println!("Deleted {name} workspace");
+
+    for inventory_type in inventory_types.iter() {
+        let inventory_file_path = working_directory_path
+            .join("ansible")
+            .join("inventory")
+            .join(format!(
+                ".{}_{}_inventory_digital_ocean.yml",
+                name, inventory_type
+            ));
+        if inventory_file_path.exists() {
+            debug!("Removing inventory file at {inventory_file_path:#?}");
+            std::fs::remove_file(inventory_file_path)?;
+        }
+    }
+    println!("Deleted Ansible inventory for {name}");
+    Ok(())
 }
 
 fn print_duration(duration: Duration) {

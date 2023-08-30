@@ -45,6 +45,10 @@ pub enum Error {
     LogsForPreviousTestnetExist(String),
     #[error("Logs have not been retrieved for the '{0}' environment.")]
     LogsNotRetrievedError(String),
+    #[error("The API response did not contain the expected '{0}' value")]
+    MalformedDigitalOceanApiRespose(String),
+    #[error(transparent)]
+    ReqwestError(#[from] reqwest::Error),
     #[error("Error in byte stream when attempting to retrieve S3 object")]
     S3ByteStreamError,
     #[error(transparent)]

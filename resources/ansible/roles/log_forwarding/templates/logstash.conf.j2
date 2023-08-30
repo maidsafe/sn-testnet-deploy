@@ -1,26 +1,19 @@
 input {
-  file {
-    path => "/home/safe/.local/share/safe/node/**/safenode.log"
-    start_position => "beginning"
-    sincedb_path => "/var/lib/logstash/sincedb"
-    type => "safenode-log"
-  }
-
-  file {
-    path => "/home/safe/.local/share/safe/node/resource-usage.log"
-    start_position => "beginning"
-    sincedb_path => "/var/lib/logstash/sincedb"
-    type => "resource-usage-log"
+  beats {
+    port => 5044
+    ssl_enabled => true
+    ssl_certificate => "{{ ssl_public_certs_path }}/logstash-public.crt"
+    ssl_key => "{{ ssl_private_key_path }}/logstash-private.key"
   }
 }
 
 filter {
-  if [type] == "resource-usage-log" {
+  if [fields][log_type] == "resource-usage-log" {
     grok {
       match => { "[log][file][path]" => ".*/(?<filename>[^/]*)$" }
     }
   }
-  if [type] == "safenode-log" {
+  if [fields][log_type] == "safenode-log" {
     grok {
       match => { "[log][file][path]" => "/home/safe/.local/share/safe/node/%{GREEDYDATA:filename}" }
     }
@@ -28,31 +21,31 @@ filter {
 }
 
 output {
-  if [type] == "resource-usage-log" {
+  if [fields][log_type] == "resource-usage-log" {
     s3 {
       access_key_id => "{{ aws_access_key_id }}"
       secret_access_key => "{{ aws_secret_access_key }}"
       region => "{{ aws_region }}"
       bucket => "{{ aws_bucket }}"
       canned_acl => "public-read"
-      time_file => 30
+      time_file => 5
       rotation_strategy => "time"
-      prefix => "testnet-logs/{{ testnet_name }}/%{[host][name]}/%{filename}"
+      prefix => "testnet-logs/%{[fields][testnet_name]}/%{[host][name]}/%{filename}"
       codec => plain {
         format => "%{message}\n"
       }
     }
   }
-  if [type] == "safenode-log" {
+  if [fields][log_type] == "safenode-log" {
     s3 {
       access_key_id => "{{ aws_access_key_id }}"
       secret_access_key => "{{ aws_secret_access_key }}"
       region => "{{ aws_region }}"
       bucket => "{{ aws_bucket }}"
       canned_acl => "public-read"
-      time_file => 30
+      time_file => 5
       rotation_strategy => "time"
-      prefix => "testnet-logs/{{ testnet_name }}/%{[host][name]}/%{filename}"
+      prefix => "testnet-logs/%{[fields][testnet_name]}/%{[host][name]}/%{filename}"
       codec => plain {
         format => "%{message}\n"
       }

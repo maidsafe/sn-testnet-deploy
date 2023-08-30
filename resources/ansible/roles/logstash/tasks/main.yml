@@ -24,6 +24,10 @@
     name: logstash
     state: latest
     update_cache: yes
+  register: result
+  until: result is succeeded
+  retries: 5
+  delay: 10
 
 - name: check if aws integration plugin is installed
   command: /usr/share/logstash/bin/logstash-plugin list
@@ -33,3 +37,35 @@
 - name: install aws integration plugin
   command: /usr/share/logstash/bin/logstash-plugin install logstash-integration-aws
   when: "'logstash-integration-aws' not in plugin_list.stdout_lines"
+
+# This directory is completely private, which prevents Logstash reading the certificate.
+- name: open permissions on ssl private directory
+  file:
+    dest: "{{ ssl_private_key_path }}"
+    mode: 0755
+
+- name: copy logstash-public.crt
+  copy:
+    src: /tmp/logstash-{{ stack_name }}-public.crt
+    dest: "{{ ssl_public_certs_path }}/logstash-public.crt"
+    remote_src: yes
+    mode: 0644
+
+- name: copy logstash-private.key
+  copy:
+    src: /tmp/logstash-{{ stack_name }}-private.key
+    dest: "{{ ssl_private_key_path }}/logstash-private.key"
+    remote_src: yes
+    mode: 0644
+
+- name: set log.level to debug if enabled
+  lineinfile:
+    path: /etc/logstash/logstash.yml
+    regexp: '^#?\s*log\.level:.*$'
+    line: 'log.level: debug'
+  when: debug_log_output | bool
+
+- name: restart logstash
+  ansible.builtin.systemd_service:
+    name: logstash
+    state: restarted

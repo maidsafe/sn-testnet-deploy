@@ -1,0 +1,34 @@
+---
+- name: reorganise local log files
+  hosts: localhost
+  tasks:
+    - name: generate certificates for use with filebeat
+      command: >-
+        openssl req -x509 -batch -nodes -days 3650 -newkey rsa:2048
+        -keyout logstash-{{ stack_name }}-private.key
+        -out logstash-{{ stack_name }}-public.crt
+      args:
+        creates: logstash-{{ stack_name }}-private.key
+
+- name: copy certificates to logstash machines
+  hosts: all
+  become: False
+  tasks:
+    - name: copy logstash public certificate to logstash servers
+      copy:
+        src: logstash-{{ stack_name }}-public.crt
+        dest: /tmp/logstash-{{ stack_name }}-public.crt
+        mode: 0644
+    - name: copy logstash private key to logstash servers
+      copy:
+        src: logstash-{{ stack_name }}-private.key
+        dest: /tmp/logstash-{{ stack_name }}-private.key
+        mode: 0644
+
+- name: provision a logstash setup
+  hosts: all
+  become: True
+  roles:
+    - prerequisites
+    - logstash
+    - log_forwarding

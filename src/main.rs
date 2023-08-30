@@ -8,9 +8,9 @@ use clap::{Parser, Subcommand};
 use color_eyre::{eyre::eyre, Help, Result};
 use dotenv::dotenv;
 use sn_testnet_deploy::error::Error;
+use sn_testnet_deploy::logstash::LogstashDeployBuilder;
 use sn_testnet_deploy::setup::setup_dotenv_file;
-use sn_testnet_deploy::CloudProvider;
-use sn_testnet_deploy::TestnetDeployBuilder;
+use sn_testnet_deploy::{CloudProvider, TestnetDeployBuilder};
 
 pub fn parse_provider(val: &str) -> Result<CloudProvider> {
     match val {
@@ -48,6 +48,9 @@ enum Commands {
         /// This argument must be used in conjunction with the --repo-owner argument.
         #[arg(long)]
         branch: Option<String>,
+        /// The name of the Logstash stack to forward logs to.
+        #[clap(long, default_value = "main")]
+        logstash_stack_name: String,
         /// Optionally supply the owner or organisation of the Github repository to be used for the
         /// safenode binary. A safenode binary will be built from this repository.
         ///
@@ -81,6 +84,8 @@ enum Commands {
     },
     #[clap(name = "logs", subcommand)]
     Logs(LogCommands),
+    #[clap(name = "logstash", subcommand)]
+    Logstash(LogstashCommands),
     Setup {},
 }
 
@@ -126,6 +131,33 @@ enum LogCommands {
     },
 }
 
+#[derive(Subcommand, Debug)]
+enum LogstashCommands {
+    /// Clean a deployed Logstash environment.
+    Clean {
+        /// The name of the environment.
+        #[arg(short = 'n', long)]
+        name: String,
+        /// The cloud provider for the environment.
+        #[clap(long, value_parser = parse_provider, verbatim_doc_comment)]
+        provider: CloudProvider,
+    },
+    /// Deploy the Logstash infrastructure to support log forwarding to S3.
+    Deploy {
+        /// The name of the Logstash environment
+        #[arg(short = 'n', long)]
+        name: String,
+        /// The cloud provider to provision on
+        #[clap(long, default_value_t = CloudProvider::DigitalOcean, value_parser = parse_provider, verbatim_doc_comment)]
+        provider: CloudProvider,
+        /// The number of VMs to create.
+        ///
+        /// Use this to horizontally scale Logstash if need be.
+        #[clap(long, default_value = "1")]
+        vm_count: u16,
+    },
+}
+
 #[tokio::main]
 async fn main() -> Result<()> {
     color_eyre::install()?;
@@ -141,13 +173,16 @@ async fn main() -> Result<()> {
         }
         Some(Commands::Deploy {
             branch,
+            logstash_stack_name,
             name,
             node_count,
             provider,
             repo_owner,
             vm_count,
         }) => {
-            let testnet_deploy = TestnetDeployBuilder::default().provider(provider).build()?;
+            let testnet_deploy = TestnetDeployBuilder::default()
+                .provider(provider.clone())
+                .build()?;
             let result = testnet_deploy.init(&name).await;
             match result {
                 Ok(_) => {}
@@ -171,8 +206,22 @@ async fn main() -> Result<()> {
                 },
             }
 
+            let logstash_deploy = LogstashDeployBuilder::default()
+                .provider(provider)
+                .build()?;
+            let stack_hosts = logstash_deploy
+                .get_stack_hosts(&logstash_stack_name)
+                .await?;
             testnet_deploy
-                .deploy(&name, vm_count, node_count, repo_owner, branch)
+                .deploy(
+                    &name,
+                    &logstash_stack_name,
+                    &stack_hosts,
+                    vm_count,
+                    node_count,
+                    repo_owner,
+                    branch,
+                )
                 .await?;
             Ok(())
         }
@@ -198,6 +247,27 @@ async fn main() -> Result<()> {
             }
             LogCommands::Rm { name } => {
                 sn_testnet_deploy::logs::rm_logs(&name).await?;
+                Ok(())
+            }
+        },
+        Some(Commands::Logstash(logstash_cmd)) => match logstash_cmd {
+            LogstashCommands::Clean { name, provider } => {
+                let logstash_deploy = LogstashDeployBuilder::default()
+                    .provider(provider)
+                    .build()?;
+                logstash_deploy.clean(&name).await?;
+                Ok(())
+            }
+            LogstashCommands::Deploy {
+                name,
+                provider,
+                vm_count,
+            } => {
+                let logstash_deploy = LogstashDeployBuilder::default()
+                    .provider(provider)
+                    .build()?;
+                logstash_deploy.init(&name).await?;
+                logstash_deploy.deploy(&name, vm_count).await?;
                 Ok(())
             }
         },
