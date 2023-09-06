@@ -47,7 +47,6 @@ async fn should_run_ansible_against_the_remaining_nodes() -> Result<()> {
             "beta",
             "/ip4/10.0.0.10/tcp/12000/p2p/12D3KooWLvmkUDQRthtZv9CrzozRLk9ZVEHXgmx6UxVMiho5aded",
             None,
-            None,
         )
         .await?;
 
@@ -88,8 +87,7 @@ async fn should_run_ansible_against_the_remaining_nodes_with_a_custom_binary() -
         .provision_faucet(
             "beta",
             "/ip4/10.0.0.10/tcp/12000/p2p/12D3KooWLvmkUDQRthtZv9CrzozRLk9ZVEHXgmx6UxVMiho5aded",
-            Some("maidsafe".to_string()),
-            Some("custom_branch".to_string()),
+            Some(("maidsafe".to_string(), "custom_branch".to_string())),
         )
         .await?;
 

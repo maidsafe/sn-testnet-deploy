@@ -21,10 +21,10 @@ pub enum Error {
     CloudProviderCredentialsNotSupplied(String),
     #[error("The {0} cloud provider is not supported yet")]
     CloudProviderNotSupported(String),
-    #[error("Both the repository owner and branch name must be supplied if either are used")]
-    CustomBinConfigError,
     #[error("Failed to delete '{0}' from '{1}")]
     DeleteS3ObjectError(String, String),
+    #[error("Authorization failed for the Digital Ocean API")]
+    DigitalOceanUnauthorized,
     #[error("The '{0}' environment does not exist")]
     EnvironmentDoesNotExist(String),
     #[error("Command that executed with {0} failed. See output for details.")]
