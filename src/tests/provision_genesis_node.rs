@@ -64,12 +64,13 @@ async fn should_run_ansible_against_genesis() -> Result<()> {
     testnet
         .provision_genesis_node(
             "beta",
-            "main",
-            &[
-                SocketAddr::new(IpAddr::V4("10.0.0.1".parse()?), LOGSTASH_PORT),
-                SocketAddr::new(IpAddr::V4("10.0.0.2".parse()?), LOGSTASH_PORT),
-            ],
-            None,
+            (
+                "main",
+                &[
+                    SocketAddr::new(IpAddr::V4("10.0.0.1".parse()?), LOGSTASH_PORT),
+                    SocketAddr::new(IpAddr::V4("10.0.0.2".parse()?), LOGSTASH_PORT),
+                ],
+            ),
             None,
         )
         .await?;
@@ -127,13 +128,14 @@ async fn should_run_ansible_against_genesis_with_a_custom_binary() -> Result<()>
     testnet
         .provision_genesis_node(
             "beta",
-            "main",
-            &[
-                SocketAddr::new(IpAddr::V4("10.0.0.1".parse()?), LOGSTASH_PORT),
-                SocketAddr::new(IpAddr::V4("10.0.0.2".parse()?), LOGSTASH_PORT),
-            ],
-            Some("maidsafe".to_string()),
-            Some("custom_branch".to_string()),
+            (
+                "main",
+                &[
+                    SocketAddr::new(IpAddr::V4("10.0.0.1".parse()?), LOGSTASH_PORT),
+                    SocketAddr::new(IpAddr::V4("10.0.0.2".parse()?), LOGSTASH_PORT),
+                ],
+            ),
+            Some(("maidsafe".to_string(), "custom_branch".to_string())),
         )
         .await?;
 

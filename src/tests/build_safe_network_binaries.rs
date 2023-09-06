@@ -56,9 +56,7 @@ async fn should_run_ansible_to_build_faucet() -> Result<()> {
     );
 
     testnet.init("beta").await?;
-    testnet
-        .build_safe_network_binaries("beta", None, None)
-        .await?;
+    testnet.build_safe_network_binaries("beta", None).await?;
 
     drop(tmp_dir);
     Ok(())
@@ -110,8 +108,7 @@ async fn should_run_ansible_to_build_faucet_and_custom_safenode_bin() -> Result<
     testnet
         .build_safe_network_binaries(
             "beta",
-            Some("maidsafe".to_string()),
-            Some("custom_branch".to_string()),
+            Some(("maidsafe".to_string(), "custom_branch".to_string())),
         )
         .await?;
 

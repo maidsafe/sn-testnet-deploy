@@ -315,8 +315,7 @@ impl TestnetDeploy {
     pub async fn build_safe_network_binaries(
         &self,
         name: &str,
-        repo_owner: Option<String>,
-        branch: Option<String>,
+        custom_branch_details: Option<(String, String)>,
     ) -> Result<()> {
         let start = Instant::now();
         println!("Obtaining IP address for build VM...");
@@ -328,7 +327,7 @@ impl TestnetDeploy {
             .wait_for_ssh_availability(&build_ip, &self.cloud_provider.get_ssh_user())?;
 
         println!("Running ansible against build VM...");
-        let extra_vars = self.build_binaries_extra_vars_doc(name, repo_owner, branch)?;
+        let extra_vars = self.build_binaries_extra_vars_doc(name, custom_branch_details)?;
         self.ansible_runner.run_playbook(
             PathBuf::from("build.yml"),
             PathBuf::from("inventory").join(format!(".{name}_build_inventory_digital_ocean.yml")),
@@ -342,10 +341,8 @@ impl TestnetDeploy {
     pub async fn provision_genesis_node(
         &self,
         name: &str,
-        logstash_stack_name: &str,
-        logstash_hosts: &[SocketAddr],
-        repo_owner: Option<String>,
-        branch: Option<String>,
+        logstash_details: (&str, &[SocketAddr]),
+        custom_branch_details: Option<(String, String)>,
     ) -> Result<()> {
         let start = Instant::now();
         let genesis_inventory = self.ansible_runner.inventory_list(
@@ -363,10 +360,9 @@ impl TestnetDeploy {
                 name,
                 None,
                 None,
-                repo_owner,
-                branch,
-                logstash_stack_name,
-                logstash_hosts,
+                custom_branch_details,
+                logstash_details.0,
+                logstash_details.1,
             )?),
         )?;
         print_duration(start.elapsed());
@@ -377,8 +373,7 @@ impl TestnetDeploy {
         &self,
         name: &str,
         genesis_multiaddr: &str,
-        repo_owner: Option<String>,
-        branch: Option<String>,
+        custom_branch_details: Option<(String, String)>,
     ) -> Result<()> {
         let start = Instant::now();
         println!("Running ansible against genesis node to deploy faucet...");
@@ -386,7 +381,11 @@ impl TestnetDeploy {
             PathBuf::from("faucet.yml"),
             PathBuf::from("inventory").join(format!(".{name}_genesis_inventory_digital_ocean.yml")),
             self.cloud_provider.get_ssh_user(),
-            Some(self.build_faucet_extra_vars_doc(name, genesis_multiaddr, repo_owner, branch)?),
+            Some(self.build_faucet_extra_vars_doc(
+                name,
+                genesis_multiaddr,
+                custom_branch_details,
+            )?),
         )?;
         print_duration(start.elapsed());
         Ok(())
@@ -395,12 +394,10 @@ impl TestnetDeploy {
     pub async fn provision_remaining_nodes(
         &self,
         name: &str,
-        logstash_stack_name: &str,
-        logstash_hosts: &[SocketAddr],
+        logstash_details: (&str, &[SocketAddr]),
         genesis_multiaddr: String,
         node_instance_count: u16,
-        repo_owner: Option<String>,
-        branch: Option<String>,
+        custom_branch_details: Option<(String, String)>,
     ) -> Result<()> {
         let start = Instant::now();
         println!("Running ansible against remaining nodes...");
@@ -412,10 +409,9 @@ impl TestnetDeploy {
                 name,
                 Some(genesis_multiaddr),
                 Some(node_instance_count),
-                repo_owner,
-                branch,
-                logstash_stack_name,
-                logstash_hosts,
+                custom_branch_details,
+                logstash_details.0,
+                logstash_details.1,
             )?),
         )?;
         print_duration(start.elapsed());
@@ -439,41 +435,26 @@ impl TestnetDeploy {
     pub async fn deploy(
         &self,
         name: &str,
-        logstash_stack_name: &str,
-        logstash_hosts: &[SocketAddr],
+        logstash_details: (&str, &[SocketAddr]),
         vm_count: u16,
         node_instance_count: u16,
-        repo_owner: Option<String>,
-        branch: Option<String>,
+        custom_branch_details: Option<(String, String)>,
     ) -> Result<()> {
-        if (repo_owner.is_some() && branch.is_none()) || (branch.is_some() && repo_owner.is_none())
-        {
-            return Err(Error::CustomBinConfigError);
-        }
-
         self.create_infra(name, vm_count, true).await?;
-        self.build_safe_network_binaries(name, repo_owner.clone(), branch.clone())
+        self.build_safe_network_binaries(name, custom_branch_details.clone())
             .await?;
-        self.provision_genesis_node(
-            name,
-            logstash_stack_name,
-            logstash_hosts,
-            repo_owner.clone(),
-            branch.clone(),
-        )
-        .await?;
+        self.provision_genesis_node(name, logstash_details, custom_branch_details.clone())
+            .await?;
         let (multiaddr, genesis_ip) = self.get_genesis_multiaddr(name).await?;
         println!("Obtained multiaddr for genesis node: {multiaddr}");
-        self.provision_faucet(name, &multiaddr, repo_owner.clone(), branch.clone())
+        self.provision_faucet(name, &multiaddr, custom_branch_details.clone())
             .await?;
         self.provision_remaining_nodes(
             name,
-            logstash_stack_name,
-            logstash_hosts,
+            logstash_details,
             multiaddr,
             node_instance_count,
-            repo_owner,
-            branch,
+            custom_branch_details,
         )
         .await?;
         // For reasons not known, the faucet service needs to be 'nudged' with a restart.
@@ -583,8 +564,7 @@ impl TestnetDeploy {
         name: &str,
         genesis_multiaddr: Option<String>,
         node_instance_count: Option<u16>,
-        repo_owner: Option<String>,
-        branch: Option<String>,
+        custom_branch_details: Option<(String, String)>,
         logstash_stack_name: &str,
         logstash_hosts: &[SocketAddr],
     ) -> Result<String> {
@@ -610,14 +590,14 @@ impl TestnetDeploy {
                 &node_instance_count.unwrap_or(20).to_string(),
             );
         }
-        if repo_owner.is_some() {
+        if let Some((repo_owner, branch)) = custom_branch_details {
             Self::add_value(
                 &mut extra_vars,
                 "node_archive_url",
                 &format!(
                     "https://sn-node.s3.eu-west-2.amazonaws.com/{}/{}/safenode-{}-x86_64-unknown-linux-musl.tar.gz",
-                    repo_owner.unwrap(),
-                    branch.unwrap(),
+                    repo_owner,
+                    branch,
                     name),
             );
         }
@@ -635,8 +615,7 @@ impl TestnetDeploy {
         &self,
         name: &str,
         genesis_multiaddr: &str,
-        repo_owner: Option<String>,
-        branch: Option<String>,
+        custom_branch_details: Option<(String, String)>,
     ) -> Result<String> {
         let mut extra_vars = String::new();
         extra_vars.push_str("{ ");
@@ -647,10 +626,8 @@ impl TestnetDeploy {
         );
         Self::add_value(&mut extra_vars, "testnet_name", name);
         Self::add_value(&mut extra_vars, "genesis_multiaddr", genesis_multiaddr);
-        if let Some(branch) = branch {
+        if let Some((repo_owner, branch)) = custom_branch_details {
             Self::add_value(&mut extra_vars, "branch", &branch);
-        }
-        if let Some(repo_owner) = repo_owner {
             Self::add_value(&mut extra_vars, "org", &repo_owner);
         }
 
@@ -662,20 +639,17 @@ impl TestnetDeploy {
     fn build_binaries_extra_vars_doc(
         &self,
         name: &str,
-        repo_owner: Option<String>,
-        branch: Option<String>,
+        custom_branch_details: Option<(String, String)>,
     ) -> Result<String> {
         let mut extra_vars = String::new();
         extra_vars.push_str("{ ");
 
-        if let Some(branch) = branch {
+        if let Some((repo_owner, branch)) = custom_branch_details {
             Self::add_value(&mut extra_vars, "custom_safenode", "true");
             Self::add_value(&mut extra_vars, "branch", &branch);
+            Self::add_value(&mut extra_vars, "org", &repo_owner);
         } else {
             Self::add_value(&mut extra_vars, "custom_safenode", "false");
-        }
-        if let Some(repo_owner) = repo_owner {
-            Self::add_value(&mut extra_vars, "org", &repo_owner);
         }
         Self::add_value(&mut extra_vars, "testnet_name", name);
 
