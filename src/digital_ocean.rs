@@ -55,11 +55,22 @@ impl DigitalOceanClientInterface for DigitalOceanClient {
                 .get(url)
                 .header("Authorization", format!("Bearer {}", self.access_token))
                 .send()
-                .await?
-                .text()
                 .await?;
+            if response.status().as_u16() == 401 {
+                debug!("Error response body: {}", response.text().await?);
+                return Err(Error::DigitalOceanUnauthorized);
+            } else if !response.status().is_success() {
+                let status_code = response.status().as_u16();
+                let response_body = response.text().await?;
+                debug!("Response status code: {}", status_code);
+                debug!("Error response body: {}", response_body);
+                return Err(Error::DigitalOceanUnexpectedResponse(
+                    status_code,
+                    response_body,
+                ));
+            }
 
-            let json: serde_json::Value = serde_json::from_str(&response)?;
+            let json: serde_json::Value = serde_json::from_str(&response.text().await?)?;
             let droplet_array =
                 json["droplets"]
                     .as_array()
@@ -113,7 +124,7 @@ impl DigitalOceanClientInterface for DigitalOceanClient {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use color_eyre::Result;
+    use color_eyre::{eyre::eyre, Result};
     use httpmock::prelude::*;
 
     #[tokio::test]
@@ -942,6 +953,80 @@ mod tests {
 
         list_droplets_page_one_mock.assert();
         list_droplets_page_two_mock.assert();
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_list_droplets_with_unauthorized_response() -> Result<()> {
+        const MOCK_API_RESPONSE: &str =
+            r#"{ "id": "Unauthorized", "message": "Unable to authenticate you" }"#;
+        let server = MockServer::start();
+        let list_droplets_page_one_mock = server.mock(|when, then| {
+            when.method(GET)
+                .path("/v2/droplets")
+                .query_param("page", "1")
+                .query_param("per_page", "1");
+            then.status(401)
+                .header("Content-Type", "application/json")
+                .body(MOCK_API_RESPONSE);
+        });
+
+        let client = DigitalOceanClient {
+            base_url: server.base_url(),
+            access_token: String::from("fake_token"),
+            page_size: 1,
+        };
+
+        let result = client.list_droplets().await;
+        match result {
+            Ok(_) => return Err(eyre!("This test should return an error")),
+            Err(e) => {
+                assert_eq!(
+                    e.to_string(),
+                    "Authorization failed for the Digital Ocean API"
+                );
+            }
+        }
+
+        list_droplets_page_one_mock.assert();
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_list_droplets_with_unexpected_response() -> Result<()> {
+        const MOCK_API_RESPONSE: &str =
+            r#"{ "id": "unexpected", "message": "Something unexpected happened" }"#;
+        let server = MockServer::start();
+        let list_droplets_page_one_mock = server.mock(|when, then| {
+            when.method(GET)
+                .path("/v2/droplets")
+                .query_param("page", "1")
+                .query_param("per_page", "1");
+            then.status(500)
+                .header("Content-Type", "application/json")
+                .body(MOCK_API_RESPONSE);
+        });
+
+        let client = DigitalOceanClient {
+            base_url: server.base_url(),
+            access_token: String::from("fake_token"),
+            page_size: 1,
+        };
+
+        let result = client.list_droplets().await;
+        match result {
+            Ok(_) => return Err(eyre!("This test should return an error")),
+            Err(e) => {
+                assert_eq!(
+                    e.to_string(),
+                    "Unexpected response: 500 -- { \"id\": \"unexpected\", \"message\": \"Something unexpected happened\" }"
+                );
+            }
+        }
+
+        list_droplets_page_one_mock.assert();
 
         Ok(())
     }

@@ -187,14 +187,7 @@ async fn main() -> Result<()> {
                     "Both the repository owner and branch name must be supplied if either are used"
                 ));
             }
-
-            let custom_branch_details = if let Some(repo_owner) = repo_owner {
-                // The unwrap seems justified here because we have already verified the state of
-                // the variables, as above.
-                Some((repo_owner, branch.unwrap()))
-            } else {
-                None
-            };
+            let custom_branch_details = repo_owner.map(|repo_owner| (repo_owner, branch.unwrap()));
 
             let testnet_deploy = TestnetDeployBuilder::default()
                 .provider(provider.clone())
