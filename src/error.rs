@@ -25,6 +25,8 @@ pub enum Error {
     DeleteS3ObjectError(String, String),
     #[error("Authorization failed for the Digital Ocean API")]
     DigitalOceanUnauthorized,
+    #[error("Unexpected response: {0} -- {1}")]
+    DigitalOceanUnexpectedResponse(u16, String),
     #[error("The '{0}' environment does not exist")]
     EnvironmentDoesNotExist(String),
     #[error("Command that executed with {0} failed. See output for details.")]
