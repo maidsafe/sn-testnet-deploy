@@ -14,5 +14,6 @@ mod provision_faucet;
 mod provision_genesis_node;
 mod provision_remaining_nodes;
 mod setup;
+mod upload_test_data;
 
 const RPC_CLIENT_BIN_NAME: &str = "safenode_rpc_client";

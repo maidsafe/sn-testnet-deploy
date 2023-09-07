@@ -9,8 +9,10 @@ pub mod digital_ocean;
 pub mod error;
 pub mod logs;
 pub mod logstash;
+pub mod manage_test_data;
 pub mod rpc_client;
 pub mod s3;
+pub mod safe;
 pub mod setup;
 pub mod ssh;
 pub mod terraform;
@@ -31,7 +33,7 @@ use std::fs::File;
 use std::io::{BufRead, BufReader, BufWriter, Write};
 use std::net::SocketAddr;
 use std::os::unix::fs::PermissionsExt;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
 use std::time::{Duration, Instant};
 use tar::Archive;
@@ -62,11 +64,13 @@ impl CloudProvider {
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct DeploymentInventory {
+    pub branch_info: (String, String),
     pub vm_list: Vec<(String, String)>,
     pub ssh_user: String,
     pub genesis_multiaddr: String,
     pub peers: Vec<String>,
     pub faucet_address: String,
+    pub uploaded_files: Vec<(String, String)>,
 }
 
 impl DeploymentInventory {
@@ -81,6 +85,10 @@ impl DeploymentInventory {
         let data = std::fs::read_to_string(file_path)?;
         let deserialized_data: DeploymentInventory = serde_json::from_str(&data)?;
         Ok(deserialized_data)
+    }
+
+    pub fn add_uploaded_files(&mut self, uploaded_files: Vec<(String, String)>) {
+        self.uploaded_files.extend_from_slice(&uploaded_files);
     }
 
     pub fn print_report(&self) {
@@ -105,6 +113,13 @@ impl DeploymentInventory {
             "safe --peer {} wallet get-faucet {}",
             self.genesis_multiaddr, self.faucet_address
         );
+
+        if !self.uploaded_files.is_empty() {
+            println!("Uploaded files:");
+            for file in self.uploaded_files.iter() {
+                println!("{}: {}", file.0, file.1);
+            }
+        }
     }
 }
 
@@ -219,7 +234,6 @@ impl TestnetDeployBuilder {
             PathBuf::from("./safenode_rpc_client"),
             working_directory_path.clone(),
         );
-        let s3_repository = S3Repository::new("sn-testnet");
 
         let testnet = TestnetDeploy::new(
             Box::new(terraform_runner),
@@ -228,7 +242,7 @@ impl TestnetDeployBuilder {
             Box::new(SshClient::new(ssh_secret_key_path)),
             working_directory_path,
             provider.clone(),
-            Box::new(s3_repository),
+            Box::new(S3Repository {}),
         );
 
         Ok(testnet)
@@ -275,7 +289,7 @@ impl TestnetDeploy {
     pub async fn init(&self, name: &str) -> Result<()> {
         if self
             .s3_repository
-            .folder_exists(&format!("testnet-logs/{name}"))
+            .folder_exists("sn-testnet", &format!("testnet-logs/{name}"))
             .await?
         {
             return Err(Error::LogsForPreviousTestnetExist(name.to_string()));
@@ -292,24 +306,14 @@ impl TestnetDeploy {
         let rpc_client_path = self.working_directory_path.join("safenode_rpc_client");
         if !rpc_client_path.is_file() {
             println!("Downloading the rpc client for safenode...");
-            let asset_name = "rpc_client-latest-x86_64-unknown-linux-musl.tar.gz";
-            let archive_path = self.working_directory_path.join(asset_name);
-            self.s3_repository
-                .download_object(asset_name, &archive_path)
-                .await?;
-            let archive_file = File::open(archive_path.clone())?;
-            let decoder = GzDecoder::new(archive_file);
-            let mut archive = Archive::new(decoder);
-            let entries = archive.entries()?;
-            for entry_result in entries {
-                let mut entry = entry_result?;
-                let mut file = BufWriter::new(File::create(
-                    self.working_directory_path.join(entry.path()?),
-                )?);
-                std::io::copy(&mut entry, &mut file)?;
-            }
-
-            std::fs::remove_file(archive_path)?;
+            let archive_name = "rpc_client-latest-x86_64-unknown-linux-musl.tar.gz";
+            get_and_extract_archive(
+                &*self.s3_repository,
+                "sn-testnet",
+                archive_name,
+                &self.working_directory_path,
+            )
+            .await?;
             let mut permissions = std::fs::metadata(&rpc_client_path)?.permissions();
             permissions.set_mode(0o755); // rwxr-xr-x
             std::fs::set_permissions(&rpc_client_path, permissions)?;
@@ -503,7 +507,7 @@ impl TestnetDeploy {
             logstash_details,
             multiaddr,
             node_instance_count,
-            custom_branch_details,
+            custom_branch_details.clone(),
         )
         .await?;
         // For reasons not known, the faucet service needs to be 'nudged' with a restart.
@@ -513,7 +517,8 @@ impl TestnetDeploy {
             &self.cloud_provider.get_ssh_user(),
             "systemctl restart faucet",
         )?;
-        self.list_inventory(name, true).await?;
+        self.list_inventory(name, true, custom_branch_details)
+            .await?;
         Ok(())
     }
 
@@ -525,7 +530,12 @@ impl TestnetDeploy {
     /// The `force_regeneration` flag is used when the `deploy` command runs, to make sure that a
     /// new inventory is generated, because it's possible that an old one with the same deployment
     /// name has been cached.
-    pub async fn list_inventory(&self, name: &str, force_regeneration: bool) -> Result<()> {
+    pub async fn list_inventory(
+        &self,
+        name: &str,
+        force_regeneration: bool,
+        custom_branch_info: Option<(String, String)>,
+    ) -> Result<()> {
         let inventory_path = get_data_directory()?.join(format!("{name}-inventory.json"));
         if inventory_path.exists() && !force_regeneration {
             let inventory = DeploymentInventory::read(&inventory_path)?;
@@ -601,15 +611,15 @@ impl TestnetDeploy {
         }
 
         let inventory = DeploymentInventory {
+            branch_info: custom_branch_info.unwrap_or(("maidsafe".to_string(), "main".to_string())),
             vm_list,
             ssh_user: self.cloud_provider.get_ssh_user(),
             genesis_multiaddr,
             peers,
             faucet_address: format!("{}:8000", genesis_ip),
+            uploaded_files: Vec::new(),
         };
         inventory.print_report();
-
-        let inventory_path = get_data_directory()?.join(format!("{name}-inventory.json"));
         inventory.save(&inventory_path)?;
 
         Ok(())
@@ -628,6 +638,9 @@ impl TestnetDeploy {
         )
     }
 
+    ///
+    /// Private Helpers
+    ///
     fn build_node_extra_vars_doc(
         &self,
         name: &str,
@@ -733,6 +746,40 @@ impl TestnetDeploy {
     }
 }
 
+///
+/// Shared Helpers
+///
+pub async fn get_and_extract_archive(
+    s3_repository: &dyn S3RepositoryInterface,
+    bucket_name: &str,
+    archive_bucket_path: &str,
+    dest_path: &Path,
+) -> Result<()> {
+    // In this case, not using unwrap leads to having to provide a very trivial error variant that
+    // doesn't seem very valuable.
+    let archive_file_name = archive_bucket_path.split('/').last().unwrap();
+    let archive_dest_path = dest_path.join(archive_file_name);
+    s3_repository
+        .download_object(bucket_name, archive_bucket_path, &archive_dest_path)
+        .await?;
+    let archive_file = File::open(archive_dest_path.clone())?;
+    let decoder = GzDecoder::new(archive_file);
+    let mut archive = Archive::new(decoder);
+    let entries = archive.entries()?;
+    for entry_result in entries {
+        let mut entry = entry_result?;
+        let extract_path = dest_path.join(entry.path()?);
+        if entry.header().entry_type() == tar::EntryType::Directory {
+            std::fs::create_dir_all(extract_path)?;
+            continue;
+        }
+        let mut file = BufWriter::new(File::create(extract_path)?);
+        std::io::copy(&mut entry, &mut file)?;
+    }
+    std::fs::remove_file(archive_dest_path)?;
+    Ok(())
+}
+
 pub fn run_external_command(
     binary_path: PathBuf,
     working_directory_path: PathBuf,
@@ -835,14 +882,7 @@ pub fn do_clean(
     Ok(())
 }
 
-fn print_duration(duration: Duration) {
-    let total_seconds = duration.as_secs();
-    let minutes = total_seconds / 60;
-    let seconds = total_seconds % 60;
-    debug!("Time taken: {} minutes and {} seconds", minutes, seconds);
-}
-
-fn get_data_directory() -> Result<PathBuf> {
+pub fn get_data_directory() -> Result<PathBuf> {
     let path = dirs_next::data_dir()
         .ok_or_else(|| Error::CouldNotRetrieveDataDirectory)?
         .join("safe")
@@ -851,4 +891,11 @@ fn get_data_directory() -> Result<PathBuf> {
         std::fs::create_dir_all(path.clone())?;
     }
     Ok(path)
+}
+
+fn print_duration(duration: Duration) {
+    let total_seconds = duration.as_secs();
+    let minutes = total_seconds / 60;
+    let seconds = total_seconds % 60;
+    debug!("Time taken: {} minutes and {} seconds", minutes, seconds);
 }

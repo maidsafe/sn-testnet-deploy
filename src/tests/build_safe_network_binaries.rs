@@ -14,9 +14,9 @@ use mockall::predicate::*;
 use std::path::PathBuf;
 
 #[tokio::test]
-async fn should_run_ansible_to_build_faucet() -> Result<()> {
+async fn should_run_ansible_to_build_safe_related_binaries() -> Result<()> {
     let (tmp_dir, working_dir) = setup_working_directory()?;
-    let s3_repository = setup_default_s3_repository("beta", &working_dir)?;
+    let s3_repository = setup_deploy_s3_repository("beta", &working_dir)?;
     let mut ansible_runner = MockAnsibleRunnerInterface::new();
     ansible_runner
         .expect_inventory_list()
@@ -63,9 +63,9 @@ async fn should_run_ansible_to_build_faucet() -> Result<()> {
 }
 
 #[tokio::test]
-async fn should_run_ansible_to_build_faucet_and_custom_safenode_bin() -> Result<()> {
+async fn should_run_ansible_to_build_binaries_with_custom_branch() -> Result<()> {
     let (tmp_dir, working_dir) = setup_working_directory()?;
-    let s3_repository = setup_default_s3_repository("beta", &working_dir)?;
+    let s3_repository = setup_deploy_s3_repository("beta", &working_dir)?;
     let mut ansible_runner = MockAnsibleRunnerInterface::new();
     ansible_runner
         .expect_inventory_list()

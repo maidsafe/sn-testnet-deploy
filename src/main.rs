@@ -7,10 +7,14 @@
 use clap::{Parser, Subcommand};
 use color_eyre::{eyre::eyre, Help, Result};
 use dotenv::dotenv;
+use rand::Rng;
 use sn_testnet_deploy::error::Error;
 use sn_testnet_deploy::logstash::LogstashDeployBuilder;
+use sn_testnet_deploy::manage_test_data::TestDataClientBuilder;
 use sn_testnet_deploy::setup::setup_dotenv_file;
-use sn_testnet_deploy::{CloudProvider, TestnetDeployBuilder};
+use sn_testnet_deploy::{
+    get_data_directory, CloudProvider, DeploymentInventory, TestnetDeployBuilder,
+};
 
 pub fn parse_provider(val: &str) -> Result<CloudProvider> {
     match val {
@@ -81,12 +85,41 @@ enum Commands {
         /// The cloud provider that was used.
         #[clap(long, default_value_t = CloudProvider::DigitalOcean, value_parser = parse_provider, verbatim_doc_comment)]
         provider: CloudProvider,
+        /// Optionally supply the name of the custom branch that was used when creating the
+        /// testnet.
+        ///
+        /// You can supply this if you are running the command on a different machine from where
+        /// the testnet was deployed. It will then get written to the cached inventory on the local
+        /// machine. This information gets used with the upload-test-data command for retrieving
+        /// the safe client that was built when the testnet was deployed.
+        ///
+        /// This argument must be used in conjunction with the --repo-owner argument.
+        #[arg(long)]
+        branch: Option<String>,
+        /// Optionally supply the repo owner of the custom branch that was used when creating the
+        /// testnet.
+        ///
+        /// You can supply this if you are running the command on a different machine from where
+        /// the testnet was deployed. It will then get written to the cached inventory on the local
+        /// machine. This information gets used with the upload-test-data command for retrieving
+        /// the safe client that was built when the testnet was deployed.
+        ///
+        /// This argument must be used in conjunction with the --branch argument.
+        #[arg(long)]
+        repo_owner: Option<String>,
     },
     #[clap(name = "logs", subcommand)]
     Logs(LogCommands),
     #[clap(name = "logstash", subcommand)]
     Logstash(LogstashCommands),
     Setup {},
+    /// Clean a deployed testnet environment.
+    #[clap(name = "upload-test-data")]
+    UploadTestData {
+        /// The name of the environment.
+        #[arg(short = 'n', long)]
+        name: String,
+    },
 }
 
 #[derive(Subcommand, Debug)]
@@ -232,9 +265,25 @@ async fn main() -> Result<()> {
                 .await?;
             Ok(())
         }
-        Some(Commands::Inventory { name, provider }) => {
+        Some(Commands::Inventory {
+            name,
+            provider,
+            branch,
+            repo_owner,
+        }) => {
+            if (repo_owner.is_some() && branch.is_none())
+                || (branch.is_some() && repo_owner.is_none())
+            {
+                return Err(eyre!(
+                    "Both the repository owner and branch name must be supplied if either are used"
+                ));
+            }
+
+            let custom_branch_details = repo_owner.map(|repo_owner| (repo_owner, branch.unwrap()));
             let testnet_deploy = TestnetDeployBuilder::default().provider(provider).build()?;
-            testnet_deploy.list_inventory(&name, false).await?;
+            testnet_deploy
+                .list_inventory(&name, false, custom_branch_details)
+                .await?;
             Ok(())
         }
         Some(Commands::Logs(log_cmd)) => match log_cmd {
@@ -280,6 +329,32 @@ async fn main() -> Result<()> {
         },
         Some(Commands::Setup {}) => {
             setup_dotenv_file()?;
+            Ok(())
+        }
+        Some(Commands::UploadTestData { name }) => {
+            let inventory_path = get_data_directory()?.join(format!("{name}-inventory.json"));
+            if !inventory_path.exists() {
+                return Err(eyre!("There is no inventory for the {name} testnet")
+                    .suggestion("Please run the inventory command to generate it"));
+            }
+
+            let mut inventory = DeploymentInventory::read(&inventory_path)?;
+            let mut rng = rand::thread_rng();
+            let i = rng.gen_range(0..inventory.peers.len());
+            let random_peer = &inventory.peers[i];
+
+            let test_data_client = TestDataClientBuilder::default().build()?;
+            let uploaded_files = test_data_client
+                .upload_test_data(&name, random_peer, inventory.branch_info.clone())
+                .await?;
+
+            println!("Uploaded files:");
+            for (path, address) in uploaded_files.iter() {
+                println!("{path}: {address}");
+            }
+            inventory.add_uploaded_files(uploaded_files.clone());
+            inventory.save(&inventory_path)?;
+
             Ok(())
         }
         None => Ok(()),
