@@ -94,14 +94,14 @@ fn process_part_files(dir_path: &Path, source_root: &PathBuf, dest_root: &PathBu
         .collect();
 
     part_files.sort_by_key(|a| {
-        a.file_name()
+        a.file_stem()
             .unwrap()
             .to_string_lossy()
             .split(".part")
             .nth(1)
-            .unwrap_or("")
+            .unwrap()
             .parse::<u32>()
-            .unwrap_or(u32::MAX)
+            .unwrap()
     });
 
     if part_files.is_empty() {
