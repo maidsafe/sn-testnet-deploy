@@ -1,6 +1,7 @@
 resources/ansible/inventory/.*
 resources/ansible/extra_vars/.*
 resources/**/.terraform/
+resources/test-data/
 .env
 /target
 /logs
