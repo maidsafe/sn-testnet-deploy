@@ -26,8 +26,9 @@ use crate::ssh::{SshClient, SshClientInterface};
 use crate::terraform::{TerraformRunner, TerraformRunnerInterface};
 use flate2::read::GzDecoder;
 use log::debug;
+use serde::{Deserialize, Serialize};
 use std::fs::File;
-use std::io::{BufRead, BufReader, BufWriter};
+use std::io::{BufRead, BufReader, BufWriter, Write};
 use std::net::SocketAddr;
 use std::os::unix::fs::PermissionsExt;
 use std::path::PathBuf;
@@ -56,6 +57,54 @@ impl CloudProvider {
             CloudProvider::Aws => "ubuntu".to_string(),
             CloudProvider::DigitalOcean => "root".to_string(),
         }
+    }
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct DeploymentInventory {
+    pub vm_list: Vec<(String, String)>,
+    pub ssh_user: String,
+    pub genesis_multiaddr: String,
+    pub peers: Vec<String>,
+    pub faucet_address: String,
+}
+
+impl DeploymentInventory {
+    pub fn save(&self, file_path: &PathBuf) -> Result<()> {
+        let serialized_data = serde_json::to_string_pretty(self)?;
+        let mut file = File::create(file_path)?;
+        file.write_all(serialized_data.as_bytes())?;
+        Ok(())
+    }
+
+    pub fn read(file_path: &PathBuf) -> Result<Self> {
+        let data = std::fs::read_to_string(file_path)?;
+        let deserialized_data: DeploymentInventory = serde_json::from_str(&data)?;
+        Ok(deserialized_data)
+    }
+
+    pub fn print_report(&self) {
+        println!("**************************************");
+        println!("*                                    *");
+        println!("*          Inventory Report          *");
+        println!("*                                    *");
+        println!("**************************************");
+
+        for vm in self.vm_list.iter() {
+            println!("{}: {}", vm.0, vm.1);
+        }
+        println!("SSH user: {}", self.ssh_user);
+        println!("Sample peers:");
+        for peer in self.peers.iter() {
+            println!("{peer}");
+        }
+        println!("Genesis multiaddr: {}", self.genesis_multiaddr);
+        println!("Faucet address: {}", self.faucet_address);
+        println!("Check the faucet:");
+        println!(
+            "safe --peer {} wallet get-faucet {}",
+            self.genesis_multiaddr, self.faucet_address
+        );
     }
 }
 
@@ -464,11 +513,26 @@ impl TestnetDeploy {
             &self.cloud_provider.get_ssh_user(),
             "systemctl restart faucet",
         )?;
-        self.list_inventory(name).await?;
+        self.list_inventory(name, true).await?;
         Ok(())
     }
 
-    pub async fn list_inventory(&self, name: &str) -> Result<()> {
+    /// Print the inventory for the deployment.
+    ///
+    /// It will be cached for the purposes of quick display later and also for use with the test
+    /// data upload.
+    ///
+    /// The `force_regeneration` flag is used when the `deploy` command runs, to make sure that a
+    /// new inventory is generated, because it's possible that an old one with the same deployment
+    /// name has been cached.
+    pub async fn list_inventory(&self, name: &str, force_regeneration: bool) -> Result<()> {
+        let inventory_path = get_data_directory()?.join(format!("{name}-inventory.json"));
+        if inventory_path.exists() && !force_regeneration {
+            let inventory = DeploymentInventory::read(&inventory_path)?;
+            inventory.print_report();
+            return Ok(());
+        }
+
         let environments = self.terraform_runner.workspace_list()?;
         if !environments.contains(&name.to_string()) {
             return Err(Error::EnvironmentDoesNotExist(name.to_string()));
@@ -508,41 +572,46 @@ impl TestnetDeploy {
             return Err(Error::EnvironmentDoesNotExist(name.to_string()));
         }
 
-        println!("**************************************");
-        println!("*                                    *");
-        println!("*          Inventory Report          *");
-        println!("*                                    *");
-        println!("**************************************");
-
-        let genesis_ip = &genesis_inventory[0].1;
-        println!("{}: {}", genesis_inventory[0].0, genesis_ip);
-        if !build_inventory.is_empty() {
-            println!("{}: {}", build_inventory[0].0, build_inventory[0].1);
-        }
+        let mut vm_list = Vec::new();
+        vm_list.push((
+            genesis_inventory[0].0.clone(),
+            genesis_inventory[0].1.clone(),
+        ));
+        vm_list.push((build_inventory[0].0.clone(), build_inventory[0].1.clone()));
         for entry in remaining_nodes_inventory.iter() {
-            println!("{}: {}", entry.0, entry.1);
+            vm_list.push((entry.0.clone(), entry.1.clone()));
         }
-        println!("SSH user: {}", self.cloud_provider.get_ssh_user());
-        let (genesis_multiaddr, _) = self.get_genesis_multiaddr(name).await?;
-        println!("Genesis multiaddr: {}", genesis_multiaddr);
-        println!();
+        let (genesis_multiaddr, genesis_ip) = self.get_genesis_multiaddr(name).await?;
 
         // The scripts are relative to the `resources` directory, so we need to change the current
         // working directory back to that location first.
         std::env::set_current_dir(self.working_directory_path.clone())?;
-        println!("Sample peers:");
+        let mut peers = Vec::new();
+        println!("Retrieving sample peers. This can take several minutes.");
         for (_, ip_address) in remaining_nodes_inventory {
-            self.ssh_client.run_script(
+            let output = self.ssh_client.run_script(
                 &ip_address,
                 "safe",
                 PathBuf::from("scripts").join("get_peer_multiaddr.sh"),
+                true,
             )?;
+            for line in output.iter() {
+                peers.push(line.to_string());
+            }
         }
-        println!();
 
-        println!("Faucet address: {}:8000", genesis_ip);
-        println!("Check the faucet:");
-        println!("safe --peer {genesis_multiaddr} wallet get-faucet {genesis_ip}:8000");
+        let inventory = DeploymentInventory {
+            vm_list,
+            ssh_user: self.cloud_provider.get_ssh_user(),
+            genesis_multiaddr,
+            peers,
+            faucet_address: format!("{}:8000", genesis_ip),
+        };
+        inventory.print_report();
+
+        let inventory_path = get_data_directory()?.join(format!("{name}-inventory.json"));
+        inventory.save(&inventory_path)?;
+
         Ok(())
     }
 
@@ -771,4 +840,15 @@ fn print_duration(duration: Duration) {
     let minutes = total_seconds / 60;
     let seconds = total_seconds % 60;
     debug!("Time taken: {} minutes and {} seconds", minutes, seconds);
+}
+
+fn get_data_directory() -> Result<PathBuf> {
+    let path = dirs_next::data_dir()
+        .ok_or_else(|| Error::CouldNotRetrieveDataDirectory)?
+        .join("safe")
+        .join("testnet-deploy");
+    if !path.exists() {
+        std::fs::create_dir_all(path.clone())?;
+    }
+    Ok(path)
 }

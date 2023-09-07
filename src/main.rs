@@ -234,7 +234,7 @@ async fn main() -> Result<()> {
         }
         Some(Commands::Inventory { name, provider }) => {
             let testnet_deploy = TestnetDeployBuilder::default().provider(provider).build()?;
-            testnet_deploy.list_inventory(&name).await?;
+            testnet_deploy.list_inventory(&name, false).await?;
             Ok(())
         }
         Some(Commands::Logs(log_cmd)) => match log_cmd {

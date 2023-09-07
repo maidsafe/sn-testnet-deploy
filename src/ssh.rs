@@ -18,7 +18,13 @@ use std::path::PathBuf;
 pub trait SshClientInterface {
     fn wait_for_ssh_availability(&self, ip_address: &str, user: &str) -> Result<()>;
     fn run_command(&self, ip_address: &str, user: &str, command: &str) -> Result<Vec<String>>;
-    fn run_script(&self, ip_address: &str, user: &str, script: PathBuf) -> Result<Vec<String>>;
+    fn run_script(
+        &self,
+        ip_address: &str,
+        user: &str,
+        script: PathBuf,
+        suppress_output: bool,
+    ) -> Result<Vec<String>>;
 }
 
 pub struct SshClient {
@@ -96,7 +102,13 @@ impl SshClientInterface for SshClient {
         Ok(output)
     }
 
-    fn run_script(&self, ip_address: &str, user: &str, script: PathBuf) -> Result<Vec<String>> {
+    fn run_script(
+        &self,
+        ip_address: &str,
+        user: &str,
+        script: PathBuf,
+        suppress_output: bool,
+    ) -> Result<Vec<String>> {
         let file_name = script
             .file_name()
             .ok_or_else(|| {
@@ -117,9 +129,15 @@ impl SshClientInterface for SshClient {
             script.to_string_lossy().to_string(),
             format!("{}@{}:/tmp/{}", user, ip_address, file_name),
         ];
-        run_external_command(PathBuf::from("scp"), std::env::current_dir()?, args, false).map_err(
-            |e| Error::SshCommandFailed(format!("Failed to copy script file to remote host: {e}")),
-        )?;
+        run_external_command(
+            PathBuf::from("scp"),
+            std::env::current_dir()?,
+            args,
+            suppress_output,
+        )
+        .map_err(|e| {
+            Error::SshCommandFailed(format!("Failed to copy script file to remote host: {e}"))
+        })?;
 
         let args = vec![
             "-i".to_string(),
@@ -135,13 +153,15 @@ impl SshClientInterface for SshClient {
             "bash".to_string(),
             format!("/tmp/{file_name}"),
         ];
-        let output =
-            run_external_command(PathBuf::from("ssh"), std::env::current_dir()?, args, false)
-                .map_err(|e| {
-                    Error::SshCommandFailed(format!(
-                        "Failed to execute command on remote host: {e}"
-                    ))
-                })?;
+        let output = run_external_command(
+            PathBuf::from("ssh"),
+            std::env::current_dir()?,
+            args,
+            suppress_output,
+        )
+        .map_err(|e| {
+            Error::SshCommandFailed(format!("Failed to execute command on remote host: {e}"))
+        })?;
         Ok(output)
     }
 }

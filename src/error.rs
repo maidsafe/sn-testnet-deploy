@@ -21,6 +21,8 @@ pub enum Error {
     CloudProviderCredentialsNotSupplied(String),
     #[error("The {0} cloud provider is not supported yet")]
     CloudProviderNotSupported(String),
+    #[error("The home data directory could not be retrieved")]
+    CouldNotRetrieveDataDirectory,
     #[error("Failed to delete '{0}' from '{1}")]
     DeleteS3ObjectError(String, String),
     #[error("Authorization failed for the Digital Ocean API")]
