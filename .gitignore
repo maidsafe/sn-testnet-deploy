@@ -6,6 +6,7 @@ resources/test-data/
 /target
 /logs
 safenode_rpc_client
+resources/safe
 *.orig
 *.key
 *.csr

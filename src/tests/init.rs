@@ -32,7 +32,7 @@ async fn should_create_a_new_workspace() -> Result<()> {
         .times(1)
         .with(eq("beta".to_string()))
         .returning(|_| Ok(()));
-    let s3_repository = setup_default_s3_repository("beta", &working_dir)?;
+    let s3_repository = setup_deploy_s3_repository("beta", &working_dir)?;
     let testnet = TestnetDeploy::new(
         Box::new(terraform_runner),
         Box::new(MockAnsibleRunnerInterface::new()),
@@ -68,7 +68,7 @@ async fn should_not_create_a_new_workspace_when_one_with_the_same_name_exists() 
         .with(eq("alpha".to_string()))
         .returning(|_| Ok(()));
 
-    let s3_repository = setup_default_s3_repository("alpha", &working_dir)?;
+    let s3_repository = setup_deploy_s3_repository("alpha", &working_dir)?;
     let testnet = TestnetDeploy::new(
         Box::new(terraform_runner),
         Box::new(MockAnsibleRunnerInterface::new()),
@@ -90,7 +90,7 @@ async fn should_download_and_extract_the_rpc_client() -> Result<()> {
         working_dir.child("rpc_client-latest-x86_64-unknown-linux-musl.tar.gz");
 
     let extracted_rpc_client_bin = working_dir.child(RPC_CLIENT_BIN_NAME);
-    let s3_repository = setup_default_s3_repository("alpha", &working_dir)?;
+    let s3_repository = setup_deploy_s3_repository("alpha", &working_dir)?;
     let terraform_runner = setup_default_terraform_runner("alpha");
     let testnet = TestnetDeploy::new(
         Box::new(terraform_runner),
@@ -123,9 +123,9 @@ async fn should_not_download_the_rpc_client_if_it_already_exists() -> Result<()>
     let mut s3_repository = MockS3RepositoryInterface::new();
     s3_repository
         .expect_folder_exists()
-        .with(eq("testnet-logs/alpha".to_string()))
+        .with(eq("sn-testnet"), eq("testnet-logs/alpha".to_string()))
         .times(1)
-        .returning(|_| Ok(false));
+        .returning(|_, _| Ok(false));
     s3_repository.expect_download_object().times(0);
 
     let terraform_runner = setup_default_terraform_runner("alpha");
@@ -147,7 +147,7 @@ async fn should_not_download_the_rpc_client_if_it_already_exists() -> Result<()>
 #[tokio::test]
 async fn should_generate_ansible_inventory_for_digital_ocean_for_the_new_testnet() -> Result<()> {
     let (tmp_dir, working_dir) = setup_working_directory()?;
-    let s3_repository = setup_default_s3_repository("alpha", &working_dir)?;
+    let s3_repository = setup_deploy_s3_repository("alpha", &working_dir)?;
     let terraform_runner = setup_default_terraform_runner("alpha");
 
     let testnet = TestnetDeploy::new(
@@ -187,24 +187,26 @@ async fn should_not_overwrite_generated_inventory() -> Result<()> {
     let saved_archive_path = working_dir
         .to_path_buf()
         .join("rpc_client-latest-x86_64-unknown-linux-musl.tar.gz");
-    let rpc_client_archive_path = create_fake_rpc_client_archive(&working_dir)?;
+    let rpc_client_archive_path =
+        create_fake_bin_archive(&working_dir, "rpc_client.tar.gz", RPC_CLIENT_BIN_NAME)?;
     let mut s3_repository = MockS3RepositoryInterface::new();
     s3_repository
         .expect_download_object()
         .with(
+            eq("sn-testnet"),
             eq("rpc_client-latest-x86_64-unknown-linux-musl.tar.gz"),
             eq(saved_archive_path),
         )
         .times(1)
-        .returning(move |_object_path, archive_path| {
+        .returning(move |_bucket_name, _object_path, archive_path| {
             std::fs::copy(&rpc_client_archive_path, archive_path)?;
             Ok(())
         });
     s3_repository
         .expect_folder_exists()
-        .with(eq("testnet-logs/alpha".to_string()))
+        .with(eq("sn-testnet"), eq("testnet-logs/alpha".to_string()))
         .times(2)
-        .returning(|_| Ok(false));
+        .returning(|_, _| Ok(false));
 
     terraform_runner.expect_init().times(2).returning(|| Ok(()));
     terraform_runner
@@ -282,9 +284,9 @@ async fn should_return_an_error_if_logs_already_exist_for_environment() -> Resul
     let mut s3_repository = MockS3RepositoryInterface::new();
     s3_repository
         .expect_folder_exists()
-        .with(eq("testnet-logs/alpha"))
+        .with(eq("sn-testnet"), eq("testnet-logs/alpha".to_string()))
         .times(1)
-        .returning(|_| Ok(true));
+        .returning(|_, _| Ok(true));
 
     let testnet = TestnetDeploy::new(
         Box::new(terraform_runner),

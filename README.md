@@ -44,10 +44,19 @@ You may want to deploy a custom version of the `safenode` binary. To do so, use 
 cargo run -- deploy --name beta --vm-count 100 --node-count 30 --repo-owner jacderida --branch custom_branch 
 ```
 
-To get a list of the machines that are available for SSH access, run:
+To get a list of the machines and other information about the testnet:
 ```
 cargo run -- inventory --name beta --provider digital-ocean
 ```
+
+### Test Data
+
+There is a set of standard test data, which is about 100MB of image files. It can be uploaded to a testnet using the following command:
+```
+cargo run -- upload-test-data --name beta
+```
+
+The archive will be downloaded from S3, then each file will be uploaded using the `files upload` command of the `safe` client. The client itself is also fetched from S3. It was built using the same source as the branch used for the node binary.
 
 ## Clean Up
 

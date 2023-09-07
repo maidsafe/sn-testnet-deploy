@@ -55,6 +55,10 @@ pub enum Error {
     MalformedDigitalOceanApiRespose(String),
     #[error(transparent)]
     ReqwestError(#[from] reqwest::Error),
+    #[error(transparent)]
+    RegexError(#[from] regex::Error),
+    #[error("Safe client command failed: {0}")]
+    SafeCmdError(String),
     #[error("Error in byte stream when attempting to retrieve S3 object")]
     S3ByteStreamError,
     #[error(transparent)]
@@ -73,6 +77,8 @@ pub enum Error {
         "The '{0}' binary was not found. It is required for the deploy process. Make sure it is installed."
     )]
     ToolBinaryNotFound(String),
+    #[error("{0}")]
+    UploadTestDataError(String),
     #[error(transparent)]
     VarError(#[from] std::env::VarError),
 }

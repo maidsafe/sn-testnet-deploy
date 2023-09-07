@@ -97,7 +97,7 @@ impl DigitalOceanClientInterface for DigitalOceanClient {
                     id: id as usize,
                     name,
                     ip_address: Ipv4Addr::from_str(
-                        &public_ip["ip_address"]
+                        public_ip["ip_address"]
                             .as_str()
                             .ok_or(Error::DigitalOceanPublicIpAddressNotFound)?,
                     )?,

@@ -39,9 +39,9 @@ impl TestnetDeploy {
 pub async fn get_logs(name: &str) -> Result<()> {
     let dest_path = std::env::current_dir()?.join("logs").join(name);
     tokio::fs::create_dir_all(dest_path.clone()).await?;
-    let s3_repository = S3Repository::new("sn-testnet");
+    let s3_repository = S3Repository {};
     s3_repository
-        .download_folder(&format!("testnet-logs/{name}"), &dest_path)
+        .download_folder("sn-testnet", &format!("testnet-logs/{name}"), &dest_path)
         .await?;
     Ok(())
 }
@@ -69,9 +69,9 @@ pub async fn reassemble_logs(name: &str) -> Result<()> {
 }
 
 pub async fn rm_logs(name: &str) -> Result<()> {
-    let s3_repository = S3Repository::new("sn-testnet");
+    let s3_repository = S3Repository {};
     s3_repository
-        .delete_folder(&format!("testnet-logs/{name}"))
+        .delete_folder("sn-testnet", &format!("testnet-logs/{name}"))
         .await?;
     Ok(())
 }

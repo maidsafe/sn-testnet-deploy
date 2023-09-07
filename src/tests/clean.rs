@@ -20,7 +20,7 @@ use mockall::Sequence;
 async fn should_run_terraform_destroy_and_delete_workspace_and_delete_inventory_files() -> Result<()>
 {
     let (tmp_dir, working_dir) = setup_working_directory()?;
-    let s3_repository = setup_default_s3_repository("alpha", &working_dir)?;
+    let s3_repository = setup_deploy_s3_repository("alpha", &working_dir)?;
     let mut terraform_runner = setup_default_terraform_runner("alpha");
     let mut seq = Sequence::new();
     terraform_runner.expect_init().times(1).returning(|| Ok(()));

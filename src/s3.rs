@@ -21,43 +21,62 @@ use tokio_stream::StreamExt;
 #[cfg_attr(test, automock)]
 #[async_trait]
 pub trait S3RepositoryInterface {
-    async fn download_object(&self, object_key: &str, dest_path: &Path) -> Result<()>;
-    async fn download_folder(&self, folder_path: &str, dest_path: &Path) -> Result<()>;
-    async fn delete_folder(&self, folder_path: &str) -> Result<()>;
-    async fn folder_exists(&self, folder_path: &str) -> Result<bool>;
+    async fn download_object(
+        &self,
+        bucket_name: &str,
+        object_key: &str,
+        dest_path: &Path,
+    ) -> Result<()>;
+    async fn download_folder(
+        &self,
+        bucket_name: &str,
+        folder_path: &str,
+        dest_path: &Path,
+    ) -> Result<()>;
+    async fn delete_folder(&self, bucket_name: &str, folder_path: &str) -> Result<()>;
+    async fn folder_exists(&self, bucket_name: &str, folder_path: &str) -> Result<bool>;
 }
 
-pub struct S3Repository {
-    pub bucket_name: String,
-}
+pub struct S3Repository {}
 
 #[async_trait]
 impl S3RepositoryInterface for S3Repository {
-    async fn download_object(&self, object_key: &str, dest_path: &Path) -> Result<()> {
+    async fn download_object(
+        &self,
+        bucket_name: &str,
+        object_key: &str,
+        dest_path: &Path,
+    ) -> Result<()> {
         let conf = aws_config::from_env().region("eu-west-2").load().await;
         let client = Client::new(&conf);
-        self.retrieve_object(&client, object_key, &dest_path.to_path_buf())
+        self.retrieve_object(&client, bucket_name, object_key, &dest_path.to_path_buf())
             .await?;
         Ok(())
     }
 
-    async fn download_folder(&self, folder_path: &str, dest_path: &Path) -> Result<()> {
+    async fn download_folder(
+        &self,
+        bucket_name: &str,
+        folder_path: &str,
+        dest_path: &Path,
+    ) -> Result<()> {
         let conf = aws_config::from_env().region("eu-west-2").load().await;
         let client = Client::new(&conf);
         tokio::fs::create_dir_all(dest_path).await?;
-        self.list_and_retrieve(&client, folder_path, &dest_path.to_path_buf())
+        self.list_and_retrieve(&client, bucket_name, folder_path, &dest_path.to_path_buf())
             .await?;
         Ok(())
     }
 
-    async fn delete_folder(&self, folder_path: &str) -> Result<()> {
+    async fn delete_folder(&self, bucket_name: &str, folder_path: &str) -> Result<()> {
         let conf = aws_config::from_env().region("eu-west-2").load().await;
         let client = Client::new(&conf);
-        self.list_and_delete(&client, folder_path).await?;
+        self.list_and_delete(&client, bucket_name, folder_path)
+            .await?;
         Ok(())
     }
 
-    async fn folder_exists(&self, folder_path: &str) -> Result<bool> {
+    async fn folder_exists(&self, bucket_name: &str, folder_path: &str) -> Result<bool> {
         let conf = aws_config::from_env().region("eu-west-2").load().await;
         let client = Client::new(&conf);
         let folder = if folder_path.ends_with('/') {
@@ -67,7 +86,7 @@ impl S3RepositoryInterface for S3Repository {
         };
         let output = client
             .list_objects_v2()
-            .bucket(self.bucket_name.clone())
+            .bucket(bucket_name.to_string())
             .prefix(folder)
             .delimiter("/".to_string())
             .send()
@@ -78,22 +97,17 @@ impl S3RepositoryInterface for S3Repository {
 }
 
 impl S3Repository {
-    pub fn new(bucket_name: &str) -> Self {
-        Self {
-            bucket_name: bucket_name.to_string(),
-        }
-    }
-
     #[async_recursion]
     async fn list_and_retrieve(
         &self,
         client: &Client,
+        bucket_name: &str,
         prefix: &str,
         root_path: &PathBuf,
     ) -> Result<(), Error> {
         let output = client
             .list_objects_v2()
-            .bucket(self.bucket_name.clone())
+            .bucket(bucket_name)
             .prefix(prefix)
             .delimiter("/".to_string())
             .send()
@@ -104,7 +118,7 @@ impl S3Repository {
         if let Some(common_prefixes) = output.common_prefixes {
             for cp in common_prefixes {
                 let next_prefix = cp.prefix.unwrap();
-                self.list_and_retrieve(client, &next_prefix, root_path)
+                self.list_and_retrieve(client, bucket_name, &next_prefix, root_path)
                     .await?;
             }
         }
@@ -118,8 +132,7 @@ impl S3Repository {
                     println!("Has already been retrieved in a previous sync.");
                     continue;
                 }
-
-                self.retrieve_object(client, &object_key, &dest_file_path)
+                self.retrieve_object(client, bucket_name, &object_key, &dest_file_path)
                     .await?;
             }
         }
@@ -128,10 +141,15 @@ impl S3Repository {
     }
 
     #[async_recursion]
-    async fn list_and_delete(&self, client: &Client, prefix: &str) -> Result<(), Error> {
+    async fn list_and_delete(
+        &self,
+        client: &Client,
+        bucket_name: &str,
+        prefix: &str,
+    ) -> Result<(), Error> {
         let output = client
             .list_objects_v2()
-            .bucket(self.bucket_name.clone())
+            .bucket(bucket_name.to_string())
             .prefix(prefix)
             .delimiter("/".to_string())
             .send()
@@ -142,14 +160,15 @@ impl S3Repository {
         if let Some(common_prefixes) = output.common_prefixes {
             for cp in common_prefixes {
                 let next_prefix = cp.prefix.unwrap();
-                self.list_and_delete(client, &next_prefix).await?;
+                self.list_and_delete(client, bucket_name, &next_prefix)
+                    .await?;
             }
         }
 
         if let Some(objects) = output.contents {
             for object in objects {
                 let object_key = object.key.unwrap();
-                self.delete_object(client, &object_key).await?;
+                self.delete_object(client, bucket_name, &object_key).await?;
             }
         }
 
@@ -159,18 +178,19 @@ impl S3Repository {
     async fn retrieve_object(
         &self,
         client: &Client,
+        bucket_name: &str,
         object_key: &str,
         dest_path: &PathBuf,
     ) -> Result<()> {
         println!("Retrieving {object_key} from S3...");
         let mut resp = client
             .get_object()
-            .bucket(self.bucket_name.clone())
+            .bucket(bucket_name)
             .key(object_key)
             .send()
             .await
             .map_err(|_| {
-                Error::GetS3ObjectError(object_key.to_string(), self.bucket_name.clone())
+                Error::GetS3ObjectError(object_key.to_string(), bucket_name.to_string())
             })?;
 
         if let Some(parent) = dest_path.parent() {
@@ -193,16 +213,21 @@ impl S3Repository {
         Ok(())
     }
 
-    async fn delete_object(&self, client: &Client, object_key: &str) -> Result<()> {
+    async fn delete_object(
+        &self,
+        client: &Client,
+        bucket_name: &str,
+        object_key: &str,
+    ) -> Result<()> {
         println!("Deleting {object_key} from S3...");
         client
             .delete_object()
-            .bucket(self.bucket_name.clone())
+            .bucket(bucket_name)
             .key(object_key)
             .send()
             .await
             .map_err(|_| {
-                Error::DeleteS3ObjectError(object_key.to_string(), self.bucket_name.clone())
+                Error::DeleteS3ObjectError(object_key.to_string(), bucket_name.to_string())
             })?;
         Ok(())
     }
