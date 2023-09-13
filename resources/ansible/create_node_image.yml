@@ -5,5 +5,5 @@
   roles:
     - role: prerequisites
       become: True
-    - role: logstash
+    - role: filebeat
       become: True

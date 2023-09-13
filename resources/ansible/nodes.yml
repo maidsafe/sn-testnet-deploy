@@ -28,5 +28,15 @@
     - node
     - role: resource_usage
       become: True
-    - role: filebeat
+    - role: filebeat-config
       become: True
+  tasks:
+    # Something is wrong with the journal service on Ubuntu that causes no
+    # output to be produced when running `journalctl`. The solution seemed
+    # to be restarting the service.
+    - name: restart systemd-journald
+      become: True
+      ansible.builtin.systemd:
+        name: systemd-journald
+        state: restarted
+        enabled: yes
