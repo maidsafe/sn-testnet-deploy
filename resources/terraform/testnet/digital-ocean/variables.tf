@@ -30,7 +30,7 @@ variable "build_droplet_image_id" {
 }
 
 variable "node_droplet_image_id" {
-  default = "138988250"
+  default = "140310435"
 }
 
 variable "region" {

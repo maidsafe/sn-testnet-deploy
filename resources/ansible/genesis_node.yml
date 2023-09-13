@@ -28,5 +28,5 @@
     - node
     - role: resource_usage
       become: True
-    - role: filebeat
+    - role: filebeat-config
       become: True
