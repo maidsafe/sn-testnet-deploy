@@ -11,6 +11,7 @@ use crate::logstash::LogstashDeploy;
 use crate::ssh::MockSshClientInterface;
 use crate::terraform::MockTerraformRunnerInterface;
 use crate::CloudProvider;
+use assert_fs::prelude::*;
 use color_eyre::Result;
 use mockall::predicate::*;
 use std::path::PathBuf;
