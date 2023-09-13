@@ -232,7 +232,7 @@ impl LogstashDeploy {
                 .join(format!(".{name}_logstash_inventory_digital_ocean.yml")),
             self.cloud_provider.get_ssh_user(),
             Some(format!(
-                "{{ \"provider\": \"{}\", \"stack_name\": \"{name}\" }}",
+                "{{ \"provider\": \"{}\", \"stack_name\": \"{name}\", \"logstash_host_ip_address\": \"{logstash_ip}\" }}",
                 self.cloud_provider
             )),
         )?;

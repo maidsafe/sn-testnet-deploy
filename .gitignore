@@ -7,3 +7,4 @@ resources/**/.terraform/
 safenode_rpc_client
 *.orig
 *.key
+*.csr
