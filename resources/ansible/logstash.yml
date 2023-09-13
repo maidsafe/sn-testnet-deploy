@@ -1,14 +1,29 @@
 ---
-- name: reorganise local log files
+- name: generate certificates for use with filebeat
   hosts: localhost
   tasks:
-    - name: generate certificates for use with filebeat
-      command: >-
-        openssl req -x509 -batch -nodes -days 3650 -newkey rsa:2048
-        -keyout logstash-{{ stack_name }}-private.key
-        -out logstash-{{ stack_name }}-public.crt
+    - name: generate private key
+      command: openssl genpkey -algorithm RSA -out logstash-{{ stack_name }}-private.key
       args:
         creates: logstash-{{ stack_name }}-private.key
+    - name: generate certificate signing request
+      shell: >-
+        openssl req -new -key logstash-{{ stack_name }}-private.key
+        -out logstash-{{ stack_name }}.csr
+        -subj "/CN={{ logstash_host_ip_address }}"
+        -reqexts SAN
+        -config <(cat /etc/ssl/openssl.cnf <(printf "[SAN]\nsubjectAltName=IP:{{ logstash_host_ip_address }}"))
+      args:
+        creates: logstash-{{ stack_name }}.csr
+    - name: generate self-signed certificate
+      shell: >-
+        openssl x509 -req -days 3650
+        -in logstash-{{ stack_name }}.csr
+        -signkey logstash-{{ stack_name }}-private.key
+        -out logstash-{{ stack_name }}-public.crt
+        -extfile <(printf "subjectAltName=IP:{{ logstash_host_ip_address }}")
+      args:
+        creates: logstash-{{ stack_name }}-public.crt
 
 - name: copy certificates to logstash machines
   hosts: all

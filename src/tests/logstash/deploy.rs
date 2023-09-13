@@ -11,7 +11,6 @@ use crate::logstash::LogstashDeploy;
 use crate::ssh::MockSshClientInterface;
 use crate::terraform::MockTerraformRunnerInterface;
 use crate::CloudProvider;
-use assert_fs::prelude::*;
 use color_eyre::Result;
 use mockall::predicate::*;
 use std::path::PathBuf;
@@ -70,7 +69,7 @@ async fn should_run_ansible_to_provision_the_logstash_nodes() -> Result<()> {
             eq(PathBuf::from("inventory").join(".beta_logstash_inventory_digital_ocean.yml")),
             eq("root".to_string()),
             eq(Some(
-                "{ \"provider\": \"digital-ocean\", \"stack_name\": \"beta\" }".to_string(),
+                "{ \"provider\": \"digital-ocean\", \"stack_name\": \"beta\", \"logstash_host_ip_address\": \"10.0.0.10\" }".to_string(),
             )),
         )
         .returning(|_, _, _, _| Ok(()));
