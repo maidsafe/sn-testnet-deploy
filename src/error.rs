@@ -65,6 +65,8 @@ pub enum Error {
     SerdeJson(#[from] serde_json::Error),
     #[error("An unexpected error occurred during the setup process")]
     SetupError,
+    #[error("Smoke test failed for this testnet: {0}")]
+    SmokeTestFailed(String),
     #[error("SSH command failed: {0}")]
     SshCommandFailed(String),
     #[error("After several retry attempts an SSH connection could not be established")]
