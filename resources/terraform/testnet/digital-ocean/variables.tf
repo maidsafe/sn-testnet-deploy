@@ -24,9 +24,9 @@ variable "build_machine_size" {
   default = "s-8vcpu-16gb"
 }
 
-# This corresponds to the 'safe_network-build-1692211486' image/snapshot.
+# This corresponds to the 'testnet-deploy-builder-20-9-23-protobufadded' image/snapshot.
 variable "build_droplet_image_id" {
-  default = "138592390"
+  default = "140808464"
 }
 
 variable "node_droplet_image_id" {

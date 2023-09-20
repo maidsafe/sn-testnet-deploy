@@ -10,3 +10,4 @@ resources/safe
 *.orig
 *.key
 *.csr
+.DS_Store
