@@ -113,6 +113,13 @@ enum Commands {
     #[clap(name = "logstash", subcommand)]
     Logstash(LogstashCommands),
     Setup {},
+    /// Run a smoke test against a given network.
+    #[clap(name = "smoke-test")]
+    SmokeTest {
+        /// The name of the environment
+        #[arg(short = 'n', long)]
+        name: String,
+    },
     /// Clean a deployed testnet environment.
     #[clap(name = "upload-test-data")]
     UploadTestData {
@@ -329,6 +336,18 @@ async fn main() -> Result<()> {
         },
         Some(Commands::Setup {}) => {
             setup_dotenv_file()?;
+            Ok(())
+        }
+        Some(Commands::SmokeTest { name }) => {
+            let inventory_path = get_data_directory()?.join(format!("{name}-inventory.json"));
+            if !inventory_path.exists() {
+                return Err(eyre!("There is no inventory for the {name} testnet")
+                    .suggestion("Please run the inventory command to generate it"));
+            }
+
+            let inventory = DeploymentInventory::read(&inventory_path)?;
+            let test_data_client = TestDataClientBuilder::default().build()?;
+            test_data_client.smoke_test(inventory).await?;
             Ok(())
         }
         Some(Commands::UploadTestData { name }) => {

@@ -28,6 +28,7 @@ use crate::ssh::{SshClient, SshClientInterface};
 use crate::terraform::{TerraformRunner, TerraformRunnerInterface};
 use flate2::read::GzDecoder;
 use log::debug;
+use rand::Rng;
 use serde::{Deserialize, Serialize};
 use std::fs::File;
 use std::io::{BufRead, BufReader, BufWriter, Write};
@@ -62,8 +63,9 @@ impl CloudProvider {
     }
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct DeploymentInventory {
+    pub name: String,
     pub branch_info: (String, String),
     pub vm_list: Vec<(String, String)>,
     pub ssh_user: String,
@@ -91,12 +93,24 @@ impl DeploymentInventory {
         self.uploaded_files.extend_from_slice(&uploaded_files);
     }
 
+    pub fn get_random_peer(&self) -> String {
+        let mut rng = rand::thread_rng();
+        let i = rng.gen_range(0..self.peers.len());
+        let random_peer = &self.peers[i];
+        random_peer.to_string()
+    }
+
     pub fn print_report(&self) {
         println!("**************************************");
         println!("*                                    *");
         println!("*          Inventory Report          *");
         println!("*                                    *");
         println!("**************************************");
+
+        println!("Branch details");
+        println!("==============");
+        println!("Repo owner: {}", self.branch_info.0);
+        println!("Branch name: {}", self.branch_info.1);
 
         for vm in self.vm_list.iter() {
             println!("{}: {}", vm.0, vm.1);
@@ -611,6 +625,7 @@ impl TestnetDeploy {
         }
 
         let inventory = DeploymentInventory {
+            name: name.to_string(),
             branch_info: custom_branch_info.unwrap_or(("maidsafe".to_string(), "main".to_string())),
             vm_list,
             ssh_user: self.cloud_provider.get_ssh_user(),

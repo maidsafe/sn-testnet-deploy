@@ -9,6 +9,7 @@ use crate::run_external_command;
 #[cfg(test)]
 use mockall::automock;
 use regex::Regex;
+use std::net::SocketAddr;
 use std::path::{Path, PathBuf};
 
 /// Provides an interface for using the `safe` client.
@@ -17,6 +18,8 @@ use std::path::{Path, PathBuf};
 /// safe process.
 #[cfg_attr(test, automock)]
 pub trait SafeClientInterface {
+    fn wallet_get_faucet(&self, peer_multiaddr: &str, faucet_addr: SocketAddr) -> Result<()>;
+    fn download_files(&self, peer_multiaddr: &str) -> Result<()>;
     fn upload_file(&self, peer_multiaddr: &str, path: &Path) -> Result<String>;
 }
 
@@ -34,6 +37,21 @@ impl SafeClient {
 }
 
 impl SafeClientInterface for SafeClient {
+    fn download_files(&self, peer_multiaddr: &str) -> Result<()> {
+        run_external_command(
+            self.binary_path.clone(),
+            self.working_directory_path.clone(),
+            vec![
+                "--peer".to_string(),
+                peer_multiaddr.to_string(),
+                "files".to_string(),
+                "download".to_string(),
+            ],
+            false,
+        )?;
+        Ok(())
+    }
+
     fn upload_file(&self, peer_multiaddr: &str, path: &Path) -> Result<String> {
         let output = run_external_command(
             self.binary_path.clone(),
@@ -58,5 +76,21 @@ impl SafeClientInterface for SafeClient {
         Err(Error::SafeCmdError(
             "could not obtain hex address of uploaded file".to_string(),
         ))
+    }
+
+    fn wallet_get_faucet(&self, peer_multiaddr: &str, faucet_addr: SocketAddr) -> Result<()> {
+        run_external_command(
+            self.binary_path.clone(),
+            self.working_directory_path.clone(),
+            vec![
+                "--peer".to_string(),
+                peer_multiaddr.to_string(),
+                "wallet".to_string(),
+                "get-faucet".to_string(),
+                faucet_addr.to_string(),
+            ],
+            false,
+        )?;
+        Ok(())
     }
 }
