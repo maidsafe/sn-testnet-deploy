@@ -76,7 +76,7 @@ impl TestDataClient {
         }
     }
 
-    pub async fn smoke_test(&self, inventory: DeploymentInventory) -> Result<()> {
+    pub async fn smoke_test(&self, inventory: &mut DeploymentInventory) -> Result<()> {
         Self::download_and_extract_safe_client(
             &*self.s3_repository,
             &inventory.name,
@@ -93,6 +93,7 @@ impl TestDataClient {
 
         // Generate 10 random files to be uploaded, increasing in size from 1 to 10k.
         // They will then be re-downloaded by `safe` and compared to make sure they are right.
+        let mut uploaded_files = Vec::new();
         let mut file_hash_map = HashMap::new();
         let temp_dir_path = tempfile::tempdir()?.into_path();
         for i in 1..=10 {
@@ -113,9 +114,10 @@ impl TestDataClient {
                 .unwrap()
                 .to_string_lossy()
                 .to_string();
-            file_hash_map.insert(file_name, hash);
+            file_hash_map.insert(file_name.clone(), hash);
 
-            self.safe_client.upload_file(&random_peer, &file_path)?;
+            let hex_address = self.safe_client.upload_file(&random_peer, &file_path)?;
+            uploaded_files.push((hex_address, file_name))
         }
 
         self.safe_client.download_files(&random_peer)?;
@@ -146,6 +148,8 @@ impl TestDataClient {
                 }
             }
         }
+
+        inventory.add_uploaded_files(uploaded_files);
 
         Ok(())
     }

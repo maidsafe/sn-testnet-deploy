@@ -56,6 +56,15 @@ pub fn setup_dotenv_file() -> Result<()> {
     )
     .with_help_message("This key will be used for SSH access to droplets or EC2 instances.")
     .prompt()?;
+    let slack_webhook_url =
+        Text::new("Please supply the Slack webhook URL for sending notifications:")
+            .with_help_message(
+                "If you do not have this, contact a team member who can supply it. \
+                This is an optional value.",
+            )
+            .with_initial_value("")
+            .with_validator(inquire::required!())
+            .prompt()?;
     let sn_testnet_dev_subnet_id =
         Text::new("Please supply the ID of the VPC subnet for launching EC2 instances:")
             .with_help_message("If you are unsure of this value, just accept the default.")
@@ -83,6 +92,7 @@ AWS_SECRET_ACCESS_KEY={}
 AWS_DEFAULT_REGION={}
 DO_PAT={}
 SSH_KEY_PATH={}
+SLACK_WEBHOOK_URL={}
 SN_TESTNET_DEV_SUBNET_ID={}
 SN_TESTNET_DEV_SECURITY_GROUP_ID={}
 TERRAFORM_STATE_BUCKET_NAME={}
@@ -93,6 +103,7 @@ TERRAFORM_STATE_BUCKET_NAME={}
         aws_region,
         digital_ocean_pat,
         ssh_key_path,
+        slack_webhook_url,
         sn_testnet_dev_subnet_id,
         sn_testnet_dev_security_group_id,
         terraform_state_bucket_name
