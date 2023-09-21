@@ -30,6 +30,7 @@ use flate2::read::GzDecoder;
 use log::debug;
 use rand::Rng;
 use serde::{Deserialize, Serialize};
+use serde_json::json;
 use std::fs::File;
 use std::io::{BufRead, BufReader, BufWriter, Write};
 use std::net::SocketAddr;
@@ -68,6 +69,7 @@ pub struct DeploymentInventory {
     pub name: String,
     pub branch_info: (String, String),
     pub vm_list: Vec<(String, String)>,
+    pub node_count: u16,
     pub ssh_user: String,
     pub genesis_multiaddr: String,
     pub peers: Vec<String>,
@@ -248,6 +250,13 @@ impl TestnetDeployBuilder {
             PathBuf::from("./safenode_rpc_client"),
             working_directory_path.clone(),
         );
+
+        // Remove any `safe` binary from a previous deployment. Otherwise you can end up with
+        // mismatched binaries.
+        let safe_path = working_directory_path.join("safe");
+        if safe_path.exists() {
+            std::fs::remove_file(safe_path)?;
+        }
 
         let testnet = TestnetDeploy::new(
             Box::new(terraform_runner),
@@ -531,7 +540,7 @@ impl TestnetDeploy {
             &self.cloud_provider.get_ssh_user(),
             "systemctl restart faucet",
         )?;
-        self.list_inventory(name, true, custom_branch_details)
+        self.list_inventory(name, true, custom_branch_details, Some(node_instance_count))
             .await?;
         Ok(())
     }
@@ -549,6 +558,7 @@ impl TestnetDeploy {
         name: &str,
         force_regeneration: bool,
         custom_branch_info: Option<(String, String)>,
+        node_instance_count: Option<u16>,
     ) -> Result<()> {
         let inventory_path = get_data_directory()?.join(format!("{name}-inventory.json"));
         if inventory_path.exists() && !force_regeneration {
@@ -624,10 +634,16 @@ impl TestnetDeploy {
             }
         }
 
+        // The VM list includes the genesis node and the build machine, hence the subtraction of 2
+        // from the total VM count. After that, add one node for genesis, since this machine only
+        // runs a single node.
+        let mut node_count = (vm_list.len() - 2) as u16 * node_instance_count.unwrap_or(0);
+        node_count += 1;
         let inventory = DeploymentInventory {
             name: name.to_string(),
             branch_info: custom_branch_info.unwrap_or(("maidsafe".to_string(), "main".to_string())),
             vm_list,
+            node_count,
             ssh_user: self.cloud_provider.get_ssh_user(),
             genesis_multiaddr,
             peers,
@@ -906,6 +922,52 @@ pub fn get_data_directory() -> Result<PathBuf> {
         std::fs::create_dir_all(path.clone())?;
     }
     Ok(path)
+}
+
+pub fn get_wallet_directory() -> Result<PathBuf> {
+    Ok(dirs_next::data_dir()
+        .ok_or_else(|| Error::CouldNotRetrieveDataDirectory)?
+        .join("safe")
+        .join("client")
+        .join("wallet"))
+}
+
+pub async fn notify_slack(inventory: DeploymentInventory) -> Result<()> {
+    let webhook_url =
+        std::env::var("SLACK_WEBHOOK_URL").map_err(|_| Error::SlackWebhookUrlNotSupplied)?;
+
+    let mut message = String::new();
+    message.push_str("*Testnet Details*\n");
+    message.push_str(&format!("Name: {}\n", inventory.name));
+    message.push_str(&format!("Node count: {}\n", inventory.node_count));
+    message.push_str(&format!("Faucet address: {}\n", inventory.faucet_address));
+    message.push_str("*Branch Details*\n");
+    message.push_str(&format!("Repo owner: {}\n", inventory.branch_info.0));
+    message.push_str(&format!("Branch: {}\n", inventory.branch_info.1));
+    message.push_str("*Sample Peers*\n");
+    message.push_str("```\n");
+    for peer in inventory.peers.iter() {
+        message.push_str(&format!("{peer}\n"));
+    }
+    message.push_str("```\n");
+    message.push_str("*Available Files*\n");
+    message.push_str("```\n");
+    for (addr, file_name) in inventory.uploaded_files.iter() {
+        message.push_str(&format!("{}: {}\n", addr, file_name))
+    }
+    message.push_str("```\n");
+
+    let payload = json!({
+        "text": message,
+    });
+    reqwest::Client::new()
+        .post(webhook_url)
+        .json(&payload)
+        .send()
+        .await?;
+    println!("{message}");
+    println!("Posted notification to Slack");
+    Ok(())
 }
 
 fn print_duration(duration: Duration) {

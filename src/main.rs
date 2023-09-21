@@ -13,7 +13,8 @@ use sn_testnet_deploy::logstash::LogstashDeployBuilder;
 use sn_testnet_deploy::manage_test_data::TestDataClientBuilder;
 use sn_testnet_deploy::setup::setup_dotenv_file;
 use sn_testnet_deploy::{
-    get_data_directory, CloudProvider, DeploymentInventory, TestnetDeployBuilder,
+    get_data_directory, get_wallet_directory, notify_slack, CloudProvider, DeploymentInventory,
+    TestnetDeployBuilder,
 };
 
 pub fn parse_provider(val: &str) -> Result<CloudProvider> {
@@ -107,11 +108,24 @@ enum Commands {
         /// This argument must be used in conjunction with the --branch argument.
         #[arg(long)]
         repo_owner: Option<String>,
+        /// Optionally supply the node count.
+        ///
+        /// You can supply this if you are running the command on a different machine from where
+        /// the testnet was deployed. It will then get written to the cached inventory on the local
+        /// machine. This information gets used for Slack notifications.
+        #[arg(long)]
+        node_count: Option<u16>,
     },
     #[clap(name = "logs", subcommand)]
     Logs(LogCommands),
     #[clap(name = "logstash", subcommand)]
     Logstash(LogstashCommands),
+    /// Send a notification to Slack with testnet inventory details
+    Notify {
+        /// The name of the environment.
+        #[arg(short = 'n', long)]
+        name: String,
+    },
     Setup {},
     /// Run a smoke test against a given network.
     #[clap(name = "smoke-test")]
@@ -277,6 +291,7 @@ async fn main() -> Result<()> {
             provider,
             branch,
             repo_owner,
+            node_count,
         }) => {
             if (repo_owner.is_some() && branch.is_none())
                 || (branch.is_some() && repo_owner.is_none())
@@ -289,7 +304,7 @@ async fn main() -> Result<()> {
             let custom_branch_details = repo_owner.map(|repo_owner| (repo_owner, branch.unwrap()));
             let testnet_deploy = TestnetDeployBuilder::default().provider(provider).build()?;
             testnet_deploy
-                .list_inventory(&name, false, custom_branch_details)
+                .list_inventory(&name, false, custom_branch_details, node_count)
                 .await?;
             Ok(())
         }
@@ -334,11 +349,7 @@ async fn main() -> Result<()> {
                 Ok(())
             }
         },
-        Some(Commands::Setup {}) => {
-            setup_dotenv_file()?;
-            Ok(())
-        }
-        Some(Commands::SmokeTest { name }) => {
+        Some(Commands::Notify { name }) => {
             let inventory_path = get_data_directory()?.join(format!("{name}-inventory.json"));
             if !inventory_path.exists() {
                 return Err(eyre!("There is no inventory for the {name} testnet")
@@ -346,8 +357,33 @@ async fn main() -> Result<()> {
             }
 
             let inventory = DeploymentInventory::read(&inventory_path)?;
+            notify_slack(inventory).await?;
+            Ok(())
+        }
+        Some(Commands::Setup {}) => {
+            setup_dotenv_file()?;
+            Ok(())
+        }
+        Some(Commands::SmokeTest { name }) => {
+            let wallet_dir_path = get_wallet_directory()?;
+            if wallet_dir_path.exists() {
+                return Err(eyre!(
+                    "A previous wallet directory exists. The smoke test is intended \
+                    to be for a new network."
+                )
+                .suggestion("Please remove your previous wallet directory and try again"));
+            }
+
+            let inventory_path = get_data_directory()?.join(format!("{name}-inventory.json"));
+            if !inventory_path.exists() {
+                return Err(eyre!("There is no inventory for the {name} testnet")
+                    .suggestion("Please run the inventory command to generate it"));
+            }
+
+            let mut inventory = DeploymentInventory::read(&inventory_path)?;
             let test_data_client = TestDataClientBuilder::default().build()?;
-            test_data_client.smoke_test(inventory).await?;
+            test_data_client.smoke_test(&mut inventory).await?;
+            inventory.save(&inventory_path)?;
             Ok(())
         }
         Some(Commands::UploadTestData { name }) => {

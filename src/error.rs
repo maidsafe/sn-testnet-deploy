@@ -65,6 +65,8 @@ pub enum Error {
     SerdeJson(#[from] serde_json::Error),
     #[error("An unexpected error occurred during the setup process")]
     SetupError,
+    #[error("The SLACK_WEBHOOK_URL variable was not set")]
+    SlackWebhookUrlNotSupplied,
     #[error("Smoke test failed for this testnet: {0}")]
     SmokeTestFailed(String),
     #[error("SSH command failed: {0}")]
