@@ -59,6 +59,8 @@ pub enum Error {
     RegexError(#[from] regex::Error),
     #[error("Safe client command failed: {0}")]
     SafeCmdError(String),
+    #[error("Failed to download the safe or safenode binary")]
+    SafeBinaryDownloadError,
     #[error("Error in byte stream when attempting to retrieve S3 object")]
     S3ByteStreamError,
     #[error(transparent)]

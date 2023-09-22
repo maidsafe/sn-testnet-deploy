@@ -6,6 +6,7 @@
 
 use super::*;
 use crate::s3::MockS3RepositoryInterface;
+use crate::safe::MockSafeBinaryRepositoryInterface;
 use crate::terraform::MockTerraformRunnerInterface;
 use assert_fs::fixture::ChildPath;
 use assert_fs::prelude::*;
@@ -117,7 +118,7 @@ pub fn setup_deploy_s3_repository(
     Ok(s3_repository)
 }
 
-pub fn setup_test_data_s3_repository(
+pub fn setup_test_data_s3_repository_for_custom_branch(
     env_name: &str,
     repo_owner: &str,
     branch_name: &str,
@@ -176,4 +177,58 @@ pub fn setup_test_data_s3_repository(
             Ok(())
         });
     Ok(s3_repository)
+}
+
+pub fn setup_test_data_s3_repository_for_versioned_binary(
+    working_dir: &ChildPath,
+) -> Result<MockS3RepositoryInterface> {
+    let saved_test_data_archive_file_name = "test-data.tar.gz";
+    let saved_test_data_archive_path = working_dir
+        .join("test-data")
+        .join(saved_test_data_archive_file_name);
+    let fake_test_data_archive_path =
+        create_fake_test_data_archive(working_dir, "test-data.tar.gz")?;
+
+    let mut s3_repository = MockS3RepositoryInterface::new();
+    s3_repository
+        .expect_download_object()
+        .with(
+            eq("sn-testnet"),
+            eq(saved_test_data_archive_file_name),
+            eq(saved_test_data_archive_path),
+        )
+        .times(1)
+        .returning(move |_bucket_name, _object_path, archive_path| {
+            std::fs::copy(&fake_test_data_archive_path, archive_path)?;
+            Ok(())
+        });
+    Ok(s3_repository)
+}
+
+pub fn setup_binary_repo_for_versioned_binary(
+    version: &str,
+    working_dir: &ChildPath,
+) -> Result<MockSafeBinaryRepositoryInterface> {
+    let saved_safe_archive_file_name = format!("safe-{version}-x86_64-unknown-linux-musl.tar.gz");
+    let binary_url = format!("https://github.com/maidsafe/safe_network/releases/download/sn_cli-v{version}/{saved_safe_archive_file_name}");
+    let saved_safe_archive_path = working_dir
+        .to_path_buf()
+        .join(saved_safe_archive_file_name.clone());
+    let fake_safe_client_archive_path =
+        create_fake_bin_archive(working_dir, "safe_client.tar.gz", "safe")?;
+
+    println!("binary_url = {binary_url}");
+    println!("saved_safe_archive_path = {saved_safe_archive_path:#?}");
+
+    let mut binary_repo = MockSafeBinaryRepositoryInterface::new();
+    binary_repo
+        .expect_download()
+        .with(eq(binary_url), eq(saved_safe_archive_path))
+        .times(1)
+        .returning(move |_, dest_path| {
+            std::fs::copy(&fake_safe_client_archive_path, dest_path)?;
+            Ok(())
+        });
+
+    Ok(binary_repo)
 }

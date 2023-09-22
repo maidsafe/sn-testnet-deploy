@@ -67,7 +67,8 @@ impl CloudProvider {
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct DeploymentInventory {
     pub name: String,
-    pub branch_info: (String, String),
+    pub version_info: Option<(String, String)>,
+    pub branch_info: Option<(String, String)>,
     pub vm_list: Vec<(String, String)>,
     pub node_count: u16,
     pub ssh_user: String,
@@ -109,16 +110,25 @@ impl DeploymentInventory {
         println!("*                                    *");
         println!("**************************************");
 
-        println!("Branch details");
-        println!("==============");
-        println!("Repo owner: {}", self.branch_info.0);
-        println!("Branch name: {}", self.branch_info.1);
+        println!("Name: {}", self.name);
+        if let Some((repo_owner, branch)) = &self.branch_info {
+            println!("Branch Details");
+            println!("==============");
+            println!("Repo owner: {}", repo_owner);
+            println!("Branch name: {}", branch);
+        } else if let Some((safenode_version, safe_version)) = &self.version_info {
+            println!("Version Details");
+            println!("===============");
+            println!("safenode version: {}", safenode_version);
+            println!("safe version: {}", safe_version);
+        }
 
         for vm in self.vm_list.iter() {
             println!("{}: {}", vm.0, vm.1);
         }
         println!("SSH user: {}", self.ssh_user);
-        println!("Sample peers:");
+        println!("Sample Peers");
+        println!("============");
         for peer in self.peers.iter() {
             println!("{peer}");
         }
@@ -330,7 +340,7 @@ impl TestnetDeploy {
         if !rpc_client_path.is_file() {
             println!("Downloading the rpc client for safenode...");
             let archive_name = "rpc_client-latest-x86_64-unknown-linux-musl.tar.gz";
-            get_and_extract_archive(
+            get_and_extract_archive_from_s3(
                 &*self.s3_repository,
                 "sn-testnet",
                 archive_name,
@@ -419,6 +429,7 @@ impl TestnetDeploy {
         name: &str,
         logstash_details: (&str, &[SocketAddr]),
         custom_branch_details: Option<(String, String)>,
+        safenode_version: Option<String>,
     ) -> Result<()> {
         let start = Instant::now();
         let genesis_inventory = self.ansible_runner.inventory_list(
@@ -437,8 +448,8 @@ impl TestnetDeploy {
                 None,
                 None,
                 custom_branch_details,
-                logstash_details.0,
-                logstash_details.1,
+                logstash_details,
+                safenode_version,
             )?),
         )?;
         print_duration(start.elapsed());
@@ -474,6 +485,7 @@ impl TestnetDeploy {
         genesis_multiaddr: String,
         node_instance_count: u16,
         custom_branch_details: Option<(String, String)>,
+        safenode_version: Option<String>,
     ) -> Result<()> {
         let start = Instant::now();
         println!("Running ansible against remaining nodes...");
@@ -486,8 +498,8 @@ impl TestnetDeploy {
                 Some(genesis_multiaddr),
                 Some(node_instance_count),
                 custom_branch_details,
-                logstash_details.0,
-                logstash_details.1,
+                logstash_details,
+                safenode_version,
             )?),
         )?;
         print_duration(start.elapsed());
@@ -515,12 +527,19 @@ impl TestnetDeploy {
         vm_count: u16,
         node_instance_count: u16,
         custom_branch_details: Option<(String, String)>,
+        custom_version_details: Option<(String, String)>,
     ) -> Result<()> {
+        let safenode_version = custom_version_details.as_ref().map(|x| x.0.clone());
         self.create_infra(name, vm_count, true).await?;
         self.build_safe_network_binaries(name, custom_branch_details.clone())
             .await?;
-        self.provision_genesis_node(name, logstash_details, custom_branch_details.clone())
-            .await?;
+        self.provision_genesis_node(
+            name,
+            logstash_details,
+            custom_branch_details.clone(),
+            safenode_version.clone(),
+        )
+        .await?;
         let (multiaddr, genesis_ip) = self.get_genesis_multiaddr(name).await?;
         println!("Obtained multiaddr for genesis node: {multiaddr}");
         self.provision_faucet(name, &multiaddr, custom_branch_details.clone())
@@ -531,6 +550,7 @@ impl TestnetDeploy {
             multiaddr,
             node_instance_count,
             custom_branch_details.clone(),
+            safenode_version,
         )
         .await?;
         // For reasons not known, the faucet service needs to be 'nudged' with a restart.
@@ -540,8 +560,14 @@ impl TestnetDeploy {
             &self.cloud_provider.get_ssh_user(),
             "systemctl restart faucet",
         )?;
-        self.list_inventory(name, true, custom_branch_details, Some(node_instance_count))
-            .await?;
+        self.list_inventory(
+            name,
+            true,
+            custom_branch_details,
+            custom_version_details,
+            Some(node_instance_count),
+        )
+        .await?;
         Ok(())
     }
 
@@ -558,6 +584,7 @@ impl TestnetDeploy {
         name: &str,
         force_regeneration: bool,
         custom_branch_info: Option<(String, String)>,
+        version_info: Option<(String, String)>,
         node_instance_count: Option<u16>,
     ) -> Result<()> {
         let inventory_path = get_data_directory()?.join(format!("{name}-inventory.json"));
@@ -641,7 +668,8 @@ impl TestnetDeploy {
         node_count += 1;
         let inventory = DeploymentInventory {
             name: name.to_string(),
-            branch_info: custom_branch_info.unwrap_or(("maidsafe".to_string(), "main".to_string())),
+            branch_info: custom_branch_info,
+            version_info,
             vm_list,
             node_count,
             ssh_user: self.cloud_provider.get_ssh_user(),
@@ -678,8 +706,8 @@ impl TestnetDeploy {
         genesis_multiaddr: Option<String>,
         node_instance_count: Option<u16>,
         custom_branch_details: Option<(String, String)>,
-        logstash_stack_name: &str,
-        logstash_hosts: &[SocketAddr],
+        logstash_details: (&str, &[SocketAddr]),
+        safenode_version: Option<String>,
     ) -> Result<String> {
         let mut extra_vars = String::new();
         extra_vars.push_str("{ ");
@@ -714,6 +742,17 @@ impl TestnetDeploy {
                     name),
             );
         }
+        if let Some(version) = safenode_version {
+            Self::add_value(
+                &mut extra_vars,
+                "node_archive_url",
+                &format!(
+                    "https://github.com/maidsafe/safe_network/releases/download/sn_node-v{version}/safenode-{version}-x86_64-unknown-linux-musl.tar.gz",
+                ),
+            );
+        }
+
+        let (logstash_stack_name, logstash_hosts) = logstash_details;
         Self::add_value(&mut extra_vars, "logstash_stack_name", logstash_stack_name);
         extra_vars.push_str("\"logstash_hosts\": [");
         for host in logstash_hosts.iter() {
@@ -758,11 +797,11 @@ impl TestnetDeploy {
         extra_vars.push_str("{ ");
 
         if let Some((repo_owner, branch)) = custom_branch_details {
-            Self::add_value(&mut extra_vars, "custom_safenode", "true");
+            Self::add_value(&mut extra_vars, "custom_bin", "true");
             Self::add_value(&mut extra_vars, "branch", &branch);
             Self::add_value(&mut extra_vars, "org", &repo_owner);
         } else {
-            Self::add_value(&mut extra_vars, "custom_safenode", "false");
+            Self::add_value(&mut extra_vars, "custom_bin", "false");
         }
         Self::add_value(&mut extra_vars, "testnet_name", name);
 
@@ -780,7 +819,7 @@ impl TestnetDeploy {
 ///
 /// Shared Helpers
 ///
-pub async fn get_and_extract_archive(
+pub async fn get_and_extract_archive_from_s3(
     s3_repository: &dyn S3RepositoryInterface,
     bucket_name: &str,
     archive_bucket_path: &str,
@@ -793,7 +832,12 @@ pub async fn get_and_extract_archive(
     s3_repository
         .download_object(bucket_name, archive_bucket_path, &archive_dest_path)
         .await?;
-    let archive_file = File::open(archive_dest_path.clone())?;
+    extract_archive(&archive_dest_path, dest_path).await?;
+    Ok(())
+}
+
+pub async fn extract_archive(archive_path: &Path, dest_path: &Path) -> Result<()> {
+    let archive_file = File::open(archive_path)?;
     let decoder = GzDecoder::new(archive_file);
     let mut archive = Archive::new(decoder);
     let entries = archive.entries()?;
@@ -807,7 +851,7 @@ pub async fn get_and_extract_archive(
         let mut file = BufWriter::new(File::create(extract_path)?);
         std::io::copy(&mut entry, &mut file)?;
     }
-    std::fs::remove_file(archive_dest_path)?;
+    std::fs::remove_file(archive_path)?;
     Ok(())
 }
 
@@ -941,12 +985,18 @@ pub async fn notify_slack(inventory: DeploymentInventory) -> Result<()> {
     message.push_str(&format!("Name: {}\n", inventory.name));
     message.push_str(&format!("Node count: {}\n", inventory.node_count));
     message.push_str(&format!("Faucet address: {}\n", inventory.faucet_address));
-    message.push_str("*Branch Details*\n");
-    message.push_str(&format!("Repo owner: {}\n", inventory.branch_info.0));
-    message.push_str(&format!("Branch: {}\n", inventory.branch_info.1));
+    if let Some((repo_owner, branch)) = inventory.branch_info {
+        message.push_str("*Branch Details*\n");
+        message.push_str(&format!("Repo owner: {}\n", repo_owner));
+        message.push_str(&format!("Branch: {}\n", branch));
+    } else if let Some((safenode_version, safe_version)) = inventory.version_info {
+        message.push_str("*Version Details*\n");
+        message.push_str(&format!("safenode version: {}\n", safenode_version));
+        message.push_str(&format!("safe version: {}\n", safe_version));
+    }
     message.push_str("*Sample Peers*\n");
     message.push_str("```\n");
-    for peer in inventory.peers.iter() {
+    for peer in inventory.peers.iter().take(20) {
         message.push_str(&format!("{peer}\n"));
     }
     message.push_str("```\n");

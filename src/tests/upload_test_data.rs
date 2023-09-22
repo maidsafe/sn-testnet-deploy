@@ -6,7 +6,7 @@
 
 use super::setup::*;
 use crate::manage_test_data::TestDataClient;
-use crate::safe::MockSafeClientInterface;
+use crate::safe::{MockSafeBinaryRepositoryInterface, MockSafeClientInterface};
 use assert_fs::prelude::*;
 use color_eyre::Result;
 use mockall::predicate::*;
@@ -23,24 +23,64 @@ fn setup_default_safe_client() -> MockSafeClientInterface {
 }
 
 #[tokio::test]
-async fn should_download_and_extract_the_safe_binary() -> Result<()> {
+async fn should_download_and_extract_the_custom_branch_safe_binary() -> Result<()> {
     let (tmp_dir, working_dir) = setup_working_directory()?;
     let downloaded_safe_archive = working_dir.child("safe-alpha-x86_64-unknown-linux-musl.tar.gz");
     let extracted_safe_bin = working_dir.child("safe");
 
-    let s3_repository =
-        setup_test_data_s3_repository("alpha", "jacderida", "custom_branch", &working_dir)?;
+    let s3_repository = setup_test_data_s3_repository_for_custom_branch(
+        "alpha",
+        "jacderida",
+        "custom_branch",
+        &working_dir,
+    )?;
     let test_data_client = TestDataClient::new(
         working_dir.to_path_buf(),
         Box::new(s3_repository),
         Box::new(setup_default_safe_client()),
+        Box::new(MockSafeBinaryRepositoryInterface::new()),
     );
 
     test_data_client
         .upload_test_data(
             "alpha",
             "/ip4/10.0.0.1/tcp/43627/p2p/12D3KooWAsY69M1HYAsvwsrF9BkQRywM6CWDvM78m1k92CPco7qr",
-            ("jacderida".to_string(), "custom_branch".to_string()),
+            Some(("jacderida".to_string(), "custom_branch".to_string())),
+            None,
+        )
+        .await?;
+
+    downloaded_safe_archive.assert(predicates::path::missing());
+    extracted_safe_bin.assert(predicates::path::is_file());
+
+    let metadata = std::fs::metadata(extracted_safe_bin.path())?;
+    let permissions = metadata.permissions();
+    assert!(permissions.mode() & 0o100 > 0, "File is not executable");
+
+    drop(tmp_dir);
+    Ok(())
+}
+#[tokio::test]
+async fn should_download_and_extract_the_versioned_safe_binary() -> Result<()> {
+    let (tmp_dir, working_dir) = setup_working_directory()?;
+    let downloaded_safe_archive = working_dir.child("safe-alpha-x86_64-unknown-linux-musl.tar.gz");
+    let extracted_safe_bin = working_dir.child("safe");
+
+    let s3_repository = setup_test_data_s3_repository_for_versioned_binary(&working_dir)?;
+    let safe_binary_repository = setup_binary_repo_for_versioned_binary("0.82.1", &working_dir)?;
+    let test_data_client = TestDataClient::new(
+        working_dir.to_path_buf(),
+        Box::new(s3_repository),
+        Box::new(setup_default_safe_client()),
+        Box::new(safe_binary_repository),
+    );
+
+    test_data_client
+        .upload_test_data(
+            "alpha",
+            "/ip4/10.0.0.1/tcp/43627/p2p/12D3KooWAsY69M1HYAsvwsrF9BkQRywM6CWDvM78m1k92CPco7qr",
+            None,
+            Some("0.82.1".to_string()),
         )
         .await?;
 
@@ -65,18 +105,21 @@ async fn should_download_and_extract_the_test_data() -> Result<()> {
     let extracted_data_item_2 = test_data_dir.child("pexels-ahmed-ツ-14113084.jpg");
     let extracted_data_item_3 = test_data_dir.child("pexels-aidan-roof-11757330.jpg");
 
-    let s3_repository = setup_test_data_s3_repository("alpha", "maidsafe", "main", &working_dir)?;
+    let s3_repository =
+        setup_test_data_s3_repository_for_custom_branch("alpha", "maidsafe", "main", &working_dir)?;
     let test_data_client = TestDataClient::new(
         working_dir.to_path_buf(),
         Box::new(s3_repository),
         Box::new(setup_default_safe_client()),
+        Box::new(MockSafeBinaryRepositoryInterface::new()),
     );
 
     test_data_client
         .upload_test_data(
             "alpha",
             "/ip4/10.0.0.1/tcp/43627/p2p/12D3KooWAsY69M1HYAsvwsrF9BkQRywM6CWDvM78m1k92CPco7qr",
-            ("maidsafe".to_string(), "main".to_string()),
+            Some(("maidsafe".to_string(), "main".to_string())),
+            None,
         )
         .await?;
 
@@ -130,18 +173,21 @@ async fn should_upload_test_data_files() -> Result<()> {
             Ok("d27d605b1d4f94934530d3bce0c1c9f8db9bdf74294df3f0139ad22125a54967".to_string())
         });
 
-    let s3_repository = setup_test_data_s3_repository("alpha", "maidsafe", "main", &working_dir)?;
+    let s3_repository =
+        setup_test_data_s3_repository_for_custom_branch("alpha", "maidsafe", "main", &working_dir)?;
     let test_data_client = TestDataClient::new(
         working_dir.to_path_buf(),
         Box::new(s3_repository),
         Box::new(safe_client_repository),
+        Box::new(MockSafeBinaryRepositoryInterface::new()),
     );
 
     let download_links = test_data_client
         .upload_test_data(
             "alpha",
             "/ip4/10.0.0.1/tcp/43627/p2p/12D3KooWAsY69M1HYAsvwsrF9BkQRywM6CWDvM78m1k92CPco7qr",
-            ("maidsafe".to_string(), "main".to_string()),
+            Some(("maidsafe".to_string(), "main".to_string())),
+            None,
         )
         .await?;
 

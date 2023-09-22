@@ -10,10 +10,11 @@
       }
     - {
         role: build_safe_network_binary,
-        bin_name: "safe"
+        bin_name: "safe",
+        when: custom_bin == "true"
       }
     - {
         role: build_safe_network_binary,
         bin_name: "safenode",
-        when: custom_safenode == "true"
+        when: custom_bin == "true"
       }
