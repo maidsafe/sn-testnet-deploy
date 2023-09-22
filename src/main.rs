@@ -51,17 +51,15 @@ enum Commands {
         /// safenode binary. A safenode binary will be built from this repository.
         ///
         /// This argument must be used in conjunction with the --repo-owner argument.
+        ///
+        /// The --branch and --repo-owner arguments are mutually exclusive with the --safe-version
+        /// and --safenode-version arguments. You can only supply version numbers or a custom
+        /// branch, not both.
         #[arg(long)]
         branch: Option<String>,
         /// The name of the Logstash stack to forward logs to.
         #[clap(long, default_value = "main")]
         logstash_stack_name: String,
-        /// Optionally supply the owner or organisation of the Github repository to be used for the
-        /// safenode binary. A safenode binary will be built from this repository.
-        ///
-        /// This argument must be used in conjunction with the --branch argument.
-        #[arg(long)]
-        repo_owner: Option<String>,
         /// The name of the environment
         #[arg(short = 'n', long)]
         name: String,
@@ -73,6 +71,36 @@ enum Commands {
         /// Valid values are "aws" or "digital-ocean".
         #[clap(long, default_value_t = CloudProvider::DigitalOcean, value_parser = parse_provider, verbatim_doc_comment)]
         provider: CloudProvider,
+        /// Optionally supply the owner or organisation of the Github repository to be used for the
+        /// safenode binary. A safenode binary will be built from this repository.
+        ///
+        /// This argument must be used in conjunction with the --branch argument.
+        ///
+        /// The --branch and --repo-owner arguments are mutually exclusive with the --safe-version
+        /// and --safenode-version arguments. You can only supply version numbers or a custom
+        /// branch, not both.
+        #[arg(long)]
+        repo_owner: Option<String>,
+        /// Optionally supply a version number to be used for the safe binary. There should be no
+        /// 'v' prefix.
+        ///
+        /// This argument must be used in conjunction with the --safenode-version argument.
+        ///
+        /// The --safe-version and --safenode-version arguments are mutually exclusive with the
+        /// --branch and --repo-owner arguments. You can only supply version numbers or a custom
+        /// branch, not both.
+        #[arg(long)]
+        safe_version: Option<String>,
+        #[arg(long)]
+        /// Optionally supply a version number to be used for the safenode binary. There should be
+        /// no 'v' prefix.
+        ///
+        /// This argument must be used in conjunction with the --safe-version argument.
+        ///
+        /// The --safe-version and --safenode-version arguments are mutually exclusive with the
+        /// --branch and --repo-owner arguments. You can only supply version numbers or a custom
+        /// branch, not both.
+        safenode_version: Option<String>,
         /// The number of node VMs to create.
         ///
         /// Each VM will run many safenode processes.
@@ -115,6 +143,32 @@ enum Commands {
         /// machine. This information gets used for Slack notifications.
         #[arg(long)]
         node_count: Option<u16>,
+        /// Optionally supply a version number to be used for the safe binary. There should be no
+        /// 'v' prefix.
+        ///
+        /// You can supply this value to inventory when you are running the process on a different
+        /// machine from where the testnet was deployed.
+        ///
+        /// This argument must be used in conjunction with the --safenode-version argument.
+        ///
+        /// The --safe-version and --safenode-version arguments are mutually exclusive with the
+        /// --branch and --repo-owner arguments. You can only supply version numbers or a custom
+        /// branch, not both.
+        #[arg(long)]
+        safe_version: Option<String>,
+        #[arg(long)]
+        /// Optionally supply a version number to be used for the safenode binary. There should be
+        /// no 'v' prefix.
+        ///
+        /// You can supply this value to inventory when you are running the process on a different
+        /// machine from where the testnet was deployed.
+        ///
+        /// This argument must be used in conjunction with the --safe-version argument.
+        ///
+        /// The --safe-version and --safenode-version arguments are mutually exclusive with the
+        /// --branch and --repo-owner arguments. You can only supply version numbers or a custom
+        /// branch, not both.
+        safenode_version: Option<String>,
     },
     #[clap(name = "logs", subcommand)]
     Logs(LogCommands),
@@ -232,16 +286,16 @@ async fn main() -> Result<()> {
             node_count,
             provider,
             repo_owner,
+            safe_version,
+            safenode_version,
             vm_count,
         }) => {
-            if (repo_owner.is_some() && branch.is_none())
-                || (branch.is_some() && repo_owner.is_none())
-            {
-                return Err(eyre!(
-                    "Both the repository owner and branch name must be supplied if either are used"
-                ));
-            }
-            let custom_branch_details = repo_owner.map(|repo_owner| (repo_owner, branch.unwrap()));
+            let (custom_branch_details, custom_version_details) = validate_branch_and_version_args(
+                branch,
+                repo_owner,
+                safenode_version,
+                safe_version,
+            )?;
 
             let testnet_deploy = TestnetDeployBuilder::default()
                 .provider(provider.clone())
@@ -280,6 +334,7 @@ async fn main() -> Result<()> {
                     vm_count,
                     node_count,
                     custom_branch_details,
+                    custom_version_details,
                 )
                 .await?;
             Ok(())
@@ -290,19 +345,25 @@ async fn main() -> Result<()> {
             branch,
             repo_owner,
             node_count,
+            safe_version,
+            safenode_version,
         }) => {
-            if (repo_owner.is_some() && branch.is_none())
-                || (branch.is_some() && repo_owner.is_none())
-            {
-                return Err(eyre!(
-                    "Both the repository owner and branch name must be supplied if either are used"
-                ));
-            }
+            let (custom_branch_details, custom_version_details) = validate_branch_and_version_args(
+                branch,
+                repo_owner,
+                safenode_version,
+                safe_version,
+            )?;
 
-            let custom_branch_details = repo_owner.map(|repo_owner| (repo_owner, branch.unwrap()));
             let testnet_deploy = TestnetDeployBuilder::default().provider(provider).build()?;
             testnet_deploy
-                .list_inventory(&name, false, custom_branch_details, node_count)
+                .list_inventory(
+                    &name,
+                    false,
+                    custom_branch_details,
+                    custom_version_details,
+                    node_count,
+                )
                 .await?;
             Ok(())
         }
@@ -396,9 +457,15 @@ async fn main() -> Result<()> {
             let i = rng.gen_range(0..inventory.peers.len());
             let random_peer = &inventory.peers[i];
 
+            let safe_version = inventory.version_info.as_ref().map(|x| x.1.clone());
             let test_data_client = TestDataClientBuilder::default().build()?;
             let uploaded_files = test_data_client
-                .upload_test_data(&name, random_peer, inventory.branch_info.clone())
+                .upload_test_data(
+                    &name,
+                    random_peer,
+                    inventory.branch_info.clone(),
+                    safe_version,
+                )
                 .await?;
 
             println!("Uploaded files:");
@@ -412,4 +479,49 @@ async fn main() -> Result<()> {
         }
         None => Ok(()),
     }
+}
+
+/// Clippy complains the return type here is too complicated.
+///
+/// It is convoluted, but it's just a way to share the validation of the same arguments between two
+/// commands. In my opinion, it does not merit introducing some kind of type to wrap the data.
+#[allow(clippy::type_complexity)]
+fn validate_branch_and_version_args(
+    branch: Option<String>,
+    repo_owner: Option<String>,
+    safe_version: Option<String>,
+    safenode_version: Option<String>,
+) -> Result<(Option<(String, String)>, Option<(String, String)>)> {
+    if (repo_owner.is_some() && branch.is_none()) || (branch.is_some() && repo_owner.is_none()) {
+        return Err(eyre!(
+            "Both the repository owner and branch name must be supplied if either are used"
+        ));
+    }
+    if (safe_version.is_some() && safenode_version.is_none())
+        || (safenode_version.is_some() && safe_version.is_none())
+    {
+        return Err(eyre!(
+            "Both the safe and safenode versions must be supplied if either are used"
+        ));
+    }
+
+    if branch.is_some()
+        && repo_owner.is_some()
+        && safe_version.is_some()
+        && safenode_version.is_some()
+    {
+        return Err(eyre!(
+            "Custom version numbers and custom branches cannot be supplied at the same time"
+        )
+        .suggestion(
+            "Please choose whether you want to use specific versions or a custom \
+                    branch, then run again.",
+        ));
+    }
+
+    let custom_branch_details = repo_owner.map(|repo_owner| (repo_owner, branch.unwrap()));
+    let custom_version_details =
+        safe_version.map(|safe_version| (safe_version, safenode_version.unwrap()));
+
+    Ok((custom_branch_details, custom_version_details))
 }

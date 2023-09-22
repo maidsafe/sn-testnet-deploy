@@ -5,10 +5,12 @@
 // Please see the LICENSE file for more details.
 
 use crate::error::{Error, Result};
-use crate::get_and_extract_archive;
+use crate::get_and_extract_archive_from_s3;
 use crate::s3::{S3Repository, S3RepositoryInterface};
-use crate::safe::{SafeClient, SafeClientInterface};
-use crate::DeploymentInventory;
+use crate::safe::{
+    SafeBinaryRepository, SafeBinaryRepositoryInterface, SafeClient, SafeClientInterface,
+};
+use crate::{extract_archive, DeploymentInventory};
 use rand::Rng;
 use sha2::{Digest, Sha256};
 use std::collections::HashMap;
@@ -18,10 +20,13 @@ use std::net::SocketAddr;
 use std::os::unix::fs::PermissionsExt;
 use std::path::{Path, PathBuf};
 
+const BASE_URL: &str = "https://github.com/maidsafe/safe_network/releases/download";
+
 pub struct TestDataClient {
     pub working_directory_path: PathBuf,
     pub s3_repository: Box<dyn S3RepositoryInterface>,
     pub safe_client: Box<dyn SafeClientInterface>,
+    pub safe_binary_repository: Box<dyn SafeBinaryRepositoryInterface>,
 }
 
 #[derive(Default)]
@@ -58,6 +63,7 @@ impl TestDataClientBuilder {
             working_directory_path.clone(),
             Box::new(S3Repository {}),
             Box::new(SafeClient::new(safe_binary_path, working_directory_path)),
+            Box::new(SafeBinaryRepository {}),
         );
         Ok(test_data_client)
     }
@@ -68,23 +74,34 @@ impl TestDataClient {
         working_directory_path: PathBuf,
         s3_repository: Box<dyn S3RepositoryInterface>,
         safe_client: Box<dyn SafeClientInterface>,
+        safe_binary_repository: Box<dyn SafeBinaryRepositoryInterface>,
     ) -> TestDataClient {
         TestDataClient {
             working_directory_path,
             s3_repository,
             safe_client,
+            safe_binary_repository,
         }
     }
 
     pub async fn smoke_test(&self, inventory: &mut DeploymentInventory) -> Result<()> {
-        Self::download_and_extract_safe_client(
-            &*self.s3_repository,
-            &inventory.name,
-            &self.working_directory_path,
-            &inventory.branch_info.0,
-            &inventory.branch_info.1,
-        )
-        .await?;
+        if let Some((repo_owner, branch)) = &inventory.branch_info {
+            Self::download_and_extract_safe_client_from_s3(
+                &*self.s3_repository,
+                &inventory.name,
+                &self.working_directory_path,
+                repo_owner,
+                branch,
+            )
+            .await?;
+        } else if let Some((_, version)) = &inventory.version_info {
+            Self::download_and_extract_safe_client_from_url(
+                &*self.safe_binary_repository,
+                version,
+                &self.working_directory_path,
+            )
+            .await?;
+        }
 
         let faucet_addr: SocketAddr = inventory.faucet_address.parse()?;
         let random_peer = inventory.get_random_peer();
@@ -158,24 +175,33 @@ impl TestDataClient {
         &self,
         name: &str,
         peer_multiaddr: &str,
-        branch_info: (String, String),
+        branch_info: Option<(String, String)>,
+        safe_version: Option<String>,
     ) -> Result<Vec<(String, String)>> {
-        let (repo_owner, branch) = branch_info;
-        Self::download_and_extract_safe_client(
-            &*self.s3_repository,
-            name,
-            &self.working_directory_path,
-            &repo_owner,
-            &branch,
-        )
-        .await?;
+        if let Some((repo_owner, branch)) = branch_info {
+            Self::download_and_extract_safe_client_from_s3(
+                &*self.s3_repository,
+                name,
+                &self.working_directory_path,
+                &repo_owner,
+                &branch,
+            )
+            .await?;
+        } else if let Some(version) = safe_version {
+            Self::download_and_extract_safe_client_from_url(
+                &*self.safe_binary_repository,
+                &version,
+                &self.working_directory_path,
+            )
+            .await?;
+        }
 
         println!("Downloading test data archive from S3...");
         let test_data_dir_path = &self.working_directory_path.join("test-data");
         if !test_data_dir_path.exists() {
             std::fs::create_dir_all(test_data_dir_path)?;
         }
-        get_and_extract_archive(
+        get_and_extract_archive_from_s3(
             &*self.s3_repository,
             "sn-testnet",
             "test-data.tar.gz",
@@ -217,7 +243,7 @@ impl TestDataClient {
             .join("downloaded_files"))
     }
 
-    async fn download_and_extract_safe_client(
+    async fn download_and_extract_safe_client_from_s3(
         s3_repository: &dyn S3RepositoryInterface,
         name: &str,
         working_directory_path: &Path,
@@ -227,13 +253,35 @@ impl TestDataClient {
         let safe_client_path = working_directory_path.join("safe");
         if !safe_client_path.exists() {
             println!("Downloading the safe client from S3...");
-            get_and_extract_archive(
+            get_and_extract_archive_from_s3(
                 s3_repository,
                 "sn-node",
                 &format!("{repo_owner}/{branch}/safe-{name}-x86_64-unknown-linux-musl.tar.gz"),
                 working_directory_path,
             )
             .await?;
+            let mut permissions = std::fs::metadata(&safe_client_path)?.permissions();
+            permissions.set_mode(0o755); // rwxr-xr-x
+            std::fs::set_permissions(&safe_client_path, permissions)?;
+        }
+        Ok(())
+    }
+
+    async fn download_and_extract_safe_client_from_url(
+        safe_binary_repository: &dyn SafeBinaryRepositoryInterface,
+        version: &str,
+        working_directory_path: &Path,
+    ) -> Result<()> {
+        let safe_client_path = working_directory_path.join("safe");
+        if !safe_client_path.exists() {
+            let archive_name = format!("safe-{version}-x86_64-unknown-linux-musl.tar.gz");
+            let archive_path = working_directory_path.join(archive_name.clone());
+            let url = format!("{BASE_URL}/sn_cli-v{version}/{archive_name}");
+            println!("url = {url}");
+            println!("archive_path = {archive_path:#?}");
+            safe_binary_repository.download(&url, &archive_path).await?;
+            extract_archive(&archive_path, working_directory_path).await?;
+
             let mut permissions = std::fs::metadata(&safe_client_path)?.permissions();
             permissions.set_mode(0o755); // rwxr-xr-x
             std::fs::set_permissions(&safe_client_path, permissions)?;

@@ -14,7 +14,7 @@ use mockall::predicate::*;
 use std::path::PathBuf;
 
 #[tokio::test]
-async fn should_run_ansible_to_build_safe_related_binaries() -> Result<()> {
+async fn should_run_ansible_to_only_build_the_faucet() -> Result<()> {
     let (tmp_dir, working_dir) = setup_working_directory()?;
     let s3_repository = setup_deploy_s3_repository("beta", &working_dir)?;
     let mut ansible_runner = MockAnsibleRunnerInterface::new();
@@ -33,7 +33,7 @@ async fn should_run_ansible_to_build_safe_related_binaries() -> Result<()> {
             eq(PathBuf::from("inventory").join(".beta_build_inventory_digital_ocean.yml")),
             eq("root".to_string()),
             eq(Some(
-                "{ \"custom_safenode\": \"false\", \"testnet_name\": \"beta\" }".to_string(),
+                "{ \"custom_bin\": \"false\", \"testnet_name\": \"beta\" }".to_string(),
             )),
         )
         .returning(|_, _, _, _| Ok(()));
@@ -82,7 +82,7 @@ async fn should_run_ansible_to_build_binaries_with_custom_branch() -> Result<()>
             eq(PathBuf::from("inventory").join(".beta_build_inventory_digital_ocean.yml")),
             eq("root".to_string()),
             eq(Some(
-                "{ \"custom_safenode\": \"true\", \"branch\": \"custom_branch\", \"org\": \"maidsafe\", \"testnet_name\": \"beta\" }".to_string(),
+                "{ \"custom_bin\": \"true\", \"branch\": \"custom_branch\", \"org\": \"maidsafe\", \"testnet_name\": \"beta\" }".to_string(),
             )),
         )
         .returning(|_, _, _, _| Ok(()));

@@ -6,11 +6,14 @@
 
 use crate::error::{Error, Result};
 use crate::run_external_command;
+use async_trait::async_trait;
 #[cfg(test)]
 use mockall::automock;
 use regex::Regex;
 use std::net::SocketAddr;
 use std::path::{Path, PathBuf};
+use tokio::fs::File as TokioFile;
+use tokio::io::AsyncWriteExt;
 
 /// Provides an interface for using the `safe` client.
 ///
@@ -91,6 +94,35 @@ impl SafeClientInterface for SafeClient {
             ],
             false,
         )?;
+        Ok(())
+    }
+}
+
+/// Provides an interface for downloading release binaries for safe or safenode.
+///
+/// This trait exists for unit testing: it enables testing behaviour without actually calling the
+/// safe process.
+#[cfg_attr(test, automock)]
+#[async_trait]
+pub trait SafeBinaryRepositoryInterface {
+    async fn download(&self, binary_archive_url: &str, dest_path: &Path) -> Result<()>;
+}
+
+pub struct SafeBinaryRepository;
+
+#[async_trait]
+impl SafeBinaryRepositoryInterface for SafeBinaryRepository {
+    async fn download(&self, binary_archive_url: &str, dest_path: &Path) -> Result<()> {
+        let response = reqwest::get(binary_archive_url).await?;
+
+        if !response.status().is_success() {
+            return Err(Error::SafeBinaryDownloadError);
+        }
+
+        let mut dest = TokioFile::create(dest_path).await?;
+        let content = response.bytes().await?;
+        dest.write_all(&content).await?;
+
         Ok(())
     }
 }
