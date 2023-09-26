@@ -33,7 +33,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::json;
 use std::fs::File;
 use std::io::{BufRead, BufReader, BufWriter, Write};
-use std::net::SocketAddr;
+use std::net::{IpAddr, SocketAddr};
 use std::os::unix::fs::PermissionsExt;
 use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
@@ -68,7 +68,8 @@ impl CloudProvider {
 pub struct DeploymentInventory {
     pub name: String,
     pub branch_info: (String, String),
-    pub vm_list: Vec<(String, String)>,
+    /// A list of tuples containing the VM name and IP address.
+    pub vm_list: Vec<(String, IpAddr)>,
     pub node_count: u16,
     pub ssh_user: String,
     pub genesis_multiaddr: String,
@@ -494,7 +495,7 @@ impl TestnetDeploy {
         Ok(())
     }
 
-    pub async fn get_genesis_multiaddr(&self, name: &str) -> Result<(String, String)> {
+    pub async fn get_genesis_multiaddr(&self, name: &str) -> Result<(String, IpAddr)> {
         let genesis_inventory = self.ansible_runner.inventory_list(
             PathBuf::from("inventory").join(format!(".{name}_genesis_inventory_digital_ocean.yml")),
         )?;

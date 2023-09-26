@@ -11,6 +11,7 @@ use log::debug;
 use mockall::automock;
 use serde::Deserialize;
 use std::collections::HashMap;
+use std::net::IpAddr;
 use std::path::PathBuf;
 
 /// Ansible has multiple 'binaries', e.g., `ansible-playbook`, `ansible-inventory` etc. that are
@@ -51,7 +52,7 @@ impl AnsibleBinary {
 /// Ansible process.
 #[cfg_attr(test, automock)]
 pub trait AnsibleRunnerInterface {
-    fn inventory_list(&self, inventory_path: PathBuf) -> Result<Vec<(String, String)>>;
+    fn inventory_list(&self, inventory_path: PathBuf) -> Result<Vec<(String, IpAddr)>>;
     fn run_playbook(
         &self,
         playbook_path: PathBuf,
@@ -88,7 +89,7 @@ impl AnsibleRunner {
 // `ansible-inventory` command.
 #[derive(Debug, Deserialize)]
 struct HostVars {
-    ansible_host: String,
+    ansible_host: IpAddr,
 }
 #[derive(Debug, Deserialize)]
 struct Meta {
@@ -100,7 +101,11 @@ struct Output {
 }
 
 impl AnsibleRunnerInterface for AnsibleRunner {
-    fn inventory_list(&self, inventory_path: PathBuf) -> Result<Vec<(String, String)>> {
+    // This function is used to list the inventory of the ansible runner.
+    // It takes a PathBuf as an argument which represents the inventory path.
+    // It returns a Result containing a vector of tuples. Each tuple contains a string representing the name and the ansible host.
+    fn inventory_list(&self, inventory_path: PathBuf) -> Result<Vec<(String, IpAddr)>> {
+        // Run the external command and store the output.
         let output = run_external_command(
             AnsibleBinary::AnsibleInventory.get_binary_path()?,
             self.working_directory_path.clone(),
@@ -112,23 +117,29 @@ impl AnsibleRunnerInterface for AnsibleRunner {
             true,
         )?;
 
+        // Debug the output of the inventory list.
         debug!("Inventory list output:");
         debug!("{output:#?}");
+        // Convert the output into a string and remove any lines that do not start with '{'.
         let mut output_string = output
             .into_iter()
             .skip_while(|line| !line.starts_with('{'))
             .collect::<Vec<String>>()
             .join("\n");
+        // Truncate the string at the last '}' character.
         if let Some(end_index) = output_string.rfind('}') {
             output_string.truncate(end_index + 1);
         }
+        // Parse the output string into the Output struct.
         let parsed: Output = serde_json::from_str(&output_string)?;
-        let inventory: Vec<(String, String)> = parsed
+        // Convert the parsed output into a vector of tuples containing the name and ansible host.
+        let inventory: Vec<(String, IpAddr)> = parsed
             ._meta
             .hostvars
             .into_iter()
             .map(|(name, vars)| (name, vars.ansible_host))
             .collect();
+        // Return the inventory.
         Ok(inventory)
     }
 
