@@ -246,27 +246,25 @@ async fn main() -> Result<()> {
             let testnet_deploy = TestnetDeployBuilder::default()
                 .provider(provider.clone())
                 .build()?;
-            let result = testnet_deploy.init(&name).await;
-            match result {
+
+            match testnet_deploy.init(&name).await {
                 Ok(_) => {}
-                Err(e) => match e {
-                    Error::LogsForPreviousTestnetExist(_) => {
-                        return Err(eyre!(e)
-                            .wrap_err(format!(
-                                "Logs already exist for a previous testnet with the \
+                Err(e @ Error::LogsForPreviousTestnetExist(_)) => {
+                    return Err(eyre!(e)
+                        .wrap_err(format!(
+                            "Logs already exist for a previous testnet with the \
                                     name '{name}'"
-                            ))
-                            .suggestion(
-                                "If you wish to keep them, retrieve the logs with the 'logs get' \
+                        ))
+                        .suggestion(
+                            "If you wish to keep them, retrieve the logs with the 'logs get' \
                                 command, then remove them with 'logs rm'. If you don't need them, \
                                 simply run 'logs rm'. Then you can proceed with deploying your \
                                 new testnet.",
-                            ));
-                    }
-                    _ => {
-                        return Err(eyre!(e));
-                    }
-                },
+                        ));
+                }
+                Err(e) => {
+                    return Err(eyre!(e));
+                }
             }
 
             let logstash_deploy = LogstashDeployBuilder::default()

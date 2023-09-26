@@ -7,7 +7,7 @@
 use crate::error::{Error, Result};
 use async_recursion::async_recursion;
 use async_trait::async_trait;
-use aws_sdk_s3::Client;
+use aws_sdk_s3::{error::ProvideErrorMetadata, Client};
 #[cfg(test)]
 use mockall::automock;
 use std::path::{Path, PathBuf};
@@ -78,20 +78,24 @@ impl S3RepositoryInterface for S3Repository {
 
     async fn folder_exists(&self, bucket_name: &str, folder_path: &str) -> Result<bool> {
         let conf = aws_config::from_env().region("eu-west-2").load().await;
+
         let client = Client::new(&conf);
-        let folder = if folder_path.ends_with('/') {
+        let prefix = if folder_path.ends_with('/') {
             folder_path.to_string()
         } else {
             format!("{}/", folder_path)
         };
         let output = client
             .list_objects_v2()
-            .bucket(bucket_name.to_string())
-            .prefix(folder)
-            .delimiter("/".to_string())
+            .bucket(bucket_name)
+            .prefix(&prefix)
+            .delimiter("/")
             .send()
             .await
-            .map_err(|_| Error::ListS3ObjectsError(folder_path.to_string()))?;
+            .map_err(|err| Error::ListS3ObjectsError {
+                prefix,
+                error: err.meta().message().unwrap_or_default().to_string(),
+            })?;
         Ok(!output.contents().unwrap_or_default().is_empty())
     }
 }
@@ -109,10 +113,13 @@ impl S3Repository {
             .list_objects_v2()
             .bucket(bucket_name)
             .prefix(prefix)
-            .delimiter("/".to_string())
+            .delimiter("/")
             .send()
             .await
-            .map_err(|_| Error::ListS3ObjectsError(prefix.to_string()))?;
+            .map_err(|err| Error::ListS3ObjectsError {
+                prefix: prefix.to_string(),
+                error: err.meta().message().unwrap_or_default().to_string(),
+            })?;
 
         // So-called 'common prefixes' are subdirectories.
         if let Some(common_prefixes) = output.common_prefixes {
@@ -149,12 +156,15 @@ impl S3Repository {
     ) -> Result<(), Error> {
         let output = client
             .list_objects_v2()
-            .bucket(bucket_name.to_string())
+            .bucket(bucket_name)
             .prefix(prefix)
-            .delimiter("/".to_string())
+            .delimiter("/")
             .send()
             .await
-            .map_err(|_| Error::ListS3ObjectsError(prefix.to_string()))?;
+            .map_err(|err| Error::ListS3ObjectsError {
+                prefix: prefix.to_string(),
+                error: err.meta().message().unwrap_or_default().to_string(),
+            })?;
 
         // So-called 'common prefixes' are subdirectories.
         if let Some(common_prefixes) = output.common_prefixes {
