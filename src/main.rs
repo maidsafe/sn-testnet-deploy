@@ -394,19 +394,29 @@ async fn main() -> Result<()> {
             }
 
             let mut inventory = DeploymentInventory::read(&inventory_path)?;
-            let mut rng = rand::thread_rng();
-            let i = rng.gen_range(0..inventory.peers.len());
-            let random_peer = &inventory.peers[i];
+            let (first_machine_name, ip_address) = inventory.vm_list.first().ok_or_else(|| {
+                eyre!("There are no VMs in the inventory. Please deploy a testnet first")
+            })?;
 
-            let test_data_client = TestDataClientBuilder::default().build()?;
-            let uploaded_files = test_data_client
-                .upload_test_data(&name, random_peer, inventory.branch_info.clone())
-                .await?;
+            let testnet_deploy = TestnetDeployBuilder::default().provider(provider).build()?;
 
-            println!("Uploaded files:");
-            for (path, address) in uploaded_files.iter() {
-                println!("{path}: {address}");
-            }
+            // TODO:
+            // Ensure gen node has `safe` client
+            // get the test data from somewhere
+            let output = testnet_deploy.ssh_client.run_script(
+                &ip_address,
+                "safe",
+                PathBuf::from("scripts").join("upload_test_data.sh"),
+                false,
+            )?;
+
+            // Finally, parse the output to get the uploaded files
+            
+            
+            // println!("Uploaded files:");
+            // for (path, address) in uploaded_files.iter() {
+            //     println!("{path}: {address}");
+            // }
             inventory.add_uploaded_files(uploaded_files.clone());
             inventory.save(&inventory_path)?;
 
