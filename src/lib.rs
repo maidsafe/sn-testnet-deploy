@@ -33,7 +33,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::json;
 use std::fs::File;
 use std::io::{BufRead, BufReader, BufWriter, Write};
-use std::net::SocketAddr;
+use std::net::{IpAddr, SocketAddr};
 use std::os::unix::fs::PermissionsExt;
 use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
@@ -69,7 +69,7 @@ pub struct DeploymentInventory {
     pub name: String,
     pub version_info: Option<(String, String)>,
     pub branch_info: Option<(String, String)>,
-    pub vm_list: Vec<(String, String)>,
+    pub vm_list: Vec<(String, IpAddr)>,
     pub node_count: u16,
     pub ssh_user: String,
     pub genesis_multiaddr: String,
@@ -408,7 +408,7 @@ impl TestnetDeploy {
         let build_inventory = self.ansible_runner.inventory_list(
             PathBuf::from("inventory").join(format!(".{name}_build_inventory_digital_ocean.yml")),
         )?;
-        let build_ip = build_inventory[0].1.clone();
+        let build_ip = build_inventory[0].1;
         self.ssh_client
             .wait_for_ssh_availability(&build_ip, &self.cloud_provider.get_ssh_user())?;
 
@@ -435,7 +435,7 @@ impl TestnetDeploy {
         let genesis_inventory = self.ansible_runner.inventory_list(
             PathBuf::from("inventory").join(format!(".{name}_genesis_inventory_digital_ocean.yml")),
         )?;
-        let genesis_ip = genesis_inventory[0].1.clone();
+        let genesis_ip = genesis_inventory[0].1;
         self.ssh_client
             .wait_for_ssh_availability(&genesis_ip, &self.cloud_provider.get_ssh_user())?;
         println!("Running ansible against genesis node...");
@@ -506,11 +506,11 @@ impl TestnetDeploy {
         Ok(())
     }
 
-    pub async fn get_genesis_multiaddr(&self, name: &str) -> Result<(String, String)> {
+    pub async fn get_genesis_multiaddr(&self, name: &str) -> Result<(String, IpAddr)> {
         let genesis_inventory = self.ansible_runner.inventory_list(
             PathBuf::from("inventory").join(format!(".{name}_genesis_inventory_digital_ocean.yml")),
         )?;
-        let genesis_ip = genesis_inventory[0].1.clone();
+        let genesis_ip = genesis_inventory[0].1;
         let node_info = self
             .rpc_client
             .get_info(format!("{}:12001", genesis_ip).parse()?)?;
@@ -634,13 +634,10 @@ impl TestnetDeploy {
         }
 
         let mut vm_list = Vec::new();
-        vm_list.push((
-            genesis_inventory[0].0.clone(),
-            genesis_inventory[0].1.clone(),
-        ));
-        vm_list.push((build_inventory[0].0.clone(), build_inventory[0].1.clone()));
+        vm_list.push((genesis_inventory[0].0.clone(), genesis_inventory[0].1));
+        vm_list.push((build_inventory[0].0.clone(), build_inventory[0].1));
         for entry in remaining_nodes_inventory.iter() {
-            vm_list.push((entry.0.clone(), entry.1.clone()));
+            vm_list.push((entry.0.clone(), entry.1));
         }
         let (genesis_multiaddr, genesis_ip) = self.get_genesis_multiaddr(name).await?;
 

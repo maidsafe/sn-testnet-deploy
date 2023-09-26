@@ -223,7 +223,7 @@ impl LogstashDeploy {
             PathBuf::from("inventory")
                 .join(format!(".{name}_logstash_inventory_digital_ocean.yml")),
         )?;
-        let logstash_ip = logstash_inventory[0].1.clone();
+        let logstash_ip = logstash_inventory[0].1;
         self.ssh_client
             .wait_for_ssh_availability(&logstash_ip, &self.cloud_provider.get_ssh_user())?;
         self.ansible_runner.run_playbook(

@@ -13,6 +13,7 @@ use crate::terraform::MockTerraformRunnerInterface;
 use crate::CloudProvider;
 use color_eyre::Result;
 use mockall::predicate::*;
+use std::net::{IpAddr, Ipv4Addr};
 use std::path::PathBuf;
 
 #[tokio::test]
@@ -58,7 +59,7 @@ async fn should_run_ansible_to_provision_the_logstash_nodes() -> Result<()> {
         .returning(|_| {
             Ok(vec![(
                 "beta-logstash-1".to_string(),
-                "10.0.0.10".to_string(),
+                IpAddr::V4(Ipv4Addr::new(10, 0, 0, 10)),
             )])
         });
     ansible_runner
@@ -78,7 +79,7 @@ async fn should_run_ansible_to_provision_the_logstash_nodes() -> Result<()> {
     ssh_runner
         .expect_wait_for_ssh_availability()
         .times(1)
-        .with(eq("10.0.0.10"), eq("root"))
+        .with(eq(IpAddr::V4(Ipv4Addr::new(10, 0, 0, 10))), eq("root"))
         .returning(|_, _| Ok(()));
 
     let logstash = LogstashDeploy::new(

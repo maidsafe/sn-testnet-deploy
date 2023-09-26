@@ -13,7 +13,7 @@ use crate::ssh::MockSshClientInterface;
 use crate::terraform::MockTerraformRunnerInterface;
 use color_eyre::Result;
 use mockall::predicate::*;
-use std::net::SocketAddr;
+use std::net::{IpAddr, Ipv4Addr, SocketAddr};
 use std::path::PathBuf;
 
 #[tokio::test]
@@ -28,7 +28,12 @@ async fn should_return_the_genesis_multiaddr() -> Result<()> {
         .with(eq(
             PathBuf::from("inventory").join(".beta_genesis_inventory_digital_ocean.yml")
         ))
-        .returning(|_| Ok(vec![("beta-genesis".to_string(), "10.0.0.10".to_string())]));
+        .returning(|_| {
+            Ok(vec![(
+                "beta-genesis".to_string(),
+                IpAddr::V4(Ipv4Addr::new(10, 0, 0, 10)),
+            )])
+        });
 
     let addr: SocketAddr = "10.0.0.10:12001".parse()?;
     let mut rpc_client = MockRpcClientInterface::new();
@@ -61,7 +66,7 @@ async fn should_return_the_genesis_multiaddr() -> Result<()> {
         multiaddr,
         "/ip4/10.0.0.10/tcp/12000/p2p/12D3KooWLvmkUDQRthtZv9CrzozRLk9ZVEHXgmx6UxVMiho5aded"
     );
-    assert_eq!(genesis_ip, "10.0.0.10");
+    assert_eq!(genesis_ip, IpAddr::V4(Ipv4Addr::new(10, 0, 0, 10)));
 
     drop(tmp_dir);
     Ok(())

@@ -8,6 +8,7 @@ use crate::error::{Error, Result};
 use crate::run_external_command;
 #[cfg(test)]
 use mockall::automock;
+use std::net::IpAddr;
 use std::path::PathBuf;
 
 /// Provides an interface for using the SSH client.
@@ -16,11 +17,11 @@ use std::path::PathBuf;
 /// ssh process.
 #[cfg_attr(test, automock)]
 pub trait SshClientInterface {
-    fn wait_for_ssh_availability(&self, ip_address: &str, user: &str) -> Result<()>;
-    fn run_command(&self, ip_address: &str, user: &str, command: &str) -> Result<Vec<String>>;
+    fn wait_for_ssh_availability(&self, ip_address: &IpAddr, user: &str) -> Result<()>;
+    fn run_command(&self, ip_address: &IpAddr, user: &str, command: &str) -> Result<Vec<String>>;
     fn run_script(
         &self,
-        ip_address: &str,
+        ip_address: &IpAddr,
         user: &str,
         script: PathBuf,
         suppress_output: bool,
@@ -36,7 +37,7 @@ impl SshClient {
     }
 }
 impl SshClientInterface for SshClient {
-    fn wait_for_ssh_availability(&self, ip_address: &str, user: &str) -> Result<()> {
+    fn wait_for_ssh_availability(&self, ip_address: &IpAddr, user: &str) -> Result<()> {
         println!("Checking for SSH availability at {ip_address}...");
         let mut retries = 0;
         let max_retries = 10;
@@ -75,7 +76,7 @@ impl SshClientInterface for SshClient {
         Err(Error::SshUnavailable)
     }
 
-    fn run_command(&self, ip_address: &str, user: &str, command: &str) -> Result<Vec<String>> {
+    fn run_command(&self, ip_address: &IpAddr, user: &str, command: &str) -> Result<Vec<String>> {
         println!(
             "Running command '{}' on {}@{}...",
             command, user, ip_address
@@ -104,7 +105,7 @@ impl SshClientInterface for SshClient {
 
     fn run_script(
         &self,
-        ip_address: &str,
+        ip_address: &IpAddr,
         user: &str,
         script: PathBuf,
         suppress_output: bool,
