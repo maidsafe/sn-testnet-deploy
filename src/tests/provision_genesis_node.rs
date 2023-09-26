@@ -12,7 +12,7 @@ use crate::rpc_client::MockRpcClientInterface;
 use crate::ssh::MockSshClientInterface;
 use color_eyre::Result;
 use mockall::predicate::*;
-use std::net::{IpAddr, SocketAddr};
+use std::net::{IpAddr, Ipv4Addr, SocketAddr};
 use std::path::PathBuf;
 
 const CUSTOM_BIN_URL: &str = "https://sn-node.s3.eu-west-2.amazonaws.com/maidsafe/custom_branch/safenode-beta-x86_64-unknown-linux-musl.tar.gz";
@@ -32,7 +32,12 @@ async fn should_run_ansible_against_genesis() -> Result<()> {
         .with(eq(
             PathBuf::from("inventory").join(".beta_genesis_inventory_digital_ocean.yml")
         ))
-        .returning(|_| Ok(vec![("beta-genesis".to_string(), "10.0.0.10".to_string())]));
+        .returning(|_| {
+            Ok(vec![(
+                "beta-genesis".to_string(),
+                IpAddr::V4(Ipv4Addr::new(10, 0, 0, 10)),
+            )])
+        });
     ansible_runner
         .expect_run_playbook()
         .times(1)
@@ -48,7 +53,7 @@ async fn should_run_ansible_against_genesis() -> Result<()> {
     ssh_client
         .expect_wait_for_ssh_availability()
         .times(1)
-        .with(eq("10.0.0.10"), eq("root"))
+        .with(eq(IpAddr::V4(Ipv4Addr::new(10, 0, 0, 10))), eq("root"))
         .returning(|_, _| Ok(()));
 
     let testnet = TestnetDeploy::new(
@@ -93,7 +98,12 @@ async fn should_run_ansible_against_genesis_with_a_custom_binary() -> Result<()>
         .with(eq(
             PathBuf::from("inventory").join(".beta_genesis_inventory_digital_ocean.yml")
         ))
-        .returning(|_| Ok(vec![("beta-genesis".to_string(), "10.0.0.10".to_string())]));
+        .returning(|_| {
+            Ok(vec![(
+                "beta-genesis".to_string(),
+                IpAddr::V4(Ipv4Addr::new(10, 0, 0, 10)),
+            )])
+        });
     ansible_runner
         .expect_run_playbook()
         .times(1)
@@ -113,7 +123,7 @@ async fn should_run_ansible_against_genesis_with_a_custom_binary() -> Result<()>
     ssh_client
         .expect_wait_for_ssh_availability()
         .times(1)
-        .with(eq("10.0.0.10"), eq("root"))
+        .with(eq(IpAddr::V4(Ipv4Addr::new(10, 0, 0, 10))), eq("root"))
         .returning(|_, _| Ok(()));
 
     let testnet = TestnetDeploy::new(
@@ -158,7 +168,12 @@ async fn should_run_ansible_against_genesis_with_a_versioned_binary() -> Result<
         .with(eq(
             PathBuf::from("inventory").join(".beta_genesis_inventory_digital_ocean.yml")
         ))
-        .returning(|_| Ok(vec![("beta-genesis".to_string(), "10.0.0.10".to_string())]));
+        .returning(|_| {
+            Ok(vec![(
+                "beta-genesis".to_string(),
+                IpAddr::V4(Ipv4Addr::new(10, 0, 0, 10)),
+            )])
+        });
     ansible_runner
         .expect_run_playbook()
         .times(1)
@@ -178,7 +193,7 @@ async fn should_run_ansible_against_genesis_with_a_versioned_binary() -> Result<
     ssh_client
         .expect_wait_for_ssh_availability()
         .times(1)
-        .with(eq("10.0.0.10"), eq("root"))
+        .with(eq(IpAddr::V4(Ipv4Addr::new(10, 0, 0, 10))), eq("root"))
         .returning(|_, _| Ok(()));
 
     let testnet = TestnetDeploy::new(
