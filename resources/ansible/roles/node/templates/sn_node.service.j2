@@ -4,15 +4,12 @@ Description=Safe Node %I
 [Service]
 {% if is_genesis %}
 ExecStart={{ node_archive_dest_path }}/safenode \
-  --log-output-dest data-dir \
   --port {{ node_port }} \
   --rpc {{ node_rpc_ip }}:{{ node_rpc_port }}
 {% else %}
 ExecStart={{ node_archive_dest_path }}/safenode \
-  --log-output-dest data-dir \
   --peer {{ genesis_multiaddr }}
 {% endif %}
-Environment=SN_LOG=all
 User=safe
 
 [Install]
