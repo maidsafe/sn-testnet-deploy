@@ -42,7 +42,7 @@ enum Commands {
         #[arg(short = 'n', long)]
         name: String,
         /// The cloud provider for the environment.
-        #[clap(long, value_parser = parse_provider, verbatim_doc_comment)]
+        #[clap(long, value_parser = parse_provider, verbatim_doc_comment, default_value_t = CloudProvider::DigitalOcean)]
         provider: CloudProvider,
     },
     /// Deploy a new testnet environment using the latest version of the safenode binary.
