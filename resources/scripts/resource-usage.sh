@@ -41,5 +41,7 @@ while true; do
     running_process_count=$((running_process_count + 1))
   done
   echo "Total node processes: $running_process_count"
-  sleep 10
+
+  # sleep 15 minutes before running again
+  sleep 900
 done
