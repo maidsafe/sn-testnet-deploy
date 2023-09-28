@@ -206,6 +206,9 @@ enum LogCommands {
         /// The name of the environment
         #[arg(short = 'n', long)]
         name: String,
+        /// Should we copy the resource-usage.logs only
+        #[arg(short = 'r', long)]
+        resources_only: bool,
         /// The cloud provider that was used.
         #[clap(long, default_value_t = CloudProvider::DigitalOcean, value_parser = parse_provider, verbatim_doc_comment)]
         provider: CloudProvider,
@@ -368,10 +371,14 @@ async fn main() -> Result<()> {
             Ok(())
         }
         Some(Commands::Logs(log_cmd)) => match log_cmd {
-            LogCommands::Copy { name, provider } => {
+            LogCommands::Copy {
+                name,
+                provider,
+                resources_only,
+            } => {
                 let testnet_deploy = TestnetDeployBuilder::default().provider(provider).build()?;
                 testnet_deploy.init(&name).await?;
-                testnet_deploy.copy_logs(&name).await?;
+                testnet_deploy.copy_logs(&name, resources_only).await?;
                 Ok(())
             }
             LogCommands::Get { name } => {
