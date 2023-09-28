@@ -2,15 +2,17 @@
 Description=Safe Node %I
 
 [Service]
+WorkingDirectory=/home/safe
 {% if is_genesis %}
-ExecStart={{ node_archive_dest_path }}/safenode \
+ExecStart=heaptrack {{ node_archive_dest_path }}/safenode \
   --port {{ node_port }} \
   --rpc {{ node_rpc_ip }}:{{ node_rpc_port }}
 {% else %}
-ExecStart={{ node_archive_dest_path }}/safenode \
+ExecStart=heaptrack {{ node_archive_dest_path }}/safenode \
   --peer {{ genesis_multiaddr }}
 {% endif %}
 User=safe
+
 
 [Install]
 WantedBy=multi-user.target
