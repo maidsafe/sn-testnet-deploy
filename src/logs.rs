@@ -17,7 +17,7 @@ impl TestnetDeploy {
     ///
     /// It needs to be part of `TestnetDeploy` because the Ansible runner is already setup in that
     /// context.
-    pub async fn copy_logs(&self, name: &str) -> Result<()> {
+    pub async fn copy_logs(&self, name: &str, resources_only: bool) -> Result<()> {
         let dest = PathBuf::from(".").join("logs").join(name);
         if dest.exists() {
             println!("Removing existing {} directory", dest.to_string_lossy());
@@ -30,7 +30,9 @@ impl TestnetDeploy {
             PathBuf::from("logs.yml"),
             PathBuf::from("inventory").join(format!(".{name}_node_inventory_digital_ocean.yml")),
             self.cloud_provider.get_ssh_user(),
-            Some(format!("{{ \"env_name\": \"{name}\" }}")),
+            Some(format!(
+                "{{ \"env_name\": \"{name}\", \"resources_only\" : \"{resources_only}\" }}"
+            )),
         )?;
         Ok(())
     }

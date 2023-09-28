@@ -13,6 +13,13 @@
     - name: retrieve list of files from temporary directory
       shell: find {{ temp_dir.stdout }} -name "*.log"
       register: find_result
+      when: not resources_only
+
+    - name: retrieve list of files from temporary directory
+      shell: find {{ temp_dir.stdout }} -name "resource-usage.log"
+      register: find_result
+      when: resources_only
+
     - name: fetch each file
       fetch:
         src: "{{ item }}"
