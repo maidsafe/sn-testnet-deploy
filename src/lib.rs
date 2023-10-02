@@ -346,7 +346,7 @@ impl TestnetDeploy {
         let rpc_client_path = self.working_directory_path.join("safenode_rpc_client");
         if !rpc_client_path.is_file() {
             println!("Downloading the rpc client for safenode...");
-            let archive_name = "safenode_rpc_client-latest-x86_64-unknown-linux-musl.tar.gz";
+            let archive_name = "safenode_rpc_client-latest-x86_64.tar.gz";
             get_and_extract_archive_from_s3(
                 &*self.s3_repository,
                 "sn-node-rpc-client",
@@ -816,7 +816,7 @@ impl TestnetDeploy {
                 &mut extra_vars,
                 "node_archive_url",
                 &format!(
-                    "https://sn-node.s3.eu-west-2.amazonaws.com/{}/{}/safenode-{}-x86_64-unknown-linux-musl.tar.gz",
+                    "https://sn-node.s3.eu-west-2.amazonaws.com/{}/{}/safenode-{}-x86_64.tar.gz",
                     repo_owner,
                     branch,
                     name),
@@ -827,7 +827,7 @@ impl TestnetDeploy {
                 &mut extra_vars,
                 "node_archive_url",
                 &format!(
-                    "https://github.com/maidsafe/safe_network/releases/download/sn_node-v{version}/safenode-{version}-x86_64-unknown-linux-musl.tar.gz",
+                    "https://github.com/maidsafe/safe_network/releases/download/sn_node-v{version}/safenode-{version}-x86_64.tar.gz",
                 ),
             );
         }

@@ -1,4 +1,4 @@
 bin_name: safenode
 org: maidsafe
 branch: main
-bin_archive_filename: "{{ bin_name }}-{{ testnet_name }}-x86_64-unknown-linux-musl.tar.gz"
+bin_archive_filename: "{{ bin_name }}-{{ testnet_name }}-x86_64.tar.gz"

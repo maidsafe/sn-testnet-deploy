@@ -256,7 +256,7 @@ impl TestDataClient {
             get_and_extract_archive_from_s3(
                 s3_repository,
                 "sn-node",
-                &format!("{repo_owner}/{branch}/safe-{name}-x86_64-unknown-linux-musl.tar.gz"),
+                &format!("{repo_owner}/{branch}/safe-{name}-x86_64.tar.gz"),
                 working_directory_path,
             )
             .await?;
@@ -274,7 +274,7 @@ impl TestDataClient {
     ) -> Result<()> {
         let safe_client_path = working_directory_path.join("safe");
         if !safe_client_path.exists() {
-            let archive_name = format!("safe-{version}-x86_64-unknown-linux-musl.tar.gz");
+            let archive_name = format!("safe-{version}-x86_64.tar.gz");
             let archive_path = working_directory_path.join(archive_name.clone());
             let url = format!("{BASE_URL}/sn_cli-v{version}/{archive_name}");
             println!("url = {url}");

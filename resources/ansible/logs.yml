@@ -39,6 +39,21 @@
       with_items: "{{ find_result_resource_only.stdout_lines }}"
       when: resources_only == "true"
 
+
+    - name: copy heaptracks to temporary directory
+      shell: cp -r /root/* {{ temp_dir.stdout }}
+
+    - name: retrieve list of heaptrack files from temporary directory
+      shell: find {{ temp_dir.stdout }} -name heaptrack*
+      register: find_result_heaptrack
+
+    - name: fetch each heaptrack
+      fetch:
+        src: "{{ item }}"
+        dest: "../../logs/{{env_name}}/"
+        flat: no
+      with_items: "{{ find_result_heaptrack.stdout_lines }}"
+
     - name: remove temporary directory
       command: rm -rf {{ temp_dir.stdout }}
 

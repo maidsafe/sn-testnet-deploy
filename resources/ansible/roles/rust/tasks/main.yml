@@ -7,18 +7,18 @@
     state: present
   with_items:
     - build-essential
-    - musl
-    - musl-tools
+    # - musl
+    # - musl-tools
   register: result
   until: result is succeeded
   retries: 3
   delay: 5
 
-- name: install rustup and musl target
+    # rustup target add x86_64-unknown-linux-musl
+- name: install rustup
   ansible.builtin.shell: |
     curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh  -s -- --default-toolchain stable -y
     source $HOME/.cargo/env
-    rustup target add x86_64-unknown-linux-musl
   args:
     creates: "{{ ansible_env.HOME }}/.cargo/env"
     executable: /bin/bash

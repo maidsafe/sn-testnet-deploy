@@ -44,3 +44,9 @@
         name: systemd-journald
         state: restarted
         enabled: yes
+    # spawn extra heaptrack node
+    - name: spawn heaptracked node
+      become: True
+      ansible.builtin.shell: heaptrack safenode --peer {{genesis_multiaddr}} > /heaptrack-safenode.log 2>&1 &
+      async: 31536000  # This is a duration of 1 year
+      poll: 0
