@@ -24,6 +24,7 @@ impl TestnetDeploy {
             remove(dest.clone())?;
         }
         std::fs::create_dir_all(&dest)?;
+
         // The logs destination does not get passed to Ansible because the playbook assumes it's at
         // a relative location.
         self.ansible_runner.run_playbook(
