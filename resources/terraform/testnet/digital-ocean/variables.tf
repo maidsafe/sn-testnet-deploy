@@ -17,7 +17,7 @@ variable "droplet_ssh_keys" {
 }
 
 variable "droplet_size" {
-  default = "s-2vcpu-2gb"
+  default = "s-2vcpu-4gb"
 }
 
 variable "build_machine_size" {
