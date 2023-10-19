@@ -87,3 +87,26 @@
     state: started
     enabled: yes
   when: is_genesis
+
+- name: get the latest version or a custom build of the RPC client
+  ansible.builtin.get_url:
+    url: "{{ safenode_rpc_client_archive_url }}"
+    dest: /tmp/{{ safenode_rpc_client_archive_filename }}
+  when: is_genesis
+
+- name: extract the RPC client binary to /usr/local/bin
+  become: True
+  ansible.builtin.unarchive:
+    src: "/tmp/{{ safenode_rpc_client_archive_filename }}"
+    dest: "{{ node_archive_dest_path }}"
+    remote_src: True
+  when: is_genesis
+
+- name: Run the RPC client to store network royalties cash notes to disk
+  ansible.builtin.command:
+    chdir: "{{ node_archive_dest_path }}"
+    cmd: "safenode_rpc_client {{ node_rpc_ip }}:{{ node_rpc_port }} transfers /tmp/royalties-cash-notes"
+  async: 31536000  # One year (effectively indefinite for most use cases)
+  poll: 0         # Poll immediately to check the status
+  register: async_result
+  when: is_genesis

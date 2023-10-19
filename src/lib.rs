@@ -738,6 +738,15 @@ impl TestnetDeploy {
                     branch,
                     name),
             );
+            Self::add_value(
+                &mut extra_vars,
+                "safenode_rpc_client_archive_url",
+                &format!(
+                    "https://sn-node.s3.eu-west-2.amazonaws.com/{}/{}/safenode_rpc_client-{}-x86_64-unknown-linux-musl.tar.gz",
+                    repo_owner,
+                    branch,
+                    name),
+            );
         }
         if let Some(version) = safenode_version {
             Self::add_value(
