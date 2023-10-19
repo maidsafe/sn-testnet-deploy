@@ -18,3 +18,8 @@
         bin_name: "safenode",
         when: custom_bin == "true"
       }
+    - {
+        role: build_safe_network_binary,
+        bin_name: "safenode_rpc_client",
+        when: custom_bin == "true"
+      }
