@@ -29,6 +29,14 @@ impl TestnetDeploy {
         // a relative location.
         self.ansible_runner.run_playbook(
             PathBuf::from("logs.yml"),
+            PathBuf::from("inventory").join(format!(".{name}_genesis_inventory_digital_ocean.yml")),
+            self.cloud_provider.get_ssh_user(),
+            Some(format!(
+                "{{ \"env_name\": \"{name}\", \"resources_only\" : \"{resources_only}\" }}"
+            )),
+        )?;
+        self.ansible_runner.run_playbook(
+            PathBuf::from("logs.yml"),
             PathBuf::from("inventory").join(format!(".{name}_node_inventory_digital_ocean.yml")),
             self.cloud_provider.get_ssh_user(),
             Some(format!(

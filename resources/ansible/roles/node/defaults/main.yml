@@ -11,5 +11,6 @@ node_rpc_port: 12001
 node_instance_count: 20
 node_data_dir_path: /home/safe/.local/share/safe/node/data
 node_logs_dir_path: /home/safe/.local/share/safe/node/logs
+node_cash_notes_dir_path: /home/safe/.local/share/safe/node/royalties-cash-notes
 rust_log_setting: safenode=trace
 rust_log_otlp_setting: safenode=trace

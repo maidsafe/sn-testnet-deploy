@@ -105,7 +105,7 @@
 - name: Run the RPC client to store network royalties cash notes to disk
   ansible.builtin.command:
     chdir: "{{ node_archive_dest_path }}"
-    cmd: "safenode_rpc_client {{ node_rpc_ip }}:{{ node_rpc_port }} transfers /tmp/royalties-cash-notes"
+    cmd: "safenode_rpc_client {{ node_rpc_ip }}:{{ node_rpc_port }} transfers {{ node_cash_notes_dir_path }}"
   async: 31536000  # One year (effectively indefinite for most use cases)
   poll: 0         # Poll immediately to check the status
   register: async_result
