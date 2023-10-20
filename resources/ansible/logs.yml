@@ -12,7 +12,7 @@
       shell: cp -r /home/safe/.local/share/safe/node/* {{ temp_dir.stdout }}
 
     - name: retrieve list of log files from temporary directory
-      shell: find {{ temp_dir.stdout }} -name "*.log"
+      shell: find {{ temp_dir.stdout }} -name "*.log" -o -name "*.cash_note"
       register: find_result
       when: resources_only == "false"
 
