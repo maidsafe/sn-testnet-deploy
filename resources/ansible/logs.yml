@@ -2,7 +2,7 @@
 - name: fetch logs from remote machines
   hosts: all
   tasks:
-    # Due to the logs being continually written to, they must first be copied to a temp directory.
+    # Due to the logsss being continually written to, they must first be copied to a temp directory.
     # Otherwise the `fetch` task will produce checksum errors.
     - name: create temporary directory for logs
       command: mktemp -d
