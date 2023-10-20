@@ -102,11 +102,22 @@
     remote_src: True
   when: is_genesis
 
-- name: Run the RPC client to store network royalties cash notes to disk
-  ansible.builtin.command:
-    chdir: "{{ node_archive_dest_path }}"
-    cmd: "safenode_rpc_client {{ node_rpc_ip }}:{{ node_rpc_port }} transfers {{ node_cash_notes_dir_path }}"
-  async: 31536000  # One year (effectively indefinite for most use cases)
-  poll: 0         # Poll immediately to check the status
-  register: async_result
+- name: copy safenode_rpc_client service file
+  become: True
+  template:
+    src: safenode_rpc_client.service.j2
+    dest: /etc/systemd/system/safenode_rpc_client.service
+  register: service_template_created
+
+- name: reload the system manager configuration
+  become: True
+  command: systemctl daemon-reload
+  when: service_template_created.changed
+
+- name: start the safenode_rpc_client service to store network royalties cash notes to disk
+  become: True
+  systemd:
+    name: safenode_rpc_client
+    state: started
+    enabled: yes
   when: is_genesis
