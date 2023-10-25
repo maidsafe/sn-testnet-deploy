@@ -4,11 +4,11 @@ Description=Safe Node %I
 [Service]
 WorkingDirectory=/home/safe
 {% if is_genesis %}
-ExecStart=heaptrack {{ node_archive_dest_path }}/safenode \
+ExecStart={{ node_archive_dest_path }}/safenode \
   --port {{ node_port }} \
   --rpc {{ node_rpc_ip }}:{{ node_rpc_port }}
 {% else %}
-ExecStart=heaptrack {{ node_archive_dest_path }}/safenode \
+ExecStart={{ node_archive_dest_path }}/safenode \
   --peer {{ genesis_multiaddr }}
 {% endif %}
 User=safe
