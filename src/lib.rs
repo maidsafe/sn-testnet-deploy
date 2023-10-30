@@ -504,7 +504,7 @@ impl TestnetDeploy {
         &self,
         name: &str,
         logstash_details: (&str, &[SocketAddr]),
-        genesis_multiaddr: String,
+        genesis_multiaddr: &str,
         node_instance_count: u16,
         custom_branch_details: Option<(String, String)>,
         safenode_version: Option<String>,
@@ -517,7 +517,7 @@ impl TestnetDeploy {
             self.cloud_provider.get_ssh_user(),
             Some(self.build_node_extra_vars_doc(
                 name,
-                Some(genesis_multiaddr),
+                Some(genesis_multiaddr.to_string()),
                 Some(node_instance_count),
                 custom_branch_details,
                 logstash_details,
@@ -564,19 +564,19 @@ impl TestnetDeploy {
         .await?;
         let (multiaddr, genesis_ip) = self.get_genesis_multiaddr(name).await?;
         println!("Obtained multiaddr for genesis node: {multiaddr}");
-        self.provision_safenode_rpc_client(name, &multiaddr, custom_branch_details.clone())
-            .await?;
         self.provision_faucet(name, &multiaddr, custom_branch_details.clone())
             .await?;
         self.provision_remaining_nodes(
             name,
             logstash_details,
-            multiaddr,
+            &multiaddr,
             node_instance_count,
             custom_branch_details.clone(),
             safenode_version,
         )
         .await?;
+        self.provision_safenode_rpc_client(name, &multiaddr, custom_branch_details.clone())
+            .await?;
         // For reasons not known, the faucet service needs to be 'nudged' with a restart.
         // It seems to work fine after this.
         self.ssh_client.run_command(
