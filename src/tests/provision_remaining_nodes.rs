@@ -56,8 +56,7 @@ async fn should_run_ansible_against_the_remaining_nodes() -> Result<()> {
                     SocketAddr::new(IpAddr::V4("10.0.0.2".parse()?), LOGSTASH_PORT),
                 ],
             ),
-            "/ip4/10.0.0.10/tcp/12000/p2p/12D3KooWLvmkUDQRthtZv9CrzozRLk9ZVEHXgmx6UxVMiho5aded"
-                .to_string(),
+            "/ip4/10.0.0.10/tcp/12000/p2p/12D3KooWLvmkUDQRthtZv9CrzozRLk9ZVEHXgmx6UxVMiho5aded",
             30,
             None,
             None,
@@ -108,8 +107,7 @@ async fn should_run_ansible_against_the_remaining_nodes_with_a_custom_binary() -
                     SocketAddr::new(IpAddr::V4("10.0.0.2".parse()?), LOGSTASH_PORT),
                 ],
             ),
-            "/ip4/10.0.0.10/tcp/12000/p2p/12D3KooWLvmkUDQRthtZv9CrzozRLk9ZVEHXgmx6UxVMiho5aded"
-                .to_string(),
+            "/ip4/10.0.0.10/tcp/12000/p2p/12D3KooWLvmkUDQRthtZv9CrzozRLk9ZVEHXgmx6UxVMiho5aded",
             30,
             Some(("maidsafe".to_string(), "custom_branch".to_string())),
             None,
@@ -160,8 +158,7 @@ async fn should_run_ansible_against_the_remaining_nodes_with_a_versioned_binary(
                     SocketAddr::new(IpAddr::V4("10.0.0.2".parse()?), LOGSTASH_PORT),
                 ],
             ),
-            "/ip4/10.0.0.10/tcp/12000/p2p/12D3KooWLvmkUDQRthtZv9CrzozRLk9ZVEHXgmx6UxVMiho5aded"
-                .to_string(),
+            "/ip4/10.0.0.10/tcp/12000/p2p/12D3KooWLvmkUDQRthtZv9CrzozRLk9ZVEHXgmx6UxVMiho5aded",
             30,
             None,
             Some("0.90.35".to_string()),
