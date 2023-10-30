@@ -478,6 +478,28 @@ impl TestnetDeploy {
         Ok(())
     }
 
+    pub async fn provision_safenode_rpc_client(
+        &self,
+        name: &str,
+        genesis_multiaddr: &str,
+        custom_branch_details: Option<(String, String)>,
+    ) -> Result<()> {
+        let start = Instant::now();
+        println!("Running ansible against genesis node to deploy safenode_rpc_client...");
+        self.ansible_runner.run_playbook(
+            PathBuf::from("safenode_rpc_client.yml"),
+            PathBuf::from("inventory").join(format!(".{name}_genesis_inventory_digital_ocean.yml")),
+            self.cloud_provider.get_ssh_user(),
+            Some(self.build_safenode_rpc_client_extra_vars_doc(
+                name,
+                genesis_multiaddr,
+                custom_branch_details,
+            )?),
+        )?;
+        print_duration(start.elapsed());
+        Ok(())
+    }
+
     pub async fn provision_remaining_nodes(
         &self,
         name: &str,
@@ -542,6 +564,8 @@ impl TestnetDeploy {
         .await?;
         let (multiaddr, genesis_ip) = self.get_genesis_multiaddr(name).await?;
         println!("Obtained multiaddr for genesis node: {multiaddr}");
+        self.provision_safenode_rpc_client(name, &multiaddr, custom_branch_details.clone())
+            .await?;
         self.provision_faucet(name, &multiaddr, custom_branch_details.clone())
             .await?;
         self.provision_remaining_nodes(
@@ -738,15 +762,6 @@ impl TestnetDeploy {
                     branch,
                     name),
             );
-            Self::add_value(
-                &mut extra_vars,
-                "safenode_rpc_client_archive_url",
-                &format!(
-                    "https://sn-node.s3.eu-west-2.amazonaws.com/{}/{}/safenode_rpc_client-{}-x86_64-unknown-linux-musl.tar.gz",
-                    repo_owner,
-                    branch,
-                    name),
-            );
         }
         if let Some(version) = safenode_version {
             Self::add_value(
@@ -787,6 +802,40 @@ impl TestnetDeploy {
         if let Some((repo_owner, branch)) = custom_branch_details {
             Self::add_value(&mut extra_vars, "branch", &branch);
             Self::add_value(&mut extra_vars, "org", &repo_owner);
+        }
+
+        let mut extra_vars = extra_vars.strip_suffix(", ").unwrap().to_string();
+        extra_vars.push_str(" }");
+        Ok(extra_vars)
+    }
+
+    fn build_safenode_rpc_client_extra_vars_doc(
+        &self,
+        name: &str,
+        genesis_multiaddr: &str,
+        custom_branch_details: Option<(String, String)>,
+    ) -> Result<String> {
+        let mut extra_vars = String::new();
+        extra_vars.push_str("{ ");
+        Self::add_value(
+            &mut extra_vars,
+            "provider",
+            &self.cloud_provider.to_string(),
+        );
+        Self::add_value(&mut extra_vars, "testnet_name", name);
+        Self::add_value(&mut extra_vars, "genesis_multiaddr", genesis_multiaddr);
+        if let Some((repo_owner, branch)) = custom_branch_details {
+            Self::add_value(&mut extra_vars, "branch", &branch);
+            Self::add_value(&mut extra_vars, "org", &repo_owner);
+            Self::add_value(
+                &mut extra_vars,
+                "safenode_rpc_client_archive_url",
+                &format!(
+                    "https://sn-node.s3.eu-west-2.amazonaws.com/{}/{}/safenode_rpc_client-{}-x86_64-unknown-linux-musl.tar.gz",
+                    repo_owner,
+                    branch,
+                    name),
+            );
         }
 
         let mut extra_vars = extra_vars.strip_suffix(", ").unwrap().to_string();

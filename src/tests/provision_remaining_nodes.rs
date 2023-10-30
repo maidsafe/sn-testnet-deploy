@@ -16,7 +16,6 @@ use std::net::{IpAddr, SocketAddr};
 use std::path::PathBuf;
 
 const CUSTOM_BIN_URL: &str = "https://sn-node.s3.eu-west-2.amazonaws.com/maidsafe/custom_branch/safenode-beta-x86_64-unknown-linux-musl.tar.gz";
-const CUSTOM_RPC_CLIENT_BIN_URL: &str = "https://sn-node.s3.eu-west-2.amazonaws.com/maidsafe/custom_branch/safenode_rpc_client-beta-x86_64-unknown-linux-musl.tar.gz";
 const VERSIONED_BIN_URL: &str = "https://github.com/maidsafe/safe_network/releases/download/sn_node-v0.90.35/safenode-0.90.35-x86_64-unknown-linux-musl.tar.gz";
 
 #[tokio::test]
@@ -71,7 +70,7 @@ async fn should_run_ansible_against_the_remaining_nodes() -> Result<()> {
 
 #[tokio::test]
 async fn should_run_ansible_against_the_remaining_nodes_with_a_custom_binary() -> Result<()> {
-    let extra_vars_doc = r#"{ "provider": "digital-ocean", "testnet_name": "beta", "genesis_multiaddr": "/ip4/10.0.0.10/tcp/12000/p2p/12D3KooWLvmkUDQRthtZv9CrzozRLk9ZVEHXgmx6UxVMiho5aded", "node_instance_count": "30", "node_archive_url": "CUSTOM_BIN_URL", "safenode_rpc_client_archive_url": "CUSTOM_RPC_CLIENT_BIN_URL", "logstash_stack_name": "main", "logstash_hosts": ["10.0.0.1:5044", "10.0.0.2:5044"] }"#;
+    let extra_vars_doc = r#"{ "provider": "digital-ocean", "testnet_name": "beta", "genesis_multiaddr": "/ip4/10.0.0.10/tcp/12000/p2p/12D3KooWLvmkUDQRthtZv9CrzozRLk9ZVEHXgmx6UxVMiho5aded", "node_instance_count": "30", "node_archive_url": "CUSTOM_BIN_URL", "logstash_stack_name": "main", "logstash_hosts": ["10.0.0.1:5044", "10.0.0.2:5044"] }"#;
     let (tmp_dir, working_dir) = setup_working_directory()?;
     let s3_repository = setup_deploy_s3_repository("beta", &working_dir)?;
     let mut ansible_runner = MockAnsibleRunnerInterface::new();
@@ -83,9 +82,7 @@ async fn should_run_ansible_against_the_remaining_nodes_with_a_custom_binary() -
             eq(PathBuf::from("inventory").join(".beta_node_inventory_digital_ocean.yml")),
             eq("root".to_string()),
             eq(Some(
-                extra_vars_doc
-                    .replace("CUSTOM_BIN_URL", CUSTOM_BIN_URL)
-                    .replace("CUSTOM_RPC_CLIENT_BIN_URL", CUSTOM_RPC_CLIENT_BIN_URL),
+                extra_vars_doc.replace("CUSTOM_BIN_URL", CUSTOM_BIN_URL),
             )),
         )
         .returning(|_, _, _, _| Ok(()));

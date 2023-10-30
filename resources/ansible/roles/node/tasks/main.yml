@@ -87,37 +87,3 @@
     state: started
     enabled: yes
   when: is_genesis
-
-- name: get the latest version or a custom build of the RPC client
-  ansible.builtin.get_url:
-    url: "{{ safenode_rpc_client_archive_url }}"
-    dest: /tmp/{{ safenode_rpc_client_archive_filename }}
-  when: is_genesis
-
-- name: extract the RPC client binary to /usr/local/bin
-  become: True
-  ansible.builtin.unarchive:
-    src: "/tmp/{{ safenode_rpc_client_archive_filename }}"
-    dest: "{{ node_archive_dest_path }}"
-    remote_src: True
-  when: is_genesis
-
-- name: copy safenode_rpc_client service file
-  become: True
-  template:
-    src: safenode_rpc_client.service.j2
-    dest: /etc/systemd/system/safenode_rpc_client.service
-  register: service_template_created
-
-- name: reload the system manager configuration
-  become: True
-  command: systemctl daemon-reload
-  when: service_template_created.changed
-
-- name: start the safenode_rpc_client service to store network royalties cash notes to disk
-  become: True
-  systemd:
-    name: safenode_rpc_client
-    state: started
-    enabled: yes
-  when: is_genesis

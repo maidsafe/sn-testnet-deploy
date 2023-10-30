@@ -1,0 +1,34 @@
+---
+- name: deploy safenode_rpc_client to genesis node
+  hosts: all
+  become: False
+  roles:
+    - role: prerequisites
+      become: True
+    - {
+        role: format_disk,
+        become: True,
+        block_device: "{{ block_device }}",
+        mount_info:
+          { name: "{{ node_data_mount_path }}", owner: "root", group: "root", mode: 0755 },
+        when: provider == "aws"
+      }
+    - safenode_rpc_client
+  tasks:
+    # Something is wrong with the journal service on Ubuntu that causes no
+    # output to be produced when running `journalctl`. The solution seemed
+    # to be restarting the service.
+    - name: restart systemd-journald
+      become: True
+      ansible.builtin.systemd:
+        name: systemd-journald
+        state: restarted
+        enabled: yes
+    # For reasons not clear, the safenode_rpc_client service just does not run correctly
+    # on first try.
+    - name: restart safenode_rpc_client
+      become: True
+      ansible.builtin.systemd:
+        name: safenode_rpc_client
+        state: restarted
+        enabled: yes
