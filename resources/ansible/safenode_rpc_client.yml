@@ -24,11 +24,3 @@
         name: systemd-journald
         state: restarted
         enabled: yes
-    # For reasons not clear, the safenode_rpc_client service just does not run correctly
-    # on first try.
-    - name: restart safenode_rpc_client
-      become: True
-      ansible.builtin.systemd:
-        name: safenode_rpc_client
-        state: restarted
-        enabled: yes

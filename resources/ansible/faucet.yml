@@ -24,11 +24,3 @@
         name: systemd-journald
         state: restarted
         enabled: yes
-    # For reasons not clear, the faucet service just does not run correctly
-    # on first try.
-    - name: restart faucet
-      become: True
-      ansible.builtin.systemd:
-        name: faucet
-        state: restarted
-        enabled: yes
