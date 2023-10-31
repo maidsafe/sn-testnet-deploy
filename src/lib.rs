@@ -555,6 +555,7 @@ impl TestnetDeploy {
         self.create_infra(name, vm_count, true).await?;
         self.build_safe_network_binaries(name, custom_branch_details.clone())
             .await?;
+
         self.provision_genesis_node(
             name,
             logstash_details,
@@ -562,10 +563,10 @@ impl TestnetDeploy {
             safenode_version.clone(),
         )
         .await?;
-        let (multiaddr, genesis_ip) = self.get_genesis_multiaddr(name).await?;
+
+        let (multiaddr, _) = self.get_genesis_multiaddr(name).await?;
         println!("Obtained multiaddr for genesis node: {multiaddr}");
-        self.provision_faucet(name, &multiaddr, custom_branch_details.clone())
-            .await?;
+
         self.provision_remaining_nodes(
             name,
             logstash_details,
@@ -575,15 +576,13 @@ impl TestnetDeploy {
             safenode_version,
         )
         .await?;
+
+        self.provision_faucet(name, &multiaddr, custom_branch_details.clone())
+            .await?;
+
         self.provision_safenode_rpc_client(name, &multiaddr, custom_branch_details.clone())
             .await?;
-        // For reasons not known, the faucet service needs to be 'nudged' with a restart.
-        // It seems to work fine after this.
-        self.ssh_client.run_command(
-            &genesis_ip,
-            &self.cloud_provider.get_ssh_user(),
-            "systemctl restart faucet",
-        )?;
+
         self.list_inventory(
             name,
             true,
