@@ -1,46 +1,9 @@
 ---
-- name: store secret in a variable
-  set_fact:
-    aws_secret_key: "{{ lookup('file', 'files/ec2_read_only_secret_access_key') }}"
-
-# This IP points to the EC2 metadata service that is running on the EC2 instance. For some reason though the service doesn't make the tags available.
-- name: get current instance id
-  shell: wget -q -O - http://169.254.169.254/latest/meta-data/instance-id
-  register: instance_id_cmd
-  when: provider == "aws"
-
-- name: get ec2 instance facts
-  ec2_instance_info:
-    region: eu-west-2
-    aws_access_key: AKIAVVODCRMSHXHMIPV2
-    aws_secret_key: "{{ aws_secret_key }}"
-    instance_ids:
-      - "{{ instance_id_cmd.stdout }}"
-  register: instance_facts
-  when: provider == "aws"
-
-# The `instance_name` is then used in the service definition file.
-- name: get the name tag value
-  set_fact:
-    instance_name: "{{ instance_facts.instances[0].tags['Name'] }}"
-  when: provider == "aws"
-
 # The `instance_private_ip` is also used in the service definition file.
 - name: get the private IP for the instance
   set_fact:
     node_rpc_ip: "{{ instance_facts.instances[0].network_interfaces[0].private_ip_address }}"
   when: provider == "aws"
-
-- name: get hostname
-  command: hostname
-  register: host_output
-  when: provider == "digital-ocean"
-
-# The `instance_name` is then used in the service definition file.
-- name: use the hostname as the instance name
-  set_fact:
-    instance_name: "{{ host_output.stdout }}"
-  when: provider == "digital-ocean"
 
 # The `node_rpc_ip` is also used in the service definition file.
 - name: use the public IP as the RPC address on DO
