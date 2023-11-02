@@ -17,7 +17,7 @@ variable "user_home" {
 
 variable "droplet_image" {
   type = string
-  default = "ubuntu-22-10-x64"
+  default = "ubuntu-22-04-x64"
   description = ""
 }
 
