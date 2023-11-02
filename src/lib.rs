@@ -890,7 +890,7 @@ impl TestnetDeploy {
                 &mut extra_vars,
                 "safenode_rpc_client_archive_url",
                 &format!(
-                    "https://sn-node.s3.eu-west-2.amazonaws.com/{}/{}/safenode_rpc_client-{}-x86_64-unknown-linux-musl.tar.gz",
+                    "https://sn-node.s3.eu-west-2.amazonaws.com/{}/{}/safenode_rpc_client-{}-x86_64.tar.gz",
                     repo_owner,
                     branch,
                     name),
