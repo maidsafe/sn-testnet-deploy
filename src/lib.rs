@@ -339,10 +339,10 @@ impl TestnetDeploy {
         let rpc_client_path = self.working_directory_path.join("safenode_rpc_client");
         if !rpc_client_path.is_file() {
             println!("Downloading the rpc client for safenode...");
-            let archive_name = "rpc_client-latest-x86_64-unknown-linux-musl.tar.gz";
+            let archive_name = "safenode_rpc_client-latest-x86_64-unknown-linux-musl.tar.gz";
             get_and_extract_archive_from_s3(
                 &*self.s3_repository,
-                "sn-testnet",
+                "sn-node-rpc-client",
                 archive_name,
                 &self.working_directory_path,
             )
@@ -834,6 +834,12 @@ impl TestnetDeploy {
                     repo_owner,
                     branch,
                     name),
+            );
+        } else {
+            Self::add_value(
+                &mut extra_vars,
+                "safenode_rpc_client_archive_url",
+                "https://sn-node-rpc-client.s3.eu-west-2.amazonaws.com/safenode_rpc_client-latest-x86_64-unknown-linux-musl.tar.gz",
             );
         }
 
