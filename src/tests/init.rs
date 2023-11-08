@@ -87,7 +87,7 @@ async fn should_not_create_a_new_workspace_when_one_with_the_same_name_exists() 
 async fn should_download_and_extract_the_rpc_client() -> Result<()> {
     let (tmp_dir, working_dir) = setup_working_directory()?;
     let downloaded_safe_archive =
-        working_dir.child("rpc_client-latest-x86_64-unknown-linux-musl.tar.gz");
+        working_dir.child("safenode_rpc_client-latest-x86_64-unknown-linux-musl.tar.gz");
 
     let extracted_rpc_client_bin = working_dir.child(RPC_CLIENT_BIN_NAME);
     let s3_repository = setup_deploy_s3_repository("alpha", &working_dir)?;
@@ -186,15 +186,15 @@ async fn should_not_overwrite_generated_inventory() -> Result<()> {
 
     let saved_archive_path = working_dir
         .to_path_buf()
-        .join("rpc_client-latest-x86_64-unknown-linux-musl.tar.gz");
+        .join("safenode_rpc_client-latest-x86_64-unknown-linux-musl.tar.gz");
     let rpc_client_archive_path =
         create_fake_bin_archive(&working_dir, "rpc_client.tar.gz", RPC_CLIENT_BIN_NAME)?;
     let mut s3_repository = MockS3RepositoryInterface::new();
     s3_repository
         .expect_download_object()
         .with(
-            eq("sn-testnet"),
-            eq("rpc_client-latest-x86_64-unknown-linux-musl.tar.gz"),
+            eq("sn-node-rpc-client"),
+            eq("safenode_rpc_client-latest-x86_64-unknown-linux-musl.tar.gz"),
             eq(saved_archive_path),
         )
         .times(1)
