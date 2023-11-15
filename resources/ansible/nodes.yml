@@ -2,6 +2,7 @@
 - name: copy logstash certificate to nodes
   hosts: all
   become: False
+  max_fail_percentage: 10
   tasks:
     - name: copy public logstash certificate to node
       copy:
@@ -12,6 +13,7 @@
 - name: deploy safenode to remaining nodes
   hosts: all
   become: False
+  max_fail_percentage: 10
   vars:
     is_genesis: False
   roles:
