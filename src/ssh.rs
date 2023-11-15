@@ -16,18 +16,20 @@ use std::path::PathBuf;
 /// This trait exists for unit testing: it enables testing behaviour without actually calling the
 /// ssh process.
 #[cfg_attr(test, automock)]
-pub trait SshClientInterface {
+pub trait SshClientInterface: Send {
     fn wait_for_ssh_availability(&self, ip_address: &IpAddr, user: &str) -> Result<()>;
     fn run_command(&self, ip_address: &IpAddr, user: &str, command: &str) -> Result<Vec<String>>;
     fn run_script(
         &self,
-        ip_address: &IpAddr,
+        ip_address: IpAddr,
         user: &str,
         script: PathBuf,
         suppress_output: bool,
     ) -> Result<Vec<String>>;
+    fn clone_box(&self) -> Box<dyn SshClientInterface>;
 }
 
+#[derive(Clone)]
 pub struct SshClient {
     pub private_key_path: PathBuf,
 }
@@ -105,7 +107,7 @@ impl SshClientInterface for SshClient {
 
     fn run_script(
         &self,
-        ip_address: &IpAddr,
+        ip_address: IpAddr,
         user: &str,
         script: PathBuf,
         suppress_output: bool,
@@ -164,5 +166,9 @@ impl SshClientInterface for SshClient {
             Error::SshCommandFailed(format!("Failed to execute command on remote host: {e}"))
         })?;
         Ok(output)
+    }
+
+    fn clone_box(&self) -> Box<dyn SshClientInterface> {
+        Box::new(self.clone())
     }
 }
