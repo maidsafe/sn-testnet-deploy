@@ -715,14 +715,16 @@ impl TestnetDeploy {
         println!("Retrieving sample peers. This can take several minutes.");
         // Todo: RPC into nodes to fetch the multiaddr.
         for (_, ip_address) in remaining_nodes_inventory {
-            let output = self.ssh_client.run_script(
+            match self.ssh_client.run_script(
                 &ip_address,
                 "safe",
                 PathBuf::from("scripts").join("get_peer_multiaddr.sh"),
                 true,
-            )?;
-            for line in output.iter() {
-                peers.push(line.to_string());
+            ) {
+                Ok(output) => {
+                    peers.extend(output);
+                }
+                Err(err) => println!("Failed to SSH into {ip_address:?} with err: {err:?}"),
             }
         }
 

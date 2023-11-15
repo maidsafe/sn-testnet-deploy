@@ -3,6 +3,7 @@
   hosts: all
   become: False
   max_fail_percentage: 10
+  ignore_unreachable: yes
   tasks:
     - name: copy public logstash certificate to node
       copy:
@@ -14,6 +15,7 @@
   hosts: all
   become: False
   max_fail_percentage: 10
+  ignore_unreachable: yes
   vars:
     is_genesis: False
   roles:
