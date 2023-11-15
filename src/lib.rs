@@ -27,6 +27,7 @@ use crate::s3::{S3Repository, S3RepositoryInterface};
 use crate::ssh::{SshClient, SshClientInterface};
 use crate::terraform::{TerraformRunner, TerraformRunnerInterface};
 use flate2::read::GzDecoder;
+use futures::future::join_all;
 use log::debug;
 use rand::Rng;
 use serde::{Deserialize, Serialize};
@@ -712,19 +713,31 @@ impl TestnetDeploy {
         // working directory back to that location first.
         std::env::set_current_dir(self.working_directory_path.clone())?;
         let mut peers = Vec::new();
-        println!("Retrieving sample peers. This can take several minutes.");
+        println!("Retrieving sample peers");
         // Todo: RPC into nodes to fetch the multiaddr.
-        for (_, ip_address) in remaining_nodes_inventory {
-            match self.ssh_client.run_script(
-                &ip_address,
-                "safe",
-                PathBuf::from("scripts").join("get_peer_multiaddr.sh"),
-                true,
-            ) {
-                Ok(output) => {
-                    peers.extend(output);
+        for batch in remaining_nodes_inventory.chunks(20) {
+            let mut handles = Vec::new();
+            for (_, ip_address) in batch {
+                let ip_address = *ip_address;
+                let ssh_client_clone = self.ssh_client.clone_box();
+                let handle = tokio::spawn(async move {
+                    ssh_client_clone.run_script(
+                        ip_address,
+                        "safe",
+                        PathBuf::from("scripts").join("get_peer_multiaddr.sh"),
+                        true,
+                    )
+                });
+                handles.push(handle);
+            }
+
+            for result in join_all(handles).await {
+                match result? {
+                    Ok(output) => {
+                        peers.extend(output);
+                    }
+                    Err(err) => println!("Failed to SSH with err: {err:?}"),
                 }
-                Err(err) => println!("Failed to SSH into {ip_address:?} with err: {err:?}"),
             }
         }
 

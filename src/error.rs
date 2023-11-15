@@ -5,6 +5,7 @@
 // Please see the LICENSE file for more details.
 
 use thiserror::Error;
+use tokio::task::JoinError;
 
 pub type Result<T, E = Error> = std::result::Result<T, E>;
 /// Internal error.
@@ -41,6 +42,8 @@ pub enum Error {
     GetS3ObjectError(String, String),
     #[error(transparent)]
     FsExtraError(#[from] fs_extra::error::Error),
+    #[error(transparent)]
+    JoinError(#[from] JoinError),
     #[error(transparent)]
     InquireError(#[from] inquire::InquireError),
     #[error(transparent)]
