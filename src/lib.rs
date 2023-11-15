@@ -70,6 +70,7 @@ pub struct DeploymentInventory {
     pub version_info: Option<(String, String)>,
     pub branch_info: Option<(String, String)>,
     pub vm_list: Vec<(String, IpAddr)>,
+    pub rpc_endpoints: Vec<SocketAddr>,
     pub node_count: u16,
     pub ssh_user: String,
     pub genesis_multiaddr: String,
@@ -664,11 +665,23 @@ impl TestnetDeploy {
         }
         let (genesis_multiaddr, genesis_ip) = self.get_genesis_multiaddr(name).await?;
 
+        // To generate the rpc end points of each of the node.
+        // Genesis contains one node, and the rpc port is 12001
+        // For the other vms, the rpc ports starts from 12001 to (12000 + node_instance_count)
+        let mut rpc_endpoints = Vec::new();
+        rpc_endpoints.push(SocketAddr::new(genesis_inventory[0].1, 12001));
+        for (_, entry_ip) in remaining_nodes_inventory.iter() {
+            (1..node_instance_count.unwrap_or(0) + 1).for_each(|port_suffix| {
+                rpc_endpoints.push(SocketAddr::new(*entry_ip, 12000 + port_suffix));
+            })
+        }
+
         // The scripts are relative to the `resources` directory, so we need to change the current
         // working directory back to that location first.
         std::env::set_current_dir(self.working_directory_path.clone())?;
         let mut peers = Vec::new();
         println!("Retrieving sample peers. This can take several minutes.");
+        // Todo: RPC into nodes to fetch the multiaddr.
         for (_, ip_address) in remaining_nodes_inventory {
             let output = self.ssh_client.run_script(
                 &ip_address,
@@ -691,6 +704,7 @@ impl TestnetDeploy {
             branch_info: custom_branch_info,
             version_info,
             vm_list,
+            rpc_endpoints,
             node_count,
             ssh_user: self.cloud_provider.get_ssh_user(),
             genesis_multiaddr,
