@@ -553,9 +553,18 @@ impl TestnetDeploy {
         custom_version_details: Option<(String, String)>,
     ) -> Result<()> {
         let safenode_version = custom_version_details.as_ref().map(|x| x.0.clone());
-        self.create_infra(name, vm_count, true).await?;
+        self.create_infra(name, vm_count, true)
+            .await
+            .map_err(|err| {
+                println!("Failed to create infra {err:?}");
+                err
+            })?;
         self.build_safe_network_binaries(name, custom_branch_details.clone())
-            .await?;
+            .await
+            .map_err(|err| {
+                println!("Failed to build safe network binaries {err:?}");
+                err
+            })?;
 
         self.provision_genesis_node(
             name,
@@ -563,9 +572,16 @@ impl TestnetDeploy {
             custom_branch_details.clone(),
             safenode_version.clone(),
         )
-        .await?;
+        .await
+        .map_err(|err| {
+            println!("Failed to provision genesis node {err:?}");
+            err
+        })?;
 
-        let (multiaddr, _) = self.get_genesis_multiaddr(name).await?;
+        let (multiaddr, _) = self.get_genesis_multiaddr(name).await.map_err(|err| {
+            println!("Failed to get genesis multiaddr {err:?}");
+            err
+        })?;
         println!("Obtained multiaddr for genesis node: {multiaddr}");
 
         self.provision_remaining_nodes(
@@ -576,13 +592,25 @@ impl TestnetDeploy {
             custom_branch_details.clone(),
             safenode_version,
         )
-        .await?;
+        .await
+        .map_err(|err| {
+            println!("Failed to provision remaining nodes {err:?}");
+            err
+        })?;
 
         self.provision_faucet(name, &multiaddr, custom_branch_details.clone())
-            .await?;
+            .await
+            .map_err(|err| {
+                println!("Failed to provision faucet {err:?}");
+                err
+            })?;
 
         self.provision_safenode_rpc_client(name, &multiaddr, custom_branch_details.clone())
-            .await?;
+            .await
+            .map_err(|err| {
+                println!("Failed to provision safenode rpc client {err:?}");
+                err
+            })?;
 
         self.list_inventory(
             name,
@@ -591,7 +619,11 @@ impl TestnetDeploy {
             custom_version_details,
             Some(node_instance_count),
         )
-        .await?;
+        .await
+        .map_err(|err| {
+            println!("Failed to list inventory {err:?}");
+            err
+        })?;
         Ok(())
     }
 
