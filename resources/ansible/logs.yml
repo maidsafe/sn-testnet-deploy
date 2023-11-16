@@ -44,7 +44,7 @@
       shell: cp -r /root/* {{ temp_dir.stdout }}
 
     - name: retrieve list of heaptrack files from temporary directory
-      shell: find {{ temp_dir.stdout }} -name heaptrack*
+      shell: find {{ temp_dir.stdout }} -name "heaptrack*"
       register: find_result_heaptrack
 
     - name: fetch each heaptrack
