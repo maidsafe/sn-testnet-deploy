@@ -1,6 +1,7 @@
 ---
 - name: fetch logs from remote machines
   hosts: all
+  ignore_unreachable: yes
   tasks:
     # Due to the logs being continually written to, they must first be copied to a temp directory.
     # Otherwise the `fetch` task will produce checksum errors.
