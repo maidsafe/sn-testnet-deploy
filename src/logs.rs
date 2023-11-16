@@ -8,6 +8,8 @@ use crate::error::{Error, Result};
 use crate::s3::{S3Repository, S3RepositoryInterface};
 use crate::TestnetDeploy;
 use fs_extra::dir::{copy, remove, CopyOptions};
+use futures::future::join_all;
+use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
 use std::fs::File;
 use std::io::{Cursor, Read};
 use std::path::{Path, PathBuf};
@@ -18,31 +20,95 @@ impl TestnetDeploy {
     /// It needs to be part of `TestnetDeploy` because the Ansible runner is already setup in that
     /// context.
     pub async fn copy_logs(&self, name: &str, resources_only: bool) -> Result<()> {
-        let dest = PathBuf::from(".").join("logs").join(name);
-        if dest.exists() {
-            println!("Removing existing {} directory", dest.to_string_lossy());
-            remove(dest.clone())?;
+        let log_dest = PathBuf::from(".").join("logs").join(name);
+        if log_dest.exists() {
+            println!("Removing existing {} directory", log_dest.to_string_lossy());
+            remove(log_dest.clone())?;
         }
-        std::fs::create_dir_all(&dest)?;
+        std::fs::create_dir_all(&log_dest)?;
+        // get the absolute path
+        let log_abs_dest = std::fs::canonicalize(log_dest)?;
 
-        // The logs destination does not get passed to Ansible because the playbook assumes it's at
-        // a relative location.
-        self.ansible_runner.run_playbook(
-            PathBuf::from("logs.yml"),
-            PathBuf::from("inventory").join(format!(".{name}_genesis_inventory_digital_ocean.yml")),
-            self.cloud_provider.get_ssh_user(),
-            Some(format!(
-                "{{ \"env_name\": \"{name}\", \"resources_only\" : \"{resources_only}\" }}"
-            )),
-        )?;
-        self.ansible_runner.run_playbook(
-            PathBuf::from("logs.yml"),
-            PathBuf::from("inventory").join(format!(".{name}_node_inventory_digital_ocean.yml")),
-            self.cloud_provider.get_ssh_user(),
-            Some(format!(
-                "{{ \"env_name\": \"{name}\", \"resources_only\" : \"{resources_only}\" }}"
-            )),
-        )?;
+        let environments = self.terraform_runner.workspace_list()?;
+        if !environments.contains(&name.to_string()) {
+            return Err(Error::EnvironmentDoesNotExist(name.to_string()));
+        }
+
+        // The ansible runner will have its working directory set to this location. We need the
+        // same here to test the inventory paths, which are relative to the `ansible` directory.
+        let ansible_dir_path = self.working_directory_path.join("ansible");
+        std::env::set_current_dir(ansible_dir_path.clone())?;
+
+        // Somehow it might be possible that the workspace wasn't cleared out, but the environment
+        // was actually torn down and the generated inventory files were deleted. If the files
+        // don't exist, we can reasonably consider the environment non-existent.
+        let genesis_inventory_path =
+            PathBuf::from("inventory").join(format!(".{name}_genesis_inventory_digital_ocean.yml"));
+        let build_inventory_path =
+            PathBuf::from("inventory").join(format!(".{name}_build_inventory_digital_ocean.yml"));
+        let remaining_nodes_inventory_path =
+            PathBuf::from("inventory").join(format!(".{name}_node_inventory_digital_ocean.yml"));
+        if !genesis_inventory_path.exists()
+            || !build_inventory_path.exists()
+            || !remaining_nodes_inventory_path.exists()
+        {
+            return Err(Error::EnvironmentDoesNotExist(name.to_string()));
+        }
+
+        let mut all_node_inventory = self.ansible_runner.inventory_list(genesis_inventory_path)?;
+        all_node_inventory.extend(
+            self.ansible_runner
+                .inventory_list(remaining_nodes_inventory_path)?,
+        );
+
+        // goto the resource dir
+        std::env::set_current_dir(self.working_directory_path.clone())?;
+
+        all_node_inventory.par_iter().for_each(|(vm_name, _)| {
+            let vm_path = log_abs_dest.join(vm_name);
+            let _ = std::fs::create_dir_all(vm_path);
+        });
+
+        // Todo: RPC into nodes to fetch the multiaddr.
+        for batch in all_node_inventory.chunks(50) {
+            let mut handles = Vec::new();
+            for (vm_name, ip_address) in batch {
+                let ip_address = *ip_address;
+                let vm_path = log_abs_dest.join(vm_name);
+
+                let ssh_client_clone = self.ssh_client.clone_box();
+                let handle = tokio::spawn(async move {
+                    println!("Tarring file for {ip_address:?}");
+                    let _op = ssh_client_clone.run_script(
+                        ip_address,
+                        "safe",
+                        PathBuf::from("scripts").join("tar_log_files.sh"),
+                        false,
+                    )?;
+                    println!("copying log file for {ip_address:?}");
+                    let _op = ssh_client_clone.copy_file(
+                        ip_address,
+                        "safe",
+                        PathBuf::from("log_files.tar.gz"),
+                        vm_path,
+                        true,
+                        false,
+                    )?;
+                    println!("done copying logs for {ip_address:?}");
+
+                    Ok::<(), Error>(())
+                });
+                handles.push(handle);
+            }
+
+            for result in join_all(handles).await {
+                match result? {
+                    Ok(_) => {}
+                    Err(err) => println!("Failed to SSH with err: {err:?}"),
+                }
+            }
+        }
+
         Ok(())
     }
 }

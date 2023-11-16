@@ -26,6 +26,18 @@ pub trait SshClientInterface: Send {
         script: PathBuf,
         suppress_output: bool,
     ) -> Result<Vec<String>>;
+    fn copy_file(
+        &self,
+        ip_address: IpAddr,
+        // the remote file path must be relative to this user. i.e, we'll be in /home/user/ when we scp into an user acc
+        user: &str,
+        // file path
+        from_file_path: PathBuf,
+        // dir path
+        to_path: PathBuf,
+        from_remote: bool,
+        suppress_output: bool,
+    ) -> Result<Vec<String>>;
     fn clone_box(&self) -> Box<dyn SshClientInterface>;
 }
 
@@ -132,7 +144,7 @@ impl SshClientInterface for SshClient {
             script.to_string_lossy().to_string(),
             format!("{}@{}:/tmp/{}", user, ip_address, file_name),
         ];
-        run_external_command(
+        let mut output = run_external_command(
             PathBuf::from("scp"),
             std::env::current_dir()?,
             args,
@@ -156,7 +168,7 @@ impl SshClientInterface for SshClient {
             "bash".to_string(),
             format!("/tmp/{file_name}"),
         ];
-        let output = run_external_command(
+        let output_from_ssh = run_external_command(
             PathBuf::from("ssh"),
             std::env::current_dir()?,
             args,
@@ -165,7 +177,49 @@ impl SshClientInterface for SshClient {
         .map_err(|e| {
             Error::SshCommandFailed(format!("Failed to execute command on remote host: {e}"))
         })?;
+        output.extend(output_from_ssh);
         Ok(output)
+    }
+
+    fn copy_file(
+        &self,
+        ip_address: IpAddr,
+        user: &str,
+        from_file_path: PathBuf,
+        to_path: PathBuf,
+        from_remote: bool,
+        suppress_output: bool,
+    ) -> Result<Vec<String>> {
+        let mut args = vec![
+            "-i".to_string(),
+            self.private_key_path.to_string_lossy().to_string(),
+            "-q".to_string(),
+            "-o".to_string(),
+            "BatchMode=yes".to_string(),
+            "-o".to_string(),
+            "ConnectTimeout=30".to_string(),
+            "-o".to_string(),
+            "StrictHostKeyChecking=no".to_string(),
+        ];
+
+        if from_remote {
+            args.push(format!(
+                "{user}@{ip_address}:{}",
+                from_file_path.to_string_lossy()
+            ));
+            args.push(to_path.to_string_lossy().to_string());
+        } else {
+            args.push(from_file_path.to_string_lossy().to_string());
+            args.push(format!("{user}@{ip_address}:{}", to_path.to_string_lossy()));
+        }
+
+        run_external_command(
+            PathBuf::from("scp"),
+            std::env::current_dir()?,
+            args,
+            suppress_output,
+        )
+        .map_err(|e| Error::SshCommandFailed(format!("Failed to execute scp: {e}")))
     }
 
     fn clone_box(&self) -> Box<dyn SshClientInterface> {
