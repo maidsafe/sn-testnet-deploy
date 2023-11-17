@@ -21,10 +21,10 @@ impl TestnetDeploy {
     /// context.
     pub async fn copy_logs(&self, name: &str, resources_only: bool) -> Result<()> {
         let log_dest = PathBuf::from(".").join("logs").join(name);
-        if log_dest.exists() {
-            println!("Removing existing {} directory", log_dest.to_string_lossy());
-            remove(log_dest.clone())?;
-        }
+        // if log_dest.exists() {
+        //     println!("Removing existing {} directory", log_dest.to_string_lossy());
+        //     remove(log_dest.clone())?;
+        // }
         std::fs::create_dir_all(&log_dest)?;
         // get the absolute path
         let log_abs_dest = std::fs::canonicalize(log_dest)?;
@@ -107,55 +107,51 @@ impl TestnetDeploy {
             ),
         ]);
 
-        // Todo: RPC into nodes to fetch the multiaddr.
-        for batch in all_node_inventory.chunks(50) {
-            let mut handles = Vec::new();
-            for (vm_name, ip_address) in batch {
-                let ip_address = *ip_address;
-                let vm_path = log_abs_dest.join(vm_name);
+        let mut handles = Vec::new();
+        for (vm_name, ip_address) in all_node_inventory {
+            let vm_path = log_abs_dest.join(&vm_name);
 
-                let ssh_client_clone = self.ssh_client.clone_box();
-                let rsync_working_dir_clone = rsync_working_dir.clone();
-                let mut rsync_args_clone = rsync_args.clone();
-                let handle = tokio::spawn(async move {
-                    if !resources_only {
-                        rsync_args_clone.push(format!("safe@{ip_address}:~/tmpdir/"));
-                    } else {
-                        rsync_args_clone.push(format!("safe@{ip_address}:.local/share/safe/node/"));
-                    }
-                    rsync_args_clone.push(vm_path.to_string_lossy().to_string());
-
-                    if !resources_only {
-                        println!("Copy node  file for {ip_address:?}");
-                        let _op = ssh_client_clone.run_script(
-                            ip_address,
-                            "safe",
-                            PathBuf::from("scripts").join("copy_node_files.sh"),
-                            true,
-                        )?;
-                    }
-
-                    println!("rsync log file for {ip_address:?}");
-
-                    run_external_command(
-                        PathBuf::from("rsync"),
-                        rsync_working_dir_clone,
-                        rsync_args_clone,
-                        true,
-                    )?;
-
-                    println!("done copying logs for {ip_address:?}");
-
-                    Ok::<(), Error>(())
-                });
-                handles.push(handle);
-            }
-
-            for result in join_all(handles).await {
-                match result? {
-                    Ok(_) => {}
-                    Err(err) => println!("Failed to SSH with err: {err:?}"),
+            let ssh_client_clone = self.ssh_client.clone_box();
+            let rsync_working_dir_clone = rsync_working_dir.clone();
+            let mut rsync_args_clone = rsync_args.clone();
+            let handle = tokio::spawn(async move {
+                if !resources_only {
+                    rsync_args_clone.push(format!("safe@{ip_address}:.local/share/safe/node/"));
+                } else {
+                    rsync_args_clone.push(format!(
+                        "safe@{ip_address}:.local/share/safe/node/gggggggggggg"
+                    ));
                 }
+                rsync_args_clone.push(vm_path.to_string_lossy().to_string());
+
+                // if !resources_only {
+                //     println!("Copying logs to tmpdir for {vm_name:?}");
+                //     let _op = ssh_client_clone.run_script(
+                //         ip_address,
+                //         "safe",
+                //         PathBuf::from("scripts").join("copy_node_logs.sh"),
+                //         true,
+                //     )?;
+                // }
+
+                println!("Copying logs to our machine {vm_name:?}");
+                run_external_command(
+                    PathBuf::from("rsync"),
+                    rsync_working_dir_clone,
+                    rsync_args_clone,
+                    true,
+                )?;
+
+                println!("Copied logs for {vm_name:?}");
+
+                Ok::<(), Error>(())
+            });
+            handles.push(handle);
+        }
+        for result in join_all(handles).await {
+            match result? {
+                Ok(_) => {}
+                Err(err) => println!("Failed to SSH with err: {err:?}"),
             }
         }
 
