@@ -20,26 +20,30 @@ pub mod terraform;
 #[cfg(test)]
 mod tests;
 
-use crate::ansible::{AnsibleRunner, AnsibleRunnerInterface};
-use crate::error::{Error, Result};
-use crate::rpc_client::{RpcClient, RpcClientInterface};
-use crate::s3::{S3Repository, S3RepositoryInterface};
-use crate::ssh::{SshClient, SshClientInterface};
-use crate::terraform::{TerraformRunner, TerraformRunnerInterface};
+use crate::{
+    ansible::{AnsibleRunner, AnsibleRunnerInterface},
+    error::{Error, Result},
+    rpc_client::{RpcClient, RpcClientInterface},
+    s3::{S3Repository, S3RepositoryInterface},
+    ssh::{SshClient, SshClientInterface},
+    terraform::{TerraformRunner, TerraformRunnerInterface},
+};
 use flate2::read::GzDecoder;
-use futures::future::join_all;
 use indicatif::{ProgressBar, ProgressStyle};
 use log::debug;
 use rand::Rng;
+use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
 use serde::{Deserialize, Serialize};
 use serde_json::json;
-use std::fs::File;
-use std::io::{BufRead, BufReader, BufWriter, Write};
-use std::net::{IpAddr, SocketAddr};
-use std::os::unix::fs::PermissionsExt;
-use std::path::{Path, PathBuf};
-use std::process::{Command, Stdio};
-use std::time::{Duration, Instant};
+use std::{
+    fs::File,
+    io::{BufRead, BufReader, BufWriter, Write},
+    net::{IpAddr, SocketAddr},
+    os::unix::fs::PermissionsExt,
+    path::{Path, PathBuf},
+    process::{Command, Stdio},
+    time::{Duration, Instant},
+};
 use tar::Archive;
 
 #[derive(Debug, Clone)]
@@ -713,34 +717,28 @@ impl TestnetDeploy {
         // The scripts are relative to the `resources` directory, so we need to change the current
         // working directory back to that location first.
         std::env::set_current_dir(self.working_directory_path.clone())?;
-        let mut peers = Vec::new();
-        println!("Retrieving sample peers");
+        println!("Retrieving sample peers. This can take a minute.");
         // Todo: RPC into nodes to fetch the multiaddr.
-        for batch in remaining_nodes_inventory.chunks(20) {
-            let mut handles = Vec::new();
-            for (_, ip_address) in batch {
+        let peers = remaining_nodes_inventory
+            .par_iter()
+            .filter_map(|(vm_name, ip_address)| {
                 let ip_address = *ip_address;
                 let ssh_client_clone = self.ssh_client.clone_box();
-                let handle = tokio::spawn(async move {
-                    ssh_client_clone.run_script(
-                        ip_address,
-                        "safe",
-                        PathBuf::from("scripts").join("get_peer_multiaddr.sh"),
-                        true,
-                    )
-                });
-                handles.push(handle);
-            }
-
-            for result in join_all(handles).await {
-                match result? {
-                    Ok(output) => {
-                        peers.extend(output);
+                match ssh_client_clone.run_script(
+                    ip_address,
+                    "safe",
+                    PathBuf::from("scripts").join("get_peer_multiaddr.sh"),
+                    true,
+                ) {
+                    Ok(output) => Some(output),
+                    Err(err) => {
+                        println!("Failed to SSH into {vm_name:?}: {ip_address} with err: {err:?}");
+                        None
                     }
-                    Err(err) => println!("Failed to SSH with err: {err:?}"),
                 }
-            }
-        }
+            })
+            .flatten()
+            .collect::<Vec<_>>();
 
         // The VM list includes the genesis node and the build machine, hence the subtraction of 2
         // from the total VM count. After that, add one node for genesis, since this machine only
