@@ -6,13 +6,120 @@
 
 use crate::error::{Error, Result};
 use crate::s3::{S3Repository, S3RepositoryInterface};
-use crate::TestnetDeploy;
+use crate::{run_external_command, TestnetDeploy};
 use fs_extra::dir::{copy, remove, CopyOptions};
+use log::debug;
+use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
 use std::fs::File;
 use std::io::{Cursor, Read};
 use std::path::{Path, PathBuf};
 
 impl TestnetDeploy {
+    pub async fn rsync_logs(&self, name: &str, resources_only: bool) -> Result<()> {
+        let log_dest = PathBuf::from(".").join("logs").join(name);
+        if !log_dest.exists() {
+            std::fs::create_dir_all(&log_dest)?;
+        }
+        // Get the absolute path here. We might be changing the current_dir and we don't want to run into problems.
+        let log_abs_dest = std::fs::canonicalize(log_dest)?;
+
+        let environments = self.terraform_runner.workspace_list()?;
+        if !environments.contains(&name.to_string()) {
+            return Err(Error::EnvironmentDoesNotExist(name.to_string()));
+        }
+
+        // The ansible runner will have its working directory set to this location. We need the
+        // same here to test the inventory paths, which are relative to the `ansible` directory.
+        let ansible_dir_path = self.working_directory_path.join("ansible");
+        std::env::set_current_dir(ansible_dir_path.clone())?;
+        // Somehow it might be possible that the workspace wasn't cleared out, but the environment
+        // was actually torn down and the generated inventory files were deleted. If the files
+        // don't exist, we can reasonably consider the environment non-existent.
+        let genesis_inventory_path =
+            PathBuf::from("inventory").join(format!(".{name}_genesis_inventory_digital_ocean.yml"));
+        let remaining_nodes_inventory_path =
+            PathBuf::from("inventory").join(format!(".{name}_node_inventory_digital_ocean.yml"));
+        if !genesis_inventory_path.exists() || !remaining_nodes_inventory_path.exists() {
+            return Err(Error::EnvironmentDoesNotExist(name.to_string()));
+        }
+
+        // Get the inventory of all the nodes
+        let mut all_node_inventory = self.ansible_runner.inventory_list(genesis_inventory_path)?;
+        all_node_inventory.extend(
+            self.ansible_runner
+                .inventory_list(remaining_nodes_inventory_path)?,
+        );
+        // Create a log dir per VM
+        all_node_inventory.par_iter().for_each(|(vm_name, _)| {
+            let vm_path = log_abs_dest.join(vm_name);
+            let _ = std::fs::create_dir_all(vm_path);
+        });
+
+        // Rsync args
+        let mut rsync_args = vec![
+            "--compress".to_string(),
+            "--archive".to_string(),
+            "--prune-empty-dirs".to_string(),
+            "--verbose".to_string(),
+            "--verbose".to_string(),
+        ];
+        if !resources_only {
+            // to filter the log files
+            rsync_args.extend(vec![
+                "--filter=+ */".to_string(),     // Include all directories for traversal
+                "--filter=+ *.log*".to_string(), // Include all *.log* files
+                "--filter=- *".to_string(),      // Exclude all other files
+            ])
+        } else {
+            // to filter the resource usage files
+            rsync_args.extend(vec![
+                "--filter=+ */".to_string(), // Include all directories for traversal
+                "--filter=+ resource-usage.log".to_string(), // Include only the resource-usage logs
+                "--filter=- *".to_string(),  // Exclude all other files
+            ])
+        }
+        // Add the ssh details
+        // TODO: SSH limits the connections/instances to 10 at a time. Changing /etc/ssh/sshd_config, doesn't work?
+        // How to bypass this?
+        rsync_args.extend(vec![
+            "-e".to_string(),
+            format!(
+                "ssh -i {} -q -o StrictHostKeyChecking=no -o BatchMode=yes -o ConnectTimeout=30",
+                self.ssh_client
+                    .get_private_key_path()
+                    .to_string_lossy()
+                    .as_ref()
+            ),
+        ]);
+
+        // We might use the script, so goto the resource dir.
+        std::env::set_current_dir(self.working_directory_path.clone())?;
+
+        all_node_inventory
+            .par_iter()
+            .for_each(|(vm_name, ip_address)| {
+                let vm_path = log_abs_dest.join(vm_name);
+                let mut rsync_args_clone = rsync_args.clone();
+
+                rsync_args_clone.push(format!("safe@{ip_address}:.local/share/safe/"));
+                rsync_args_clone.push(vm_path.to_string_lossy().to_string());
+
+                debug!("Rsync logs to our machine for {vm_name:?} : {ip_address}");
+                if let Err(err) = run_external_command(
+                    PathBuf::from("rsync"),
+                    PathBuf::from("."),
+                    rsync_args_clone.clone(),
+                    true,
+                ) {
+                    println!("Failed to rsync {vm_name:?} : {ip_address} with err: {err:?}");
+                }
+
+                debug!("Finished rsync for for {vm_name:?} : {ip_address}");
+            });
+
+        Ok(())
+    }
+
     /// Run an Ansible playbook to copy the logs from all the machines in the inventory.
     ///
     /// It needs to be part of `TestnetDeploy` because the Ansible runner is already setup in that

@@ -199,6 +199,21 @@ enum Commands {
 
 #[derive(Subcommand, Debug)]
 enum LogCommands {
+    /// Rsync the logs from all the VMs for a given environment.
+    /// Rerunning the same command will sync only the changed log files without copying everything from the beginning.
+    ///
+    /// This will write the logs to 'logs/<name>', relative to the current directory.
+    Rsync {
+        /// The name of the environment
+        #[arg(short = 'n', long)]
+        name: String,
+        /// Should we copy the resource-usage.logs only
+        #[arg(short = 'r', long)]
+        resources_only: bool,
+        /// The cloud provider that was used.
+        #[clap(long, default_value_t = CloudProvider::DigitalOcean, value_parser = parse_provider, verbatim_doc_comment)]
+        provider: CloudProvider,
+    },
     /// Retrieve the logs for a given environment by copying them from all the VMs.
     ///
     /// This will write the logs to 'logs/<name>', relative to the current directory.
@@ -371,6 +386,16 @@ async fn main() -> Result<()> {
             Ok(())
         }
         Some(Commands::Logs(log_cmd)) => match log_cmd {
+            LogCommands::Rsync {
+                name,
+                resources_only,
+                provider,
+            } => {
+                let testnet_deploy = TestnetDeployBuilder::default().provider(provider).build()?;
+                testnet_deploy.init(&name).await?;
+                testnet_deploy.rsync_logs(&name, resources_only).await?;
+                Ok(())
+            }
             LogCommands::Copy {
                 name,
                 provider,
