@@ -6,7 +6,7 @@
 
 use crate::error::{Error, Result};
 use crate::s3::{S3Repository, S3RepositoryInterface};
-use crate::{run_external_command, TestnetDeploy};
+use crate::{get_progress_bar, run_external_command, TestnetDeploy};
 use fs_extra::dir::{copy, remove, CopyOptions};
 use log::debug;
 use rayon::iter::{IntoParallelIterator, IntoParallelRefIterator, ParallelIterator};
@@ -95,6 +95,8 @@ impl TestnetDeploy {
 
         // We might use the script, so goto the resource dir.
         std::env::set_current_dir(self.working_directory_path.clone())?;
+        println!("Starting to rsync the log files");
+        let progress_bar = get_progress_bar(all_node_inventory.len() as u64)?;
 
         let failed_inventory = all_node_inventory
             .par_iter()
@@ -103,6 +105,7 @@ impl TestnetDeploy {
                     println!("Failed to rsync. Retrying it after ssh-keygen {vm_name:?} : {ip_address} with err: {err:?}");
                     return Some((vm_name, ip_address));
                 }
+                progress_bar.inc(1);
                 None
             });
 
@@ -123,8 +126,9 @@ impl TestnetDeploy {
                 {
                     println!("Failed to rsync even after ssh-keygen. Could not obtain logs for {vm_name:?} : {ip_address} with err: {err:?}");
                 }
+                progress_bar.inc(1);
             });
-
+        progress_bar.finish_and_clear();
         Ok(())
     }
 

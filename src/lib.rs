@@ -28,6 +28,7 @@ use crate::ssh::{SshClient, SshClientInterface};
 use crate::terraform::{TerraformRunner, TerraformRunnerInterface};
 use flate2::read::GzDecoder;
 use futures::future::join_all;
+use indicatif::{ProgressBar, ProgressStyle};
 use log::debug;
 use rand::Rng;
 use serde::{Deserialize, Serialize};
@@ -1146,4 +1147,15 @@ fn print_duration(duration: Duration) {
     let minutes = total_seconds / 60;
     let seconds = total_seconds % 60;
     debug!("Time taken: {} minutes and {} seconds", minutes, seconds);
+}
+
+pub fn get_progress_bar(length: u64) -> Result<ProgressBar> {
+    let progress_bar = ProgressBar::new(length);
+    progress_bar.set_style(
+        ProgressStyle::default_bar()
+            .template("{spinner:.green} [{elapsed_precise}] [{bar:40.cyan/blue}] {pos}/{len}")?
+            .progress_chars("#>-"),
+    );
+    progress_bar.enable_steady_tick(Duration::from_millis(100));
+    Ok(progress_bar)
 }
