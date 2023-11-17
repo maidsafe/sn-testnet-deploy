@@ -16,7 +16,8 @@ use std::path::PathBuf;
 /// This trait exists for unit testing: it enables testing behaviour without actually calling the
 /// ssh process.
 #[cfg_attr(test, automock)]
-pub trait SshClientInterface: Send {
+pub trait SshClientInterface: Send + Sync {
+    fn get_private_key_path(&self) -> PathBuf;
     fn wait_for_ssh_availability(&self, ip_address: &IpAddr, user: &str) -> Result<()>;
     fn run_command(&self, ip_address: &IpAddr, user: &str, command: &str) -> Result<Vec<String>>;
     fn run_script(
@@ -39,6 +40,10 @@ impl SshClient {
     }
 }
 impl SshClientInterface for SshClient {
+    fn get_private_key_path(&self) -> PathBuf {
+        self.private_key_path.clone()
+    }
+
     fn wait_for_ssh_availability(&self, ip_address: &IpAddr, user: &str) -> Result<()> {
         println!("Checking for SSH availability at {ip_address}...");
         let mut retries = 0;
