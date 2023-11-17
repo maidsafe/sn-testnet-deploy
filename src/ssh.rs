@@ -39,6 +39,7 @@ pub trait SshClientInterface: Send {
         suppress_output: bool,
     ) -> Result<Vec<String>>;
     fn clone_box(&self) -> Box<dyn SshClientInterface>;
+    fn get_private_key_path(&self) -> PathBuf;
 }
 
 #[derive(Clone)]
@@ -51,6 +52,10 @@ impl SshClient {
     }
 }
 impl SshClientInterface for SshClient {
+    fn get_private_key_path(&self) -> PathBuf {
+        self.private_key_path.clone()
+    }
+
     fn wait_for_ssh_availability(&self, ip_address: &IpAddr, user: &str) -> Result<()> {
         println!("Checking for SSH availability at {ip_address}...");
         let mut retries = 0;

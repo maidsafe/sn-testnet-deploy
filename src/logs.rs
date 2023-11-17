@@ -6,7 +6,7 @@
 
 use crate::error::{Error, Result};
 use crate::s3::{S3Repository, S3RepositoryInterface};
-use crate::TestnetDeploy;
+use crate::{run_external_command, TestnetDeploy};
 use fs_extra::dir::{copy, remove, CopyOptions};
 use futures::future::join_all;
 use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
@@ -69,6 +69,44 @@ impl TestnetDeploy {
             let _ = std::fs::create_dir_all(vm_path);
         });
 
+        // rysnc
+        let mut rsync_working_dir = log_abs_dest.clone();
+        rsync_working_dir.pop();
+
+        let mut rsync_args = vec![
+            "--compress".to_string(),
+            "--archive".to_string(),
+            "--prune-empty-dirs".to_string(),
+            "--verbose".to_string(),
+            "--verbose".to_string(),
+        ];
+        if !resources_only {
+            // to filter the log files
+            rsync_args.extend(vec![
+                "--filter=+ */".to_string(),     // Include all directories for traversal
+                "--filter=+ *.log*".to_string(), // Include all *.log* files
+                "--filter=- *".to_string(),      // Exclude all other files
+            ])
+        } else {
+            // to filter the log files
+            rsync_args.extend(vec![
+                "--filter=+ */".to_string(), // Include all directories for traversal
+                "--filter=+ resource-usage.log".to_string(), // Include all *.log* files
+                "--filter=- *".to_string(),  // Exclude all other files
+            ])
+        }
+        // add the ssh details
+        rsync_args.extend(vec![
+            "-e".to_string(),
+            format!(
+                "ssh -i {}",
+                self.ssh_client
+                    .get_private_key_path()
+                    .to_string_lossy()
+                    .as_ref()
+            ),
+        ]);
+
         // Todo: RPC into nodes to fetch the multiaddr.
         for batch in all_node_inventory.chunks(50) {
             let mut handles = Vec::new();
@@ -77,23 +115,35 @@ impl TestnetDeploy {
                 let vm_path = log_abs_dest.join(vm_name);
 
                 let ssh_client_clone = self.ssh_client.clone_box();
+                let rsync_working_dir_clone = rsync_working_dir.clone();
+                let mut rsync_args_clone = rsync_args.clone();
                 let handle = tokio::spawn(async move {
-                    println!("Tarring file for {ip_address:?}");
-                    let _op = ssh_client_clone.run_script(
-                        ip_address,
-                        "safe",
-                        PathBuf::from("scripts").join("tar_log_files.sh"),
-                        false,
-                    )?;
-                    println!("copying log file for {ip_address:?}");
-                    let _op = ssh_client_clone.copy_file(
-                        ip_address,
-                        "safe",
-                        PathBuf::from("log_files.tar.gz"),
-                        vm_path,
+                    if !resources_only {
+                        rsync_args_clone.push(format!("safe@{ip_address}:~/tmpdir/"));
+                    } else {
+                        rsync_args_clone.push(format!("safe@{ip_address}:.local/share/safe/node/"));
+                    }
+                    rsync_args_clone.push(vm_path.to_string_lossy().to_string());
+
+                    if !resources_only {
+                        println!("Copy node  file for {ip_address:?}");
+                        let _op = ssh_client_clone.run_script(
+                            ip_address,
+                            "safe",
+                            PathBuf::from("scripts").join("copy_node_files.sh"),
+                            true,
+                        )?;
+                    }
+
+                    println!("rsync log file for {ip_address:?}");
+
+                    run_external_command(
+                        PathBuf::from("rsync"),
+                        rsync_working_dir_clone,
+                        rsync_args_clone,
                         true,
-                        false,
                     )?;
+
                     println!("done copying logs for {ip_address:?}");
 
                     Ok::<(), Error>(())
