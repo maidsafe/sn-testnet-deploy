@@ -9,9 +9,10 @@ use crate::s3::{S3Repository, S3RepositoryInterface};
 use crate::{run_external_command, TestnetDeploy};
 use fs_extra::dir::{copy, remove, CopyOptions};
 use log::debug;
-use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
+use rayon::iter::{IntoParallelIterator, IntoParallelRefIterator, ParallelIterator};
 use std::fs::File;
 use std::io::{Cursor, Read};
+use std::net::IpAddr;
 use std::path::{Path, PathBuf};
 
 impl TestnetDeploy {
@@ -95,28 +96,59 @@ impl TestnetDeploy {
         // We might use the script, so goto the resource dir.
         std::env::set_current_dir(self.working_directory_path.clone())?;
 
-        all_node_inventory
+        let failed_inventory = all_node_inventory
             .par_iter()
-            .for_each(|(vm_name, ip_address)| {
-                let vm_path = log_abs_dest.join(vm_name);
-                let mut rsync_args_clone = rsync_args.clone();
-
-                rsync_args_clone.push(format!("safe@{ip_address}:.local/share/safe/"));
-                rsync_args_clone.push(vm_path.to_string_lossy().to_string());
-
-                debug!("Rsync logs to our machine for {vm_name:?} : {ip_address}");
-                if let Err(err) = run_external_command(
-                    PathBuf::from("rsync"),
-                    PathBuf::from("."),
-                    rsync_args_clone.clone(),
-                    true,
-                ) {
-                    println!("Failed to rsync {vm_name:?} : {ip_address} with err: {err:?}");
+            .filter_map(|(vm_name, ip_address)| {
+                if let Err(err) = Self::run_rsync(vm_name, ip_address, &log_abs_dest, &rsync_args) {
+                    println!("Failed to rsync. Retrying it after ssh-keygen {vm_name:?} : {ip_address} with err: {err:?}");
+                    return Some((vm_name, ip_address));
                 }
-
-                debug!("Finished rsync for for {vm_name:?} : {ip_address}");
+                None
             });
 
+        // try ssh-keygen for the failed inventory and try to rsync again
+        failed_inventory
+            .into_par_iter()
+            .for_each(|(vm_name, ip_address)| {
+                debug!("Trying to ssh-keygen for {vm_name:?} : {ip_address}");
+                if let Err(err) = run_external_command(
+                    PathBuf::from("ssh-keygen"),
+                    PathBuf::from("."),
+                    vec!["-R".to_string(), format!("{ip_address}")],
+                    false,
+                ) {
+                    println!("Failed to ssh-keygen {vm_name:?} : {ip_address} with err: {err:?}");
+                } else if let Err(err) =
+                    Self::run_rsync(vm_name, ip_address, &log_abs_dest, &rsync_args)
+                {
+                    println!("Failed to rsync even after ssh-keygen. Could not obtain logs for {vm_name:?} : {ip_address} with err: {err:?}");
+                }
+            });
+
+        Ok(())
+    }
+
+    fn run_rsync(
+        vm_name: &String,
+        ip_address: &IpAddr,
+        log_abs_dest: &Path,
+        rsync_args: &[String],
+    ) -> Result<()> {
+        let vm_path = log_abs_dest.join(vm_name);
+        let mut rsync_args_clone = rsync_args.to_vec();
+
+        rsync_args_clone.push(format!("safe@{ip_address}:.local/share/safe/"));
+        rsync_args_clone.push(vm_path.to_string_lossy().to_string());
+
+        debug!("Rsync logs to our machine for {vm_name:?} : {ip_address}");
+        run_external_command(
+            PathBuf::from("rsync"),
+            PathBuf::from("."),
+            rsync_args_clone.clone(),
+            true,
+        )?;
+
+        debug!("Finished rsync for for {vm_name:?} : {ip_address}");
         Ok(())
     }
 
