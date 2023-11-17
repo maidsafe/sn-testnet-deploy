@@ -8,7 +8,7 @@ use crate::error::{Error, Result};
 use crate::s3::{S3Repository, S3RepositoryInterface};
 use crate::{run_external_command, TestnetDeploy};
 use fs_extra::dir::{copy, remove, CopyOptions};
-use futures::future::join_all;
+// use futures::future::join_all;
 use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
 use std::fs::File;
 use std::io::{Cursor, Read};
@@ -96,6 +96,7 @@ impl TestnetDeploy {
             ])
         }
         // add the ssh details
+        // TODO: limits the connection to 10 at a time? how to bypass this?
         rsync_args.extend(vec![
             "-e".to_string(),
             format!(
@@ -107,16 +108,19 @@ impl TestnetDeploy {
             ),
         ]);
 
-        let mut handles = Vec::new();
-        for (vm_name, ip_address) in all_node_inventory {
-            let vm_path = log_abs_dest.join(&vm_name);
+        // let ssh_client_clone = self.ssh_client.clone_box();
 
-            let ssh_client_clone = self.ssh_client.clone_box();
-            let rsync_working_dir_clone = rsync_working_dir.clone();
-            let mut rsync_args_clone = rsync_args.clone();
-            let handle = tokio::spawn(async move {
+        // let mut handles = Vec::new();
+        all_node_inventory
+            .par_iter()
+            .for_each(|(vm_name, ip_address)| {
+                let vm_path = log_abs_dest.join(vm_name);
+
+                let rsync_working_dir_clone = rsync_working_dir.clone();
+                let mut rsync_args_clone = rsync_args.clone();
+
                 if !resources_only {
-                    rsync_args_clone.push(format!("safe@{ip_address}:.local/share/safe/node/"));
+                    rsync_args_clone.push(format!("safe@{ip_address}:.local/share/safe/"));
                 } else {
                     rsync_args_clone.push(format!(
                         "safe@{ip_address}:.local/share/safe/node/gggggggggggg"
@@ -124,36 +128,30 @@ impl TestnetDeploy {
                 }
                 rsync_args_clone.push(vm_path.to_string_lossy().to_string());
 
-                // if !resources_only {
+                // if !resources_only && {
                 //     println!("Copying logs to tmpdir for {vm_name:?}");
                 //     let _op = ssh_client_clone.run_script(
-                //         ip_address,
+                //         *ip_address,
                 //         "safe",
                 //         PathBuf::from("scripts").join("copy_node_logs.sh"),
                 //         true,
-                //     )?;
+                //     );
                 // }
 
-                println!("Copying logs to our machine {vm_name:?}");
-                run_external_command(
+                // println!("Copying logs to our machine {vm_name:?}");
+                if let Err(err) = run_external_command(
                     PathBuf::from("rsync"),
                     rsync_working_dir_clone,
                     rsync_args_clone,
                     true,
-                )?;
+                ) {
+                    println!("failed to rsync {vm_name:?} {err:?}");
+                }
 
-                println!("Copied logs for {vm_name:?}");
+                // println!("Copied logs for {vm_name:?}");
 
-                Ok::<(), Error>(())
+                // Ok::<(), Error>(());
             });
-            handles.push(handle);
-        }
-        for result in join_all(handles).await {
-            match result? {
-                Ok(_) => {}
-                Err(err) => println!("Failed to SSH with err: {err:?}"),
-            }
-        }
 
         Ok(())
     }
