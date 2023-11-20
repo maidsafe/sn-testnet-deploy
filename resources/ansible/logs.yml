@@ -10,11 +10,22 @@
       command: mktemp -d
       register: temp_dir
 
-    - name: copy logs to temporary directory
-      shell: cp -r /home/safe/.local/share/safe/node/* {{ temp_dir.stdout }}
+    - name: copy all logs to temporary directory
+      shell: |
+        for file in $(find /home/safe/.local/share/safe/node/ -name "safenode.log" -o -name "safenode.log*" -o -name "*.log"); do
+          cp $file {{ temp_dir.stdout }}
+        done
+      when: resources_only == "false"
+
+    - name: copy all resource logs to temporary directory
+      shell: |
+        for file in $(find /home/safe/.local/share/safe/node/ -name "resource-usage.log"); do
+          cp $file {{ temp_dir.stdout }}
+        done
+      when: resources_only == "true"
 
     - name: retrieve list of log files from temporary directory
-      shell: find {{ temp_dir.stdout }} -name "*.log" -o -name "*.cash_note"
+      shell: find {{ temp_dir.stdout }} -name "*.log" -o -name "*.log*" -o -name "safenode.log*"
       register: find_result
       when: resources_only == "false"
 
