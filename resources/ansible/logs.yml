@@ -14,7 +14,7 @@
       shell: find /home/safe/.local/share/safe/node/ -name "safenode.log" -o -name "safenode.log*" -o -name "*.log" -exec cp {} {{ temp_dir.stdout }} \;
 
     - name: retrieve list of log files from temporary directory
-      shell: find {{ temp_dir.stdout }} -name "safenode.log*" # -o -name "*.cash_note"
+      shell: find {{ temp_dir.stdout }} -name "safenode.log" -o -name "safenode.log*" -o -name "*.log"  # -o -name "*.cash_note"
       register: find_result
       when: resources_only == "false"
 
