@@ -139,7 +139,9 @@ impl SshClientInterface for SshClient {
             suppress_output,
         )
         .map_err(|e| {
-            Error::SshCommandFailed(format!("Failed to copy script file to remote host: {e}"))
+            Error::SshCommandFailed(format!(
+                "Failed to copy script file to remote host {ip_address:?}: {e}"
+            ))
         })?;
 
         let args = vec![
