@@ -12,15 +12,15 @@
 - name: "build {{ bin_name }} binary"
   ansible.builtin.shell: |
     source $HOME/.cargo/env
-    cargo build --target x86_64-unknown-linux-musl --release --bin {{bin_name}}
+     RUSTFLAGS="-C debuginfo=2" cargo build --release --bin {{bin_name}}
   args:
     chdir: "{{ ansible_env.HOME }}/safe_network"
-    creates: "{{ ansible_env.HOME }}/safe_network/target/x86_64-unknown-linux-musl/release/{{bin_name}}"
+    creates: "{{ ansible_env.HOME }}/safe_network/target/release/{{bin_name}}"
     executable: /bin/bash
 
 - name: copy binary to tmp directory
   ansible.builtin.command:
-    chdir: "{{ ansible_env.HOME }}/safe_network/target/x86_64-unknown-linux-musl/release"
+    chdir: "{{ ansible_env.HOME }}/safe_network/target/release"
     cmd: cp {{bin_name}} /tmp/
 
 - name: archive binary

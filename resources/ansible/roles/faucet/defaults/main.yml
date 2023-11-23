@@ -1,6 +1,6 @@
 ---
 org: maidsafe
 branch: main
-faucet_archive_filename: faucet-{{ testnet_name }}-x86_64-unknown-linux-musl.tar.gz
+faucet_archive_filename: faucet-{{ testnet_name }}-x86_64.tar.gz
 faucet_archive_url: https://sn-node.s3.eu-west-2.amazonaws.com/{{ org }}/{{ branch }}/{{ faucet_archive_filename }}
 faucet_archive_dest_path: /usr/local/bin
