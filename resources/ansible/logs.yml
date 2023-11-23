@@ -31,13 +31,13 @@
       with_items: "{{ find_result.stdout_lines }}"
       when: resources_only == "false"
 
-    - name: fetch resource file
-      fetch:
-        src: "{{ item }}"
-        dest: "../../logs/{{env_name}}/"
-        flat: no
-      with_items: "{{ find_result_resource_only.stdout_lines }}"
-      when: resources_only == "true"
+    # - name: fetch resource file
+    #   fetch:
+    #     src: "{{ item }}"
+    #     dest: "../../logs/{{env_name}}/"
+    #     flat: no
+    #   with_items: "{{ find_result_resource_only.stdout_lines }}"
+    #   when: resources_only == "true"
 
 
     # - name: copy heaptracks to temporary directory
