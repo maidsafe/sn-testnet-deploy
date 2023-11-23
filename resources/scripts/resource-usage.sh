@@ -31,7 +31,7 @@ while true; do
     fi
     rss=$(ps -p $pid -o rss=)
     cpu=$(top -b -n1 -p $pid | awk 'NR>7 {print $9}')
-    count=$(find "$folder" -name '*' -not -name '*.pid' -type f | wc -l)
+    count=$(find "$folder/record_store" -name '*' -not -name '*.pid' -type f | wc -l)
     printf "%-52s %-8s %-10s %-10s %s\n" \
       "$peer_id" \
       "$pid" \
