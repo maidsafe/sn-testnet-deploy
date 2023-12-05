@@ -1,9 +1,9 @@
 ---
 is_genesis: False
 otlp_endpoint: http://dev-testnet-infra-f2016fb1217aaf30.elb.eu-west-2.amazonaws.com:4317
-node_archive_filename: safenode-latest-x86_64-unknown-linux-musl.tar.gz
-node_archive_url: https://sn-node.s3.eu-west-2.amazonaws.com/{{ node_archive_filename }}
-node_archive_dest_path: /usr/local/bin
+node_manager_archive_filename: safenode-manager-latest-x86_64-unknown-linux-musl.tar.gz
+node_manager_archive_url: https://sn-node-manager.s3.eu-west-2.amazonaws.com/{{ node_manager_archive_filename }}
+node_manager_archive_dest_path: /usr/local/bin
 node_port: 12000
 node_rpc_port: 12001
 node_instance_count: 20
