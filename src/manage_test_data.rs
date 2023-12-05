@@ -206,10 +206,7 @@ impl TestDataClient {
                 )
                 .await?;
             }
-            SnCodebaseType::Versioned {
-                safe_version,
-                safenode_version: _,
-            } => {
+            SnCodebaseType::Versioned { safe_version, .. } => {
                 Self::download_and_extract_safe_client_from_url(
                     &self.safe_binary_repository,
                     safe_version,

@@ -109,6 +109,9 @@ enum Commands {
         /// --branch and --repo-owner arguments. You can only supply version numbers or a custom
         /// branch, not both.
         safenode_version: Option<String>,
+        #[arg(long)]
+        /// Optionally supply a version number used for the safenode manager binary. There should be no 'v' prefix.
+        safenode_manager_version: Option<String>,
     },
     Inventory {
         /// The name of the environment
@@ -146,32 +149,6 @@ enum Commands {
         /// machine. This information gets used for Slack notifications.
         #[arg(long)]
         node_count: Option<u16>,
-        /// Optionally supply a version number to be used for the safe binary. There should be no
-        /// 'v' prefix.
-        ///
-        /// You can supply this value to inventory when you are running the process on a different
-        /// machine from where the testnet was deployed.
-        ///
-        /// This argument must be used in conjunction with the --safenode-version argument.
-        ///
-        /// The --safe-version and --safenode-version arguments are mutually exclusive with the
-        /// --branch and --repo-owner arguments. You can only supply version numbers or a custom
-        /// branch, not both.
-        #[arg(long)]
-        safe_version: Option<String>,
-        #[arg(long)]
-        /// Optionally supply a version number to be used for the safenode binary. There should be
-        /// no 'v' prefix.
-        ///
-        /// You can supply this value to inventory when you are running the process on a different
-        /// machine from where the testnet was deployed.
-        ///
-        /// This argument must be used in conjunction with the --safe-version argument.
-        ///
-        /// The --safe-version and --safenode-version arguments are mutually exclusive with the
-        /// --branch and --repo-owner arguments. You can only supply version numbers or a custom
-        /// branch, not both.
-        safenode_version: Option<String>,
     },
     #[clap(name = "logs", subcommand)]
     Logs(LogCommands),
@@ -329,12 +306,15 @@ async fn main() -> Result<()> {
             logstash_stack_name,
             safe_version,
             safenode_version,
+            safenode_manager_version,
+            ..
         }) => {
             let sn_codebase_type = get_sn_codebase_type(
                 branch,
                 repo_owner,
                 safe_version,
                 safenode_version,
+                safenode_manager_version,
                 safenode_features,
             )?;
 
@@ -385,11 +365,9 @@ async fn main() -> Result<()> {
             branch,
             repo_owner,
             node_count,
-            safe_version,
-            safenode_version,
         }) => {
             let sn_codebase_type =
-                get_sn_codebase_type(branch, repo_owner, safe_version, safenode_version, None)?;
+                get_sn_codebase_type(branch, repo_owner, None, None, None, None)?;
 
             let testnet_deploy = TestnetDeployBuilder::default().provider(provider).build()?;
             testnet_deploy
@@ -536,6 +514,7 @@ fn get_sn_codebase_type(
     repo_owner: Option<String>,
     safe_version: Option<String>,
     safenode_version: Option<String>,
+    safenode_manager_version: Option<String>,
     safenode_features: Option<Vec<String>>,
 ) -> Result<SnCodebaseType> {
     if let (Some(_), None) | (None, Some(_)) = (&repo_owner, &branch) {
@@ -577,10 +556,13 @@ fn get_sn_codebase_type(
             branch,
             safenode_features,
         }
-    } else if let (Some(safe_version), Some(safenode_version)) = (safe_version, safenode_version) {
+    } else if let (Some(safe_version), Some(safenode_version), Some(safenode_manager_version)) =
+        (safe_version, safenode_version, safenode_manager_version)
+    {
         SnCodebaseType::Versioned {
             safe_version,
             safenode_version,
+            safenode_manager_version,
         }
     } else {
         SnCodebaseType::Main { safenode_features }

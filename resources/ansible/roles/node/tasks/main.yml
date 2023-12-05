@@ -11,27 +11,48 @@
     node_rpc_ip: "{{ ansible_host }}"
   when: provider == "digital-ocean"
 
-- name: get the latest version or a custom build of the node
+- name: download the node manager binary
   ansible.builtin.get_url:
-    url: "{{ node_archive_url }}"
-    dest: /tmp/{{ node_archive_filename }}
+    url: "{{ node_manager_archive_url }}"
+    dest: /tmp/{{ node_manager_archive_filename }}
 
-- name: extract the node binary to /usr/local/bin
+- name: extract the node manager binary to /usr/local/bin
   become: True
   ansible.builtin.unarchive:
-    src: "/tmp/{{ node_archive_filename }}"
-    dest: "{{ node_archive_dest_path }}"
+    src: "/tmp/{{ node_manager_archive_filename }}"
+    dest: "{{ node_manager_archive_dest_path }}"
     remote_src: True
 
-- name: start the node services
-  include_tasks: start_service.yml
+- name: add genesis node service
+  ansible.builtin.command:
+    argv: "{{ command_args | reject('equalto', omit) | list }}"
   vars:
-    node_rpc_port: "{{ 12000 + item }}"
-  loop: "{{ range(1, (node_instance_count | int) + 1)|list }}"
+    command_args:
+      - "{{ node_manager_archive_dest_path }}/safenode-manager"
+      - add
+      - --first
+      - --count=1
+      - --port=12000
+      - --rpc-port=12001
+      - "{{ ('--version=' + node_version) if node_version is defined else omit }}"
+  when: is_genesis
+
+- name: add node services
+  ansible.builtin.command:
+    # The `omit` filter is used to remove the `--version` argument if the
+    # `node_version` variable is not defined. If the argv would be otherwise
+    # defined as '', the command would fail as it doesn't expect an empty
+    # argument, so it's omitted instead.
+    argv: "{{ command_args | reject('equalto', omit) | list }}"
+  vars:
+    command_args:
+      - "{{ node_manager_archive_dest_path }}/safenode-manager"
+      - add
+      - "--count={{ node_instance_count }}"
+      - "--peer={{ genesis_multiaddr }}"
+      - "{{ ('--version=' + node_version) if node_version is defined else omit }}"
   when: not is_genesis
 
-- name: start the genesis node service
-  include_tasks: start_service.yml
-  vars:
-    item: 1
-  when: is_genesis
+- name: start the node services
+  become: True
+  command: safenode-manager start
