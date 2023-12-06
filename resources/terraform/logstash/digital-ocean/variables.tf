@@ -17,7 +17,7 @@ variable "droplet_ssh_keys" {
 }
 
 variable "droplet_size" {
-  default = "s-4vcpu-8gb"
+  default = "s-2vcpu-4gb"
 }
 
 variable "droplet_image" {
