@@ -216,14 +216,17 @@ enum LogCommands {
     },
     /// Run a ripgrep query through all the logs from all the VMs and copy the results.
     ///
-    /// The results will be written to `logs/<name>/query.log`
+    /// The results will be written to `logs/<name>/<vm>/rg-timestamp.log`
     Rg {
         /// The name of the environment
         #[arg(short = 'n', long)]
         name: String,
-        /// The ripgrep query to run
-        #[arg(short = 'q', long)]
-        query: String,
+        /// The ripgrep arguments that are directly passed to ripgrep. The text to search for should be put inside
+        /// single quotes. The dir to search for is set automatically, so do not provide one.
+        ///
+        /// Example command: `cargo run --release -- logs rg --name <name> --args "'ValidSpendRecordPutFromNetwork' -c"`
+        #[arg(short = 'a', long, allow_hyphen_values(true))]
+        args: String,
         /// The cloud provider that was used.
         #[clap(long, default_value_t = CloudProvider::DigitalOcean, value_parser = parse_provider, verbatim_doc_comment)]
         provider: CloudProvider,
@@ -413,12 +416,12 @@ async fn main() -> Result<()> {
             }
             LogCommands::Rg {
                 name,
-                query,
                 provider,
+                args,
             } => {
                 let testnet_deploy = TestnetDeployBuilder::default().provider(provider).build()?;
                 testnet_deploy.init(&name).await?;
-                testnet_deploy.ripgrep_logs(&name, &query).await?;
+                testnet_deploy.ripgrep_logs(&name, &args).await?;
                 Ok(())
             }
             LogCommands::Copy {
