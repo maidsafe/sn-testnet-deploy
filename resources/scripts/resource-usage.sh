@@ -10,12 +10,13 @@ while true; do
   echo "Report for $(date)"
   echo "------------------------------------------------------"
   echo "Checking $(hostname) on $(hostname -I | awk '{print $1}')"
-  printf "%-52s %-8s %-10s %-10s %s\n" \
+  printf "%-52s %-8s %-10s %-10s %-20s %-10s\n" \
     "Node                                                " \
     "PID" \
     "Memory (MB)" \
     "CPU (%)" \
-    "Record Count"
+    "Record Count" \
+    "Connections"
   running_process_count=0
   for folder in $NODE_DATA_DIR_PATH/*; do
     if [ ! -d "$folder" ]; then continue; fi
@@ -32,15 +33,19 @@ while true; do
     rss=$(ps -p $pid -o rss=)
     cpu=$(top -b -n1 -p $pid | awk 'NR>7 {print $9}')
     count=$(find "$folder/record_store" -name '*' -not -name '*.pid' -type f | wc -l)
-    printf "%-52s %-8s %-10s %-10s %s\n" \
+    con_count=$(ss -tunpa | grep ESTAB | grep =$pid -c)
+    printf "%-52s %-8s %-10s %-10s %-20s %-10s\n" \
       "$peer_id" \
       "$pid" \
       "$(awk "BEGIN {print $rss/1024}")" \
       "$cpu" \
-      "$count"
+      "$count" \
+      "$con_count"
     running_process_count=$((running_process_count + 1))
   done
   echo "Total node processes: $running_process_count"
+  total_connections=$(ss -tunpa | grep ESTAB | grep safenode -c)
+  echo "Total live connections: $total_connections"
 
   # sleep 15 minutes before running again
   sleep 900
