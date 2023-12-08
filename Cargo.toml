@@ -13,6 +13,7 @@ async-recursion = "1.0.4"
 async-trait = "0.1"
 aws-config = "0.56.0"
 aws-sdk-s3 = "0.29.0"
+chrono = "0.4.31"
 clap = { version = "4.2.1", features = ["derive"] }
 color-eyre = "0.6.2"
 dirs-next = "2.0.0"
