@@ -124,24 +124,21 @@ impl TestnetDeploy {
         Ok(())
     }
 
-    pub async fn ripgrep_logs(&self, name: &str, query: &str) -> Result<()> {
+    pub async fn ripgrep_logs(&self, name: &str, rg_args: &str) -> Result<()> {
         // take root_dir at the top as `get_all_node_inventory` changes the working dir.
         let root_dir = std::env::current_dir()?;
         let all_node_inventory = self.get_all_node_inventory(name)?;
         let log_abs_dest = create_initial_log_dir_setup(&root_dir, name, &all_node_inventory)?;
 
-        println!("Starting to run rg");
+        let rg_cmd = format!("rg {rg_args} .local/share/safe/");
+        println!("Running ripgrep with command: {rg_cmd}");
+
         let progress_bar = get_progress_bar(all_node_inventory.len() as u64)?;
         let ssh_client = self.ssh_client.clone_box();
         let _failed_inventory = all_node_inventory
             .par_iter()
             .filter_map(|(vm_name, ip_address)| {
-                let op = match ssh_client.run_command(
-                    ip_address,
-                    "safe",
-                    format!("rg {query:?} .local/share/safe/").as_str(),
-                    true,
-                ) {
+                let op = match ssh_client.run_command(ip_address, "safe", &rg_cmd, true) {
                     Ok(output) => match Self::store_rg_output(&output, &log_abs_dest, vm_name) {
                         Ok(_) => None,
                         Err(err) => {
