@@ -6,6 +6,7 @@
 
 use crate::error::{Error, Result};
 use crate::run_external_command;
+use log::debug;
 #[cfg(test)]
 use mockall::automock;
 use std::net::IpAddr;
@@ -19,7 +20,13 @@ use std::path::PathBuf;
 pub trait SshClientInterface: Send + Sync {
     fn get_private_key_path(&self) -> PathBuf;
     fn wait_for_ssh_availability(&self, ip_address: &IpAddr, user: &str) -> Result<()>;
-    fn run_command(&self, ip_address: &IpAddr, user: &str, command: &str) -> Result<Vec<String>>;
+    fn run_command(
+        &self,
+        ip_address: &IpAddr,
+        user: &str,
+        command: &str,
+        suppress_output: bool,
+    ) -> Result<Vec<String>>;
     fn run_script(
         &self,
         ip_address: IpAddr,
@@ -83,8 +90,14 @@ impl SshClientInterface for SshClient {
         Err(Error::SshUnavailable)
     }
 
-    fn run_command(&self, ip_address: &IpAddr, user: &str, command: &str) -> Result<Vec<String>> {
-        println!(
+    fn run_command(
+        &self,
+        ip_address: &IpAddr,
+        user: &str,
+        command: &str,
+        suppress_output: bool,
+    ) -> Result<Vec<String>> {
+        debug!(
             "Running command '{}' on {}@{}...",
             command, user, ip_address
         );
@@ -104,9 +117,13 @@ impl SshClientInterface for SshClient {
         ];
         args.extend(command_args);
 
-        let output =
-            run_external_command(PathBuf::from("ssh"), std::env::current_dir()?, args, false)
-                .map_err(|_| Error::SshCommandFailed(command.to_string()))?;
+        let output = run_external_command(
+            PathBuf::from("ssh"),
+            std::env::current_dir()?,
+            args,
+            suppress_output,
+        )
+        .map_err(|_| Error::SshCommandFailed(command.to_string()))?;
         Ok(output)
     }
 

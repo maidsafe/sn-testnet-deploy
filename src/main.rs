@@ -214,6 +214,21 @@ enum LogCommands {
         #[clap(long, default_value_t = CloudProvider::DigitalOcean, value_parser = parse_provider, verbatim_doc_comment)]
         provider: CloudProvider,
     },
+    /// Run a ripgrep query through all the logs from all the VMs and copy the results.
+    ///
+    /// The results will be written to `logs/<name>/query.log`
+    Rg {
+        /// The name of the environment
+        #[arg(short = 'n', long)]
+        name: String,
+        /// The ripgrep query to run
+        #[arg(short = 'q', long)]
+        query: String,
+        /// The cloud provider that was used.
+        #[clap(long, default_value_t = CloudProvider::DigitalOcean, value_parser = parse_provider, verbatim_doc_comment)]
+        provider: CloudProvider,
+    },
+
     /// Retrieve the logs for a given environment by copying them from all the VMs.
     ///
     /// This will write the logs to 'logs/<name>', relative to the current directory.
@@ -394,6 +409,16 @@ async fn main() -> Result<()> {
                 let testnet_deploy = TestnetDeployBuilder::default().provider(provider).build()?;
                 testnet_deploy.init(&name).await?;
                 testnet_deploy.rsync_logs(&name, resources_only).await?;
+                Ok(())
+            }
+            LogCommands::Rg {
+                name,
+                query,
+                provider,
+            } => {
+                let testnet_deploy = TestnetDeployBuilder::default().provider(provider).build()?;
+                testnet_deploy.init(&name).await?;
+                testnet_deploy.ripgrep_logs(&name, &query).await?;
                 Ok(())
             }
             LogCommands::Copy {

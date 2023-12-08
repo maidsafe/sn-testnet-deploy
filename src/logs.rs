@@ -10,51 +10,19 @@ use crate::{get_progress_bar, run_external_command, TestnetDeploy};
 use fs_extra::dir::{copy, remove, CopyOptions};
 use log::debug;
 use rayon::iter::{IntoParallelIterator, IntoParallelRefIterator, ParallelIterator};
-use std::fs::File;
-use std::io::{Cursor, Read};
-use std::net::IpAddr;
-use std::path::{Path, PathBuf};
+use std::{
+    fs::File,
+    io::{Cursor, Read, Write},
+    net::IpAddr,
+    path::{Path, PathBuf},
+};
 
 impl TestnetDeploy {
     pub async fn rsync_logs(&self, name: &str, resources_only: bool) -> Result<()> {
-        let log_dest = PathBuf::from(".").join("logs").join(name);
-        if !log_dest.exists() {
-            std::fs::create_dir_all(&log_dest)?;
-        }
-        // Get the absolute path here. We might be changing the current_dir and we don't want to run into problems.
-        let log_abs_dest = std::fs::canonicalize(log_dest)?;
-
-        let environments = self.terraform_runner.workspace_list()?;
-        if !environments.contains(&name.to_string()) {
-            return Err(Error::EnvironmentDoesNotExist(name.to_string()));
-        }
-
-        // The ansible runner will have its working directory set to this location. We need the
-        // same here to test the inventory paths, which are relative to the `ansible` directory.
-        let ansible_dir_path = self.working_directory_path.join("ansible");
-        std::env::set_current_dir(ansible_dir_path.clone())?;
-        // Somehow it might be possible that the workspace wasn't cleared out, but the environment
-        // was actually torn down and the generated inventory files were deleted. If the files
-        // don't exist, we can reasonably consider the environment non-existent.
-        let genesis_inventory_path =
-            PathBuf::from("inventory").join(format!(".{name}_genesis_inventory_digital_ocean.yml"));
-        let remaining_nodes_inventory_path =
-            PathBuf::from("inventory").join(format!(".{name}_node_inventory_digital_ocean.yml"));
-        if !genesis_inventory_path.exists() || !remaining_nodes_inventory_path.exists() {
-            return Err(Error::EnvironmentDoesNotExist(name.to_string()));
-        }
-
-        // Get the inventory of all the nodes
-        let mut all_node_inventory = self.ansible_runner.inventory_list(genesis_inventory_path)?;
-        all_node_inventory.extend(
-            self.ansible_runner
-                .inventory_list(remaining_nodes_inventory_path)?,
-        );
-        // Create a log dir per VM
-        all_node_inventory.par_iter().for_each(|(vm_name, _)| {
-            let vm_path = log_abs_dest.join(vm_name);
-            let _ = std::fs::create_dir_all(vm_path);
-        });
+        // take root_dir at the top as `get_all_node_inventory` changes the working dir.
+        let root_dir = std::env::current_dir()?;
+        let all_node_inventory = self.get_all_node_inventory(name)?;
+        let log_abs_dest = create_initial_log_dir_setup(&root_dir, name, &all_node_inventory)?;
 
         // Rsync args
         let mut rsync_args = vec![
@@ -156,6 +124,64 @@ impl TestnetDeploy {
         Ok(())
     }
 
+    pub async fn ripgrep_logs(&self, name: &str, query: &str) -> Result<()> {
+        // take root_dir at the top as `get_all_node_inventory` changes the working dir.
+        let root_dir = std::env::current_dir()?;
+        let all_node_inventory = self.get_all_node_inventory(name)?;
+        let log_abs_dest = create_initial_log_dir_setup(&root_dir, name, &all_node_inventory)?;
+
+        println!("Starting to run rg");
+        let progress_bar = get_progress_bar(all_node_inventory.len() as u64)?;
+        let ssh_client = self.ssh_client.clone_box();
+        let _failed_inventory = all_node_inventory
+            .par_iter()
+            .filter_map(|(vm_name, ip_address)| {
+                let op = match ssh_client.run_command(
+                    ip_address,
+                    "safe",
+                    format!("rg {query:?} .local/share/safe/").as_str(),
+                    true,
+                ) {
+                    Ok(output) => match Self::store_rg_output(&output, &log_abs_dest, vm_name) {
+                        Ok(_) => None,
+                        Err(err) => {
+                            println!("Failed store output for {ip_address:?} with: {err:?}");
+                            Some((vm_name, ip_address))
+                        }
+                    },
+                    Err(err) => {
+                        println!("Failed to run rg query for {ip_address:?} with: {err:?}");
+                        Some((vm_name, ip_address))
+                    }
+                };
+                progress_bar.inc(1);
+                op
+            })
+            .collect::<Vec<_>>();
+
+        Ok(())
+    }
+
+    fn store_rg_output(output: &[String], log_abs_dest: &Path, vm_name: &str) -> Result<()> {
+        std::fs::create_dir_all(log_abs_dest.join(vm_name))?;
+
+        // Get current date and time
+        let now = chrono::Utc::now();
+        let timestamp = now.format("%Y%m%dT%H%M%S").to_string();
+
+        let mut file = File::create(
+            log_abs_dest
+                .join(vm_name)
+                .join(format!("rg-{timestamp}.log")),
+        )?;
+
+        for line in output {
+            writeln!(file, "{}", line)?;
+        }
+
+        Ok(())
+    }
+
     /// Run an Ansible playbook to copy the logs from all the machines in the inventory.
     ///
     /// It needs to be part of `TestnetDeploy` because the Ansible runner is already setup in that
@@ -187,6 +213,37 @@ impl TestnetDeploy {
             )),
         )?;
         Ok(())
+    }
+
+    // Return the list of all the node machines.
+    fn get_all_node_inventory(&self, name: &str) -> Result<Vec<(String, IpAddr)>> {
+        let environments = self.terraform_runner.workspace_list()?;
+        if !environments.contains(&name.to_string()) {
+            return Err(Error::EnvironmentDoesNotExist(name.to_string()));
+        }
+
+        // The ansible runner will have its working directory set to this location. We need the
+        // same here to test the inventory paths, which are relative to the `ansible` directory.
+        let ansible_dir_path = self.working_directory_path.join("ansible");
+        std::env::set_current_dir(ansible_dir_path.clone())?;
+        // Somehow it might be possible that the workspace wasn't cleared out, but the environment
+        // was actually torn down and the generated inventory files were deleted. If the files
+        // don't exist, we can reasonably consider the environment non-existent.
+        let genesis_inventory_path =
+            PathBuf::from("inventory").join(format!(".{name}_genesis_inventory_digital_ocean.yml"));
+        let remaining_nodes_inventory_path =
+            PathBuf::from("inventory").join(format!(".{name}_node_inventory_digital_ocean.yml"));
+        if !genesis_inventory_path.exists() || !remaining_nodes_inventory_path.exists() {
+            return Err(Error::EnvironmentDoesNotExist(name.to_string()));
+        }
+
+        // Get the inventory of all the nodes
+        let mut all_node_inventory = self.ansible_runner.inventory_list(genesis_inventory_path)?;
+        all_node_inventory.extend(
+            self.ansible_runner
+                .inventory_list(remaining_nodes_inventory_path)?,
+        );
+        Ok(all_node_inventory)
     }
 }
 
@@ -298,4 +355,24 @@ fn visit_dirs(
         }
     }
     Ok(())
+}
+
+// Create the log dirs for all the machines. Returns the absolute path to the `logs/name`
+fn create_initial_log_dir_setup(
+    root_dir: &Path,
+    name: &str,
+    all_node_inventory: &[(String, IpAddr)],
+) -> Result<PathBuf> {
+    let log_dest = root_dir.join("logs").join(name);
+    if !log_dest.exists() {
+        std::fs::create_dir_all(&log_dest)?;
+    }
+    // Get the absolute path here. We might be changing the current_dir and we don't want to run into problems.
+    let log_abs_dest = std::fs::canonicalize(log_dest)?;
+    // Create a log dir per VM
+    all_node_inventory.par_iter().for_each(|(vm_name, _)| {
+        let vm_path = log_abs_dest.join(vm_name);
+        let _ = std::fs::create_dir_all(vm_path);
+    });
+    Ok(log_abs_dest)
 }
