@@ -37,14 +37,14 @@ while true; do
     count=$(find "$folder/record_store" -name '*' -not -name '*.pid' -type f | wc -l)
     con_count=$(ss -tunpa | grep ESTAB | grep =$pid -c)
     earned=$(
-      rg 'new wallet balance is [^,]*' $folder/logs --glob safe.* -o --no-line-number --no-filename |
-      awk -F' ' '/new wallet balance is /{print $5}' |
+      rg 'new wallet balance is [^,]*' $folder/logs -o --no-line-number --no-filename |
+      awk '{split($0, arr, " "); print arr[5]}' |
       sort -n |
       tail -n 1
     )
     store_cost=$(
-      rg 'Cost is now [^ ]*' $folder/logs --glob safe.* -o --no-line-number --no-filename |
-      awk -F' ' '/Cost is now /{print $4}' |
+      rg 'Cost is now [^ ]*' $folder/logs -o --no-line-number --no-filename |
+      awk '{split($0, arr, " "); print arr[4]}' |
       sort -n |
       tail -n 1
     )
