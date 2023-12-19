@@ -48,7 +48,7 @@ while true; do
       sort -n |
       tail -n 1
     )
-    printf "%-52s %-8s %-10s %-10s %-20s %-10s\n" \
+    printf "%-52s %-8s %-10s %-10s %-20s %-10s %-10s %-10s\n" \
       "$peer_id" \
       "$pid" \
       "$(awk "BEGIN {print $rss/1024}")" \
