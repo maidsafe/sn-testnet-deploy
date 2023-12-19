@@ -10,13 +10,15 @@ while true; do
   echo "Report for $(date)"
   echo "------------------------------------------------------"
   echo "Checking $(hostname) on $(hostname -I | awk '{print $1}')"
-  printf "%-52s %-8s %-10s %-10s %-20s %-10s\n" \
+  printf "%-52s %-8s %-10s %-10s %-20s %-10s %-10s %-10s\n" \
     "Node                                                " \
     "PID" \
     "Memory (MB)" \
     "CPU (%)" \
     "Record Count" \
-    "Connections"
+    "Connections" \
+    "earned" \
+    "store_cost"
   running_process_count=0
   for folder in $NODE_DATA_DIR_PATH/*; do
     if [ ! -d "$folder" ]; then continue; fi
@@ -34,13 +36,27 @@ while true; do
     cpu=$(top -b -n1 -p $pid | awk 'NR>7 {print $9}')
     count=$(find "$folder/record_store" -name '*' -not -name '*.pid' -type f | wc -l)
     con_count=$(ss -tunpa | grep ESTAB | grep =$pid -c)
+    earned=$(
+      rg 'new wallet balance is [^,]*' $folder/logs --glob safe.* -o --no-line-number --no-filename |
+      awk -F' ' '/new wallet balance is /{print $5}' |
+      sort -n |
+      tail -n 1
+    )
+    store_cost=$(
+      rg 'Cost is now [^ ]*' $folder/logs --glob safe.* -o --no-line-number --no-filename |
+      awk -F' ' '/Cost is now /{print $4}' |
+      sort -n |
+      tail -n 1
+    )
     printf "%-52s %-8s %-10s %-10s %-20s %-10s\n" \
       "$peer_id" \
       "$pid" \
       "$(awk "BEGIN {print $rss/1024}")" \
       "$cpu" \
       "$count" \
-      "$con_count"
+      "$con_count" \
+      "$earned" \
+      "$store_cost"
     running_process_count=$((running_process_count + 1))
   done
   echo "Total node processes: $running_process_count"
