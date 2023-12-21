@@ -10,15 +10,16 @@ while true; do
   echo "Report for $(date)"
   echo "------------------------------------------------------"
   echo "Checking $(hostname) on $(hostname -I | awk '{print $1}')"
-  printf "%-52s %-8s %-10s %-10s %-20s %-10s %-10s %-10s\n" \
+  printf "%-52s %-8s %-10s %-10s %-16s %-15s %-10s %-12s %-10s\n" \
     "Node                                                " \
     "PID" \
     "Memory (MB)" \
     "CPU (%)" \
     "Record Count" \
     "Connections" \
-    "earned" \
-    "store_cost"
+    "Earned" \
+    "Store Cost" \
+    "RT Nodes"
   running_process_count=0
   for folder in $NODE_DATA_DIR_PATH/*; do
     if [ ! -d "$folder" ]; then continue; fi
@@ -48,7 +49,13 @@ while true; do
       sort -n |
       tail -n 1
     )
-    printf "%-52s %-8s %-10s %-10s %-20s %-10s %-10s %-10s\n" \
+    rt_nodes=$(
+      rg 'kbuckets [^,]*' $folder/logs -o --no-line-number --no-filename |
+      awk '{split($0, arr, " "); print arr[2]}' |
+      sort -n |
+      tail -n 1
+    )
+    printf "%-52s %-8s %-11s %-13s %-16s %-12s %-13s %-12s %-10s\n" \
       "$peer_id" \
       "$pid" \
       "$(awk "BEGIN {print $rss/1024}")" \
@@ -56,7 +63,8 @@ while true; do
       "$count" \
       "$con_count" \
       "$earned" \
-      "$store_cost"
+      "$store_cost" \
+      "$rt_nodes"
     running_process_count=$((running_process_count + 1))
   done
   echo "Total node processes: $running_process_count"
