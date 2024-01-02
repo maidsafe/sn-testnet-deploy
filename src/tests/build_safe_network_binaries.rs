@@ -15,60 +15,6 @@ use std::net::{IpAddr, Ipv4Addr};
 use std::path::PathBuf;
 
 #[tokio::test]
-async fn should_run_ansible_to_only_build_the_faucet() -> Result<()> {
-    let (tmp_dir, working_dir) = setup_working_directory()?;
-    let s3_repository = setup_deploy_s3_repository("beta", &working_dir)?;
-    let mut ansible_runner = MockAnsibleRunnerInterface::new();
-    ansible_runner
-        .expect_inventory_list()
-        .times(1)
-        .with(eq(
-            PathBuf::from("inventory").join(".beta_build_inventory_digital_ocean.yml")
-        ))
-        .returning(|_| {
-            Ok(vec![(
-                "beta-build".to_string(),
-                IpAddr::V4(Ipv4Addr::new(10, 0, 0, 10)),
-            )])
-        });
-    ansible_runner
-        .expect_run_playbook()
-        .times(1)
-        .with(
-            eq(PathBuf::from("build.yml")),
-            eq(PathBuf::from("inventory").join(".beta_build_inventory_digital_ocean.yml")),
-            eq("root".to_string()),
-            eq(Some(
-                "{ \"custom_bin\": \"false\", \"testnet_name\": \"beta\" }".to_string(),
-            )),
-        )
-        .returning(|_, _, _, _| Ok(()));
-
-    let mut ssh_client = MockSshClientInterface::new();
-    ssh_client
-        .expect_wait_for_ssh_availability()
-        .times(1)
-        .with(eq(IpAddr::V4(Ipv4Addr::new(10, 0, 0, 10))), eq("root"))
-        .returning(|_, _| Ok(()));
-
-    let testnet = TestnetDeploy::new(
-        Box::new(setup_default_terraform_runner("beta")),
-        Box::new(ansible_runner),
-        Box::new(MockRpcClientInterface::new()),
-        Box::new(ssh_client),
-        working_dir.to_path_buf(),
-        CloudProvider::DigitalOcean,
-        Box::new(s3_repository),
-    );
-
-    testnet.init("beta").await?;
-    testnet.build_safe_network_binaries("beta", None).await?;
-
-    drop(tmp_dir);
-    Ok(())
-}
-
-#[tokio::test]
 async fn should_run_ansible_to_build_binaries_with_custom_branch() -> Result<()> {
     let (tmp_dir, working_dir) = setup_working_directory()?;
     let s3_repository = setup_deploy_s3_repository("beta", &working_dir)?;
@@ -119,7 +65,7 @@ async fn should_run_ansible_to_build_binaries_with_custom_branch() -> Result<()>
     testnet
         .build_safe_network_binaries(
             "beta",
-            Some(("maidsafe".to_string(), "custom_branch".to_string())),
+            ("maidsafe".to_string(), "custom_branch".to_string()),
         )
         .await?;
 

@@ -408,7 +408,7 @@ impl TestnetDeploy {
     pub async fn build_safe_network_binaries(
         &self,
         name: &str,
-        custom_branch_details: Option<(String, String)>,
+        custom_branch_details: (String, String),
     ) -> Result<()> {
         let start = Instant::now();
         println!("Obtaining IP address for build VM...");
@@ -559,18 +559,22 @@ impl TestnetDeploy {
         custom_version_details: Option<(String, String)>,
     ) -> Result<()> {
         let safenode_version = custom_version_details.as_ref().map(|x| x.0.clone());
-        self.create_infra(name, vm_count, true)
+        let enable_build_vm = custom_branch_details.is_some();
+
+        self.create_infra(name, vm_count, enable_build_vm)
             .await
             .map_err(|err| {
                 println!("Failed to create infra {err:?}");
                 err
             })?;
-        self.build_safe_network_binaries(name, custom_branch_details.clone())
-            .await
-            .map_err(|err| {
-                println!("Failed to build safe network binaries {err:?}");
-                err
-            })?;
+        if let Some(custom_branch) = &custom_branch_details {
+            self.build_safe_network_binaries(name, custom_branch.clone())
+                .await
+                .map_err(|err| {
+                    println!("Failed to build safe network binaries {err:?}");
+                    err
+                })?;
+        }
 
         self.provision_genesis_node(
             name,
@@ -697,7 +701,9 @@ impl TestnetDeploy {
 
         let mut vm_list = Vec::new();
         vm_list.push((genesis_inventory[0].0.clone(), genesis_inventory[0].1));
-        vm_list.push((build_inventory[0].0.clone(), build_inventory[0].1));
+        if !build_inventory.is_empty() {
+            vm_list.push((build_inventory[0].0.clone(), build_inventory[0].1));
+        }
         for entry in remaining_nodes_inventory.iter() {
             vm_list.push((entry.0.clone(), entry.1));
         }
@@ -861,6 +867,21 @@ impl TestnetDeploy {
         if let Some((repo_owner, branch)) = custom_branch_details {
             Self::add_value(&mut extra_vars, "branch", &branch);
             Self::add_value(&mut extra_vars, "org", &repo_owner);
+            Self::add_value(
+                &mut extra_vars,
+                "faucet_archive_url",
+                &format!(
+                    "https://sn-node.s3.eu-west-2.amazonaws.com/{}/{}/faucet-{}-x86_64-unknown-linux-musl.tar.gz",
+                    repo_owner,
+                    branch,
+                    name),
+            );
+        } else {
+            Self::add_value(
+                &mut extra_vars,
+                "faucet_archive_url",
+                "https://sn-faucet.s3.eu-west-2.amazonaws.com/faucet-latest-x86_64-unknown-linux-musl.tar.gz",
+            );
         }
 
         let mut extra_vars = extra_vars.strip_suffix(", ").unwrap().to_string();
@@ -911,18 +932,14 @@ impl TestnetDeploy {
     fn build_binaries_extra_vars_doc(
         &self,
         name: &str,
-        custom_branch_details: Option<(String, String)>,
+        (repo_owner, branch): (String, String),
     ) -> Result<String> {
         let mut extra_vars = String::new();
         extra_vars.push_str("{ ");
 
-        if let Some((repo_owner, branch)) = custom_branch_details {
-            Self::add_value(&mut extra_vars, "custom_bin", "true");
-            Self::add_value(&mut extra_vars, "branch", &branch);
-            Self::add_value(&mut extra_vars, "org", &repo_owner);
-        } else {
-            Self::add_value(&mut extra_vars, "custom_bin", "false");
-        }
+        Self::add_value(&mut extra_vars, "custom_bin", "true");
+        Self::add_value(&mut extra_vars, "branch", &branch);
+        Self::add_value(&mut extra_vars, "org", &repo_owner);
         Self::add_value(&mut extra_vars, "testnet_name", name);
 
         let mut extra_vars = extra_vars.strip_suffix(", ").unwrap().to_string();

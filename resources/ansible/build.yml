@@ -6,7 +6,8 @@
   roles:
     - {
         role: build_safe_network_binary,
-        bin_name: "faucet"
+        bin_name: "faucet",
+        when: custom_bin == "true"
       }
     - {
         role: build_safe_network_binary,
