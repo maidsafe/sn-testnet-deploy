@@ -139,6 +139,10 @@ impl AnsibleRunnerInterface for AnsibleRunner {
             .into_iter()
             .map(|(name, vars)| (name, vars.ansible_host))
             .collect();
+
+        if inventory.is_empty() {
+            return Err(Error::EmptyInventory(inventory_path));
+        }
         // Return the inventory.
         Ok(inventory)
     }
