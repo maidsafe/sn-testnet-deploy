@@ -4,6 +4,7 @@
 // This SAFE Network Software is licensed under the BSD-3-Clause license.
 // Please see the LICENSE file for more details.
 
+use std::path::PathBuf;
 use thiserror::Error;
 use tokio::task::JoinError;
 
@@ -36,6 +37,8 @@ pub enum Error {
     EnvironmentDoesNotExist(String),
     #[error("Command that executed with {0} failed. See output for details.")]
     ExternalCommandRunFailed(String),
+    #[error("The provided inventory file is empty or does not exists {0}")]
+    EmptyInventory(PathBuf),
     #[error("To provision the remaining nodes the multiaddr of the genesis node must be supplied")]
     GenesisMultiAddrNotSupplied,
     #[error("Failed to retrieve '{0}' from '{1}")]
