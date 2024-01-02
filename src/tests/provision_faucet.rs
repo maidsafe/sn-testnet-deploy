@@ -26,7 +26,7 @@ async fn should_run_ansible_against_the_remaining_nodes() -> Result<()> {
             eq(PathBuf::from("inventory").join(".beta_genesis_inventory_digital_ocean.yml")),
             eq("root".to_string()),
             eq(Some(
-                "{ \"provider\": \"digital-ocean\", \"testnet_name\": \"beta\", \"genesis_multiaddr\": \"/ip4/10.0.0.10/tcp/12000/p2p/12D3KooWLvmkUDQRthtZv9CrzozRLk9ZVEHXgmx6UxVMiho5aded\" }".to_string(),
+                "{ \"provider\": \"digital-ocean\", \"testnet_name\": \"beta\", \"genesis_multiaddr\": \"/ip4/10.0.0.10/tcp/12000/p2p/12D3KooWLvmkUDQRthtZv9CrzozRLk9ZVEHXgmx6UxVMiho5aded\", \"faucet_archive_url\": \"https://sn-faucet.s3.eu-west-2.amazonaws.com/faucet-latest-x86_64-unknown-linux-musl.tar.gz\" }".to_string(),
             )),
         )
         .returning(|_, _, _, _| Ok(()));
@@ -67,7 +67,7 @@ async fn should_run_ansible_against_the_remaining_nodes_with_a_custom_binary() -
             eq(PathBuf::from("inventory").join(".beta_genesis_inventory_digital_ocean.yml")),
             eq("root".to_string()),
             eq(Some(
-                "{ \"provider\": \"digital-ocean\", \"testnet_name\": \"beta\", \"genesis_multiaddr\": \"/ip4/10.0.0.10/tcp/12000/p2p/12D3KooWLvmkUDQRthtZv9CrzozRLk9ZVEHXgmx6UxVMiho5aded\", \"branch\": \"custom_branch\", \"org\": \"maidsafe\" }".to_string()
+                "{ \"provider\": \"digital-ocean\", \"testnet_name\": \"beta\", \"genesis_multiaddr\": \"/ip4/10.0.0.10/tcp/12000/p2p/12D3KooWLvmkUDQRthtZv9CrzozRLk9ZVEHXgmx6UxVMiho5aded\", \"branch\": \"custom_branch\", \"org\": \"maidsafe\", \"faucet_archive_url\": \"https://sn-node.s3.eu-west-2.amazonaws.com/maidsafe/custom_branch/faucet-beta-x86_64-unknown-linux-musl.tar.gz\" }".to_string(),
             )),
         )
         .returning(|_, _, _, _| Ok(()));
