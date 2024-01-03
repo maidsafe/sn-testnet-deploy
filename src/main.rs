@@ -8,6 +8,7 @@ use clap::{Parser, Subcommand};
 use color_eyre::{eyre::eyre, Help, Result};
 use dotenv::dotenv;
 use rand::Rng;
+use sn_testnet_deploy::deploy::DeployCmd;
 use sn_testnet_deploy::error::Error;
 use sn_testnet_deploy::logstash::LogstashDeployBuilder;
 use sn_testnet_deploy::manage_test_data::TestDataClientBuilder;
@@ -363,16 +364,16 @@ async fn main() -> Result<()> {
             let stack_hosts = logstash_deploy
                 .get_stack_hosts(&logstash_stack_name)
                 .await?;
-            testnet_deploy
-                .deploy(
-                    &name,
-                    (&logstash_stack_name, &stack_hosts),
-                    vm_count,
-                    node_count,
-                    custom_branch_details,
-                    custom_version_details,
-                )
-                .await?;
+            let deploy_cmd = DeployCmd::new(
+                testnet_deploy,
+                name,
+                node_count,
+                vm_count,
+                (logstash_stack_name, stack_hosts),
+                custom_branch_details,
+                custom_version_details,
+            );
+            deploy_cmd.deploy().await?;
             Ok(())
         }
         Some(Commands::Inventory {
