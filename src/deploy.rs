@@ -6,7 +6,7 @@
 
 use crate::{
     error::{Error, Result},
-    print_duration, TestnetDeploy,
+    print_duration, SnCodebaseType, TestnetDeploy,
 };
 use std::{net::SocketAddr, path::PathBuf, time::Instant};
 
@@ -16,10 +16,7 @@ pub struct DeployCmd {
     node_count: u16,
     vm_count: u16,
     logstash_details: (String, Vec<SocketAddr>),
-    // (repo_owner, branch)
-    custom_branch_details: Option<(String, String)>,
-    // (safe_version, safenode_version)
-    custom_version_details: Option<(String, String)>,
+    sn_codebase_type: SnCodebaseType,
 }
 
 impl DeployCmd {
@@ -30,8 +27,7 @@ impl DeployCmd {
         node_count: u16,
         vm_count: u16,
         logstash_details: (String, Vec<SocketAddr>),
-        custom_branch_details: Option<(String, String)>,
-        custom_version_details: Option<(String, String)>,
+        sn_codebase_type: SnCodebaseType,
     ) -> Self {
         Self {
             testnet_deploy,
@@ -39,19 +35,25 @@ impl DeployCmd {
             node_count,
             vm_count,
             logstash_details,
-            custom_branch_details,
-            custom_version_details,
+            sn_codebase_type,
         }
     }
 
     pub async fn deploy(self) -> Result<()> {
-        self.create_infra(self.custom_branch_details.is_some())
+        let build_custom_binaries = {
+            match &self.sn_codebase_type {
+                SnCodebaseType::Main { safenode_features } => safenode_features.is_some(),
+                SnCodebaseType::CustomBranch { .. } => true,
+                SnCodebaseType::PreBuiltBinary { .. } => false,
+            }
+        };
+        self.create_infra(build_custom_binaries)
             .await
             .map_err(|err| {
                 println!("Failed to create infra {err:?}");
                 err
             })?;
-        if self.custom_branch_details.is_some() {
+        if build_custom_binaries {
             self.build_safe_network_binaries().await.map_err(|err| {
                 println!("Failed to build safe network binaries {err:?}");
                 err
@@ -96,8 +98,7 @@ impl DeployCmd {
             .list_inventory(
                 &self.name,
                 true,
-                self.custom_branch_details,
-                self.custom_version_details,
+                self.sn_codebase_type,
                 Some(self.node_count),
             )
             .await
@@ -234,12 +235,36 @@ impl DeployCmd {
         let mut extra_vars = String::new();
         extra_vars.push_str("{ ");
 
-        Self::add_value(&mut extra_vars, "custom_bin", "true");
-        Self::add_value(&mut extra_vars, "testnet_name", &self.name);
-        if let Some((repo_owner, branch)) = &self.custom_branch_details {
-            Self::add_value(&mut extra_vars, "branch", branch);
-            Self::add_value(&mut extra_vars, "org", repo_owner);
-        }
+        match &self.sn_codebase_type {
+            SnCodebaseType::Main { safenode_features } => {
+                if let Some(features) = safenode_features {
+                    Self::add_value(&mut extra_vars, "custom_bin", "true");
+                    Self::add_value(&mut extra_vars, "testnet_name", &self.name);
+                    // Manually specifying the default value from ansible cfg to make things clear.
+                    Self::add_value(&mut extra_vars, "org", "maidsafe");
+                    Self::add_value(&mut extra_vars, "branch", "main");
+                    Self::add_value(&mut extra_vars, "safenode_features_list", features);
+                } else {
+                    Self::add_value(&mut extra_vars, "custom_bin", "false");
+                }
+            }
+            SnCodebaseType::CustomBranch {
+                repo_owner,
+                branch,
+                safenode_features,
+            } => {
+                Self::add_value(&mut extra_vars, "custom_bin", "true");
+                Self::add_value(&mut extra_vars, "testnet_name", &self.name);
+                Self::add_value(&mut extra_vars, "org", repo_owner);
+                Self::add_value(&mut extra_vars, "branch", branch);
+                if let Some(features) = safenode_features {
+                    Self::add_value(&mut extra_vars, "safenode_features_list", features);
+                }
+            }
+            SnCodebaseType::PreBuiltBinary { .. } => {
+                Self::add_value(&mut extra_vars, "custom_bin", "false");
+            }
+        };
 
         let mut extra_vars = extra_vars.strip_suffix(", ").unwrap().to_string();
         extra_vars.push_str(" }");
@@ -274,26 +299,37 @@ impl DeployCmd {
                 &node_instance_count.unwrap_or(20).to_string(),
             );
         }
-        if let Some((repo_owner, branch)) = &self.custom_branch_details {
-            Self::add_value(
-            &mut extra_vars,
-            "node_archive_url",
-            &format!(
-                "https://sn-node.s3.eu-west-2.amazonaws.com/{}/{}/safenode-{}-x86_64-unknown-linux-musl.tar.gz",
-                repo_owner,
-                branch,
-                self.name),
-        );
-        }
-        if let Some((_, safenode_version)) = &self.custom_version_details {
-            Self::add_value(
-            &mut extra_vars,
-            "node_archive_url",
-            &format!(
-                "https://github.com/maidsafe/safe_network/releases/download/sn_node-v{safenode_version}/safenode-{safenode_version}-x86_64-unknown-linux-musl.tar.gz",
-            ),
-        );
-        }
+
+        let node_archive_url = match &self.sn_codebase_type {
+            SnCodebaseType::Main { safenode_features } => {
+                if safenode_features.is_some() {
+                    format!(
+                        "https://sn-node.s3.eu-west-2.amazonaws.com/maidsafe/main/safenode-{}-x86_64-unknown-linux-musl.tar.gz",
+                        self.name)
+                } else {
+                    // This value is predefined inside ansible cfg, but manually writing it down for clarity.
+                    // Get the default
+                    "https://sn-node.s3.eu-west-2.amazonaws.com/safenode-latest-x86_64-unknown-linux-musl.tar.gz".to_string()
+                }
+            }
+            SnCodebaseType::CustomBranch {
+                repo_owner, branch, ..
+            } => {
+                format!(
+                    "https://sn-node.s3.eu-west-2.amazonaws.com/{}/{}/safenode-{}-x86_64-unknown-linux-musl.tar.gz",
+                    repo_owner,
+                    branch,
+                    self.name)
+            }
+            SnCodebaseType::PreBuiltBinary {
+                safenode_version, ..
+            } => {
+                format!(
+                    "https://github.com/maidsafe/safe_network/releases/download/sn_node-v{safenode_version}/safenode-{safenode_version}-x86_64-unknown-linux-musl.tar.gz",
+                )
+            }
+        };
+        Self::add_value(&mut extra_vars, "node_archive_url", &node_archive_url);
 
         let (logstash_stack_name, logstash_hosts) = &self.logstash_details;
         Self::add_value(&mut extra_vars, "logstash_stack_name", logstash_stack_name);
@@ -316,24 +352,29 @@ impl DeployCmd {
         );
         Self::add_value(&mut extra_vars, "testnet_name", &self.name);
         Self::add_value(&mut extra_vars, "genesis_multiaddr", genesis_multiaddr);
-        if let Some((repo_owner, branch)) = &self.custom_branch_details {
-            Self::add_value(&mut extra_vars, "branch", branch);
-            Self::add_value(&mut extra_vars, "org", repo_owner);
-            Self::add_value(
-            &mut extra_vars,
-            "faucet_archive_url",
-            &format!(
-                "https://sn-node.s3.eu-west-2.amazonaws.com/{}/{}/faucet-{}-x86_64-unknown-linux-musl.tar.gz",
-                repo_owner,
-                branch,
-                &self.name),
-        );
-        } else {
-            Self::add_value(
-            &mut extra_vars,
-            "faucet_archive_url",
-            "https://sn-faucet.s3.eu-west-2.amazonaws.com/faucet-latest-x86_64-unknown-linux-musl.tar.gz",
-        );
+        match &self.sn_codebase_type {
+            SnCodebaseType::CustomBranch {
+                repo_owner, branch, ..
+            } => {
+                Self::add_value(&mut extra_vars, "branch", branch);
+                Self::add_value(&mut extra_vars, "org", repo_owner);
+                Self::add_value(
+                &mut extra_vars,
+                "faucet_archive_url",
+                &format!(
+                    "https://sn-node.s3.eu-west-2.amazonaws.com/{}/{}/faucet-{}-x86_64-unknown-linux-musl.tar.gz",
+                    repo_owner,
+                    branch,
+                    &self.name),
+            );
+            }
+            _ => {
+                Self::add_value(
+                    &mut extra_vars,
+                    "faucet_archive_url",
+                    "https://sn-faucet.s3.eu-west-2.amazonaws.com/faucet-latest-x86_64-unknown-linux-musl.tar.gz",
+                );
+            }
         }
 
         let mut extra_vars = extra_vars.strip_suffix(", ").unwrap().to_string();
@@ -351,24 +392,28 @@ impl DeployCmd {
         );
         Self::add_value(&mut extra_vars, "testnet_name", &self.name);
         Self::add_value(&mut extra_vars, "genesis_multiaddr", genesis_multiaddr);
-        if let Some((repo_owner, branch)) = &self.custom_branch_details {
-            Self::add_value(&mut extra_vars, "branch", branch);
-            Self::add_value(&mut extra_vars, "org", repo_owner);
-            Self::add_value(
-            &mut extra_vars,
-            "safenode_rpc_client_archive_url",
-            &format!(
-                "https://sn-node.s3.eu-west-2.amazonaws.com/{}/{}/safenode_rpc_client-{}-x86_64-unknown-linux-musl.tar.gz",
-                repo_owner,
-                branch,
-                &self.name),
-        );
-        } else {
-            Self::add_value(
-            &mut extra_vars,
-            "safenode_rpc_client_archive_url",
-            "https://sn-node-rpc-client.s3.eu-west-2.amazonaws.com/safenode_rpc_client-latest-x86_64-unknown-linux-musl.tar.gz",
-        );
+        match &self.sn_codebase_type {
+            SnCodebaseType::CustomBranch {
+                repo_owner, branch, ..
+            } => {
+                Self::add_value(&mut extra_vars, "branch", branch);
+                Self::add_value(&mut extra_vars, "org", repo_owner);
+                Self::add_value(
+                &mut extra_vars,
+                "safenode_rpc_client_archive_url",
+                &format!(
+                    "https://sn-node.s3.eu-west-2.amazonaws.com/{}/{}/safenode_rpc_client-{}-x86_64-unknown-linux-musl.tar.gz",
+                    repo_owner,
+                    branch,
+                    &self.name),
+            );
+            }
+            _ => {
+                Self::add_value(
+                    &mut extra_vars,
+                    "safenode_rpc_client_archive_url",
+                    "https://sn-node-rpc-client.s3.eu-west-2.amazonaws.com/safenode_rpc_client-latest-x86_64-unknown-linux-musl.tar.gz",);
+            }
         }
 
         let mut extra_vars = extra_vars.strip_suffix(", ").unwrap().to_string();

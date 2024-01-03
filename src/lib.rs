@@ -47,6 +47,25 @@ use std::{
 };
 use tar::Archive;
 
+/// How or where to build the binaries from.
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub enum SnCodebaseType {
+    Main {
+        // CSV of features to enable on main::safenode
+        safenode_features: Option<String>,
+    },
+    CustomBranch {
+        repo_owner: String,
+        branch: String,
+        // CSV of features to enable on the custom branch::safenode
+        safenode_features: Option<String>,
+    },
+    PreBuiltBinary {
+        safe_version: String,
+        safenode_version: String,
+    },
+}
+
 #[derive(Debug, Clone)]
 pub enum CloudProvider {
     Aws,
@@ -74,8 +93,7 @@ impl CloudProvider {
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct DeploymentInventory {
     pub name: String,
-    pub version_info: Option<(String, String)>,
-    pub branch_info: Option<(String, String)>,
+    pub sn_codebase_type: SnCodebaseType,
     pub vm_list: Vec<(String, IpAddr)>,
     pub rpc_endpoints: Vec<SocketAddr>,
     pub node_count: u16,
@@ -119,16 +137,25 @@ impl DeploymentInventory {
         println!("**************************************");
 
         println!("Name: {}", self.name);
-        if let Some((repo_owner, branch)) = &self.branch_info {
-            println!("Branch Details");
-            println!("==============");
-            println!("Repo owner: {}", repo_owner);
-            println!("Branch name: {}", branch);
-        } else if let Some((safenode_version, safe_version)) = &self.version_info {
-            println!("Version Details");
-            println!("===============");
-            println!("safenode version: {}", safenode_version);
-            println!("safe version: {}", safe_version);
+        match &self.sn_codebase_type {
+            SnCodebaseType::Main { .. } => {}
+            SnCodebaseType::CustomBranch {
+                repo_owner, branch, ..
+            } => {
+                println!("Branch Details");
+                println!("==============");
+                println!("Repo owner: {}", repo_owner);
+                println!("Branch name: {}", branch);
+            }
+            SnCodebaseType::PreBuiltBinary {
+                safe_version,
+                safenode_version,
+            } => {
+                println!("Version Details");
+                println!("===============");
+                println!("safenode version: {}", safenode_version);
+                println!("safe version: {}", safe_version);
+            }
         }
 
         for vm in self.vm_list.iter() {
@@ -413,8 +440,7 @@ impl TestnetDeploy {
         &self,
         name: &str,
         force_regeneration: bool,
-        custom_branch_info: Option<(String, String)>,
-        version_info: Option<(String, String)>,
+        sn_codebase_type: SnCodebaseType,
         node_instance_count: Option<u16>,
     ) -> Result<()> {
         let inventory_path = get_data_directory()?.join(format!("{name}-inventory.json"));
@@ -517,8 +543,7 @@ impl TestnetDeploy {
         node_count += 1;
         let inventory = DeploymentInventory {
             name: name.to_string(),
-            branch_info: custom_branch_info,
-            version_info,
+            sn_codebase_type,
             vm_list,
             rpc_endpoints,
             node_count,
@@ -717,15 +742,25 @@ pub async fn notify_slack(inventory: DeploymentInventory) -> Result<()> {
     message.push_str(&format!("Name: {}\n", inventory.name));
     message.push_str(&format!("Node count: {}\n", inventory.node_count));
     message.push_str(&format!("Faucet address: {}\n", inventory.faucet_address));
-    if let Some((repo_owner, branch)) = inventory.branch_info {
-        message.push_str("*Branch Details*\n");
-        message.push_str(&format!("Repo owner: {}\n", repo_owner));
-        message.push_str(&format!("Branch: {}\n", branch));
-    } else if let Some((safenode_version, safe_version)) = inventory.version_info {
-        message.push_str("*Version Details*\n");
-        message.push_str(&format!("safenode version: {}\n", safenode_version));
-        message.push_str(&format!("safe version: {}\n", safe_version));
+    match inventory.sn_codebase_type {
+        SnCodebaseType::Main { .. } => {}
+        SnCodebaseType::CustomBranch {
+            repo_owner, branch, ..
+        } => {
+            message.push_str("*Branch Details*\n");
+            message.push_str(&format!("Repo owner: {}\n", repo_owner));
+            message.push_str(&format!("Branch: {}\n", branch));
+        }
+        SnCodebaseType::PreBuiltBinary {
+            safe_version,
+            safenode_version,
+        } => {
+            message.push_str("*Version Details*\n");
+            message.push_str(&format!("safenode version: {}\n", safenode_version));
+            message.push_str(&format!("safe version: {}\n", safe_version));
+        }
     }
+
     message.push_str("*Sample Peers*\n");
     message.push_str("```\n");
     for peer in inventory.peers.iter().take(20) {

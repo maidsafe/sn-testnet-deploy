@@ -15,7 +15,7 @@ use sn_testnet_deploy::manage_test_data::TestDataClientBuilder;
 use sn_testnet_deploy::setup::setup_dotenv_file;
 use sn_testnet_deploy::{
     get_data_directory, get_wallet_directory, notify_slack, CloudProvider, DeploymentInventory,
-    TestnetDeployBuilder,
+    SnCodebaseType, TestnetDeployBuilder,
 };
 
 pub fn parse_provider(val: &str) -> Result<CloudProvider> {
@@ -48,6 +48,30 @@ enum Commands {
     },
     /// Deploy a new testnet environment using the latest version of the safenode binary.
     Deploy {
+        /// The name of the environment
+        #[arg(short = 'n', long)]
+        name: String,
+        /// The number of safenode processes to run on each VM.
+        #[clap(long, default_value = "20")]
+        node_count: u16,
+        /// The number of node VMs to create.
+        ///
+        /// Each VM will run many safenode processes.
+        #[clap(long, default_value = "10")]
+        vm_count: u16,
+        /// The cloud provider to deploy to.
+        ///
+        /// Valid values are "aws" or "digital-ocean".
+        #[clap(long, default_value_t = CloudProvider::DigitalOcean, value_parser = parse_provider, verbatim_doc_comment)]
+        provider: CloudProvider,
+        /// The name of the Logstash stack to forward logs to.
+        #[clap(long, default_value = "main")]
+        logstash_stack_name: String,
+        /// The features to enable on the safenode instance
+        ///
+        /// If not provided, the default feature set specified for the safenode binary are used.
+        #[clap(long)]
+        safenode_features: Option<Vec<String>>,
         /// Optionally supply the name of a branch on the Github repository to be used for the
         /// safenode binary. A safenode binary will be built from this repository.
         ///
@@ -58,20 +82,6 @@ enum Commands {
         /// branch, not both.
         #[arg(long)]
         branch: Option<String>,
-        /// The name of the Logstash stack to forward logs to.
-        #[clap(long, default_value = "main")]
-        logstash_stack_name: String,
-        /// The name of the environment
-        #[arg(short = 'n', long)]
-        name: String,
-        /// The number of safenode processes to run on each VM.
-        #[clap(long, default_value = "20")]
-        node_count: u16,
-        /// The cloud provider to deploy to.
-        ///
-        /// Valid values are "aws" or "digital-ocean".
-        #[clap(long, default_value_t = CloudProvider::DigitalOcean, value_parser = parse_provider, verbatim_doc_comment)]
-        provider: CloudProvider,
         /// Optionally supply the owner or organisation of the Github repository to be used for the
         /// safenode binary. A safenode binary will be built from this repository.
         ///
@@ -102,11 +112,6 @@ enum Commands {
         /// --branch and --repo-owner arguments. You can only supply version numbers or a custom
         /// branch, not both.
         safenode_version: Option<String>,
-        /// The number of node VMs to create.
-        ///
-        /// Each VM will run many safenode processes.
-        #[clap(long, default_value = "10")]
-        vm_count: u16,
     },
     Inventory {
         /// The name of the environment
@@ -317,21 +322,23 @@ async fn main() -> Result<()> {
             Ok(())
         }
         Some(Commands::Deploy {
-            branch,
-            logstash_stack_name,
             name,
             node_count,
+            vm_count,
             provider,
+            safenode_features,
+            branch,
             repo_owner,
+            logstash_stack_name,
             safe_version,
             safenode_version,
-            vm_count,
         }) => {
-            let (custom_branch_details, custom_version_details) = validate_branch_and_version_args(
+            let sn_codebase_type = get_sn_codebase_type(
                 branch,
                 repo_owner,
                 safenode_version,
                 safe_version,
+                safenode_features,
             )?;
 
             let testnet_deploy = TestnetDeployBuilder::default()
@@ -370,8 +377,7 @@ async fn main() -> Result<()> {
                 node_count,
                 vm_count,
                 (logstash_stack_name, stack_hosts),
-                custom_branch_details,
-                custom_version_details,
+                sn_codebase_type,
             );
             deploy_cmd.deploy().await?;
             Ok(())
@@ -385,22 +391,12 @@ async fn main() -> Result<()> {
             safe_version,
             safenode_version,
         }) => {
-            let (custom_branch_details, custom_version_details) = validate_branch_and_version_args(
-                branch,
-                repo_owner,
-                safenode_version,
-                safe_version,
-            )?;
+            let sn_codebase_type =
+                get_sn_codebase_type(branch, repo_owner, safenode_version, safe_version, None)?;
 
             let testnet_deploy = TestnetDeployBuilder::default().provider(provider).build()?;
             testnet_deploy
-                .list_inventory(
-                    &name,
-                    false,
-                    custom_branch_details,
-                    custom_version_details,
-                    node_count,
-                )
+                .list_inventory(&name, false, sn_codebase_type, node_count)
                 .await?;
             Ok(())
         }
@@ -518,15 +514,9 @@ async fn main() -> Result<()> {
             let i = rng.gen_range(0..inventory.peers.len());
             let random_peer = &inventory.peers[i];
 
-            let safe_version = inventory.version_info.as_ref().map(|x| x.1.clone());
             let test_data_client = TestDataClientBuilder::default().build()?;
             let uploaded_files = test_data_client
-                .upload_test_data(
-                    &name,
-                    random_peer,
-                    inventory.branch_info.clone(),
-                    safe_version,
-                )
+                .upload_test_data(&name, random_peer, &inventory.sn_codebase_type)
                 .await?;
 
             println!("Uploaded files:");
@@ -542,27 +532,28 @@ async fn main() -> Result<()> {
     }
 }
 
-/// Clippy complains the return type here is too complicated.
-///
-/// It is convoluted, but it's just a way to share the validation of the same arguments between two
-/// commands. In my opinion, it does not merit introducing some kind of type to wrap the data.
+// Validate the branch and version args along with the feature list
 #[allow(clippy::type_complexity)]
-fn validate_branch_and_version_args(
+fn get_sn_codebase_type(
     branch: Option<String>,
     repo_owner: Option<String>,
     safe_version: Option<String>,
     safenode_version: Option<String>,
-) -> Result<(Option<(String, String)>, Option<(String, String)>)> {
-    if (repo_owner.is_some() && branch.is_none()) || (branch.is_some() && repo_owner.is_none()) {
+    safenode_features: Option<Vec<String>>,
+) -> Result<SnCodebaseType> {
+    if let (Some(_), None) | (None, Some(_)) = (&repo_owner, &branch) {
         return Err(eyre!(
-            "Both the repository owner and branch name must be supplied if either are used"
+            "Both 'repository owner' and 'branch name' must be supplied together."
         ));
     }
-    if (safe_version.is_some() && safenode_version.is_none())
-        || (safenode_version.is_some() && safe_version.is_none())
-    {
+    if let (Some(_), None) | (None, Some(_)) = (&safe_version, &safenode_version) {
         return Err(eyre!(
-            "Both the safe and safenode versions must be supplied if either are used"
+            "Both 'safe' and 'safenode' versions must be supplied together."
+        ));
+    }
+    if safe_version.is_some() && safenode_features.is_some() {
+        return Err(eyre!(
+            "Cannot enable custom safenode features if the 'safe, safenode' versions are provided."
         ));
     }
 
@@ -580,9 +571,23 @@ fn validate_branch_and_version_args(
         ));
     }
 
-    let custom_branch_details = repo_owner.map(|repo_owner| (repo_owner, branch.unwrap()));
-    let custom_version_details =
-        safe_version.map(|safe_version| (safe_version, safenode_version.unwrap()));
+    // get the CSV features list
+    let safenode_features = safenode_features.map(|list| list.join(","));
 
-    Ok((custom_branch_details, custom_version_details))
+    let codebase_type = if let (Some(repo_owner), Some(branch)) = (repo_owner, branch) {
+        SnCodebaseType::CustomBranch {
+            repo_owner,
+            branch,
+            safenode_features,
+        }
+    } else if let (Some(safe_version), Some(safenode_version)) = (safe_version, safenode_version) {
+        SnCodebaseType::PreBuiltBinary {
+            safe_version,
+            safenode_version,
+        }
+    } else {
+        SnCodebaseType::Main { safenode_features }
+    };
+
+    Ok(codebase_type)
 }
