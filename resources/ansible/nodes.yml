@@ -32,8 +32,7 @@
     - node
     - role: resource_usage
       become: True
-    - role: filebeat-config
-      become: True
+
   tasks:
     # Something is wrong with the journal service on Ubuntu that causes no
     # output to be produced when running `journalctl`. The solution seemed
