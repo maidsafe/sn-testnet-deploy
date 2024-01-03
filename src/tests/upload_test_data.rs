@@ -5,8 +5,11 @@
 // Please see the LICENSE file for more details.
 
 use super::setup::*;
-use crate::manage_test_data::TestDataClient;
-use crate::safe::{MockSafeBinaryRepositoryInterface, MockSafeClientInterface};
+use crate::{
+    manage_test_data::TestDataClient,
+    safe::{MockSafeBinaryRepositoryInterface, MockSafeClientInterface},
+    SnCodebaseType,
+};
 use assert_fs::prelude::*;
 use color_eyre::Result;
 use mockall::predicate::*;
@@ -41,12 +44,16 @@ async fn should_download_and_extract_the_custom_branch_safe_binary() -> Result<(
         Box::new(MockSafeBinaryRepositoryInterface::new()),
     );
 
+    let sn_codebase_type = SnCodebaseType::CustomBranch {
+        repo_owner: "jacderida".to_string(),
+        branch: "custom_branch".to_string(),
+        safenode_features: None,
+    };
     test_data_client
         .upload_test_data(
             "alpha",
             "/ip4/10.0.0.1/tcp/43627/p2p/12D3KooWAsY69M1HYAsvwsrF9BkQRywM6CWDvM78m1k92CPco7qr",
-            Some(("jacderida".to_string(), "custom_branch".to_string())),
-            None,
+            &sn_codebase_type,
         )
         .await?;
 
@@ -75,12 +82,15 @@ async fn should_download_and_extract_the_versioned_safe_binary() -> Result<()> {
         Box::new(safe_binary_repository),
     );
 
+    let sn_codebase_type = SnCodebaseType::PreBuiltBinary {
+        safe_version: "0.82.1".to_string(),
+        safenode_version: "ignored".to_string(),
+    };
     test_data_client
         .upload_test_data(
             "alpha",
             "/ip4/10.0.0.1/tcp/43627/p2p/12D3KooWAsY69M1HYAsvwsrF9BkQRywM6CWDvM78m1k92CPco7qr",
-            None,
-            Some("0.82.1".to_string()),
+            &sn_codebase_type,
         )
         .await?;
 
@@ -114,12 +124,16 @@ async fn should_download_and_extract_the_test_data() -> Result<()> {
         Box::new(MockSafeBinaryRepositoryInterface::new()),
     );
 
+    let sn_codebase_type = SnCodebaseType::CustomBranch {
+        repo_owner: "maidsafe".to_string(),
+        branch: "main".to_string(),
+        safenode_features: None,
+    };
     test_data_client
         .upload_test_data(
             "alpha",
             "/ip4/10.0.0.1/tcp/43627/p2p/12D3KooWAsY69M1HYAsvwsrF9BkQRywM6CWDvM78m1k92CPco7qr",
-            Some(("maidsafe".to_string(), "main".to_string())),
-            None,
+            &sn_codebase_type,
         )
         .await?;
 
@@ -182,12 +196,16 @@ async fn should_upload_test_data_files() -> Result<()> {
         Box::new(MockSafeBinaryRepositoryInterface::new()),
     );
 
+    let sn_codebase_type = SnCodebaseType::CustomBranch {
+        repo_owner: "maidsafe".to_string(),
+        branch: "main".to_string(),
+        safenode_features: None,
+    };
     let download_links = test_data_client
         .upload_test_data(
             "alpha",
             "/ip4/10.0.0.1/tcp/43627/p2p/12D3KooWAsY69M1HYAsvwsrF9BkQRywM6CWDvM78m1k92CPco7qr",
-            Some(("maidsafe".to_string(), "main".to_string())),
-            None,
+            &sn_codebase_type,
         )
         .await?;
 

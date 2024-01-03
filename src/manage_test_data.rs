@@ -5,12 +5,12 @@
 // Please see the LICENSE file for more details.
 
 use crate::error::{Error, Result};
-use crate::get_and_extract_archive_from_s3;
 use crate::s3::{S3Repository, S3RepositoryInterface};
 use crate::safe::{
     SafeBinaryRepository, SafeBinaryRepositoryInterface, SafeClient, SafeClientInterface,
 };
 use crate::{extract_archive, DeploymentInventory};
+use crate::{get_and_extract_archive_from_s3, SnCodebaseType};
 use rand::Rng;
 use sha2::{Digest, Sha256};
 use std::collections::HashMap;
@@ -85,22 +85,28 @@ impl TestDataClient {
     }
 
     pub async fn smoke_test(&self, inventory: &mut DeploymentInventory) -> Result<()> {
-        if let Some((repo_owner, branch)) = &inventory.branch_info {
-            Self::download_and_extract_safe_client_from_s3(
-                &*self.s3_repository,
-                &inventory.name,
-                &self.working_directory_path,
-                repo_owner,
-                branch,
-            )
-            .await?;
-        } else if let Some((_, version)) = &inventory.version_info {
-            Self::download_and_extract_safe_client_from_url(
-                &*self.safe_binary_repository,
-                version,
-                &self.working_directory_path,
-            )
-            .await?;
+        match &inventory.sn_codebase_type {
+            crate::SnCodebaseType::Main { .. } => {}
+            crate::SnCodebaseType::CustomBranch {
+                repo_owner, branch, ..
+            } => {
+                Self::download_and_extract_safe_client_from_s3(
+                    &*self.s3_repository,
+                    &inventory.name,
+                    &self.working_directory_path,
+                    repo_owner,
+                    branch,
+                )
+                .await?;
+            }
+            crate::SnCodebaseType::PreBuiltBinary { safe_version, .. } => {
+                Self::download_and_extract_safe_client_from_url(
+                    &*self.safe_binary_repository,
+                    safe_version,
+                    &self.working_directory_path,
+                )
+                .await?;
+            }
         }
 
         let faucet_addr: SocketAddr = inventory.faucet_address.parse()?;
@@ -175,25 +181,40 @@ impl TestDataClient {
         &self,
         name: &str,
         peer_multiaddr: &str,
-        branch_info: Option<(String, String)>,
-        safe_version: Option<String>,
+        sn_codebase_type: &SnCodebaseType,
     ) -> Result<Vec<(String, String)>> {
-        if let Some((repo_owner, branch)) = branch_info {
-            Self::download_and_extract_safe_client_from_s3(
-                &*self.s3_repository,
-                name,
-                &self.working_directory_path,
-                &repo_owner,
-                &branch,
-            )
-            .await?;
-        } else if let Some(version) = safe_version {
-            Self::download_and_extract_safe_client_from_url(
-                &*self.safe_binary_repository,
-                &version,
-                &self.working_directory_path,
-            )
-            .await?;
+        match sn_codebase_type {
+            SnCodebaseType::Main { .. } => {
+                Self::download_and_extract_safe_client_from_url(
+                    &*self.safe_binary_repository,
+                    "latest",
+                    &self.working_directory_path,
+                )
+                .await?;
+            }
+            SnCodebaseType::CustomBranch {
+                repo_owner, branch, ..
+            } => {
+                Self::download_and_extract_safe_client_from_s3(
+                    &*self.s3_repository,
+                    name,
+                    &self.working_directory_path,
+                    repo_owner,
+                    branch,
+                )
+                .await?;
+            }
+            SnCodebaseType::PreBuiltBinary {
+                safe_version,
+                safenode_version: _,
+            } => {
+                Self::download_and_extract_safe_client_from_url(
+                    &*self.safe_binary_repository,
+                    safe_version,
+                    &self.working_directory_path,
+                )
+                .await?;
+            }
         }
 
         println!("Downloading test data archive from S3...");

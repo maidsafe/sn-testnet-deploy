@@ -2,3 +2,5 @@ bin_name: safenode
 org: maidsafe
 branch: main
 bin_archive_filename: "{{ bin_name }}-{{ testnet_name }}-x86_64-unknown-linux-musl.tar.gz"
+# csv of the features that you want to enable on safenode. By default, none of the features are enabled.
+safenode_features_list: ""
