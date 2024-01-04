@@ -44,7 +44,7 @@ async fn should_download_and_extract_the_custom_branch_safe_binary() -> Result<(
         Box::new(MockSafeBinaryRepositoryInterface::new()),
     );
 
-    let sn_codebase_type = SnCodebaseType::CustomBranch {
+    let sn_codebase_type = SnCodebaseType::Branch {
         repo_owner: "jacderida".to_string(),
         branch: "custom_branch".to_string(),
         safenode_features: None,
@@ -82,7 +82,7 @@ async fn should_download_and_extract_the_versioned_safe_binary() -> Result<()> {
         Box::new(safe_binary_repository),
     );
 
-    let sn_codebase_type = SnCodebaseType::PreBuiltBinary {
+    let sn_codebase_type = SnCodebaseType::Versioned {
         safe_version: "0.82.1".to_string(),
         safenode_version: "ignored".to_string(),
     };
@@ -124,7 +124,7 @@ async fn should_download_and_extract_the_test_data() -> Result<()> {
         Box::new(MockSafeBinaryRepositoryInterface::new()),
     );
 
-    let sn_codebase_type = SnCodebaseType::CustomBranch {
+    let sn_codebase_type = SnCodebaseType::Branch {
         repo_owner: "maidsafe".to_string(),
         branch: "main".to_string(),
         safenode_features: None,
@@ -196,7 +196,7 @@ async fn should_upload_test_data_files() -> Result<()> {
         Box::new(MockSafeBinaryRepositoryInterface::new()),
     );
 
-    let sn_codebase_type = SnCodebaseType::CustomBranch {
+    let sn_codebase_type = SnCodebaseType::Branch {
         repo_owner: "maidsafe".to_string(),
         branch: "main".to_string(),
         safenode_features: None,
