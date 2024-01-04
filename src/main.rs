@@ -336,8 +336,8 @@ async fn main() -> Result<()> {
             let sn_codebase_type = get_sn_codebase_type(
                 branch,
                 repo_owner,
-                safenode_version,
                 safe_version,
+                safenode_version,
                 safenode_features,
             )?;
 
@@ -392,7 +392,7 @@ async fn main() -> Result<()> {
             safenode_version,
         }) => {
             let sn_codebase_type =
-                get_sn_codebase_type(branch, repo_owner, safenode_version, safe_version, None)?;
+                get_sn_codebase_type(branch, repo_owner, safe_version, safenode_version, None)?;
 
             let testnet_deploy = TestnetDeployBuilder::default().provider(provider).build()?;
             testnet_deploy
