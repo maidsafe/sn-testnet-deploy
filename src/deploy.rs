@@ -39,12 +39,12 @@ impl DeployCmd {
         }
     }
 
-    pub async fn deploy(self) -> Result<()> {
+    pub async fn execute(self) -> Result<()> {
         let build_custom_binaries = {
             match &self.sn_codebase_type {
                 SnCodebaseType::Main { safenode_features } => safenode_features.is_some(),
-                SnCodebaseType::CustomBranch { .. } => true,
-                SnCodebaseType::PreBuiltBinary { .. } => false,
+                SnCodebaseType::Branch { .. } => true,
+                SnCodebaseType::Versioned { .. } => false,
             }
         };
         self.create_infra(build_custom_binaries)
@@ -248,7 +248,7 @@ impl DeployCmd {
                     Self::add_value(&mut extra_vars, "custom_bin", "false");
                 }
             }
-            SnCodebaseType::CustomBranch {
+            SnCodebaseType::Branch {
                 repo_owner,
                 branch,
                 safenode_features,
@@ -261,7 +261,7 @@ impl DeployCmd {
                     Self::add_value(&mut extra_vars, "safenode_features_list", features);
                 }
             }
-            SnCodebaseType::PreBuiltBinary { .. } => {
+            SnCodebaseType::Versioned { .. } => {
                 Self::add_value(&mut extra_vars, "custom_bin", "false");
             }
         };
@@ -312,7 +312,7 @@ impl DeployCmd {
                     "https://sn-node.s3.eu-west-2.amazonaws.com/safenode-latest-x86_64-unknown-linux-musl.tar.gz".to_string()
                 }
             }
-            SnCodebaseType::CustomBranch {
+            SnCodebaseType::Branch {
                 repo_owner, branch, ..
             } => {
                 format!(
@@ -321,7 +321,7 @@ impl DeployCmd {
                     branch,
                     self.name)
             }
-            SnCodebaseType::PreBuiltBinary {
+            SnCodebaseType::Versioned {
                 safenode_version, ..
             } => {
                 format!(
@@ -353,7 +353,7 @@ impl DeployCmd {
         Self::add_value(&mut extra_vars, "testnet_name", &self.name);
         Self::add_value(&mut extra_vars, "genesis_multiaddr", genesis_multiaddr);
         match &self.sn_codebase_type {
-            SnCodebaseType::CustomBranch {
+            SnCodebaseType::Branch {
                 repo_owner, branch, ..
             } => {
                 Self::add_value(&mut extra_vars, "branch", branch);
@@ -393,7 +393,7 @@ impl DeployCmd {
         Self::add_value(&mut extra_vars, "testnet_name", &self.name);
         Self::add_value(&mut extra_vars, "genesis_multiaddr", genesis_multiaddr);
         match &self.sn_codebase_type {
-            SnCodebaseType::CustomBranch {
+            SnCodebaseType::Branch {
                 repo_owner, branch, ..
             } => {
                 Self::add_value(&mut extra_vars, "branch", branch);

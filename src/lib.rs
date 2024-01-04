@@ -50,19 +50,25 @@ use tar::Archive;
 /// How or where to build the binaries from.
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub enum SnCodebaseType {
+    /// The latest release binaries from `maidsafe/safe_network` is used if the `safenode_features` are not provided.
+    /// If the `safenode_features` are provided, the build VM is used to build the `safenode` binary, while the latest
+    /// release are fetched for the rest of the binaries.
     Main {
         // CSV of features to enable on main::safenode
         safenode_features: Option<String>,
     },
-    CustomBranch {
+    /// The build VM is used to build all the binaries that we will be using.
+    Branch {
         repo_owner: String,
         branch: String,
         // CSV of features to enable on the custom branch::safenode
         safenode_features: Option<String>,
     },
-    PreBuiltBinary {
+    /// The specific versions of `safe` and `safenode` are fetched from `maidsafe/safe_network/releases`
+    Versioned {
         safe_version: String,
         safenode_version: String,
+        // todo: make `faucet, rpc` versions optional?
     },
 }
 
@@ -139,7 +145,7 @@ impl DeploymentInventory {
         println!("Name: {}", self.name);
         match &self.sn_codebase_type {
             SnCodebaseType::Main { .. } => {}
-            SnCodebaseType::CustomBranch {
+            SnCodebaseType::Branch {
                 repo_owner, branch, ..
             } => {
                 println!("Branch Details");
@@ -147,7 +153,7 @@ impl DeploymentInventory {
                 println!("Repo owner: {}", repo_owner);
                 println!("Branch name: {}", branch);
             }
-            SnCodebaseType::PreBuiltBinary {
+            SnCodebaseType::Versioned {
                 safe_version,
                 safenode_version,
             } => {
@@ -744,14 +750,14 @@ pub async fn notify_slack(inventory: DeploymentInventory) -> Result<()> {
     message.push_str(&format!("Faucet address: {}\n", inventory.faucet_address));
     match inventory.sn_codebase_type {
         SnCodebaseType::Main { .. } => {}
-        SnCodebaseType::CustomBranch {
+        SnCodebaseType::Branch {
             repo_owner, branch, ..
         } => {
             message.push_str("*Branch Details*\n");
             message.push_str(&format!("Repo owner: {}\n", repo_owner));
             message.push_str(&format!("Branch: {}\n", branch));
         }
-        SnCodebaseType::PreBuiltBinary {
+        SnCodebaseType::Versioned {
             safe_version,
             safenode_version,
         } => {

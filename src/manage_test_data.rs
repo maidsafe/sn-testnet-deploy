@@ -87,7 +87,7 @@ impl TestDataClient {
     pub async fn smoke_test(&self, inventory: &mut DeploymentInventory) -> Result<()> {
         match &inventory.sn_codebase_type {
             crate::SnCodebaseType::Main { .. } => {}
-            crate::SnCodebaseType::CustomBranch {
+            crate::SnCodebaseType::Branch {
                 repo_owner, branch, ..
             } => {
                 Self::download_and_extract_safe_client_from_s3(
@@ -99,7 +99,7 @@ impl TestDataClient {
                 )
                 .await?;
             }
-            crate::SnCodebaseType::PreBuiltBinary { safe_version, .. } => {
+            crate::SnCodebaseType::Versioned { safe_version, .. } => {
                 Self::download_and_extract_safe_client_from_url(
                     &*self.safe_binary_repository,
                     safe_version,
@@ -192,7 +192,7 @@ impl TestDataClient {
                 )
                 .await?;
             }
-            SnCodebaseType::CustomBranch {
+            SnCodebaseType::Branch {
                 repo_owner, branch, ..
             } => {
                 Self::download_and_extract_safe_client_from_s3(
@@ -204,7 +204,7 @@ impl TestDataClient {
                 )
                 .await?;
             }
-            SnCodebaseType::PreBuiltBinary {
+            SnCodebaseType::Versioned {
                 safe_version,
                 safenode_version: _,
             } => {

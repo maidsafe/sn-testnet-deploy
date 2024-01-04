@@ -67,7 +67,7 @@ enum Commands {
         /// The name of the Logstash stack to forward logs to.
         #[clap(long, default_value = "main")]
         logstash_stack_name: String,
-        /// The features to enable on the safenode instance
+        /// The features to enable on the safenode binary.
         ///
         /// If not provided, the default feature set specified for the safenode binary are used.
         #[clap(long)]
@@ -379,7 +379,7 @@ async fn main() -> Result<()> {
                 (logstash_stack_name, stack_hosts),
                 sn_codebase_type,
             );
-            deploy_cmd.deploy().await?;
+            deploy_cmd.execute().await?;
             Ok(())
         }
         Some(Commands::Inventory {
@@ -575,13 +575,13 @@ fn get_sn_codebase_type(
     let safenode_features = safenode_features.map(|list| list.join(","));
 
     let codebase_type = if let (Some(repo_owner), Some(branch)) = (repo_owner, branch) {
-        SnCodebaseType::CustomBranch {
+        SnCodebaseType::Branch {
             repo_owner,
             branch,
             safenode_features,
         }
     } else if let (Some(safe_version), Some(safenode_version)) = (safe_version, safenode_version) {
-        SnCodebaseType::PreBuiltBinary {
+        SnCodebaseType::Versioned {
             safe_version,
             safenode_version,
         }
