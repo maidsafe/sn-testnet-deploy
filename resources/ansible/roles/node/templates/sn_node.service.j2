@@ -13,6 +13,7 @@ ExecStart={{ node_archive_dest_path }}/safenode \
   --rpc {{ node_rpc_ip }}:{{ node_rpc_port }}
 {% endif %}
 User=safe
+KillMode=process
 
 
 [Install]
