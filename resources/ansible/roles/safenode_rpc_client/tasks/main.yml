@@ -1,15 +1,4 @@
 ---
-# The `node_rpc_ip` is used in the service definition file.
-- name: get the private IP for the instance
-  set_fact:
-    node_rpc_ip: "{{ instance_facts.instances[0].network_interfaces[0].private_ip_address }}"
-  when: provider == "aws"
-
-- name: use the public IP as the RPC address on DO
-  set_fact:
-    node_rpc_ip: "{{ ansible_host }}"
-  when: provider == "digital-ocean"
-
 - name: get the latest version or a custom build of the RPC client
   ansible.builtin.get_url:
     url: "{{ safenode_rpc_client_archive_url }}"
@@ -21,22 +10,3 @@
     src: "/tmp/{{ safenode_rpc_client_archive_filename }}"
     dest: "{{ safenode_rpc_client_archive_dest_path }}"
     remote_src: True
-
-- name: copy safenode_rpc_client service file
-  become: True
-  template:
-    src: safenode_rpc_client.service.j2
-    dest: /etc/systemd/system/safenode_rpc_client.service
-  register: service_template_created
-
-- name: reload the system manager configuration
-  become: True
-  command: systemctl daemon-reload
-  when: service_template_created.changed
-
-- name: start the safenode_rpc_client service to store network royalties cash notes to disk
-  become: True
-  systemd:
-    name: safenode_rpc_client
-    state: started
-    enabled: yes
