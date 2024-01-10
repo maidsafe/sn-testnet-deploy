@@ -31,6 +31,7 @@ use indicatif::{ProgressBar, ProgressStyle};
 use log::debug;
 use rand::Rng;
 use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
+use rpc_client::parse_output;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 use std::{
@@ -298,7 +299,7 @@ impl TestnetDeployBuilder {
             vault_password_path,
         );
         let rpc_client = RpcClient::new(
-            PathBuf::from("./safenode_rpc_client"),
+            PathBuf::from("/usr/local/bin/safenode_rpc_client"),
             working_directory_path.clone(),
         );
 
@@ -430,9 +431,23 @@ impl TestnetDeploy {
             )
             .await?;
         let genesis_ip = genesis_inventory[0].1;
-        let node_info = self
-            .rpc_client
-            .get_info(format!("{}:12001", genesis_ip).parse()?)?;
+        // let node_info = self
+        //     .rpc_client
+        //     // .get_info(format!("{}:12001", genesis_ip).parse()?, "root", &genesis_ip.to_string())?;
+        //     .get_info(
+        //         (Ipv4Addr::LOCALHOST, 12001).into(),
+        //         "root",
+        //         &genesis_ip.to_string(),
+        //     )?;
+
+        let output = self.ssh_client.run_command(
+            &genesis_ip,
+            "root",
+            "/usr/local/bin/safenode_rpc_client 127.0.0.1:12001 info",
+            false
+        )?;
+        let node_info = parse_output(output)?;
+
         let multiaddr = format!("/ip4/{}/tcp/12000/p2p/{}", genesis_ip, node_info.peer_id);
         // The genesis_ip is obviously inside the multiaddr, but it's just being returned as a
         // separate item for convenience.

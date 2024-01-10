@@ -38,57 +38,61 @@ impl RpcClient {
             false,
         )?;
 
-        let endpoint = output
-            .iter()
-            .find(|line| line.starts_with("RPC endpoint:"))
-            .map(|line| line.split(": ").nth(1).unwrap_or("").to_string())
-            .unwrap_or_default();
-        let peer_id = output
-            .iter()
-            .find(|line| line.starts_with("Peer Id:"))
-            .map(|line| line.split(": ").nth(1).unwrap_or("").to_string())
-            .unwrap_or_default();
-        let logs_dir = output
-            .iter()
-            .find(|line| line.starts_with("Logs dir:"))
-            .map(|line| line.split(": ").nth(1).unwrap_or("").to_string())
-            .unwrap_or_default();
-        let pid = output
-            .iter()
-            .find(|line| line.starts_with("PID:"))
-            .map(|line| {
-                line.split(": ")
-                    .nth(1)
-                    .unwrap_or("")
-                    .parse::<u16>()
-                    .unwrap_or(0)
-            })
-            .unwrap_or_default();
-        let safenode_version = output
-            .iter()
-            .find(|line| line.starts_with("Binary version:"))
-            .map(|line| line.split(": ").nth(1).unwrap_or("").to_string())
-            .unwrap_or_default();
-        let last_restart = output
-            .iter()
-            .find(|line| line.starts_with("Time since last restart:"))
-            .map(|line| {
-                line.split(": ")
-                    .nth(1)
-                    .unwrap_or("")
-                    .trim_end_matches('s')
-                    .parse::<u32>()
-                    .unwrap_or(0)
-            })
-            .unwrap_or_default();
-
-        Ok(NodeInfo {
-            endpoint,
-            peer_id,
-            logs_dir: PathBuf::from(logs_dir),
-            pid,
-            safenode_version,
-            last_restart,
-        })
+        parse_output(output)
     }
+}
+
+pub fn parse_output(output: Vec<String>) -> Result<NodeInfo> {
+    let endpoint = output
+        .iter()
+        .find(|line| line.starts_with("RPC endpoint:"))
+        .map(|line| line.split(": ").nth(1).unwrap_or("").to_string())
+        .unwrap_or_default();
+    let peer_id = output
+        .iter()
+        .find(|line| line.starts_with("Peer Id:"))
+        .map(|line| line.split(": ").nth(1).unwrap_or("").to_string())
+        .unwrap_or_default();
+    let logs_dir = output
+        .iter()
+        .find(|line| line.starts_with("Logs dir:"))
+        .map(|line| line.split(": ").nth(1).unwrap_or("").to_string())
+        .unwrap_or_default();
+    let pid = output
+        .iter()
+        .find(|line| line.starts_with("PID:"))
+        .map(|line| {
+            line.split(": ")
+                .nth(1)
+                .unwrap_or("")
+                .parse::<u16>()
+                .unwrap_or(0)
+        })
+        .unwrap_or_default();
+    let safenode_version = output
+        .iter()
+        .find(|line| line.starts_with("Binary version:"))
+        .map(|line| line.split(": ").nth(1).unwrap_or("").to_string())
+        .unwrap_or_default();
+    let last_restart = output
+        .iter()
+        .find(|line| line.starts_with("Time since last restart:"))
+        .map(|line| {
+            line.split(": ")
+                .nth(1)
+                .unwrap_or("")
+                .trim_end_matches('s')
+                .parse::<u32>()
+                .unwrap_or(0)
+        })
+        .unwrap_or_default();
+
+    Ok(NodeInfo {
+        endpoint,
+        peer_id,
+        logs_dir: PathBuf::from(logs_dir),
+        pid,
+        safenode_version,
+        last_restart,
+    })
 }

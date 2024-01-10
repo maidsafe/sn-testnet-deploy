@@ -1,0 +1,6 @@
+---
+- name: start safenode_rpc_client service on genesis node
+  hosts: all
+  become: False
+  roles:
+    - safenode_rpc_client_service
