@@ -5,6 +5,7 @@ Description=Safe Node %I
 WorkingDirectory=/home/safe
 {% if is_genesis %}
 ExecStart={{ node_archive_dest_path }}/safenode \
+  --first \
   --port {{ node_port }} \
   --rpc {{ node_rpc_ip }}:{{ node_rpc_port }}
 {% else %}
