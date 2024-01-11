@@ -51,6 +51,7 @@ impl SafeClientInterface for SafeClient {
                 "download".to_string(),
             ],
             false,
+            false,
         )?;
         Ok(())
     }
@@ -66,6 +67,7 @@ impl SafeClientInterface for SafeClient {
                 "upload".to_string(),
                 path.to_string_lossy().to_string(),
             ],
+            false,
             false,
         )?;
 
@@ -92,6 +94,7 @@ impl SafeClientInterface for SafeClient {
                 "get-faucet".to_string(),
                 faucet_addr.to_string(),
             ],
+            false,
             false,
         )?;
         Ok(())

@@ -74,6 +74,7 @@ impl SshClientInterface for SshClient {
                     "--version".to_string(),
                 ],
                 false,
+                false,
             );
             if result.is_ok() {
                 println!("SSH is available.");
@@ -122,6 +123,7 @@ impl SshClientInterface for SshClient {
             std::env::current_dir()?,
             args,
             suppress_output,
+            false,
         )
         .map_err(|_| Error::SshCommandFailed(command.to_string()))?;
         Ok(output)
@@ -159,6 +161,7 @@ impl SshClientInterface for SshClient {
             std::env::current_dir()?,
             args,
             suppress_output,
+            false,
         )
         .map_err(|e| {
             Error::SshCommandFailed(format!(
@@ -185,6 +188,7 @@ impl SshClientInterface for SshClient {
             std::env::current_dir()?,
             args,
             suppress_output,
+            false,
         )
         .map_err(|e| {
             Error::SshCommandFailed(format!("Failed to execute command on remote host: {e}"))

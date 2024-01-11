@@ -87,6 +87,7 @@ impl TestnetDeploy {
                     PathBuf::from("."),
                     vec!["-R".to_string(), format!("{ip_address}")],
                     false,
+                    false,
                 ) {
                     println!("Failed to ssh-keygen {vm_name:?} : {ip_address} with err: {err:?}");
                 } else if let Err(err) =
@@ -118,6 +119,7 @@ impl TestnetDeploy {
             PathBuf::from("."),
             rsync_args_clone.clone(),
             true,
+            false,
         )?;
 
         debug!("Finished rsync for for {vm_name:?} : {ip_address}");

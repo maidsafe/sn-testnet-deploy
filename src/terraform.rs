@@ -47,6 +47,7 @@ impl TerraformRunnerInterface for TerraformRunner {
             self.working_directory_path.clone(),
             args,
             false,
+            false,
         )?;
         Ok(())
     }
@@ -56,6 +57,7 @@ impl TerraformRunnerInterface for TerraformRunner {
             self.binary_path.clone(),
             self.working_directory_path.clone(),
             vec!["destroy".to_string(), "-auto-approve".to_string()],
+            false,
             false,
         )?;
         Ok(())
@@ -72,6 +74,7 @@ impl TerraformRunnerInterface for TerraformRunner {
             self.working_directory_path.clone(),
             args,
             false,
+            false,
         )?;
         Ok(())
     }
@@ -86,6 +89,7 @@ impl TerraformRunnerInterface for TerraformRunner {
                 name.to_string(),
             ],
             true,
+            false,
         )?;
         Ok(())
     }
@@ -96,6 +100,7 @@ impl TerraformRunnerInterface for TerraformRunner {
             self.working_directory_path.clone(),
             vec!["workspace".to_string(), "list".to_string()],
             true,
+            false,
         )?;
         let workspaces: Vec<String> = output
             .into_iter()
@@ -111,6 +116,7 @@ impl TerraformRunnerInterface for TerraformRunner {
             self.working_directory_path.clone(),
             vec!["workspace".to_string(), "new".to_string(), name.to_string()],
             false,
+            false,
         )?;
         Ok(())
     }
@@ -124,6 +130,7 @@ impl TerraformRunnerInterface for TerraformRunner {
                 "select".to_string(),
                 name.to_string(),
             ],
+            false,
             false,
         )?;
         Ok(())

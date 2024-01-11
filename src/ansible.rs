@@ -115,6 +115,7 @@ impl AnsibleRunnerInterface for AnsibleRunner {
                 "--list".to_string(),
             ],
             true,
+            false,
         )?;
 
         // Debug the output of the inventory list.
@@ -174,6 +175,7 @@ impl AnsibleRunnerInterface for AnsibleRunner {
             PathBuf::from(AnsibleBinary::AnsiblePlaybook.to_string()),
             self.working_directory_path.clone(),
             args,
+            false,
             false,
         )?;
         Ok(())

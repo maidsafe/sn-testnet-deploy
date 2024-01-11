@@ -622,7 +622,8 @@ pub fn run_external_command(
     binary_path: PathBuf,
     working_directory_path: PathBuf,
     args: Vec<String>,
-    suppress_output: bool,
+    suppress_stdout: bool,
+    suppress_stderr: bool,
 ) -> Result<Vec<String>> {
     let mut command = Command::new(binary_path.clone());
     for arg in &args {
@@ -641,8 +642,8 @@ pub fn run_external_command(
         let reader = BufReader::new(stdout);
         for line in reader.lines() {
             let line = line?;
-            if !suppress_output {
-                println!("{}", &line);
+            if !suppress_stdout {
+                println!("{line}");
             }
             output_lines.push(line);
         }
@@ -652,8 +653,8 @@ pub fn run_external_command(
         let reader = BufReader::new(stderr);
         for line in reader.lines() {
             let line = line?;
-            if !suppress_output {
-                println!("{}", &line);
+            if !suppress_stderr {
+                eprintln!("{line}");
             }
             output_lines.push(line);
         }
