@@ -6,42 +6,15 @@
 
 use crate::error::{Error, Result};
 use async_recursion::async_recursion;
-use async_trait::async_trait;
 use aws_sdk_s3::{error::ProvideErrorMetadata, Client};
-#[cfg(test)]
-use mockall::automock;
 use std::path::{Path, PathBuf};
 use tokio::io::AsyncWriteExt;
 use tokio_stream::StreamExt;
 
-/// Provides an interface for using S3.
-///
-/// This trait exists for unit testing: it enables testing behaviour without actually calling the
-/// ssh process.
-#[cfg_attr(test, automock)]
-#[async_trait]
-pub trait S3RepositoryInterface {
-    async fn download_object(
-        &self,
-        bucket_name: &str,
-        object_key: &str,
-        dest_path: &Path,
-    ) -> Result<()>;
-    async fn download_folder(
-        &self,
-        bucket_name: &str,
-        folder_path: &str,
-        dest_path: &Path,
-    ) -> Result<()>;
-    async fn delete_folder(&self, bucket_name: &str, folder_path: &str) -> Result<()>;
-    async fn folder_exists(&self, bucket_name: &str, folder_path: &str) -> Result<bool>;
-}
-
 pub struct S3Repository {}
 
-#[async_trait]
-impl S3RepositoryInterface for S3Repository {
-    async fn download_object(
+impl S3Repository {
+    pub async fn download_object(
         &self,
         bucket_name: &str,
         object_key: &str,
@@ -54,7 +27,7 @@ impl S3RepositoryInterface for S3Repository {
         Ok(())
     }
 
-    async fn download_folder(
+    pub async fn download_folder(
         &self,
         bucket_name: &str,
         folder_path: &str,
@@ -68,7 +41,7 @@ impl S3RepositoryInterface for S3Repository {
         Ok(())
     }
 
-    async fn delete_folder(&self, bucket_name: &str, folder_path: &str) -> Result<()> {
+    pub async fn delete_folder(&self, bucket_name: &str, folder_path: &str) -> Result<()> {
         let conf = aws_config::from_env().region("eu-west-2").load().await;
         let client = Client::new(&conf);
         self.list_and_delete(&client, bucket_name, folder_path)
@@ -76,7 +49,7 @@ impl S3RepositoryInterface for S3Repository {
         Ok(())
     }
 
-    async fn folder_exists(&self, bucket_name: &str, folder_path: &str) -> Result<bool> {
+    pub async fn folder_exists(&self, bucket_name: &str, folder_path: &str) -> Result<bool> {
         let conf = aws_config::from_env().region("eu-west-2").load().await;
 
         let client = Client::new(&conf);
@@ -98,9 +71,7 @@ impl S3RepositoryInterface for S3Repository {
             })?;
         Ok(!output.contents().unwrap_or_default().is_empty())
     }
-}
 
-impl S3Repository {
     #[async_recursion]
     async fn list_and_retrieve(
         &self,

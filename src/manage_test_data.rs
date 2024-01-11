@@ -4,29 +4,31 @@
 // This SAFE Network Software is licensed under the BSD-3-Clause license.
 // Please see the LICENSE file for more details.
 
-use crate::error::{Error, Result};
-use crate::s3::{S3Repository, S3RepositoryInterface};
-use crate::safe::{
-    SafeBinaryRepository, SafeBinaryRepositoryInterface, SafeClient, SafeClientInterface,
+use crate::{
+    error::{Error, Result},
+    extract_archive, get_and_extract_archive_from_s3,
+    s3::S3Repository,
+    safe::{SafeBinaryRepository, SafeClient},
+    DeploymentInventory, SnCodebaseType,
 };
-use crate::{extract_archive, DeploymentInventory};
-use crate::{get_and_extract_archive_from_s3, SnCodebaseType};
 use rand::Rng;
 use sha2::{Digest, Sha256};
-use std::collections::HashMap;
-use std::fs::File;
-use std::io::{Read, Write};
-use std::net::SocketAddr;
-use std::os::unix::fs::PermissionsExt;
-use std::path::{Path, PathBuf};
+use std::{
+    collections::HashMap,
+    fs::File,
+    io::{Read, Write},
+    net::SocketAddr,
+    os::unix::fs::PermissionsExt,
+    path::{Path, PathBuf},
+};
 
 const BASE_URL: &str = "https://github.com/maidsafe/safe_network/releases/download";
 
 pub struct TestDataClient {
     pub working_directory_path: PathBuf,
-    pub s3_repository: Box<dyn S3RepositoryInterface>,
-    pub safe_client: Box<dyn SafeClientInterface>,
-    pub safe_binary_repository: Box<dyn SafeBinaryRepositoryInterface>,
+    pub s3_repository: S3Repository,
+    pub safe_client: SafeClient,
+    pub safe_binary_repository: SafeBinaryRepository,
 }
 
 #[derive(Default)]
@@ -61,9 +63,9 @@ impl TestDataClientBuilder {
         };
         let test_data_client = TestDataClient::new(
             working_directory_path.clone(),
-            Box::new(S3Repository {}),
-            Box::new(SafeClient::new(safe_binary_path, working_directory_path)),
-            Box::new(SafeBinaryRepository {}),
+            S3Repository {},
+            SafeClient::new(safe_binary_path, working_directory_path),
+            SafeBinaryRepository {},
         );
         Ok(test_data_client)
     }
@@ -72,9 +74,9 @@ impl TestDataClientBuilder {
 impl TestDataClient {
     pub fn new(
         working_directory_path: PathBuf,
-        s3_repository: Box<dyn S3RepositoryInterface>,
-        safe_client: Box<dyn SafeClientInterface>,
-        safe_binary_repository: Box<dyn SafeBinaryRepositoryInterface>,
+        s3_repository: S3Repository,
+        safe_client: SafeClient,
+        safe_binary_repository: SafeBinaryRepository,
     ) -> TestDataClient {
         TestDataClient {
             working_directory_path,
@@ -91,7 +93,7 @@ impl TestDataClient {
                 repo_owner, branch, ..
             } => {
                 Self::download_and_extract_safe_client_from_s3(
-                    &*self.s3_repository,
+                    &self.s3_repository,
                     &inventory.name,
                     &self.working_directory_path,
                     repo_owner,
@@ -101,7 +103,7 @@ impl TestDataClient {
             }
             crate::SnCodebaseType::Versioned { safe_version, .. } => {
                 Self::download_and_extract_safe_client_from_url(
-                    &*self.safe_binary_repository,
+                    &self.safe_binary_repository,
                     safe_version,
                     &self.working_directory_path,
                 )
@@ -186,7 +188,7 @@ impl TestDataClient {
         match sn_codebase_type {
             SnCodebaseType::Main { .. } => {
                 Self::download_and_extract_safe_client_from_url(
-                    &*self.safe_binary_repository,
+                    &self.safe_binary_repository,
                     "latest",
                     &self.working_directory_path,
                 )
@@ -196,7 +198,7 @@ impl TestDataClient {
                 repo_owner, branch, ..
             } => {
                 Self::download_and_extract_safe_client_from_s3(
-                    &*self.s3_repository,
+                    &self.s3_repository,
                     name,
                     &self.working_directory_path,
                     repo_owner,
@@ -209,7 +211,7 @@ impl TestDataClient {
                 safenode_version: _,
             } => {
                 Self::download_and_extract_safe_client_from_url(
-                    &*self.safe_binary_repository,
+                    &self.safe_binary_repository,
                     safe_version,
                     &self.working_directory_path,
                 )
@@ -223,7 +225,7 @@ impl TestDataClient {
             std::fs::create_dir_all(test_data_dir_path)?;
         }
         get_and_extract_archive_from_s3(
-            &*self.s3_repository,
+            &self.s3_repository,
             "sn-testnet",
             "test-data.tar.gz",
             test_data_dir_path,
@@ -265,7 +267,7 @@ impl TestDataClient {
     }
 
     async fn download_and_extract_safe_client_from_s3(
-        s3_repository: &dyn S3RepositoryInterface,
+        s3_repository: &S3Repository,
         name: &str,
         working_directory_path: &Path,
         repo_owner: &str,
@@ -289,7 +291,7 @@ impl TestDataClient {
     }
 
     async fn download_and_extract_safe_client_from_url(
-        safe_binary_repository: &dyn SafeBinaryRepositoryInterface,
+        safe_binary_repository: &SafeBinaryRepository,
         version: &str,
         working_directory_path: &Path,
     ) -> Result<()> {

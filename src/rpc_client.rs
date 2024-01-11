@@ -4,12 +4,8 @@
 // This SAFE Network Software is licensed under the BSD-3-Clause license.
 // Please see the LICENSE file for more details.
 
-use crate::error::Result;
-use crate::run_external_command;
-#[cfg(test)]
-use mockall::automock;
-use std::net::SocketAddr;
-use std::path::PathBuf;
+use crate::{error::Result, run_external_command};
+use std::{net::SocketAddr, path::PathBuf};
 
 pub struct NodeInfo {
     pub endpoint: String,
@@ -18,14 +14,6 @@ pub struct NodeInfo {
     pub pid: u16,
     pub safenode_version: String,
     pub last_restart: u32,
-}
-
-/// This trait exists for unit testing.
-///
-/// It allows us to return dummy node info during a test, without making a real RPC call.
-#[cfg_attr(test, automock)]
-pub trait RpcClientInterface {
-    fn get_info(&self, rpc_address: SocketAddr) -> Result<NodeInfo>;
 }
 
 pub struct RpcClient {
@@ -40,10 +28,8 @@ impl RpcClient {
             working_directory_path,
         }
     }
-}
 
-impl RpcClientInterface for RpcClient {
-    fn get_info(&self, rpc_address: SocketAddr) -> Result<NodeInfo> {
+    pub fn get_info(&self, rpc_address: SocketAddr) -> Result<NodeInfo> {
         let output = run_external_command(
             self.binary_path.clone(),
             self.working_directory_path.clone(),

@@ -5,13 +5,9 @@
 // Please see the LICENSE file for more details.
 
 use crate::error::{Error, Result};
-use async_trait::async_trait;
 use log::debug;
-#[cfg(test)]
-use mockall::automock;
 use reqwest::Client;
-use std::net::Ipv4Addr;
-use std::str::FromStr;
+use std::{net::Ipv4Addr, str::FromStr};
 
 pub const DIGITAL_OCEAN_API_BASE_URL: &str = "https://api.digitalocean.com";
 pub const DIGITAL_OCEAN_API_PAGE_SIZE: usize = 200;
@@ -22,25 +18,14 @@ pub struct Droplet {
     pub ip_address: Ipv4Addr,
 }
 
-/// Provides an interface for using the SSH client.
-///
-/// This trait exists for unit testing: it enables testing behaviour without actually calling the
-/// ssh process.
-#[cfg_attr(test, automock)]
-#[async_trait]
-pub trait DigitalOceanClientInterface {
-    async fn list_droplets(&self) -> Result<Vec<Droplet>>;
-}
-
 pub struct DigitalOceanClient {
     pub base_url: String,
     pub access_token: String,
     pub page_size: usize,
 }
 
-#[async_trait]
-impl DigitalOceanClientInterface for DigitalOceanClient {
-    async fn list_droplets(&self) -> Result<Vec<Droplet>> {
+impl DigitalOceanClient {
+    pub async fn list_droplets(&self) -> Result<Vec<Droplet>> {
         let client = Client::new();
         let mut has_next_page = true;
         let mut page = 1;

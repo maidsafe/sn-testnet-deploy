@@ -4,38 +4,12 @@
 // This SAFE Network Software is licensed under the BSD-3-Clause license.
 // Please see the LICENSE file for more details.
 
-use crate::error::{Error, Result};
-use crate::run_external_command;
+use crate::{
+    error::{Error, Result},
+    run_external_command,
+};
 use log::debug;
-#[cfg(test)]
-use mockall::automock;
-use std::net::IpAddr;
-use std::path::PathBuf;
-
-/// Provides an interface for using the SSH client.
-///
-/// This trait exists for unit testing: it enables testing behaviour without actually calling the
-/// ssh process.
-#[cfg_attr(test, automock)]
-pub trait SshClientInterface: Send + Sync {
-    fn get_private_key_path(&self) -> PathBuf;
-    fn wait_for_ssh_availability(&self, ip_address: &IpAddr, user: &str) -> Result<()>;
-    fn run_command(
-        &self,
-        ip_address: &IpAddr,
-        user: &str,
-        command: &str,
-        suppress_output: bool,
-    ) -> Result<Vec<String>>;
-    fn run_script(
-        &self,
-        ip_address: IpAddr,
-        user: &str,
-        script: PathBuf,
-        suppress_output: bool,
-    ) -> Result<Vec<String>>;
-    fn clone_box(&self) -> Box<dyn SshClientInterface>;
-}
+use std::{net::IpAddr, path::PathBuf};
 
 #[derive(Clone)]
 pub struct SshClient {
@@ -45,13 +19,12 @@ impl SshClient {
     pub fn new(private_key_path: PathBuf) -> SshClient {
         SshClient { private_key_path }
     }
-}
-impl SshClientInterface for SshClient {
-    fn get_private_key_path(&self) -> PathBuf {
+
+    pub fn get_private_key_path(&self) -> PathBuf {
         self.private_key_path.clone()
     }
 
-    fn wait_for_ssh_availability(&self, ip_address: &IpAddr, user: &str) -> Result<()> {
+    pub fn wait_for_ssh_availability(&self, ip_address: &IpAddr, user: &str) -> Result<()> {
         println!("Checking for SSH availability at {ip_address}...");
         let mut retries = 0;
         let max_retries = 10;
@@ -91,7 +64,7 @@ impl SshClientInterface for SshClient {
         Err(Error::SshUnavailable)
     }
 
-    fn run_command(
+    pub fn run_command(
         &self,
         ip_address: &IpAddr,
         user: &str,
@@ -129,7 +102,7 @@ impl SshClientInterface for SshClient {
         Ok(output)
     }
 
-    fn run_script(
+    pub fn run_script(
         &self,
         ip_address: IpAddr,
         user: &str,
@@ -194,9 +167,5 @@ impl SshClientInterface for SshClient {
             Error::SshCommandFailed(format!("Failed to execute command on remote host: {e}"))
         })?;
         Ok(output)
-    }
-
-    fn clone_box(&self) -> Box<dyn SshClientInterface> {
-        Box::new(self.clone())
     }
 }
