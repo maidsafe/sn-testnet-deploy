@@ -18,16 +18,13 @@ pub mod setup;
 pub mod ssh;
 pub mod terraform;
 
-#[cfg(test)]
-mod tests;
-
 use crate::{
-    ansible::{AnsibleRunner, AnsibleRunnerInterface},
+    ansible::AnsibleRunner,
     error::{Error, Result},
-    rpc_client::{RpcClient, RpcClientInterface},
-    s3::{S3Repository, S3RepositoryInterface},
-    ssh::{SshClient, SshClientInterface},
-    terraform::{TerraformRunner, TerraformRunnerInterface},
+    rpc_client::RpcClient,
+    s3::S3Repository,
+    ssh::SshClient,
+    terraform::TerraformRunner,
 };
 use flate2::read::GzDecoder;
 use indicatif::{ProgressBar, ProgressStyle};
@@ -310,13 +307,13 @@ impl TestnetDeployBuilder {
         }
 
         let testnet = TestnetDeploy::new(
-            Box::new(terraform_runner),
-            Box::new(ansible_runner),
-            Box::new(rpc_client),
-            Box::new(SshClient::new(ssh_secret_key_path)),
+            terraform_runner,
+            ansible_runner,
+            rpc_client,
+            SshClient::new(ssh_secret_key_path),
             working_directory_path,
             provider.clone(),
-            Box::new(S3Repository {}),
+            S3Repository {},
         );
 
         Ok(testnet)
@@ -324,25 +321,25 @@ impl TestnetDeployBuilder {
 }
 
 pub struct TestnetDeploy {
-    pub terraform_runner: Box<dyn TerraformRunnerInterface>,
-    pub ansible_runner: Box<dyn AnsibleRunnerInterface>,
-    pub rpc_client: Box<dyn RpcClientInterface>,
-    pub ssh_client: Box<dyn SshClientInterface>,
+    pub terraform_runner: TerraformRunner,
+    pub ansible_runner: AnsibleRunner,
+    pub rpc_client: RpcClient,
+    pub ssh_client: SshClient,
     pub working_directory_path: PathBuf,
     pub cloud_provider: CloudProvider,
-    pub s3_repository: Box<dyn S3RepositoryInterface>,
+    pub s3_repository: S3Repository,
     pub inventory_file_path: PathBuf,
 }
 
 impl TestnetDeploy {
     pub fn new(
-        terraform_runner: Box<dyn TerraformRunnerInterface>,
-        ansible_runner: Box<dyn AnsibleRunnerInterface>,
-        rpc_client: Box<dyn RpcClientInterface>,
-        ssh_client: Box<dyn SshClientInterface>,
+        terraform_runner: TerraformRunner,
+        ansible_runner: AnsibleRunner,
+        rpc_client: RpcClient,
+        ssh_client: SshClient,
         working_directory_path: PathBuf,
         cloud_provider: CloudProvider,
-        s3_repository: Box<dyn S3RepositoryInterface>,
+        s3_repository: S3Repository,
     ) -> TestnetDeploy {
         let inventory_file_path = working_directory_path
             .join("ansible")
@@ -382,7 +379,7 @@ impl TestnetDeploy {
             println!("Downloading the rpc client for safenode...");
             let archive_name = "safenode_rpc_client-latest-x86_64-unknown-linux-musl.tar.gz";
             get_and_extract_archive_from_s3(
-                &*self.s3_repository,
+                &self.s3_repository,
                 "sn-node-rpc-client",
                 archive_name,
                 &self.working_directory_path,
@@ -525,8 +522,7 @@ impl TestnetDeploy {
             .par_iter()
             .filter_map(|(vm_name, ip_address)| {
                 let ip_address = *ip_address;
-                let ssh_client_clone = self.ssh_client.clone_box();
-                match ssh_client_clone.run_script(
+                match self.ssh_client.run_script(
                     ip_address,
                     "safe",
                     PathBuf::from("scripts").join("get_peer_multiaddr.sh"),
@@ -569,7 +565,7 @@ impl TestnetDeploy {
         do_clean(
             name,
             self.working_directory_path.clone(),
-            &*self.terraform_runner,
+            &self.terraform_runner,
             vec![
                 "build".to_string(),
                 "genesis".to_string(),
@@ -583,7 +579,7 @@ impl TestnetDeploy {
 /// Shared Helpers
 ///
 pub async fn get_and_extract_archive_from_s3(
-    s3_repository: &dyn S3RepositoryInterface,
+    s3_repository: &S3Repository,
     bucket_name: &str,
     archive_bucket_path: &str,
     dest_path: &Path,
@@ -686,7 +682,7 @@ pub fn is_binary_on_path(binary_name: &str) -> bool {
 pub fn do_clean(
     name: &str,
     working_directory_path: PathBuf,
-    terraform_runner: &dyn TerraformRunnerInterface,
+    terraform_runner: &TerraformRunner,
     inventory_types: Vec<String>,
 ) -> Result<()> {
     terraform_runner.init()?;

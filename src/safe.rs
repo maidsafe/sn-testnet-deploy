@@ -4,32 +4,22 @@
 // This SAFE Network Software is licensed under the BSD-3-Clause license.
 // Please see the LICENSE file for more details.
 
-use crate::error::{Error, Result};
-use crate::run_external_command;
-use async_trait::async_trait;
-#[cfg(test)]
-use mockall::automock;
+use crate::{
+    error::{Error, Result},
+    run_external_command,
+};
 use regex::Regex;
-use std::net::SocketAddr;
-use std::path::{Path, PathBuf};
-use tokio::fs::File as TokioFile;
-use tokio::io::AsyncWriteExt;
-
-/// Provides an interface for using the `safe` client.
-///
-/// This trait exists for unit testing: it enables testing behaviour without actually calling the
-/// safe process.
-#[cfg_attr(test, automock)]
-pub trait SafeClientInterface {
-    fn wallet_get_faucet(&self, peer_multiaddr: &str, faucet_addr: SocketAddr) -> Result<()>;
-    fn download_files(&self, peer_multiaddr: &str) -> Result<()>;
-    fn upload_file(&self, peer_multiaddr: &str, path: &Path) -> Result<String>;
-}
+use std::{
+    net::SocketAddr,
+    path::{Path, PathBuf},
+};
+use tokio::{fs::File as TokioFile, io::AsyncWriteExt};
 
 pub struct SafeClient {
     pub binary_path: PathBuf,
     pub working_directory_path: PathBuf,
 }
+
 impl SafeClient {
     pub fn new(binary_path: PathBuf, working_directory_path: PathBuf) -> SafeClient {
         SafeClient {
@@ -37,10 +27,8 @@ impl SafeClient {
             working_directory_path,
         }
     }
-}
 
-impl SafeClientInterface for SafeClient {
-    fn download_files(&self, peer_multiaddr: &str) -> Result<()> {
+    pub fn download_files(&self, peer_multiaddr: &str) -> Result<()> {
         run_external_command(
             self.binary_path.clone(),
             self.working_directory_path.clone(),
@@ -56,7 +44,7 @@ impl SafeClientInterface for SafeClient {
         Ok(())
     }
 
-    fn upload_file(&self, peer_multiaddr: &str, path: &Path) -> Result<String> {
+    pub fn upload_file(&self, peer_multiaddr: &str, path: &Path) -> Result<String> {
         let output = run_external_command(
             self.binary_path.clone(),
             self.working_directory_path.clone(),
@@ -83,7 +71,7 @@ impl SafeClientInterface for SafeClient {
         ))
     }
 
-    fn wallet_get_faucet(&self, peer_multiaddr: &str, faucet_addr: SocketAddr) -> Result<()> {
+    pub fn wallet_get_faucet(&self, peer_multiaddr: &str, faucet_addr: SocketAddr) -> Result<()> {
         run_external_command(
             self.binary_path.clone(),
             self.working_directory_path.clone(),
@@ -101,21 +89,10 @@ impl SafeClientInterface for SafeClient {
     }
 }
 
-/// Provides an interface for downloading release binaries for safe or safenode.
-///
-/// This trait exists for unit testing: it enables testing behaviour without actually calling the
-/// safe process.
-#[cfg_attr(test, automock)]
-#[async_trait]
-pub trait SafeBinaryRepositoryInterface {
-    async fn download(&self, binary_archive_url: &str, dest_path: &Path) -> Result<()>;
-}
-
 pub struct SafeBinaryRepository;
 
-#[async_trait]
-impl SafeBinaryRepositoryInterface for SafeBinaryRepository {
-    async fn download(&self, binary_archive_url: &str, dest_path: &Path) -> Result<()> {
+impl SafeBinaryRepository {
+    pub async fn download(&self, binary_archive_url: &str, dest_path: &Path) -> Result<()> {
         let response = reqwest::get(binary_archive_url).await?;
 
         if !response.status().is_success() {

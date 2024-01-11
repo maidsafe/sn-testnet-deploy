@@ -8,14 +8,11 @@ use clap::{Parser, Subcommand};
 use color_eyre::{eyre::eyre, Help, Result};
 use dotenv::dotenv;
 use rand::Rng;
-use sn_testnet_deploy::deploy::DeployCmd;
-use sn_testnet_deploy::error::Error;
-use sn_testnet_deploy::logstash::LogstashDeployBuilder;
-use sn_testnet_deploy::manage_test_data::TestDataClientBuilder;
-use sn_testnet_deploy::setup::setup_dotenv_file;
 use sn_testnet_deploy::{
-    get_data_directory, get_wallet_directory, notify_slack, CloudProvider, DeploymentInventory,
-    SnCodebaseType, TestnetDeployBuilder,
+    deploy::DeployCmd, error::Error, get_data_directory, get_wallet_directory,
+    logstash::LogstashDeployBuilder, manage_test_data::TestDataClientBuilder, notify_slack,
+    setup::setup_dotenv_file, CloudProvider, DeploymentInventory, SnCodebaseType,
+    TestnetDeployBuilder,
 };
 
 pub fn parse_provider(val: &str) -> Result<CloudProvider> {

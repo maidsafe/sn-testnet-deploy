@@ -3,16 +3,13 @@
 //
 // This SAFE Network Software is licensed under the BSD-3-Clause license.
 // Please see the LICENSE file for more details.
-use crate::error::{Error, Result};
-use crate::CloudProvider;
-use crate::{is_binary_on_path, run_external_command};
+use crate::{
+    error::{Error, Result},
+    is_binary_on_path, run_external_command, CloudProvider,
+};
 use log::debug;
-#[cfg(test)]
-use mockall::automock;
 use serde::Deserialize;
-use std::collections::HashMap;
-use std::net::IpAddr;
-use std::path::PathBuf;
+use std::{collections::HashMap, net::IpAddr, path::PathBuf};
 
 /// Ansible has multiple 'binaries', e.g., `ansible-playbook`, `ansible-inventory` etc. that are
 /// wrappers around the main `ansible` program. It would be a bit cumbersome to create a different
@@ -46,43 +43,11 @@ impl AnsibleBinary {
     }
 }
 
-/// Provides an interface for running Ansible.
-///
-/// This trait exists for unit testing: it enables testing behaviour without actually calling the
-/// Ansible process.
-#[cfg_attr(test, automock)]
-pub trait AnsibleRunnerInterface {
-    fn inventory_list(&self, inventory_path: PathBuf) -> Result<Vec<(String, IpAddr)>>;
-    fn run_playbook(
-        &self,
-        playbook_path: PathBuf,
-        inventory_path: PathBuf,
-        user: String,
-        extra_vars_document: Option<String>,
-    ) -> Result<()>;
-}
-
 pub struct AnsibleRunner {
     pub provider: CloudProvider,
     pub working_directory_path: PathBuf,
     pub ssh_sk_path: PathBuf,
     pub vault_password_file_path: PathBuf,
-}
-
-impl AnsibleRunner {
-    pub fn new(
-        working_directory_path: PathBuf,
-        provider: CloudProvider,
-        ssh_sk_path: PathBuf,
-        vault_password_file_path: PathBuf,
-    ) -> AnsibleRunner {
-        AnsibleRunner {
-            provider,
-            working_directory_path,
-            ssh_sk_path,
-            vault_password_file_path,
-        }
-    }
 }
 
 // The following three structs are utilities that are used to parse the output of the
@@ -100,11 +65,25 @@ struct Output {
     _meta: Meta,
 }
 
-impl AnsibleRunnerInterface for AnsibleRunner {
+impl AnsibleRunner {
+    pub fn new(
+        working_directory_path: PathBuf,
+        provider: CloudProvider,
+        ssh_sk_path: PathBuf,
+        vault_password_file_path: PathBuf,
+    ) -> AnsibleRunner {
+        AnsibleRunner {
+            provider,
+            working_directory_path,
+            ssh_sk_path,
+            vault_password_file_path,
+        }
+    }
+
     // This function is used to list the inventory of the ansible runner.
     // It takes a PathBuf as an argument which represents the inventory path.
     // It returns a Result containing a vector of tuples. Each tuple contains a string representing the name and the ansible host.
-    fn inventory_list(&self, inventory_path: PathBuf) -> Result<Vec<(String, IpAddr)>> {
+    pub fn inventory_list(&self, inventory_path: PathBuf) -> Result<Vec<(String, IpAddr)>> {
         // Run the external command and store the output.
         let output = run_external_command(
             AnsibleBinary::AnsibleInventory.get_binary_path()?,
@@ -145,7 +124,7 @@ impl AnsibleRunnerInterface for AnsibleRunner {
         Ok(inventory)
     }
 
-    fn run_playbook(
+    pub fn run_playbook(
         &self,
         playbook_path: PathBuf,
         inventory_path: PathBuf,

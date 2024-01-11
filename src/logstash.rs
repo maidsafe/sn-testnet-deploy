@@ -4,18 +4,20 @@
 // This SAFE Network Software is licensed under the BSD-3-Clause license.
 // Please see the LICENSE file for more details.
 
-use crate::ansible::{AnsibleRunner, AnsibleRunnerInterface};
-use crate::digital_ocean::{
-    DigitalOceanClient, DigitalOceanClientInterface, DIGITAL_OCEAN_API_BASE_URL,
-    DIGITAL_OCEAN_API_PAGE_SIZE,
+use crate::{
+    ansible::AnsibleRunner,
+    digital_ocean::{DigitalOceanClient, DIGITAL_OCEAN_API_BASE_URL, DIGITAL_OCEAN_API_PAGE_SIZE},
+    do_clean,
+    error::{Error, Result},
+    ssh::SshClient,
+    terraform::TerraformRunner,
+    CloudProvider,
 };
-use crate::error::{Error, Result};
-use crate::ssh::{SshClient, SshClientInterface};
-use crate::terraform::{TerraformRunner, TerraformRunnerInterface};
-use crate::{do_clean, CloudProvider};
 use log::debug;
-use std::net::{IpAddr, SocketAddr};
-use std::path::PathBuf;
+use std::{
+    net::{IpAddr, SocketAddr},
+    path::PathBuf,
+};
 
 pub const LOGSTASH_PORT: u16 = 5044;
 
@@ -136,10 +138,10 @@ impl LogstashDeployBuilder {
         );
 
         let logstash = LogstashDeploy::new(
-            Box::new(terraform_runner),
-            Box::new(ansible_runner),
-            Box::new(SshClient::new(ssh_secret_key_path)),
-            Box::new(digital_ocean_client),
+            terraform_runner,
+            ansible_runner,
+            SshClient::new(ssh_secret_key_path),
+            digital_ocean_client,
             working_directory_path,
             provider.clone(),
         );
@@ -149,10 +151,10 @@ impl LogstashDeployBuilder {
 }
 
 pub struct LogstashDeploy {
-    pub terraform_runner: Box<dyn TerraformRunnerInterface>,
-    pub ansible_runner: Box<dyn AnsibleRunnerInterface>,
-    pub ssh_client: Box<dyn SshClientInterface>,
-    pub digital_ocean_client: Box<dyn DigitalOceanClientInterface>,
+    pub terraform_runner: TerraformRunner,
+    pub ansible_runner: AnsibleRunner,
+    pub ssh_client: SshClient,
+    pub digital_ocean_client: DigitalOceanClient,
     pub working_directory_path: PathBuf,
     pub cloud_provider: CloudProvider,
     pub inventory_file_path: PathBuf,
@@ -160,10 +162,10 @@ pub struct LogstashDeploy {
 
 impl LogstashDeploy {
     pub fn new(
-        terraform_runner: Box<dyn TerraformRunnerInterface>,
-        ansible_runner: Box<dyn AnsibleRunnerInterface>,
-        ssh_client: Box<dyn SshClientInterface>,
-        digital_ocean_client: Box<dyn DigitalOceanClientInterface>,
+        terraform_runner: TerraformRunner,
+        ansible_runner: AnsibleRunner,
+        ssh_client: SshClient,
+        digital_ocean_client: DigitalOceanClient,
         working_directory_path: PathBuf,
         cloud_provider: CloudProvider,
     ) -> LogstashDeploy {
@@ -249,7 +251,7 @@ impl LogstashDeploy {
         do_clean(
             name,
             self.working_directory_path.clone(),
-            &*self.terraform_runner,
+            &self.terraform_runner,
             vec!["logstash".to_string()],
         )
     }

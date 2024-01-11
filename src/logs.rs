@@ -4,9 +4,12 @@
 // This SAFE Network Software is licensed under the BSD-3-Clause license.
 // Please see the LICENSE file for more details.
 
-use crate::error::{Error, Result};
-use crate::s3::{S3Repository, S3RepositoryInterface};
-use crate::{get_progress_bar, run_external_command, TestnetDeploy};
+use crate::{
+    error::{Error, Result},
+    get_progress_bar, run_external_command,
+    s3::S3Repository,
+    TestnetDeploy,
+};
 use fs_extra::dir::{copy, remove, CopyOptions};
 use log::debug;
 use rayon::iter::{IntoParallelIterator, IntoParallelRefIterator, ParallelIterator};
@@ -136,11 +139,13 @@ impl TestnetDeploy {
         println!("Running ripgrep with command: {rg_cmd}");
 
         let progress_bar = get_progress_bar(all_node_inventory.len() as u64)?;
-        let ssh_client = self.ssh_client.clone_box();
         let _failed_inventory = all_node_inventory
             .par_iter()
             .filter_map(|(vm_name, ip_address)| {
-                let op = match ssh_client.run_command(ip_address, "safe", &rg_cmd, true) {
+                let op = match self
+                    .ssh_client
+                    .run_command(ip_address, "safe", &rg_cmd, true)
+                {
                     Ok(output) => match Self::store_rg_output(&output, &log_abs_dest, vm_name) {
                         Ok(_) => None,
                         Err(err) => {
