@@ -49,6 +49,7 @@ impl RpcClientInterface for RpcClient {
             self.working_directory_path.clone(),
             vec![rpc_address.to_string(), "info".to_string()],
             false,
+            false,
         )?;
 
         let endpoint = output
