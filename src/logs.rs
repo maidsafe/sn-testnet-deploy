@@ -101,6 +101,7 @@ impl TestnetDeploy {
                 progress_bar.inc(1);
             });
         progress_bar.finish_and_clear();
+        println!("Rsync completed!");
         Ok(())
     }
 
@@ -162,6 +163,9 @@ impl TestnetDeploy {
                 op
             })
             .collect::<Vec<_>>();
+
+        progress_bar.finish_and_clear();
+        println!("Ripgrep completed!");
 
         Ok(())
     }
