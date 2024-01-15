@@ -7,9 +7,9 @@ use crate::{
     error::{Error, Result},
     is_binary_on_path, run_external_command, CloudProvider,
 };
-use log::debug;
+use log::{debug, warn};
 use serde::Deserialize;
-use std::{collections::HashMap, net::IpAddr, path::PathBuf};
+use std::{collections::HashMap, net::IpAddr, path::PathBuf, time::Duration};
 
 /// Ansible has multiple 'binaries', e.g., `ansible-playbook`, `ansible-inventory` etc. that are
 /// wrappers around the main `ansible` program. It would be a bit cumbersome to create a different
@@ -83,42 +83,65 @@ impl AnsibleRunner {
     // This function is used to list the inventory of the ansible runner.
     // It takes a PathBuf as an argument which represents the inventory path.
     // It returns a Result containing a vector of tuples. Each tuple contains a string representing the name and the ansible host.
-    pub fn inventory_list(&self, inventory_path: PathBuf) -> Result<Vec<(String, IpAddr)>> {
+    //
+    // Set re_attempt to re-run the ansible runner if the inventory list is empty
+    pub async fn inventory_list(
+        &self,
+        inventory_path: PathBuf,
+        re_attempt: bool,
+    ) -> Result<Vec<(String, IpAddr)>> {
         // Run the external command and store the output.
-        let output = run_external_command(
-            AnsibleBinary::AnsibleInventory.get_binary_path()?,
-            self.working_directory_path.clone(),
-            vec![
-                "--inventory".to_string(),
-                inventory_path.to_string_lossy().to_string(),
-                "--list".to_string(),
-            ],
-            true,
-            false,
-        )?;
+        let retry_count = if re_attempt { 3 } else { 0 };
+        let mut count = 0;
+        let mut inventory = Vec::new();
 
-        // Debug the output of the inventory list.
-        debug!("Inventory list output:");
-        debug!("{output:#?}");
-        // Convert the output into a string and remove any lines that do not start with '{'.
-        let mut output_string = output
-            .into_iter()
-            .skip_while(|line| !line.starts_with('{'))
-            .collect::<Vec<String>>()
-            .join("\n");
-        // Truncate the string at the last '}' character.
-        if let Some(end_index) = output_string.rfind('}') {
-            output_string.truncate(end_index + 1);
+        while count <= retry_count {
+            debug!("Running inventory list. retry attempts {count}/{retry_count}");
+            let output = run_external_command(
+                AnsibleBinary::AnsibleInventory.get_binary_path()?,
+                self.working_directory_path.clone(),
+                vec![
+                    "--inventory".to_string(),
+                    inventory_path.to_string_lossy().to_string(),
+                    "--list".to_string(),
+                ],
+                true,
+                false,
+            )?;
+
+            // Debug the output of the inventory list.
+            debug!("Inventory list output:");
+            debug!("{output:#?}");
+            // Convert the output into a string and remove any lines that do not start with '{'.
+            let mut output_string = output
+                .into_iter()
+                .skip_while(|line| !line.starts_with('{'))
+                .collect::<Vec<String>>()
+                .join("\n");
+            // Truncate the string at the last '}' character.
+            if let Some(end_index) = output_string.rfind('}') {
+                output_string.truncate(end_index + 1);
+            }
+            // Parse the output string into the Output struct.
+            let parsed: Output = serde_json::from_str(&output_string)?;
+            // Convert the parsed output into a vector of tuples containing the name and ansible host.
+            inventory = parsed
+                ._meta
+                .hostvars
+                .into_iter()
+                .map(|(name, vars)| (name, vars.ansible_host))
+                .collect();
+
+            count += 1;
+            if !inventory.is_empty() {
+                break;
+            }
+            debug!("Inventory list is empty, re-running after a few seconds.");
+            tokio::time::sleep(Duration::from_secs(3)).await;
         }
-        // Parse the output string into the Output struct.
-        let parsed: Output = serde_json::from_str(&output_string)?;
-        // Convert the parsed output into a vector of tuples containing the name and ansible host.
-        let inventory: Vec<(String, IpAddr)> = parsed
-            ._meta
-            .hostvars
-            .into_iter()
-            .map(|(name, vars)| (name, vars.ansible_host))
-            .collect();
+        if inventory.is_empty() {
+            warn!("Inventory list is empty after {retry_count} retries");
+        }
 
         // Return the inventory.
         Ok(inventory)

@@ -24,7 +24,7 @@ impl TestnetDeploy {
     pub async fn rsync_logs(&self, name: &str, resources_only: bool) -> Result<()> {
         // take root_dir at the top as `get_all_node_inventory` changes the working dir.
         let root_dir = std::env::current_dir()?;
-        let all_node_inventory = self.get_all_node_inventory(name)?;
+        let all_node_inventory = self.get_all_node_inventory(name).await?;
         let log_abs_dest = create_initial_log_dir_setup(&root_dir, name, &all_node_inventory)?;
 
         // Rsync args
@@ -133,7 +133,7 @@ impl TestnetDeploy {
     pub async fn ripgrep_logs(&self, name: &str, rg_args: &str) -> Result<()> {
         // take root_dir at the top as `get_all_node_inventory` changes the working dir.
         let root_dir = std::env::current_dir()?;
-        let all_node_inventory = self.get_all_node_inventory(name)?;
+        let all_node_inventory = self.get_all_node_inventory(name).await?;
         let log_abs_dest = create_initial_log_dir_setup(&root_dir, name, &all_node_inventory)?;
 
         let rg_cmd = format!("rg {rg_args} .local/share/safe/");
@@ -224,7 +224,7 @@ impl TestnetDeploy {
     }
 
     // Return the list of all the node machines.
-    fn get_all_node_inventory(&self, name: &str) -> Result<Vec<(String, IpAddr)>> {
+    async fn get_all_node_inventory(&self, name: &str) -> Result<Vec<(String, IpAddr)>> {
         let environments = self.terraform_runner.workspace_list()?;
         if !environments.contains(&name.to_string()) {
             return Err(Error::EnvironmentDoesNotExist(name.to_string()));
@@ -246,10 +246,14 @@ impl TestnetDeploy {
         }
 
         // Get the inventory of all the nodes
-        let mut all_node_inventory = self.ansible_runner.inventory_list(genesis_inventory_path)?;
+        let mut all_node_inventory = self
+            .ansible_runner
+            .inventory_list(genesis_inventory_path, false)
+            .await?;
         all_node_inventory.extend(
             self.ansible_runner
-                .inventory_list(remaining_nodes_inventory_path)?,
+                .inventory_list(remaining_nodes_inventory_path, false)
+                .await?,
         );
         Ok(all_node_inventory)
     }

@@ -129,10 +129,15 @@ impl DeployCmd {
     async fn build_safe_network_binaries(&self) -> Result<()> {
         let start = Instant::now();
         println!("Obtaining IP address for build VM...");
-        let build_inventory = self.testnet_deploy.ansible_runner.inventory_list(
-            PathBuf::from("inventory")
-                .join(format!(".{}_build_inventory_digital_ocean.yml", self.name)),
-        )?;
+        let build_inventory = self
+            .testnet_deploy
+            .ansible_runner
+            .inventory_list(
+                PathBuf::from("inventory")
+                    .join(format!(".{}_build_inventory_digital_ocean.yml", self.name)),
+                true,
+            )
+            .await?;
         let build_ip = build_inventory[0].1;
         self.testnet_deploy.ssh_client.wait_for_ssh_availability(
             &build_ip,
@@ -154,13 +159,17 @@ impl DeployCmd {
 
     pub async fn provision_genesis_node(&self) -> Result<()> {
         let start = Instant::now();
-        let genesis_inventory =
-            self.testnet_deploy
-                .ansible_runner
-                .inventory_list(PathBuf::from("inventory").join(format!(
+        let genesis_inventory = self
+            .testnet_deploy
+            .ansible_runner
+            .inventory_list(
+                PathBuf::from("inventory").join(format!(
                     ".{}_genesis_inventory_digital_ocean.yml",
                     self.name
-                )))?;
+                )),
+                false,
+            )
+            .await?;
         let genesis_ip = genesis_inventory[0].1;
         self.testnet_deploy.ssh_client.wait_for_ssh_availability(
             &genesis_ip,
