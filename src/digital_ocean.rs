@@ -64,6 +64,7 @@ impl DigitalOceanClient {
                     ))?;
 
             for droplet_json in droplet_array {
+                debug!("Droplet json {droplet_json:?}");
                 let id = droplet_json["id"]
                     .as_u64()
                     .ok_or(Error::MalformedDigitalOceanApiRespose("id".to_string()))?;
@@ -78,14 +79,18 @@ impl DigitalOceanClient {
                     .iter()
                     .find(|x| x["type"].as_str().unwrap() == "public")
                     .ok_or(Error::DigitalOceanPublicIpAddressNotFound)?;
+                debug!("Got public ip {public_ip:?}");
+                let ip_address = Ipv4Addr::from_str(
+                    public_ip["ip_address"]
+                        .as_str()
+                        .ok_or(Error::DigitalOceanPublicIpAddressNotFound)?,
+                )?;
+                debug!("got ip address {ip_address:?}");
+
                 droplets.push(Droplet {
                     id: id as usize,
                     name,
-                    ip_address: Ipv4Addr::from_str(
-                        public_ip["ip_address"]
-                            .as_str()
-                            .ok_or(Error::DigitalOceanPublicIpAddressNotFound)?,
-                    )?,
+                    ip_address,
                 });
             }
 
