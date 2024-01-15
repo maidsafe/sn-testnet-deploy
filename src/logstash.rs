@@ -257,7 +257,7 @@ impl LogstashDeploy {
     }
 
     pub async fn get_stack_hosts(&self, name: &str) -> Result<Vec<SocketAddr>> {
-        let droplets = self.digital_ocean_client.list_droplets().await?;
+        let droplets = self.digital_ocean_client.list_droplets(true).await?;
         let stack_hosts: Vec<SocketAddr> = droplets
             .iter()
             .filter(|x| x.name.starts_with(&format!("logstash-{}", name)))
