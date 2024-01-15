@@ -25,7 +25,7 @@ pub struct DigitalOceanClient {
 }
 
 impl DigitalOceanClient {
-    pub async fn list_droplets(&self) -> Result<Vec<Droplet>> {
+    pub async fn list_droplets(&self, skip_if_no_ip: bool) -> Result<Vec<Droplet>> {
         let client = Client::new();
         let mut has_next_page = true;
         let mut page = 1;
@@ -64,7 +64,6 @@ impl DigitalOceanClient {
                     ))?;
 
             for droplet_json in droplet_array {
-                debug!("Droplet json {droplet_json:?}");
                 let id = droplet_json["id"]
                     .as_u64()
                     .ok_or(Error::MalformedDigitalOceanApiRespose("id".to_string()))?;
@@ -75,23 +74,38 @@ impl DigitalOceanClient {
                 let ip_address_array = droplet_json["networks"]["v4"].as_array().ok_or(
                     Error::MalformedDigitalOceanApiRespose("droplets".to_string()),
                 )?;
-                let public_ip = ip_address_array
-                    .iter()
-                    .find(|x| x["type"].as_str().unwrap() == "public")
-                    .ok_or(Error::DigitalOceanPublicIpAddressNotFound)?;
-                debug!("Got public ip {public_ip:?}");
-                let ip_address = Ipv4Addr::from_str(
-                    public_ip["ip_address"]
-                        .as_str()
-                        .ok_or(Error::DigitalOceanPublicIpAddressNotFound)?,
-                )?;
-                debug!("got ip address {ip_address:?}");
+                // The following might fail if we start multiple networks in parallel.
+                let get_ip_address = || -> Result<Ipv4Addr, Error> {
+                    let public_ip = ip_address_array
+                        .iter()
+                        .find(|x| x["type"].as_str().unwrap() == "public")
+                        .ok_or(Error::DigitalOceanPublicIpAddressNotFound)?;
 
-                droplets.push(Droplet {
-                    id: id as usize,
-                    name,
-                    ip_address,
-                });
+                    let ip_address = Ipv4Addr::from_str(
+                        public_ip["ip_address"]
+                            .as_str()
+                            .ok_or(Error::DigitalOceanPublicIpAddressNotFound)?,
+                    )?;
+
+                    Ok(ip_address)
+                };
+
+                match get_ip_address() {
+                    Ok(ip_address) => {
+                        droplets.push(Droplet {
+                            id: id as usize,
+                            name,
+                            ip_address,
+                        });
+                    }
+                    Err(err) => {
+                        if skip_if_no_ip {
+                            continue;
+                        } else {
+                            return Err(err);
+                        }
+                    }
+                }
             }
 
             let links_object = json["links"]
@@ -513,7 +527,7 @@ mod tests {
             page_size: DIGITAL_OCEAN_API_PAGE_SIZE,
         };
 
-        let droplets = client.list_droplets().await?;
+        let droplets = client.list_droplets(false).await?;
 
         assert_eq!(2, droplets.len());
         assert_eq!(118019015, droplets[0].id);
@@ -955,7 +969,7 @@ mod tests {
             page_size: 1,
         };
 
-        let droplets = client.list_droplets().await?;
+        let droplets = client.list_droplets(false).await?;
         assert_eq!(2, droplets.len());
         assert_eq!(118019015, droplets[0].id);
         assert_eq!("testnet-node-01", droplets[0].name);
@@ -997,7 +1011,7 @@ mod tests {
             page_size: 1,
         };
 
-        let result = client.list_droplets().await;
+        let result = client.list_droplets(false).await;
         match result {
             Ok(_) => return Err(eyre!("This test should return an error")),
             Err(e) => {
@@ -1034,7 +1048,7 @@ mod tests {
             page_size: 1,
         };
 
-        let result = client.list_droplets().await;
+        let result = client.list_droplets(false).await;
         match result {
             Ok(_) => return Err(eyre!("This test should return an error")),
             Err(e) => {
@@ -1435,7 +1449,7 @@ mod tests {
             page_size: DIGITAL_OCEAN_API_PAGE_SIZE,
         };
 
-        let droplets = client.list_droplets().await?;
+        let droplets = client.list_droplets(false).await?;
 
         assert_eq!(2, droplets.len());
         assert_eq!(118019015, droplets[0].id);
