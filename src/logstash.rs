@@ -221,10 +221,14 @@ impl LogstashDeploy {
 
     pub async fn provision(&self, name: &str) -> Result<()> {
         println!("Obtaining IP address for Logstash VM...");
-        let logstash_inventory = self.ansible_runner.inventory_list(
-            PathBuf::from("inventory")
-                .join(format!(".{name}_logstash_inventory_digital_ocean.yml")),
-        )?;
+        let logstash_inventory = self
+            .ansible_runner
+            .inventory_list(
+                PathBuf::from("inventory")
+                    .join(format!(".{name}_logstash_inventory_digital_ocean.yml")),
+                false,
+            )
+            .await?;
         let logstash_ip = logstash_inventory[0].1;
         self.ssh_client
             .wait_for_ssh_availability(&logstash_ip, &self.cloud_provider.get_ssh_user())?;

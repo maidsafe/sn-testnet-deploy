@@ -418,9 +418,14 @@ impl TestnetDeploy {
     }
 
     pub async fn get_genesis_multiaddr(&self, name: &str) -> Result<(String, IpAddr)> {
-        let genesis_inventory = self.ansible_runner.inventory_list(
-            PathBuf::from("inventory").join(format!(".{name}_genesis_inventory_digital_ocean.yml")),
-        )?;
+        let genesis_inventory = self
+            .ansible_runner
+            .inventory_list(
+                PathBuf::from("inventory")
+                    .join(format!(".{name}_genesis_inventory_digital_ocean.yml")),
+                false,
+            )
+            .await?;
         let genesis_ip = genesis_inventory[0].1;
         let node_info = self
             .rpc_client
@@ -479,11 +484,18 @@ impl TestnetDeploy {
             return Err(Error::EnvironmentDoesNotExist(name.to_string()));
         }
 
-        let genesis_inventory = self.ansible_runner.inventory_list(genesis_inventory_path)?;
-        let build_inventory = self.ansible_runner.inventory_list(build_inventory_path)?;
+        let genesis_inventory = self
+            .ansible_runner
+            .inventory_list(genesis_inventory_path, false)
+            .await?;
+        let build_inventory = self
+            .ansible_runner
+            .inventory_list(build_inventory_path, false)
+            .await?;
         let remaining_nodes_inventory = self
             .ansible_runner
-            .inventory_list(remaining_nodes_inventory_path)?;
+            .inventory_list(remaining_nodes_inventory_path, false)
+            .await?;
 
         // It also seems to be possible for a workspace and inventory files to still exist, but
         // there to be no inventory items returned. Perhaps someone deleted the VMs manually. We
