@@ -31,10 +31,10 @@
       - "{{ node_manager_archive_dest_path }}/safenode-manager"
       - add
       - --first
-      - --count=1
       - --port=12000
       - --rpc-port=12001
-      - "{{ ('--version=' + node_version) if node_version is defined else omit }}"
+      # - "{{ ('--version=' + node_version) if node_version is defined else omit }}"
+      - "{{ ('--url=' + node_archive_url) if node_archive_url is defined else omit }}"
   when: is_genesis
 
 - name: add node services
@@ -50,7 +50,8 @@
       - add
       - "--count={{ node_instance_count }}"
       - "--peer={{ genesis_multiaddr }}"
-      - "{{ ('--version=' + node_version) if node_version is defined else omit }}"
+      # - "{{ ('--version=' + node_version) if node_version is defined else omit }}"
+      - "{{ ('--url=' + node_archive_url) if node_archive_url is defined else omit }}"
   when: not is_genesis
 
 - name: start the node services

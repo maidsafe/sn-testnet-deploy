@@ -65,6 +65,14 @@ impl DeployCmd {
             err
         })?;
 
+        // Build
+        self.provision_safenode_rpc_client()
+            .await
+            .map_err(|err| {
+                println!("Failed to provision safenode rpc client {err:?}");
+                err
+            })?;
+
         let (multiaddr, _) = self
             .testnet_deploy
             .get_genesis_multiaddr(&self.name)
@@ -87,10 +95,11 @@ impl DeployCmd {
             err
         })?;
 
-        self.provision_safenode_rpc_client(&multiaddr)
+        // Run service
+        self.provision_safenode_rpc_client_service(&multiaddr)
             .await
             .map_err(|err| {
-                println!("Failed to provision safenode rpc client {err:?}");
+                println!("Failed to provision safenode rpc client service {err:?}");
                 err
             })?;
 
@@ -205,7 +214,7 @@ impl DeployCmd {
         Ok(())
     }
 
-    pub async fn provision_safenode_rpc_client(&self, genesis_multiaddr: &str) -> Result<()> {
+    pub async fn provision_safenode_rpc_client(&self) -> Result<()> {
         let start = Instant::now();
         println!("Running ansible against genesis node to deploy safenode_rpc_client...");
         self.testnet_deploy.ansible_runner.run_playbook(
@@ -215,7 +224,23 @@ impl DeployCmd {
                 self.name
             )),
             self.testnet_deploy.cloud_provider.get_ssh_user(),
-            Some(self.build_safenode_rpc_client_extra_vars_doc(genesis_multiaddr)?),
+            Some(self.build_safenode_rpc_client_extra_vars_doc()?),
+        )?;
+        print_duration(start.elapsed());
+        Ok(())
+    }
+
+    pub async fn provision_safenode_rpc_client_service(&self, genesis_multiaddr: &str) -> Result<()> {
+        let start = Instant::now();
+        println!("Running ansible against genesis node to start safenode_rpc_client service...");
+        self.testnet_deploy.ansible_runner.run_playbook(
+            PathBuf::from("safenode_rpc_client_service.yml"),
+            PathBuf::from("inventory").join(format!(
+                ".{}_genesis_inventory_digital_ocean.yml",
+                self.name
+            )),
+            self.testnet_deploy.cloud_provider.get_ssh_user(),
+            Some(self.start_safenode_rpc_client_service_extra_vars_doc(genesis_multiaddr)?),
         )?;
         print_duration(start.elapsed());
         Ok(())
@@ -391,7 +416,7 @@ impl DeployCmd {
         Ok(extra_vars)
     }
 
-    fn build_safenode_rpc_client_extra_vars_doc(&self, genesis_multiaddr: &str) -> Result<String> {
+    fn build_safenode_rpc_client_extra_vars_doc(&self) -> Result<String> {
         let mut extra_vars = String::new();
         extra_vars.push_str("{ ");
         Self::add_value(
@@ -400,7 +425,6 @@ impl DeployCmd {
             &self.testnet_deploy.cloud_provider.to_string(),
         );
         Self::add_value(&mut extra_vars, "testnet_name", &self.name);
-        Self::add_value(&mut extra_vars, "genesis_multiaddr", genesis_multiaddr);
         match &self.sn_codebase_type {
             SnCodebaseType::Branch {
                 repo_owner, branch, ..
@@ -424,6 +448,22 @@ impl DeployCmd {
                     "https://sn-node-rpc-client.s3.eu-west-2.amazonaws.com/safenode_rpc_client-latest-x86_64-unknown-linux-musl.tar.gz",);
             }
         }
+
+        let mut extra_vars = extra_vars.strip_suffix(", ").unwrap().to_string();
+        extra_vars.push_str(" }");
+        Ok(extra_vars)
+    }
+
+    fn start_safenode_rpc_client_service_extra_vars_doc(&self, genesis_multiaddr: &str) -> Result<String> {
+        let mut extra_vars = String::new();
+        extra_vars.push_str("{ ");
+        Self::add_value(
+            &mut extra_vars,
+            "provider",
+            &self.testnet_deploy.cloud_provider.to_string(),
+        );
+        Self::add_value(&mut extra_vars, "testnet_name", &self.name);
+        Self::add_value(&mut extra_vars, "genesis_multiaddr", genesis_multiaddr);
 
         let mut extra_vars = extra_vars.strip_suffix(", ").unwrap().to_string();
         extra_vars.push_str(" }");
