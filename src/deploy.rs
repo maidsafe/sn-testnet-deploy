@@ -174,7 +174,7 @@ impl DeployCmd {
                     ".{}_genesis_inventory_digital_ocean.yml",
                     self.name
                 )),
-                false,
+                true,
             )
             .await?;
         let genesis_ip = genesis_inventory[0].1;

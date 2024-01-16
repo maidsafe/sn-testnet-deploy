@@ -424,7 +424,7 @@ impl TestnetDeploy {
             .inventory_list(
                 PathBuf::from("inventory")
                     .join(format!(".{name}_genesis_inventory_digital_ocean.yml")),
-                false,
+                true,
             )
             .await?;
         let genesis_ip = genesis_inventory[0].1;
