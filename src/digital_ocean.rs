@@ -98,13 +98,8 @@ impl DigitalOceanClient {
                             ip_address,
                         });
                     }
-                    Err(err) => {
-                        if skip_if_no_ip {
-                            continue;
-                        } else {
-                            return Err(err);
-                        }
-                    }
+                    Err(_) if skip_if_no_ip => continue,
+                    Err(err) => return Err(err),
                 }
             }
 
