@@ -66,12 +66,10 @@ impl DeployCmd {
         })?;
 
         // Build
-        self.provision_safenode_rpc_client()
-            .await
-            .map_err(|err| {
-                println!("Failed to provision safenode rpc client {err:?}");
-                err
-            })?;
+        self.provision_safenode_rpc_client().await.map_err(|err| {
+            println!("Failed to provision safenode rpc client {err:?}");
+            err
+        })?;
 
         let (multiaddr, _) = self
             .testnet_deploy
@@ -221,7 +219,10 @@ impl DeployCmd {
         Ok(())
     }
 
-    pub async fn provision_safenode_rpc_client_service(&self, genesis_multiaddr: &str) -> Result<()> {
+    pub async fn provision_safenode_rpc_client_service(
+        &self,
+        genesis_multiaddr: &str,
+    ) -> Result<()> {
         let start = Instant::now();
         println!("Running ansible against genesis node to start safenode_rpc_client service...");
         self.testnet_deploy.ansible_runner.run_playbook(
@@ -445,7 +446,10 @@ impl DeployCmd {
         Ok(extra_vars)
     }
 
-    fn start_safenode_rpc_client_service_extra_vars_doc(&self, genesis_multiaddr: &str) -> Result<String> {
+    fn start_safenode_rpc_client_service_extra_vars_doc(
+        &self,
+        genesis_multiaddr: &str,
+    ) -> Result<String> {
         let mut extra_vars = String::new();
         extra_vars.push_str("{ ");
         Self::add_value(
