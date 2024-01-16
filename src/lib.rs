@@ -66,7 +66,6 @@ pub enum SnCodebaseType {
     Versioned {
         safe_version: String,
         safenode_version: String,
-        safenode_manager_version: String,
         // todo: make `faucet, rpc` versions optional?
     },
 }
@@ -155,12 +154,10 @@ impl DeploymentInventory {
             SnCodebaseType::Versioned {
                 safe_version,
                 safenode_version,
-                safenode_manager_version,
             } => {
                 println!("Version Details");
                 println!("===============");
                 println!("safenode version: {}", safenode_version);
-                println!("safenode manager version: {}", safenode_manager_version);
                 println!("safe version: {}", safe_version);
             }
         }
@@ -439,7 +436,7 @@ impl TestnetDeploy {
             &genesis_ip,
             "root",
             "/usr/local/bin/safenode_rpc_client 127.0.0.1:12001 info",
-            false
+            false,
         )?;
         let node_info = parse_output(output)?;
 
@@ -775,11 +772,9 @@ pub async fn notify_slack(inventory: DeploymentInventory) -> Result<()> {
         SnCodebaseType::Versioned {
             safe_version,
             safenode_version,
-            safenode_manager_version,
         } => {
             message.push_str("*Version Details*\n");
             message.push_str(&format!("safenode version: {}\n", safenode_version));
-            message.push_str(&format!("safenode manager version: {}\n", safenode_manager_version));
             message.push_str(&format!("safe version: {}\n", safe_version));
         }
     }
