@@ -159,6 +159,7 @@ impl AnsibleRunner {
         // error variant, which is very cumbersome. These paths are extremely unlikely to have any
         // unicode characters in them.
         let mut args = vec![
+            "-v".to_string(),
             "--inventory".to_string(),
             inventory_path.to_string_lossy().to_string(),
             "--private-key".to_string(),
