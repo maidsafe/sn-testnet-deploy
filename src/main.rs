@@ -49,7 +49,7 @@ enum Commands {
         #[arg(short = 'n', long)]
         name: String,
         /// The number of safenode processes to run on each VM.
-        #[clap(long, default_value = "20")]
+        #[clap(long, default_value = "40")]
         node_count: u16,
         /// The number of node VMs to create.
         ///
