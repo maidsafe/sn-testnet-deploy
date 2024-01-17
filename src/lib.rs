@@ -423,14 +423,6 @@ impl TestnetDeploy {
             PathBuf::from("inventory").join(format!(".{name}_genesis_inventory_digital_ocean.yml")),
         )?;
         let genesis_ip = genesis_inventory[0].1;
-        // let node_info = self
-        //     .rpc_client
-        //     // .get_info(format!("{}:12001", genesis_ip).parse()?, "root", &genesis_ip.to_string())?;
-        //     .get_info(
-        //         (Ipv4Addr::LOCALHOST, 12001).into(),
-        //         "root",
-        //         &genesis_ip.to_string(),
-        //     )?;
 
         let output = self.ssh_client.run_command(
             &genesis_ip,

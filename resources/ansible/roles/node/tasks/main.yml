@@ -31,9 +31,8 @@
       - "{{ node_manager_archive_dest_path }}/safenode-manager"
       - add
       - --first
-      - --port=12000
-      - --rpc-port=12001
-      # - "{{ ('--version=' + node_version) if node_version is defined else omit }}"
+      - --port={{ genesis_port }}
+      - --rpc-port={{ genesis_rpc_port }}
       - "{{ ('--url=' + node_archive_url) if node_archive_url is defined else omit }}"
   when: is_genesis
 
@@ -50,7 +49,6 @@
       - add
       - "--count={{ node_instance_count }}"
       - "--peer={{ genesis_multiaddr }}"
-      # - "{{ ('--version=' + node_version) if node_version is defined else omit }}"
       - "{{ ('--url=' + node_archive_url) if node_archive_url is defined else omit }}"
   when: not is_genesis
 
