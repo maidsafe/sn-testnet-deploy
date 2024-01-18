@@ -4,6 +4,7 @@ Description=Safe Faucet Service
 [Service]
 ExecStart={{ faucet_archive_dest_path }}/faucet \
   --peer {{ genesis_multiaddr }} \
+  --log-output-dest /var/log/safenode/faucet/logs \
   server
 StandardOutput=journal
 StandardError=inherit
