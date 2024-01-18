@@ -1,7 +1,7 @@
 #!/bin/bash
 
 NODE_DATA_DIR_PATH=~/.local/share/safe/node
-LOGFILE=$NODE_DATA_DIR_PATH/resource-usage.log
+LOGFILE=/var/log/safenode/resource-usage.log
 
 exec > >(tee -a $LOGFILE) 2>&1
 
