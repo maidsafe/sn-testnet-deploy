@@ -114,7 +114,7 @@ impl TestnetDeploy {
         let vm_path = log_abs_dest.join(vm_name);
         let mut rsync_args_clone = rsync_args.to_vec();
 
-        rsync_args_clone.push(format!("safe@{ip_address}:.local/share/safe/"));
+        rsync_args_clone.push(format!("safe@{ip_address}:/var/log/safenode/"));
         rsync_args_clone.push(vm_path.to_string_lossy().to_string());
 
         debug!("Rsync logs to our machine for {vm_name:?} : {ip_address}");
