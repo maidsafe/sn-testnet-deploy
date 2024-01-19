@@ -28,13 +28,14 @@ use crate::{
 };
 use flate2::read::GzDecoder;
 use indicatif::{ProgressBar, ProgressStyle};
-use log::debug;
+use log::{debug, error, trace};
 use rand::Rng;
 use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
 use rpc_client::parse_output;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 use std::{
+    collections::HashMap,
     fs::File,
     io::{BufRead, BufReader, BufWriter, Write},
     net::{IpAddr, SocketAddr},
@@ -44,6 +45,7 @@ use std::{
     time::Duration,
 };
 use tar::Archive;
+use walkdir::WalkDir;
 
 /// How or where to build the binaries from.
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -493,7 +495,7 @@ impl TestnetDeploy {
 
         let genesis_inventory = self
             .ansible_runner
-            .inventory_list(genesis_inventory_path, false)
+            .inventory_list(genesis_inventory_path.clone(), false)
             .await?;
         let build_inventory = self
             .ansible_runner
@@ -501,7 +503,7 @@ impl TestnetDeploy {
             .await?;
         let remaining_nodes_inventory = self
             .ansible_runner
-            .inventory_list(remaining_nodes_inventory_path, false)
+            .inventory_list(remaining_nodes_inventory_path.clone(), false)
             .await?;
 
         // It also seems to be possible for a workspace and inventory files to still exist, but
@@ -521,16 +523,73 @@ impl TestnetDeploy {
         }
         let (genesis_multiaddr, genesis_ip) = self.get_genesis_multiaddr(name).await?;
 
-        // To generate the rpc end points of each of the node.
-        // Genesis contains one node, and the rpc port is 12001
-        // For the other vms, the rpc ports starts from 12001 to (12000 + node_instance_count)
-        let mut rpc_endpoints = Vec::new();
-        rpc_endpoints.push(SocketAddr::new(genesis_inventory[0].1, 12001));
-        for (_, entry_ip) in remaining_nodes_inventory.iter() {
-            (1..node_instance_count.unwrap_or(0) + 1).for_each(|port_suffix| {
-                rpc_endpoints.push(SocketAddr::new(*entry_ip, 12000 + port_suffix));
-            })
-        }
+        // Get the rpc end points from the node-manager inventory file
+        let rpc_endpoints = {
+            debug!("Fetching node manager inventory");
+            let temp_dir_path = tempfile::tempdir()?.into_path();
+            let temp_dir_json = serde_json::to_string(&temp_dir_path)?;
+
+            self.ansible_runner.run_playbook(
+                PathBuf::from("node_manager_inventory.yml"),
+                remaining_nodes_inventory_path,
+                self.cloud_provider.get_ssh_user(),
+                Some(format!("{{ \"dest\": {temp_dir_json} }}")),
+            )?;
+            self.ansible_runner.run_playbook(
+                PathBuf::from("node_manager_inventory.yml"),
+                genesis_inventory_path,
+                self.cloud_provider.get_ssh_user(),
+                Some(format!("{{ \"dest\": {temp_dir_json} }}")),
+            )?;
+
+            let all_node_inventory = genesis_inventory
+                .iter()
+                .chain(remaining_nodes_inventory.iter())
+                .cloned()
+                .collect::<HashMap<_, _>>();
+
+            // collect the manager inventory file paths along with their respective ip addr
+            let manager_inventory_files = WalkDir::new(temp_dir_path)
+                .into_iter()
+                .flatten()
+                .filter_map(|entry| {
+                    if entry.file_type().is_file()
+                        && entry.path().extension().is_some_and(|ext| ext == "json")
+                    {
+                        // tempdir/<testnet_name>-node/var/safenode-manager/node_registry.json
+                        let mut vm_name = entry.path().to_path_buf();
+                        trace!("Found file with json extension: {vm_name:?}");
+                        vm_name.pop();
+                        vm_name.pop();
+                        vm_name.pop();
+                        // Extract the <testnet_name>-node string
+                        trace!("Extracting the vm name from the path");
+                        let vm_name = vm_name.file_name()?.to_str()?;
+                        trace!("Extracted vm name from path: {vm_name}");
+                        if let Some(ip_addr) = all_node_inventory.get(vm_name) {
+                            Some((entry.path().to_path_buf(), *ip_addr))
+                        } else {
+                            error!("Could not obtain ip addr for the provided vm name {vm_name:?}");
+                            None
+                        }
+                    } else {
+                        None
+                    }
+                })
+                .collect::<Vec<(PathBuf, IpAddr)>>();
+
+            manager_inventory_files
+                .par_iter()
+                .flat_map(|(file_path, ip_addr)| {
+                    match get_rpc_ports_from_manager_inventory(file_path) {
+                        Ok(rpc_ports) => rpc_ports
+                            .map(|port| Ok(SocketAddr::new(*ip_addr, port)))
+                            .collect::<Vec<_>>(),
+                        Err(e) => vec![Err(e)],
+                    }
+                })
+                .collect::<Result<Vec<SocketAddr>>>()?
+        };
 
         // The scripts are relative to the `resources` directory, so we need to change the current
         // working directory back to that location first.
@@ -829,4 +888,23 @@ pub fn get_progress_bar(length: u64) -> Result<ProgressBar> {
     );
     progress_bar.enable_steady_tick(Duration::from_millis(100));
     Ok(progress_bar)
+}
+
+fn get_rpc_ports_from_manager_inventory(
+    inventory_file_path: &PathBuf,
+) -> Result<impl Iterator<Item = u16>> {
+    #[derive(Deserialize)]
+    struct NodeRegistry {
+        nodes: Vec<Node>,
+    }
+    #[derive(Deserialize)]
+    struct Node {
+        rpc_port: u16,
+    }
+
+    let file = File::open(inventory_file_path)?;
+    let reader = BufReader::new(file);
+    let node_registry: Result<NodeRegistry, _> = serde_json::from_reader(reader);
+    let rpc_ports = node_registry?.nodes.into_iter().map(|node| node.rpc_port);
+    Ok(rpc_ports)
 }

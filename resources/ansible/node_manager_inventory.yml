@@ -1,0 +1,11 @@
+---
+- name: fetch node manager inventory from remote machines
+  hosts: all
+  ignore_unreachable: yes
+  max_fail_percentage: 10
+  tasks:
+    - name: fetch inventory file
+      fetch:
+        src: "/var/safenode-manager/node_registry.json"
+        dest: "{{dest}}"
+        flat: no
