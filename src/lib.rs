@@ -537,11 +537,12 @@ impl TestnetDeploy {
         std::env::set_current_dir(self.working_directory_path.clone())?;
         println!("Retrieving sample peers. This can take a minute.");
         // Todo: RPC into nodes to fetch the multiaddr.
+        let peers_progress_bar = get_progress_bar(remaining_nodes_inventory.len() as u64)?;
         let peers = remaining_nodes_inventory
             .par_iter()
             .filter_map(|(vm_name, ip_address)| {
                 let ip_address = *ip_address;
-                match self.ssh_client.run_script(
+                let op = match self.ssh_client.run_script(
                     ip_address,
                     "safe",
                     PathBuf::from("scripts").join("get_peer_multiaddr.sh"),
@@ -552,10 +553,13 @@ impl TestnetDeploy {
                         println!("Failed to SSH into {vm_name:?}: {ip_address} with err: {err:?}");
                         None
                     }
-                }
+                };
+                peers_progress_bar.inc(1);
+                op
             })
             .flatten()
             .collect::<Vec<_>>();
+        peers_progress_bar.finish_and_clear();
 
         // The VM list includes the genesis node and the build machine, hence the subtraction of 2
         // from the total VM count. After that, add one node for genesis, since this machine only
