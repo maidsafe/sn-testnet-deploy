@@ -14,6 +14,7 @@ use sn_testnet_deploy::{
     setup::setup_dotenv_file, CloudProvider, DeploymentInventory, SnCodebaseType,
     TestnetDeployBuilder,
 };
+use url::Url;
 
 pub fn parse_provider(val: &str) -> Result<CloudProvider> {
     match val {
@@ -109,6 +110,11 @@ enum Commands {
         /// --branch and --repo-owner arguments. You can only supply version numbers or a custom
         /// branch, not both.
         safenode_version: Option<String>,
+        /// Optionally supply the URL of a gzipped tar archive containing a node manager binary.
+        ///
+        /// Useful for testing experimental versions of the node manager.
+        #[arg(long)]
+        node_manager_url: Option<String>,
     },
     Inventory {
         /// The name of the environment
@@ -303,7 +309,7 @@ async fn main() -> Result<()> {
             logstash_stack_name,
             safe_version,
             safenode_version,
-            ..
+            node_manager_url,
         }) => {
             let sn_codebase_type = get_sn_codebase_type(
                 branch,
@@ -343,6 +349,11 @@ async fn main() -> Result<()> {
             let stack_hosts = logstash_deploy
                 .get_stack_hosts(&logstash_stack_name)
                 .await?;
+            let node_manager_url = if let Some(node_manager_url) = node_manager_url {
+                Some(Url::parse(&node_manager_url)?)
+            } else {
+                None
+            };
             let deploy_cmd = DeployCmd::new(
                 testnet_deploy,
                 name,
@@ -350,6 +361,7 @@ async fn main() -> Result<()> {
                 vm_count,
                 (logstash_stack_name, stack_hosts),
                 sn_codebase_type,
+                node_manager_url,
             );
             deploy_cmd.execute().await?;
             Ok(())

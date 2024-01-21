@@ -9,6 +9,7 @@ use crate::{
     print_duration, SnCodebaseType, TestnetDeploy,
 };
 use std::{net::SocketAddr, path::PathBuf, time::Instant};
+use url::Url;
 
 pub struct DeployCmd {
     testnet_deploy: TestnetDeploy,
@@ -17,6 +18,7 @@ pub struct DeployCmd {
     vm_count: u16,
     logstash_details: (String, Vec<SocketAddr>),
     sn_codebase_type: SnCodebaseType,
+    node_manager_url: Option<Url>,
 }
 
 impl DeployCmd {
@@ -28,6 +30,7 @@ impl DeployCmd {
         vm_count: u16,
         logstash_details: (String, Vec<SocketAddr>),
         sn_codebase_type: SnCodebaseType,
+        node_manager_url: Option<Url>,
     ) -> Self {
         Self {
             testnet_deploy,
@@ -36,6 +39,7 @@ impl DeployCmd {
             vm_count,
             logstash_details,
             sn_codebase_type,
+            node_manager_url,
         }
     }
 
@@ -365,6 +369,14 @@ impl DeployCmd {
             }
         };
         Self::add_value(&mut extra_vars, "node_archive_url", &node_archive_url);
+
+        if let Some(node_manager_url) = self.node_manager_url.as_ref() {
+            Self::add_value(
+                &mut extra_vars,
+                "node_manager_archive_url",
+                node_manager_url.as_ref(),
+            );
+        }
 
         let (logstash_stack_name, logstash_hosts) = &self.logstash_details;
         Self::add_value(&mut extra_vars, "logstash_stack_name", logstash_stack_name);
