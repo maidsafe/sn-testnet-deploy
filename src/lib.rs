@@ -170,7 +170,7 @@ impl DeploymentInventory {
         println!("SSH user: {}", self.ssh_user);
         println!("Sample Peers");
         println!("============");
-        for peer in self.peers.iter() {
+        for peer in self.peers.iter().take(10) {
             println!("{peer}");
         }
         println!("Genesis multiaddr: {}", self.genesis_multiaddr);
@@ -523,8 +523,12 @@ impl TestnetDeploy {
         }
         let (genesis_multiaddr, genesis_ip) = self.get_genesis_multiaddr(name).await?;
 
-        // Get the rpc end points from the node-manager inventory file
-        let rpc_endpoints = {
+        println!("Retrieving node manager inventory. This can take a minute.");
+        let node_manager_inv_progress =
+            get_progress_bar(remaining_nodes_inventory.len() as u64 + 1)?;
+
+        // Get peer ids and rpc addr from node manager inventory file
+        let node_manager_inventories = {
             debug!("Fetching node manager inventory");
             let temp_dir_path = tempfile::tempdir()?.into_path();
             let temp_dir_json = serde_json::to_string(&temp_dir_path)?;
@@ -569,6 +573,7 @@ impl TestnetDeploy {
                         if let Some(ip_addr) = all_node_inventory.get(vm_name) {
                             Some((entry.path().to_path_buf(), *ip_addr))
                         } else {
+                            // todo: throw error
                             error!("Could not obtain ip addr for the provided vm name {vm_name:?}");
                             None
                         }
@@ -581,44 +586,33 @@ impl TestnetDeploy {
             manager_inventory_files
                 .par_iter()
                 .flat_map(|(file_path, ip_addr)| {
-                    match get_rpc_ports_from_manager_inventory(file_path) {
-                        Ok(rpc_ports) => rpc_ports
-                            .map(|port| Ok(SocketAddr::new(*ip_addr, port)))
-                            .collect::<Vec<_>>(),
-                        Err(e) => vec![Err(e)],
-                    }
+                    let res = match get_node_manager_inventory(file_path) {
+                        Ok(inventory) => vec![Ok((inventory, *ip_addr))],
+                        Err(err) => vec![Err(err)],
+                    };
+                    node_manager_inv_progress.inc(1);
+                    res
                 })
-                .collect::<Result<Vec<SocketAddr>>>()?
+                .collect::<Result<Vec<(NodeManagerInventory, IpAddr)>>>()?
         };
+        node_manager_inv_progress.finish_and_clear();
 
-        // The scripts are relative to the `resources` directory, so we need to change the current
-        // working directory back to that location first.
-        std::env::set_current_dir(self.working_directory_path.clone())?;
-        println!("Retrieving sample peers. This can take a minute.");
-        // Todo: RPC into nodes to fetch the multiaddr.
-        let peers_progress_bar = get_progress_bar(remaining_nodes_inventory.len() as u64)?;
-        let peers = remaining_nodes_inventory
-            .par_iter()
-            .filter_map(|(vm_name, ip_address)| {
-                let ip_address = *ip_address;
-                let op = match self.ssh_client.run_script(
-                    ip_address,
-                    "safe",
-                    PathBuf::from("scripts").join("get_peer_multiaddr.sh"),
-                    true,
-                ) {
-                    Ok(output) => Some(output),
-                    Err(err) => {
-                        println!("Failed to SSH into {vm_name:?}: {ip_address} with err: {err:?}");
-                        None
-                    }
-                };
-                peers_progress_bar.inc(1);
-                op
-            })
-            .flatten()
-            .collect::<Vec<_>>();
-        peers_progress_bar.finish_and_clear();
+        let mut rpc_endpoints = Vec::new();
+        let mut peers = Vec::new();
+
+        for (node_manager_inventory, ip_addr) in node_manager_inventories {
+            let vm_rpc_ports = node_manager_inventory
+                .nodes
+                .iter()
+                .map(|node| SocketAddr::new(ip_addr, node.rpc_port));
+            rpc_endpoints.extend(vm_rpc_ports);
+
+            let vm_peers = node_manager_inventory
+                .nodes
+                .into_iter()
+                .filter_map(|node| node.peer_id);
+            peers.extend(vm_peers);
+        }
 
         // The VM list includes the genesis node and the build machine, hence the subtraction of 2
         // from the total VM count. After that, add one node for genesis, since this machine only
@@ -890,21 +884,19 @@ pub fn get_progress_bar(length: u64) -> Result<ProgressBar> {
     Ok(progress_bar)
 }
 
-fn get_rpc_ports_from_manager_inventory(
-    inventory_file_path: &PathBuf,
-) -> Result<impl Iterator<Item = u16>> {
-    #[derive(Deserialize)]
-    struct NodeRegistry {
-        nodes: Vec<Node>,
-    }
-    #[derive(Deserialize)]
-    struct Node {
-        rpc_port: u16,
-    }
+#[derive(Deserialize)]
+struct NodeManagerInventory {
+    nodes: Vec<Node>,
+}
+#[derive(Deserialize)]
+struct Node {
+    rpc_port: u16,
+    peer_id: Option<String>,
+}
 
+fn get_node_manager_inventory(inventory_file_path: &PathBuf) -> Result<NodeManagerInventory> {
     let file = File::open(inventory_file_path)?;
     let reader = BufReader::new(file);
-    let node_registry: Result<NodeRegistry, _> = serde_json::from_reader(reader);
-    let rpc_ports = node_registry?.nodes.into_iter().map(|node| node.rpc_port);
-    Ok(rpc_ports)
+    let inventory = serde_json::from_reader(reader)?;
+    Ok(inventory)
 }
