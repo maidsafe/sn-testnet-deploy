@@ -439,7 +439,10 @@ impl TestnetDeploy {
         )?;
         let node_info = parse_output(output)?;
 
-        let multiaddr = format!("/ip4/{}/tcp/12000/p2p/{}", genesis_ip, node_info.peer_id);
+        let multiaddr = format!(
+            "/ip4/{genesis_ip}/udp/12000/quic-v1/p2p/{}",
+            node_info.peer_id
+        );
         // The genesis_ip is obviously inside the multiaddr, but it's just being returned as a
         // separate item for convenience.
         Ok((multiaddr, genesis_ip))
