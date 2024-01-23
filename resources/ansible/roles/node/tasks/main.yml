@@ -70,8 +70,7 @@
 
 - name: calculate number of nodes to add
   set_fact:
-    nodes_to_add: "{{ node_instance_count | int - current_node_count | int }}"
-  when: current_node_count is defined
+    nodes_to_add: "{{ node_instance_count | int - (current_node_count | default(0)) | int }}"
 
 - name: add node services
   become: True
