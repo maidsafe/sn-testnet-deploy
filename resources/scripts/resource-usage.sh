@@ -1,6 +1,7 @@
 #!/bin/bash
 
-NODE_DATA_DIR_PATH=~/.local/share/safe/node
+NODE_ROOT_DIR_PATH="/var/safenode-manager/services"
+NODE_LOG_DIR_PATH="/var/log/safenode"
 LOGFILE=/var/log/safenode/resource-usage.log
 
 exec > >(tee -a $LOGFILE) 2>&1
@@ -21,10 +22,17 @@ while true; do
     "Store Cost" \
     "RT Nodes"
   running_process_count=0
-  for folder in $NODE_DATA_DIR_PATH/*; do
-    if [ ! -d "$folder" ]; then continue; fi
-    peer_id=$(basename "$folder")
-    pid=$(cat "$folder/safenode.pid")
+  for root_dir in "$NODE_ROOT_DIR_PATH"/*; do
+    if [ ! -d "$root_dir" ]; then continue; fi
+    safe_node_instance=$(basename "$root_dir")
+    node_log_path="${NODE_LOG_DIR_PATH}/${safe_node_instance}"
+    
+    peer_id=$(
+      rg 'Self PeerID' "${node_log_path}" --no-line-number --no-filename |
+      grep -o '12D3Koo[^ ]*'
+    )
+    pid=$(cat "$root_dir/safenode.pid")
+
     if [ -z "$pid" ]; then
       echo "No PID found for $peer_id"
       continue
@@ -35,22 +43,22 @@ while true; do
     fi
     rss=$(ps -p $pid -o rss=)
     cpu=$(top -b -n1 -p $pid | awk 'NR>7 {print $9}')
-    count=$(find "$folder/record_store" -name '*' -not -name '*.pid' -type f | wc -l)
+    count=$(find "$root_dir/record_store" -name '*' -not -name '*.pid' -type f | wc -l)
     con_count=$(ss -tunpa | grep ESTAB | grep =$pid -c)
     earned=$(
-      rg 'new wallet balance is [^,]*' $folder/logs -o --no-line-number --no-filename |
+      rg 'new wallet balance is [^,]*' $node_log_path -o --no-line-number --no-filename |
       awk '{split($0, arr, " "); print arr[5]}' |
       sort -n |
       tail -n 1
     )
     store_cost=$(
-      rg 'Cost is now [^ ]*' $folder/logs -o --no-line-number --no-filename |
+      rg 'Cost is now [^ ]*' $node_log_path -o --no-line-number --no-filename |
       awk '{split($0, arr, " "); print arr[4]}' |
       sort -n |
       tail -n 1
     )
     rt_nodes=$(
-      rg 'kbuckets [^,]*' $folder/logs -o --no-line-number --no-filename |
+      rg 'kbuckets [^,]*' $node_log_path -o --no-line-number --no-filename |
       awk '{split($0, arr, " "); print arr[2]}' |
       sort -n |
       tail -n 1
