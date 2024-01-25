@@ -5,7 +5,10 @@
 // Please see the LICENSE file for more details.
 
 use clap::{Parser, Subcommand};
-use color_eyre::{eyre::eyre, Help, Result};
+use color_eyre::{
+    eyre::{bail, eyre},
+    Help, Result,
+};
 use dotenv::dotenv;
 use rand::Rng;
 use sn_testnet_deploy::{
@@ -313,7 +316,8 @@ async fn main() -> Result<()> {
                 safe_version,
                 safenode_version,
                 safenode_features,
-            )?;
+            )
+            .await?;
 
             let testnet_deploy = TestnetDeployBuilder::default()
                 .ansible_verbose_mode(ansible_verbose.unwrap_or(false))
@@ -364,7 +368,8 @@ async fn main() -> Result<()> {
             repo_owner,
             node_count,
         }) => {
-            let sn_codebase_type = get_sn_codebase_type(branch, repo_owner, None, None, None)?;
+            let sn_codebase_type =
+                get_sn_codebase_type(branch, repo_owner, None, None, None).await?;
 
             let testnet_deploy = TestnetDeployBuilder::default().provider(provider).build()?;
             testnet_deploy
@@ -506,7 +511,7 @@ async fn main() -> Result<()> {
 
 // Validate the branch and version args along with the feature list
 #[allow(clippy::type_complexity)]
-fn get_sn_codebase_type(
+async fn get_sn_codebase_type(
     branch: Option<String>,
     repo_owner: Option<String>,
     safe_version: Option<String>,
@@ -547,6 +552,13 @@ fn get_sn_codebase_type(
     let safenode_features = safenode_features.map(|list| list.join(","));
 
     let codebase_type = if let (Some(repo_owner), Some(branch)) = (repo_owner, branch) {
+        // check if the custom branch exists.
+
+        let url = format!("https://github.com/{repo_owner}/safe_network/tree/{branch}",);
+        let response = reqwest::get(&url).await?;
+        if !response.status().is_success() {
+            bail!("The provided branch or owner does not exists: {url:?}");
+        }
         SnCodebaseType::Branch {
             repo_owner,
             branch,
