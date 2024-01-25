@@ -1,11 +1,9 @@
 ---
-# The `instance_private_ip` is also used in the service definition file.
 - name: get the private IP for the instance
   set_fact:
     node_rpc_ip: "{{ instance_facts.instances[0].network_interfaces[0].private_ip_address }}"
   when: provider == "aws"
 
-# The `node_rpc_ip` is also used in the service definition file.
 - name: use the public IP as the RPC address on DO
   set_fact:
     node_rpc_ip: "{{ ansible_host }}"
@@ -48,7 +46,7 @@
       - add
       - --first
       - --port={{ genesis_port }}
-      - --rpc-port={{ genesis_rpc_port }}
+      - --rpc-address={{ node_rpc_ip }}
       - --url={{ node_archive_url }}
   when: is_genesis and not genesis_exists | default(false)
 
@@ -80,6 +78,7 @@
       - add
       - "--count={{ nodes_to_add }}"
       - "--peer={{ genesis_multiaddr }}"
+      - --rpc-address={{ node_rpc_ip }}
       - --url={{ node_archive_url }}
   when: not is_genesis and nodes_to_add | default(0) | int > 0
 
