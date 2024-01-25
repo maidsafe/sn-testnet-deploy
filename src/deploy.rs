@@ -10,7 +10,6 @@ use crate::{
 };
 use colored::Colorize;
 use std::{net::SocketAddr, path::PathBuf, time::Instant};
-use url::Url;
 
 pub struct DeployCmd {
     testnet_deploy: TestnetDeploy,
@@ -19,7 +18,6 @@ pub struct DeployCmd {
     vm_count: u16,
     logstash_details: (String, Vec<SocketAddr>),
     sn_codebase_type: SnCodebaseType,
-    node_manager_url: Option<Url>,
 }
 
 impl DeployCmd {
@@ -31,7 +29,6 @@ impl DeployCmd {
         vm_count: u16,
         logstash_details: (String, Vec<SocketAddr>),
         sn_codebase_type: SnCodebaseType,
-        node_manager_url: Option<Url>,
     ) -> Self {
         Self {
             testnet_deploy,
@@ -40,7 +37,6 @@ impl DeployCmd {
             vm_count,
             logstash_details,
             sn_codebase_type,
-            node_manager_url,
         }
     }
 
@@ -399,12 +395,29 @@ impl DeployCmd {
         };
         Self::add_value(&mut extra_vars, "node_archive_url", &node_archive_url);
 
-        if let Some(node_manager_url) = self.node_manager_url.as_ref() {
-            Self::add_value(
+        match &self.sn_codebase_type {
+            SnCodebaseType::Branch {
+                repo_owner, branch, ..
+            } => {
+                Self::add_value(&mut extra_vars, "branch", branch);
+                Self::add_value(&mut extra_vars, "org", repo_owner);
+                Self::add_value(
                 &mut extra_vars,
                 "node_manager_archive_url",
-                node_manager_url.as_ref(),
+                &format!(
+                    "https://sn-node.s3.eu-west-2.amazonaws.com/{}/{}/safenode-manager-{}-x86_64-unknown-linux-musl.tar.gz",
+                    repo_owner,
+                    branch,
+                    &self.name),
             );
+            }
+            _ => {
+                Self::add_value(
+                    &mut extra_vars,
+                    "node_manager_archive_url",
+                    "https://sn-node-manager.s3.eu-west-2.amazonaws.com/safenode-manager-latest-x86_64-unknown-linux-musl.tar.gz",
+                );
+            }
         }
 
         let (logstash_stack_name, logstash_hosts) = &self.logstash_details;
