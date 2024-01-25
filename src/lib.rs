@@ -135,7 +135,7 @@ impl DeploymentInventory {
         random_peer.to_string()
     }
 
-    pub fn print_report(&self) {
+    pub fn print_report(&self) -> Result<()> {
         println!("**************************************");
         println!("*                                    *");
         println!("*          Inventory Report          *");
@@ -168,12 +168,13 @@ impl DeploymentInventory {
             println!("{}: {}", vm.0, vm.1);
         }
         println!("SSH user: {}", self.ssh_user);
-        println!("Sample Peers");
+        let testnet_dir = get_data_directory()?;
+        println!("Sample Peers (Entire list can be found inside {testnet_dir:?})",);
         println!("============");
-        for peer in self.peers.iter() {
+        for peer in self.peers.iter().take(10) {
             println!("{peer}");
         }
-        println!("Genesis multiaddr: {}", self.genesis_multiaddr);
+        println!("\nGenesis multiaddr: {}", self.genesis_multiaddr);
         println!("Faucet address: {}", self.faucet_address);
         println!("Check the faucet:");
         println!(
@@ -187,6 +188,7 @@ impl DeploymentInventory {
                 println!("{}: {}", file.0, file.1);
             }
         }
+        Ok(())
     }
 }
 
@@ -466,7 +468,7 @@ impl TestnetDeploy {
         let inventory_path = get_data_directory()?.join(format!("{name}-inventory.json"));
         if inventory_path.exists() && !force_regeneration {
             let inventory = DeploymentInventory::read(&inventory_path)?;
-            inventory.print_report();
+            inventory.print_report()?;
             return Ok(());
         }
 
@@ -646,7 +648,7 @@ impl TestnetDeploy {
             faucet_address: format!("{}:8000", genesis_ip),
             uploaded_files: Vec::new(),
         };
-        inventory.print_report();
+        inventory.print_report()?;
         inventory.save(&inventory_path)?;
 
         Ok(())
