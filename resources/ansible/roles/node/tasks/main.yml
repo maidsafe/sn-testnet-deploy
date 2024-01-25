@@ -40,11 +40,7 @@
 - name: add genesis node service
   become: True
   ansible.builtin.command:
-    # The `omit` filter is used to remove the `--version` argument if the
-    # `node_version` variable is not defined. If the argv would be otherwise
-    # defined as '', the command would fail as it doesn't expect an empty
-    # argument, so it's omitted instead.
-    argv: "{{ command_args | reject('equalto', omit) | list }}"
+    argv: "{{ command_args | list }}"
   vars:
     command_args:
       - "{{ node_manager_archive_dest_path }}/safenode-manager"
@@ -53,7 +49,7 @@
       - --first
       - --port={{ genesis_port }}
       - --rpc-port={{ genesis_rpc_port }}
-      - "{{ ('--url=' + node_archive_url) if node_archive_url is defined else omit }}"
+      - --url={{ node_archive_url }}
   when: is_genesis and not genesis_exists | default(false)
 
 #
@@ -76,7 +72,7 @@
 - name: add node services
   become: True
   ansible.builtin.command:
-    argv: "{{ command_args | reject('equalto', omit) | list }}"
+    argv: "{{ command_args | list }}"
   vars:
     command_args:
       - "{{ node_manager_archive_dest_path }}/safenode-manager"
@@ -84,7 +80,7 @@
       - add
       - "--count={{ nodes_to_add }}"
       - "--peer={{ genesis_multiaddr }}"
-      - "{{ ('--url=' + node_archive_url) if node_archive_url is defined else omit }}"
+      - --url={{ node_archive_url }}
   when: not is_genesis and nodes_to_add | default(0) | int > 0
 
 - name: start the node services

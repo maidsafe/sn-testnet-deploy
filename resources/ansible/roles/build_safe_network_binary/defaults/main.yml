@@ -1,6 +1,7 @@
 bin_name: safenode
 org: maidsafe
 branch: main
+# The archive is stored inside "https://sn-node.s3.eu-west-2.amazonaws.com/{org}/{branch}/{bin_name}-{testnet_name}-x86_64-unknown-linux-musl.tar.gz"
 bin_archive_filename: "{{ bin_name }}-{{ testnet_name }}-x86_64-unknown-linux-musl.tar.gz"
 # csv of the features that you want to enable on safenode. By default, none of the features are enabled.
 safenode_features_list: ""
