@@ -33,6 +33,7 @@
     chdir: /tmp/
     cmd: tar -zcvf {{ bin_archive_filename }} {{ bin_name }}
 
+# Uploads the archive to "https://sn-node.s3.eu-west-2.amazonaws.com/{org}/{branch}/{bin_name}-{testnet_name}-x86_64-unknown-linux-musl.tar.gz",
 - name: upload archive to S3
   amazon.aws.s3_object:
     access_key: AKIAVVODCRMSELAPBQHK
