@@ -169,11 +169,13 @@ impl DeploymentInventory {
         }
         println!("SSH user: {}", self.ssh_user);
         let testnet_dir = get_data_directory()?;
-        println!("Sample Peers (Entire list can be found inside {testnet_dir:?})",);
+        println!("Sample Peers",);
         println!("============");
         for peer in self.peers.iter().take(10) {
             println!("{peer}");
         }
+        println!("The entire peer list can be found at {testnet_dir:?}",);
+
         println!("\nGenesis multiaddr: {}", self.genesis_multiaddr);
         println!("Faucet address: {}", self.faucet_address);
         println!("Check the faucet:");
