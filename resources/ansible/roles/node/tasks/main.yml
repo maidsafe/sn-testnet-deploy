@@ -48,6 +48,7 @@
   vars:
     command_args:
       - "{{ node_manager_archive_dest_path }}/safenode-manager"
+      - -v
       - add
       - --first
       - --port={{ genesis_port }}
@@ -79,6 +80,7 @@
   vars:
     command_args:
       - "{{ node_manager_archive_dest_path }}/safenode-manager"
+      - -v
       - add
       - "--count={{ nodes_to_add }}"
       - "--peer={{ genesis_multiaddr }}"
@@ -87,4 +89,4 @@
 
 - name: start the node services
   become: True
-  command: safenode-manager start
+  command: safenode-manager -v start
