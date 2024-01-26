@@ -8,6 +8,7 @@ use crate::{
     error::{Error, Result},
     print_duration, SnCodebaseType, TestnetDeploy,
 };
+use colored::Colorize;
 use std::{net::SocketAddr, path::PathBuf, time::Instant};
 use url::Url;
 
@@ -57,23 +58,31 @@ impl DeployCmd {
                 println!("Failed to create infra {err:?}");
                 err
             })?;
+
+        let mut n = 1;
+        let total = if build_custom_binaries { 6 } else { 5 };
         if build_custom_binaries {
+            self.print_ansible_run_banner(n, total, "Build Custom Binaries");
             self.build_safe_network_binaries().await.map_err(|err| {
                 println!("Failed to build safe network binaries {err:?}");
                 err
             })?;
+            n += 1;
         }
 
+        self.print_ansible_run_banner(n, total, "Provision Genesis Node");
         self.provision_genesis_node().await.map_err(|err| {
             println!("Failed to provision genesis node {err:?}");
             err
         })?;
+        n += 1;
 
-        // Build
+        self.print_ansible_run_banner(n, total, "Provision RPC Client on Genesis Node");
         self.provision_safenode_rpc_client().await.map_err(|err| {
             println!("Failed to provision safenode rpc client {err:?}");
             err
         })?;
+        n += 1;
 
         let (multiaddr, _) = self
             .testnet_deploy
@@ -85,19 +94,27 @@ impl DeployCmd {
             })?;
         println!("Obtained multiaddr for genesis node: {multiaddr}");
 
-        self.provision_remaining_nodes(&multiaddr)
-            .await
-            .map_err(|err| {
-                println!("Failed to provision remaining nodes {err:?}");
-                err
-            })?;
+        let mut node_provision_failed = false;
+        self.print_ansible_run_banner(n, total, "Provision Remaining Nodes");
+        let result = self.provision_remaining_nodes(&multiaddr).await;
+        match result {
+            Ok(()) => {
+                println!("Provisioned all remaining nodes");
+            }
+            Err(_) => {
+                node_provision_failed = true;
+            }
+        }
+        n += 1;
 
+        self.print_ansible_run_banner(n, total, "Deploy Faucet");
         self.provision_faucet(&multiaddr).await.map_err(|err| {
             println!("Failed to provision faucet {err:?}");
             err
         })?;
+        n += 1;
 
-        // Run service
+        self.print_ansible_run_banner(n, total, "Start RPC Client Service");
         self.provision_safenode_rpc_client_service(&multiaddr)
             .await
             .map_err(|err| {
@@ -117,6 +134,15 @@ impl DeployCmd {
                 println!("Failed to list inventory {err:?}");
                 err
             })?;
+
+        if node_provision_failed {
+            println!();
+            println!("{}", "WARNING!".yellow());
+            println!("Some nodes failed to provision without error.");
+            println!("This usually means a small number of nodes failed to start on a few VMs.");
+            println!("However, most of the time the deployment will still be usable.");
+            println!("See the output from Ansible to determine which VMs had failures.");
+        }
 
         Ok(())
     }
@@ -186,7 +212,6 @@ impl DeployCmd {
             &genesis_ip,
             &self.testnet_deploy.cloud_provider.get_ssh_user(),
         )?;
-        println!("Running ansible against genesis node...");
         self.testnet_deploy.ansible_runner.run_playbook(
             PathBuf::from("genesis_node.yml"),
             PathBuf::from("inventory").join(format!(
@@ -218,7 +243,6 @@ impl DeployCmd {
 
     pub async fn provision_safenode_rpc_client(&self) -> Result<()> {
         let start = Instant::now();
-        println!("Running ansible against genesis node to deploy safenode_rpc_client...");
         self.testnet_deploy.ansible_runner.run_playbook(
             PathBuf::from("safenode_rpc_client.yml"),
             PathBuf::from("inventory").join(format!(
@@ -253,7 +277,6 @@ impl DeployCmd {
 
     pub async fn provision_remaining_nodes(&self, genesis_multiaddr: &str) -> Result<()> {
         let start = Instant::now();
-        println!("Running ansible against remaining nodes...");
         self.testnet_deploy.ansible_runner.run_playbook(
             PathBuf::from("nodes.yml"),
             PathBuf::from("inventory")
@@ -269,6 +292,12 @@ impl DeployCmd {
     }
 
     /// Helpers
+
+    fn print_ansible_run_banner(&self, n: usize, total: usize, s: &str) {
+        let ansible_run_msg = format!("Ansible Run {} of {}: ", n, total);
+        let line = "=".repeat(s.len() + ansible_run_msg.len());
+        println!("{}\n{}{}\n{}", line, ansible_run_msg, s, line);
+    }
 
     fn build_binaries_extra_vars_doc(&self) -> Result<String> {
         let mut extra_vars = String::new();
