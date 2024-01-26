@@ -115,6 +115,8 @@ enum Commands {
         /// Useful for testing experimental versions of the node manager.
         #[arg(long)]
         node_manager_url: Option<String>,
+        /// Set to run Ansible with more verbose output.
+        ansible_verbose: Option<bool>,
     },
     Inventory {
         /// The name of the environment
@@ -310,6 +312,7 @@ async fn main() -> Result<()> {
             safe_version,
             safenode_version,
             node_manager_url,
+            ansible_verbose,
         }) => {
             let sn_codebase_type = get_sn_codebase_type(
                 branch,
@@ -320,6 +323,7 @@ async fn main() -> Result<()> {
             )?;
 
             let testnet_deploy = TestnetDeployBuilder::default()
+                .ansible_verbose_mode(ansible_verbose.unwrap_or(false))
                 .provider(provider.clone())
                 .build()?;
 

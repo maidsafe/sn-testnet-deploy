@@ -194,6 +194,7 @@ impl DeploymentInventory {
 
 #[derive(Default)]
 pub struct TestnetDeployBuilder {
+    ansible_verbose_mode: bool,
     provider: Option<CloudProvider>,
     state_bucket_name: Option<String>,
     terraform_binary_path: Option<PathBuf>,
@@ -205,6 +206,11 @@ pub struct TestnetDeployBuilder {
 impl TestnetDeployBuilder {
     pub fn new() -> Self {
         Default::default()
+    }
+
+    pub fn ansible_verbose_mode(&mut self, ansible_verbose_mode: bool) -> &mut Self {
+        self.ansible_verbose_mode = ansible_verbose_mode;
+        self
     }
 
     pub fn provider(&mut self, provider: CloudProvider) -> &mut Self {
@@ -298,6 +304,7 @@ impl TestnetDeployBuilder {
             provider.clone(),
             ssh_secret_key_path.clone(),
             vault_password_path,
+            self.ansible_verbose_mode,
         );
         let rpc_client = RpcClient::new(
             PathBuf::from("/usr/local/bin/safenode_rpc_client"),

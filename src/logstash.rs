@@ -135,6 +135,7 @@ impl LogstashDeployBuilder {
             provider.clone(),
             ssh_secret_key_path.clone(),
             vault_password_path,
+            false,
         );
 
         let logstash = LogstashDeploy::new(
