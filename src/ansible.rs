@@ -48,6 +48,7 @@ pub struct AnsibleRunner {
     pub working_directory_path: PathBuf,
     pub ssh_sk_path: PathBuf,
     pub vault_password_file_path: PathBuf,
+    pub verbose_mode: bool,
 }
 
 // The following three structs are utilities that are used to parse the output of the
@@ -71,12 +72,14 @@ impl AnsibleRunner {
         provider: CloudProvider,
         ssh_sk_path: PathBuf,
         vault_password_file_path: PathBuf,
+        verbose_mode: bool,
     ) -> AnsibleRunner {
         AnsibleRunner {
             provider,
             working_directory_path,
             ssh_sk_path,
             vault_password_file_path,
+            verbose_mode,
         }
     }
 
@@ -159,7 +162,6 @@ impl AnsibleRunner {
         // error variant, which is very cumbersome. These paths are extremely unlikely to have any
         // unicode characters in them.
         let mut args = vec![
-            "-v".to_string(),
             "--inventory".to_string(),
             inventory_path.to_string_lossy().to_string(),
             "--private-key".to_string(),
@@ -172,6 +174,9 @@ impl AnsibleRunner {
         if let Some(extra_vars) = extra_vars_document {
             args.push("--extra-vars".to_string());
             args.push(extra_vars);
+        }
+        if self.verbose_mode {
+            args.push("-v".to_string());
         }
         args.push(playbook_path.to_string_lossy().to_string());
         run_external_command(
