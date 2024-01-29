@@ -31,7 +31,6 @@ use indicatif::{ProgressBar, ProgressStyle};
 use log::{debug, error, trace};
 use rand::Rng;
 use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
-use rpc_client::parse_output;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 use std::{
@@ -442,18 +441,19 @@ impl TestnetDeploy {
             .await?;
         let genesis_ip = genesis_inventory[0].1;
 
-        let output = self.ssh_client.run_command(
-            &genesis_ip,
-            "root",
-            "/usr/local/bin/safenode_rpc_client 127.0.0.1:12001 info",
-            false,
-        )?;
-        let node_info = parse_output(output)?;
+        let peer_id = self
+            .ssh_client
+            .run_command(
+                &genesis_ip,
+                "root",
+                // fetch the peer_id if genesis is true
+                "jq -r '.nodes[] | select(.genesis == true) | .peer_id' /var/safenode-manager/node_registry.json",
+                false,
+            )?.first()
+            .cloned()
+            .ok_or_else(|| Error::GenesisMultiAddrNotFound)?;
 
-        let multiaddr = format!(
-            "/ip4/{genesis_ip}/udp/12000/quic-v1/p2p/{}",
-            node_info.peer_id
-        );
+        let multiaddr = format!("/ip4/{genesis_ip}/udp/12000/quic-v1/p2p/{peer_id}",);
         // The genesis_ip is obviously inside the multiaddr, but it's just being returned as a
         // separate item for convenience.
         Ok((multiaddr, genesis_ip))

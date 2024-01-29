@@ -14,6 +14,7 @@
     - python3-pip
     - ripgrep
     - zip
+    - jq
   register: result
   until: result is succeeded
   retries: 5

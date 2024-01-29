@@ -3,7 +3,7 @@ Description=Safe node RPC client Service
 
 [Service]
 ExecStart={{ safenode_rpc_client_archive_dest_path }}/safenode_rpc_client \
-  {{ node_rpc_ip }}:{{ node_rpc_port }} \
+  {{ node_rpc_ip }}:{{ genesis_rpc_socket_addr }} \
   transfers 8c54a5e8b3be5315516fc70c70cc532a16c932bc78780b396eed544feedb6f862ea749a894ccf4e1ff9c0b9ebe23412a \
   {{ royalties_cash_notes_dir_path }} \
   --peer {{ genesis_multiaddr }}
