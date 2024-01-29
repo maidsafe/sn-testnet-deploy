@@ -28,13 +28,12 @@ use crate::{
 };
 use flate2::read::GzDecoder;
 use indicatif::{ProgressBar, ProgressStyle};
-use log::{debug, error, trace};
+use log::{debug, trace};
 use rand::Rng;
 use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 use std::{
-    collections::HashMap,
     fs::File,
     io::{BufRead, BufReader, BufWriter, Write},
     net::{IpAddr, SocketAddr},
@@ -558,12 +557,6 @@ impl TestnetDeploy {
                 Some(format!("{{ \"dest\": {temp_dir_json} }}")),
             )?;
 
-            let all_node_inventory = genesis_inventory
-                .iter()
-                .chain(remaining_nodes_inventory.iter())
-                .cloned()
-                .collect::<HashMap<_, _>>();
-
             // collect the manager inventory file paths along with their respective ip addr
             let manager_inventory_files = WalkDir::new(temp_dir_path)
                 .into_iter()
@@ -582,38 +575,26 @@ impl TestnetDeploy {
                         trace!("Extracting the vm name from the path");
                         let vm_name = vm_name.file_name()?.to_str()?;
                         trace!("Extracted vm name from path: {vm_name}");
-                        if let Some(ip_addr) = all_node_inventory.get(vm_name) {
-                            Some((entry.path().to_path_buf(), *ip_addr))
-                        } else {
-                            // todo: throw error
-                            error!("Could not obtain ip addr for the provided vm name {vm_name:?}");
-                            None
-                        }
+                        Some(entry.path().to_path_buf())
                     } else {
                         None
                     }
                 })
-                .collect::<Vec<(PathBuf, IpAddr)>>();
+                .collect::<Vec<PathBuf>>();
 
             manager_inventory_files
                 .par_iter()
-                .flat_map(
-                    |(file_path, ip_addr)| match get_node_manager_inventory(file_path) {
-                        Ok(inventory) => vec![Ok((inventory, *ip_addr))],
-                        Err(err) => vec![Err(err)],
-                    },
-                )
-                .collect::<Result<Vec<(NodeManagerInventory, IpAddr)>>>()?
+                .flat_map(|file_path| match get_node_manager_inventory(file_path) {
+                    Ok(inventory) => vec![Ok(inventory)],
+                    Err(err) => vec![Err(err)],
+                })
+                .collect::<Result<Vec<NodeManagerInventory>>>()?
         };
 
-        let mut rpc_endpoints = Vec::new();
-        for (node_manager_inventory, ip_addr) in node_manager_inventories {
-            let vm_rpc_ports = node_manager_inventory
-                .nodes
-                .iter()
-                .map(|node| SocketAddr::new(ip_addr, node.rpc_port));
-            rpc_endpoints.extend(vm_rpc_ports);
-        }
+        let rpc_endpoints = node_manager_inventories
+            .iter()
+            .flat_map(|nodes| nodes.nodes.iter().map(|node| node.rpc_socket_addr))
+            .collect();
 
         // The scripts are relative to the `resources` directory, so we need to change the current
         // working directory back to that location first.
@@ -916,7 +897,7 @@ struct NodeManagerInventory {
 }
 #[derive(Deserialize)]
 struct Node {
-    rpc_port: u16,
+    rpc_socket_addr: SocketAddr,
 }
 
 fn get_node_manager_inventory(inventory_file_path: &PathBuf) -> Result<NodeManagerInventory> {
