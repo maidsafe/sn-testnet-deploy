@@ -41,6 +41,8 @@ pub enum Error {
     EmptyInventory(PathBuf),
     #[error("To provision the remaining nodes the multiaddr of the genesis node must be supplied")]
     GenesisMultiAddrNotSupplied,
+    #[error("Could not obtain Genesis multiaddr")]
+    GenesisMultiAddrNotFound,
     #[error("Failed to retrieve '{0}' from '{1}")]
     GetS3ObjectError(String, String),
     #[error(transparent)]
