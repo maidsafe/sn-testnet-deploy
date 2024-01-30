@@ -5,7 +5,7 @@ resources/test-data/
 .env
 /target
 /logs
-safenode_rpc_client
+/resources/safenode_rpc_client
 resources/safe
 *.orig
 *.key

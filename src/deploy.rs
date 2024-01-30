@@ -56,7 +56,7 @@ impl DeployCmd {
             })?;
 
         let mut n = 1;
-        let total = if build_custom_binaries { 6 } else { 5 };
+        let total = if build_custom_binaries { 5 } else { 4 };
         if build_custom_binaries {
             self.print_ansible_run_banner(n, total, "Build Custom Binaries");
             self.build_safe_network_binaries().await.map_err(|err| {
@@ -73,14 +73,7 @@ impl DeployCmd {
         })?;
         n += 1;
 
-        self.print_ansible_run_banner(n, total, "Provision RPC Client on Genesis Node");
-        self.provision_safenode_rpc_client().await.map_err(|err| {
-            println!("Failed to provision safenode rpc client {err:?}");
-            err
-        })?;
-        n += 1;
-
-        let (multiaddr, _) = self
+        let (genesis_multiaddr, _) = self
             .testnet_deploy
             .get_genesis_multiaddr(&self.name)
             .await
@@ -88,11 +81,11 @@ impl DeployCmd {
                 println!("Failed to get genesis multiaddr {err:?}");
                 err
             })?;
-        println!("Obtained multiaddr for genesis node: {multiaddr}");
+        println!("Obtained multiaddr for genesis node: {genesis_multiaddr}");
 
         let mut node_provision_failed = false;
         self.print_ansible_run_banner(n, total, "Provision Remaining Nodes");
-        let result = self.provision_remaining_nodes(&multiaddr).await;
+        let result = self.provision_remaining_nodes(&genesis_multiaddr).await;
         match result {
             Ok(()) => {
                 println!("Provisioned all remaining nodes");
@@ -104,17 +97,19 @@ impl DeployCmd {
         n += 1;
 
         self.print_ansible_run_banner(n, total, "Deploy Faucet");
-        self.provision_faucet(&multiaddr).await.map_err(|err| {
-            println!("Failed to provision faucet {err:?}");
-            err
-        })?;
-        n += 1;
-
-        self.print_ansible_run_banner(n, total, "Start RPC Client Service");
-        self.provision_safenode_rpc_client_service(&multiaddr)
+        self.provision_faucet(&genesis_multiaddr)
             .await
             .map_err(|err| {
-                println!("Failed to provision safenode rpc client service {err:?}");
+                println!("Failed to provision faucet {err:?}");
+                err
+            })?;
+        n += 1;
+
+        self.print_ansible_run_banner(n, total, "Provision RPC Client on Genesis Node");
+        self.provision_safenode_rpc_client(&genesis_multiaddr)
+            .await
+            .map_err(|err| {
+                println!("Failed to provision safenode rpc client {err:?}");
                 err
             })?;
 
@@ -237,8 +232,9 @@ impl DeployCmd {
         Ok(())
     }
 
-    pub async fn provision_safenode_rpc_client(&self) -> Result<()> {
+    pub async fn provision_safenode_rpc_client(&self, genesis_multiaddr: &str) -> Result<()> {
         let start = Instant::now();
+        println!("Running ansible against genesis node to start safenode_rpc_client service...");
         self.testnet_deploy.ansible_runner.run_playbook(
             PathBuf::from("safenode_rpc_client.yml"),
             PathBuf::from("inventory").join(format!(
@@ -246,26 +242,7 @@ impl DeployCmd {
                 self.name
             )),
             self.testnet_deploy.cloud_provider.get_ssh_user(),
-            Some(self.build_safenode_rpc_client_extra_vars_doc()?),
-        )?;
-        print_duration(start.elapsed());
-        Ok(())
-    }
-
-    pub async fn provision_safenode_rpc_client_service(
-        &self,
-        genesis_multiaddr: &str,
-    ) -> Result<()> {
-        let start = Instant::now();
-        println!("Running ansible against genesis node to start safenode_rpc_client service...");
-        self.testnet_deploy.ansible_runner.run_playbook(
-            PathBuf::from("safenode_rpc_client_service.yml"),
-            PathBuf::from("inventory").join(format!(
-                ".{}_genesis_inventory_digital_ocean.yml",
-                self.name
-            )),
-            self.testnet_deploy.cloud_provider.get_ssh_user(),
-            Some(self.start_safenode_rpc_client_service_extra_vars_doc(genesis_multiaddr)?),
+            Some(self.build_safenode_rpc_client_extra_vars_doc(genesis_multiaddr)?),
         )?;
         print_duration(start.elapsed());
         Ok(())
@@ -471,7 +448,7 @@ impl DeployCmd {
         Ok(extra_vars)
     }
 
-    fn build_safenode_rpc_client_extra_vars_doc(&self) -> Result<String> {
+    fn build_safenode_rpc_client_extra_vars_doc(&self, genesis_multiaddr: &str) -> Result<String> {
         let mut extra_vars = String::new();
         extra_vars.push_str("{ ");
         Self::add_value(
@@ -480,6 +457,7 @@ impl DeployCmd {
             &self.testnet_deploy.cloud_provider.to_string(),
         );
         Self::add_value(&mut extra_vars, "testnet_name", &self.name);
+        Self::add_value(&mut extra_vars, "genesis_multiaddr", genesis_multiaddr);
         match &self.sn_codebase_type {
             SnCodebaseType::Branch {
                 repo_owner, branch, ..
@@ -503,25 +481,6 @@ impl DeployCmd {
                     "https://sn-node-rpc-client.s3.eu-west-2.amazonaws.com/safenode_rpc_client-latest-x86_64-unknown-linux-musl.tar.gz",);
             }
         }
-
-        let mut extra_vars = extra_vars.strip_suffix(", ").unwrap().to_string();
-        extra_vars.push_str(" }");
-        Ok(extra_vars)
-    }
-
-    fn start_safenode_rpc_client_service_extra_vars_doc(
-        &self,
-        genesis_multiaddr: &str,
-    ) -> Result<String> {
-        let mut extra_vars = String::new();
-        extra_vars.push_str("{ ");
-        Self::add_value(
-            &mut extra_vars,
-            "provider",
-            &self.testnet_deploy.cloud_provider.to_string(),
-        );
-        Self::add_value(&mut extra_vars, "testnet_name", &self.name);
-        Self::add_value(&mut extra_vars, "genesis_multiaddr", genesis_multiaddr);
 
         let mut extra_vars = extra_vars.strip_suffix(", ").unwrap().to_string();
         extra_vars.push_str(" }");
