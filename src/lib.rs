@@ -445,8 +445,8 @@ impl TestnetDeploy {
             .run_command(
                 &genesis_ip,
                 "root",
-                // fetch the peer_id if genesis is true
-                "jq -r '.nodes[] | select(.genesis == true) | .listen_addr | first' /var/safenode-manager/node_registry.json",
+                // fetch the first multiaddr if genesis is true and which does not contain the localhost addr.
+                "jq -r '.nodes[] | select(.genesis == true) | .listen_addr[] | select(contains(\"127.0.0.1\") | not)' /var/safenode-manager/node_registry.json | head -n 1",
                 false,
             )?.first()
             .cloned()
