@@ -45,7 +45,6 @@
       - -v
       - add
       - --first
-      - --port={{ genesis_port }}
       - --rpc-address={{ node_rpc_ip }}
       - --url={{ node_archive_url }}
   when: is_genesis and not genesis_exists | default(false)
