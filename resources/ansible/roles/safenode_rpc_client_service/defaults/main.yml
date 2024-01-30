@@ -1,5 +1,0 @@
----
-org: maidsafe
-branch: main
-safenode_rpc_client_archive_dest_path: /usr/local/bin
-royalties_cash_notes_dir_path: /home/safe/.local/share/safe/node/royalties-cash-notes
