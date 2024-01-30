@@ -42,7 +42,7 @@ pub enum Error {
     #[error("To provision the remaining nodes the multiaddr of the genesis node must be supplied")]
     GenesisMultiAddrNotSupplied,
     #[error("Could not obtain Genesis multiaddr")]
-    GenesisMultiAddrNotFound,
+    GenesisListenAddress,
     #[error("Failed to retrieve '{0}' from '{1}")]
     GetS3ObjectError(String, String),
     #[error(transparent)]

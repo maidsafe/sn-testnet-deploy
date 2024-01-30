@@ -440,19 +440,18 @@ impl TestnetDeploy {
             .await?;
         let genesis_ip = genesis_inventory[0].1;
 
-        let peer_id = self
+        let multiaddr = self
             .ssh_client
             .run_command(
                 &genesis_ip,
                 "root",
                 // fetch the peer_id if genesis is true
-                "jq -r '.nodes[] | select(.genesis == true) | .peer_id' /var/safenode-manager/node_registry.json",
+                "jq -r '.nodes[] | select(.genesis == true) | .listen_addr | first' /var/safenode-manager/node_registry.json",
                 false,
             )?.first()
             .cloned()
-            .ok_or_else(|| Error::GenesisMultiAddrNotFound)?;
+            .ok_or_else(|| Error::GenesisListenAddress)?;
 
-        let multiaddr = format!("/ip4/{genesis_ip}/udp/12000/quic-v1/p2p/{peer_id}",);
         // The genesis_ip is obviously inside the multiaddr, but it's just being returned as a
         // separate item for convenience.
         Ok((multiaddr, genesis_ip))
