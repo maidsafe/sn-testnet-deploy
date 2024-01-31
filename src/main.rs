@@ -67,6 +67,11 @@ enum Commands {
         /// The name of the Logstash stack to forward logs to.
         #[clap(long, default_value = "main")]
         logstash_stack_name: String,
+        /// If set to true, the RPC of the node will be accessible remotely.
+        ///
+        /// By default, the safenode RPC is only accessible via the 'localhost' and is not exposed for security reasons.
+        #[clap(long, default_value = "false")]
+        public_rpc: bool,
         /// The features to enable on the safenode binary.
         ///
         /// If not provided, the default feature set specified for the safenode binary are used.
@@ -320,6 +325,7 @@ async fn main() -> Result<()> {
             node_count,
             vm_count,
             provider,
+            public_rpc,
             safenode_features,
             branch,
             repo_owner,
@@ -373,6 +379,7 @@ async fn main() -> Result<()> {
                 name,
                 node_count,
                 vm_count,
+                public_rpc,
                 (logstash_stack_name, stack_hosts),
                 sn_codebase_type,
             );
