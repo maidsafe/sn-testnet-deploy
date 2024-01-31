@@ -1,5 +1,7 @@
 ---
 is_genesis: False
+public_rpc: False
+node_rpc_ip: "127.0.0.1"
 node_archive_filename: safenode-latest-x86_64-unknown-linux-musl.tar.gz
 # If a custom branch / version is specified, this value must be overwritten.
 node_archive_url: https://sn-node.s3.eu-west-2.amazonaws.com/safenode-latest-x86_64-unknown-linux-musl.tar.gz

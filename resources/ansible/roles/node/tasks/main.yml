@@ -2,12 +2,12 @@
 - name: get the private IP for the instance
   set_fact:
     node_rpc_ip: "{{ instance_facts.instances[0].network_interfaces[0].private_ip_address }}"
-  when: provider == "aws"
+  when: provider == "aws" and public_rpc
 
 - name: use the public IP as the RPC address on DO
   set_fact:
     node_rpc_ip: "{{ ansible_host }}"
-  when: provider == "digital-ocean"
+  when: provider == "digital-ocean" and public_rpc
 
 - name: download the node manager binary
   ansible.builtin.get_url:

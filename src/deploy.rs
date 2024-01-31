@@ -16,6 +16,7 @@ pub struct DeployCmd {
     name: String,
     node_count: u16,
     vm_count: u16,
+    public_rpc: bool,
     logstash_details: (String, Vec<SocketAddr>),
     sn_codebase_type: SnCodebaseType,
 }
@@ -27,6 +28,7 @@ impl DeployCmd {
         name: String,
         node_count: u16,
         vm_count: u16,
+        public_rpc: bool,
         logstash_details: (String, Vec<SocketAddr>),
         sn_codebase_type: SnCodebaseType,
     ) -> Self {
@@ -35,6 +37,7 @@ impl DeployCmd {
             name,
             node_count,
             vm_count,
+            public_rpc,
             logstash_details,
             sn_codebase_type,
         }
@@ -339,6 +342,10 @@ impl DeployCmd {
                 "node_instance_count",
                 &node_instance_count.unwrap_or(20).to_string(),
             );
+        }
+        // The default inside ansible is false
+        if self.public_rpc {
+            Self::add_value(&mut extra_vars, "public_rpc", "true");
         }
 
         match &self.sn_codebase_type {
