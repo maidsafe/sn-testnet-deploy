@@ -171,6 +171,23 @@ enum Commands {
         #[arg(short = 'n', long)]
         name: String,
     },
+    /// Upgrade the node binaries of a testnet environment to the latest version.
+    Upgrade {
+        /// Maximum number of forks Ansible will use to execute tasks on target hosts.
+        #[clap(long, default_value_t = 2)]
+        forks: usize,
+        /// The name of the environment
+        #[arg(short = 'n', long)]
+        name: String,
+        /// The cloud provider to deploy to.
+        ///
+        /// Valid values are "aws" or "digital-ocean".
+        #[clap(long, default_value_t = CloudProvider::DigitalOcean, value_parser = parse_provider, verbatim_doc_comment)]
+        provider: CloudProvider,
+        /// Set to run Ansible with more verbose output.
+        #[arg(long)]
+        ansible_verbose: bool,
+    },
     /// Clean a deployed testnet environment.
     #[clap(name = "upload-test-data")]
     UploadTestData {
@@ -478,6 +495,19 @@ async fn main() -> Result<()> {
             let test_data_client = TestDataClientBuilder::default().build()?;
             test_data_client.smoke_test(&mut inventory).await?;
             inventory.save(&inventory_path)?;
+            Ok(())
+        }
+        Some(Commands::Upgrade {
+            name,
+            provider,
+            forks,
+            ansible_verbose,
+        }) => {
+            let testnet_deploy = TestnetDeployBuilder::default()
+                .ansible_verbose_mode(ansible_verbose)
+                .provider(provider)
+                .build()?;
+            testnet_deploy.upgrade(&name, forks).await?;
             Ok(())
         }
         Some(Commands::UploadTestData { name }) => {

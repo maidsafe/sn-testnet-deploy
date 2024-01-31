@@ -1,0 +1,6 @@
+---
+- name: upgrade node binaries through the node manager
+  hosts: all
+  tasks:
+    - name: upgrade
+      ansible.builtin.command: safenode-manager upgrade
