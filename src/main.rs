@@ -113,7 +113,8 @@ enum Commands {
         /// branch, not both.
         safenode_version: Option<String>,
         /// Set to run Ansible with more verbose output.
-        ansible_verbose: Option<bool>,
+        #[arg(long)]
+        ansible_verbose: bool,
     },
     Inventory {
         /// The name of the environment
@@ -320,7 +321,7 @@ async fn main() -> Result<()> {
             .await?;
 
             let testnet_deploy = TestnetDeployBuilder::default()
-                .ansible_verbose_mode(ansible_verbose.unwrap_or(false))
+                .ansible_verbose_mode(ansible_verbose)
                 .provider(provider.clone())
                 .build()?;
 
