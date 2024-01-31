@@ -644,7 +644,11 @@ impl TestnetDeploy {
         Ok(())
     }
 
-    pub async fn upgrade(&self, name: &str) -> Result<()> {
+    pub async fn upgrade(&self, name: &str, forks: usize) -> Result<()> {
+        // Set the `forks` config value for Ansible. This environment variable will override
+        // whatever is in the ansible.cfg file.
+        std::env::set_var("ANSIBLE_FORKS", forks.to_string());
+
         let environments = self.terraform_runner.workspace_list()?;
         if !environments.contains(&name.to_string()) {
             return Err(Error::EnvironmentDoesNotExist(name.to_string()));

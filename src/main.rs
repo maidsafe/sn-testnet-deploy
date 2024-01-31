@@ -172,6 +172,9 @@ enum Commands {
     },
     /// Upgrade the node binaries of a testnet environment to the latest version.
     Upgrade {
+        /// Maximum number of forks Ansible will use to execute tasks on target hosts.
+        #[clap(long, default_value_t = 2)]
+        forks: usize,
         /// The name of the environment
         #[arg(short = 'n', long)]
         name: String,
@@ -496,13 +499,14 @@ async fn main() -> Result<()> {
         Some(Commands::Upgrade {
             name,
             provider,
+            forks,
             ansible_verbose,
         }) => {
             let testnet_deploy = TestnetDeployBuilder::default()
                 .ansible_verbose_mode(ansible_verbose)
                 .provider(provider)
                 .build()?;
-            testnet_deploy.upgrade(&name).await?;
+            testnet_deploy.upgrade(&name, forks).await?;
             Ok(())
         }
         Some(Commands::UploadTestData { name }) => {
