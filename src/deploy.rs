@@ -364,9 +364,9 @@ impl DeployCmd {
             );
         }
 
-        let node_archive_url = match &self.sn_codebase_type {
+        match &self.sn_codebase_type {
             SnCodebaseType::Main { safenode_features } => {
-                if safenode_features.is_some() {
+                let node_archive_url = if safenode_features.is_some() {
                     format!(
                         "https://sn-node.s3.eu-west-2.amazonaws.com/maidsafe/main/safenode-{}-x86_64-unknown-linux-musl.tar.gz",
                         self.name)
@@ -374,26 +374,26 @@ impl DeployCmd {
                     // This value is predefined inside ansible cfg, but manually writing it down for clarity.
                     // Get the default
                     "https://sn-node.s3.eu-west-2.amazonaws.com/safenode-latest-x86_64-unknown-linux-musl.tar.gz".to_string()
-                }
+                };
+                Self::add_value(&mut extra_vars, "node_archive_url", &node_archive_url);
             }
             SnCodebaseType::Branch {
                 repo_owner, branch, ..
             } => {
-                format!(
+                let node_archive_url = format!(
                     "https://sn-node.s3.eu-west-2.amazonaws.com/{}/{}/safenode-{}-x86_64-unknown-linux-musl.tar.gz",
                     repo_owner,
                     branch,
-                    self.name)
+                    self.name);
+                Self::add_value(&mut extra_vars, "node_archive_url", &node_archive_url);
             }
             SnCodebaseType::Versioned {
                 safenode_version, ..
             } => {
-                format!(
-                    "https://github.com/maidsafe/safe_network/releases/download/sn_node-v{safenode_version}/safenode-{safenode_version}-x86_64-unknown-linux-musl.tar.gz",
-                )
+                // The manager supports `--version`, so we don't need to pass the GitHub release URL.
+                Self::add_value(&mut extra_vars, "version", safenode_version);
             }
         };
-        Self::add_value(&mut extra_vars, "node_archive_url", &node_archive_url);
 
         match &self.sn_codebase_type {
             SnCodebaseType::Branch {
