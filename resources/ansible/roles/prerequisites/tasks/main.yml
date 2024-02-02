@@ -17,7 +17,7 @@
     - jq
   register: result
   until: result is succeeded
-  retries: 5
+  retries: 20
   delay: 10
 
 - name: install boto3
