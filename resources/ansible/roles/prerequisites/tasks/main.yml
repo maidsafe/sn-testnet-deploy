@@ -3,6 +3,21 @@
   apt:
     update_cache: yes
 
+# DO machines may run cloud-init that may cause apt locks. Wait for it to complete.
+- name: Wait for cloud-init / user-data to finish
+  command: cloud-init status --wait
+  changed_when: false
+  when: provider == "digital-ocean"
+
+- name: Wait for cloud init to finish
+  community.general.cloud_init_data_facts:
+    filter: status
+  register: res
+  until: "res.cloud_init_data_facts.status.v1.stage is defined and not res.cloud_init_data_facts.status.v1.stage"
+  when: provider == "digital-ocean"
+  retries: 50
+  delay: 5
+
 # The retries are for random lock failures.
 - name: install packages
   ansible.builtin.package:
