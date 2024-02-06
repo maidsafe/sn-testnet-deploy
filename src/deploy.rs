@@ -17,7 +17,7 @@ pub struct DeployCmd {
     node_count: u16,
     vm_count: u16,
     public_rpc: bool,
-    logstash_details: (String, Vec<SocketAddr>),
+    logstash_details: Option<(String, Vec<SocketAddr>)>,
     sn_codebase_type: SnCodebaseType,
 }
 
@@ -29,7 +29,7 @@ impl DeployCmd {
         node_count: u16,
         vm_count: u16,
         public_rpc: bool,
-        logstash_details: (String, Vec<SocketAddr>),
+        logstash_details: Option<(String, Vec<SocketAddr>)>,
         sn_codebase_type: SnCodebaseType,
     ) -> Self {
         Self {
@@ -404,14 +404,17 @@ impl DeployCmd {
             }
         }
 
-        let (logstash_stack_name, logstash_hosts) = &self.logstash_details;
-        Self::add_value(&mut extra_vars, "logstash_stack_name", logstash_stack_name);
-        extra_vars.push_str("\"logstash_hosts\": [");
-        for host in logstash_hosts.iter() {
-            extra_vars.push_str(&format!("\"{}\", ", host));
+        if let Some((logstash_stack_name, logstash_hosts)) = &self.logstash_details {
+            Self::add_value(&mut extra_vars, "logstash_stack_name", logstash_stack_name);
+            extra_vars.push_str("\"logstash_hosts\": [");
+            for host in logstash_hosts.iter() {
+                extra_vars.push_str(&format!("\"{}\", ", host));
+            }
+            let mut extra_vars = extra_vars.strip_suffix(", ").unwrap().to_string();
+            extra_vars.push(']');
         }
-        let mut extra_vars = extra_vars.strip_suffix(", ").unwrap().to_string();
-        extra_vars.push_str("] }");
+        extra_vars.push('}');
+
         Ok(extra_vars)
     }
 
