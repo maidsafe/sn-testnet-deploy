@@ -54,23 +54,24 @@ jobs:
         with:
           company-name: MaidSafe
 
-  # ignored due to nightly failure.
-  # should be fixed by https://github.com/zowens/crc32c/pull/52
-  # cargo-udeps:
-  #   name: unused dependency check
-  #   runs-on: ubuntu-latest
-  #   steps:
-  #     - uses: actions/checkout@v2
-  #     - uses: actions-rs/toolchain@v1
-  #       with:
-  #         toolchain: nightly
-  #         override: true
+  cargo-udeps:
+    name: unused dependency check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - uses: actions-rs/toolchain@v1
+        with:
+          toolchain: nightly
+          override: true
 
-  #     - name: Run cargo-udeps
-  #       uses: aig787/cargo-udeps-action@v1
-  #       with:
-  #         version: 'latest'
-  #         args: '--all-targets'
+      - name: Run cargo-udeps
+        uses: aig787/cargo-udeps-action@v1
+        with:
+          version: 'latest'
+          args: '--all-targets'
+        # ignored due to nightly failure.
+        # should be fixed by https://github.com/zowens/crc32c/pull/52
+        continue-on-error: true
 
   cargo-deny:
     runs-on: ubuntu-latest
