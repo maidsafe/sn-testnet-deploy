@@ -10,6 +10,7 @@
         src: logstash-{{ logstash_stack_name }}-public.crt
         dest: /tmp/logstash-{{ logstash_stack_name }}-public.crt
         mode: 0644
+      when: logstash_stack_name is defined and logstash_stack_name | length > 0
 
 - name: deploy safenode to remaining nodes
   hosts: all

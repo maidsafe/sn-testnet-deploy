@@ -368,19 +368,26 @@ async fn main() -> Result<()> {
                 }
             }
 
-            let logstash_deploy = LogstashDeployBuilder::default()
-                .provider(provider)
-                .build()?;
-            let stack_hosts = logstash_deploy
-                .get_stack_hosts(&logstash_stack_name)
-                .await?;
+            let logstash_details = {
+                let logstash_deploy = LogstashDeployBuilder::default()
+                    .provider(provider)
+                    .build()?;
+                let stack_hosts = logstash_deploy
+                    .get_stack_hosts(&logstash_stack_name)
+                    .await?;
+                if stack_hosts.is_empty() {
+                    None
+                } else {
+                    Some((logstash_stack_name, stack_hosts))
+                }
+            };
             let deploy_cmd = DeployCmd::new(
                 testnet_deploy,
                 name,
                 node_count,
                 vm_count,
                 public_rpc,
-                (logstash_stack_name, stack_hosts),
+                logstash_details,
                 sn_codebase_type,
             );
             deploy_cmd.execute().await?;
