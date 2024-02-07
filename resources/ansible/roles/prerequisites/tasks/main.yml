@@ -1,4 +1,26 @@
 ---
+- name: Stop unattended-upgrades service
+  ansible.builtin.service:
+    name: unattended-upgrades
+    state: stopped
+
+- name: Kill any running unattended-upgrades processes
+  ansible.builtin.shell: 
+    cmd: pkill --signal SIGKILL unattended-upgrades
+  ignore_errors: yes
+
+- name: Disable unattended-upgrades service
+  ansible.builtin.service:
+    name: unattended-upgrades
+    enabled: no
+
+- name: Disable automatic upgrades in config
+  ansible.builtin.lineinfile:
+    path: /etc/apt/apt.conf.d/20auto-upgrades
+    regexp: '^Unattended-Upgrade "1"'
+    line: 'Unattended-Upgrade "0"'
+    backrefs: yes
+
 - name: update apt cache
   apt:
     update_cache: yes
