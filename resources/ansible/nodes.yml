@@ -20,7 +20,7 @@
   vars:
     is_genesis: False
   roles:
-    - role: prerequisites
+    - role: safe_user
       become: True
     - {
         role: format_disk,

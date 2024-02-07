@@ -17,14 +17,12 @@ variable "user_home" {
 
 variable "droplet_image" {
   type = string
-  default = "ubuntu-22-04-x64"
-  description = ""
+  default = "ubuntu-23-10-x64"
 }
 
 variable "region" {
   type = string
   default = "lon1"
-  description = "This is quite a powerful image but it means the build time will be fast"
 }
 
 variable "size" {
@@ -57,11 +55,11 @@ build {
     destination = "/tmp/ansible-vault-password"
   }
   provisioner "shell" {
-    script = "../scripts/install_ansible.sh"
+    script = "../../scripts/install_ansible.sh"
   }
   provisioner "ansible-local" {
-    playbook_dir = "../ansible"
-    playbook_file = "../ansible/create_node_image.yml"
+    playbook_dir = "../../ansible"
+    playbook_file = "../../ansible/create_node_image.yml"
     extra_arguments = [
       "--vault-password-file=/tmp/ansible-vault-password",
       "--extra-vars",
