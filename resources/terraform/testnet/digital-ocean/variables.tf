@@ -31,7 +31,7 @@ variable "build_droplet_image_id" {
 
 # This corresponds to the 'safe_network-node-1698958142' image/snapshot.
 variable "node_droplet_image_id" {
-  default = "143568506"
+  default = "149664646"
 }
 
 variable "region" {
