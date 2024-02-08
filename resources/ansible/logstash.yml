@@ -44,6 +44,5 @@
   hosts: all
   become: True
   roles:
-    - prerequisites
     - logstash
     - log_forwarding
