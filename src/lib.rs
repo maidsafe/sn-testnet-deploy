@@ -643,7 +643,12 @@ impl TestnetDeploy {
         Ok(())
     }
 
-    pub async fn upgrade(&self, name: &str, forks: usize) -> Result<()> {
+    pub async fn upgrade(
+        &self,
+        name: &str,
+        env_variables: Option<Vec<(String, String)>>,
+        forks: usize,
+    ) -> Result<()> {
         // Set the `forks` config value for Ansible. This environment variable will override
         // whatever is in the ansible.cfg file.
         std::env::set_var("ANSIBLE_FORKS", forks.to_string());
@@ -666,17 +671,34 @@ impl TestnetDeploy {
             return Err(Error::EnvironmentDoesNotExist(name.to_string()));
         }
 
+        // construct extra vars
+        let extra_vars = if let Some(env_variables) = env_variables {
+            let mut extra_vars = String::new();
+            extra_vars.push_str("{ ");
+            // the values are sanitized and reconstructed here. Better to error out at the deployer than at the manager.
+            let mut env_vars_strs = Vec::new();
+            for (key, val) in env_variables {
+                env_vars_strs.push(format!("{key}={val}"));
+            }
+            let env_vars_strs = env_vars_strs.join(",");
+            extra_vars.push_str(&format!("\"env_variables\": \"{env_vars_strs}\", "));
+            extra_vars.push('}');
+            Some(extra_vars)
+        } else {
+            None
+        };
+
         self.ansible_runner.run_playbook(
             PathBuf::from("node_manager_upgrade.yml"),
             remaining_nodes_inventory_path,
             self.cloud_provider.get_ssh_user(),
-            None,
+            extra_vars.clone(),
         )?;
         self.ansible_runner.run_playbook(
             PathBuf::from("node_manager_upgrade.yml"),
             genesis_inventory_path,
             self.cloud_provider.get_ssh_user(),
-            None,
+            extra_vars,
         )?;
 
         Ok(())

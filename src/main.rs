@@ -77,6 +77,12 @@ enum Commands {
         /// If not provided, the default feature set specified for the safenode binary are used.
         #[clap(long)]
         safenode_features: Option<Vec<String>>,
+        /// Provide the environmental variable that is set for the safenode service.
+        ///
+        /// This is useful to set the safenode's log levels. Each variable should be comma separated without any space.
+        /// Example usage `--env SN_LOG=all,RUST_LOG=libp2p=debug`
+        #[clap(name = "env", long, use_value_delimiter = true, value_parser = parse_environment_variables)]
+        env_variables: Option<Vec<(String, String)>>,
         /// Optionally supply the name of a branch on the Github repository to be used for the
         /// safenode binary. A safenode binary will be built from this repository.
         ///
@@ -189,6 +195,13 @@ enum Commands {
         /// Valid values are "aws" or "digital-ocean".
         #[clap(long, default_value_t = CloudProvider::DigitalOcean, value_parser = parse_provider, verbatim_doc_comment)]
         provider: CloudProvider,
+        /// Provide the environmental variable that is set for the upgraded safenode service. This will override any
+        /// previously set values.
+        ///
+        /// This is useful to set the safenode's log levels. Each variable should be comma separated without any space.
+        /// Example usage `--env SN_LOG=all,RUST_LOG=libp2p=debug`
+        #[clap(name = "env", long, use_value_delimiter = true, value_parser = parse_environment_variables)]
+        env_variables: Option<Vec<(String, String)>>,
         /// Set to run Ansible with more verbose output.
         #[arg(long)]
         ansible_verbose: bool,
@@ -327,6 +340,7 @@ async fn main() -> Result<()> {
             provider,
             public_rpc,
             safenode_features,
+            env_variables,
             branch,
             repo_owner,
             logstash_stack_name,
@@ -389,6 +403,7 @@ async fn main() -> Result<()> {
                 public_rpc,
                 logstash_details,
                 sn_codebase_type,
+                env_variables,
             );
             deploy_cmd.execute().await?;
             Ok(())
@@ -514,6 +529,7 @@ async fn main() -> Result<()> {
         Some(Commands::Upgrade {
             name,
             provider,
+            env_variables,
             forks,
             ansible_verbose,
         }) => {
@@ -521,7 +537,7 @@ async fn main() -> Result<()> {
                 .ansible_verbose_mode(ansible_verbose)
                 .provider(provider)
                 .build()?;
-            testnet_deploy.upgrade(&name, forks).await?;
+            testnet_deploy.upgrade(&name, env_variables, forks).await?;
             Ok(())
         }
         Some(Commands::UploadTestData { name }) => {
@@ -619,4 +635,15 @@ async fn get_sn_codebase_type(
     };
 
     Ok(codebase_type)
+}
+
+// Since delimiter is on, we get element of the csv and not the entire csv.
+fn parse_environment_variables(env_var: &str) -> Result<(String, String)> {
+    let parts: Vec<&str> = env_var.splitn(2, '=').collect();
+    if parts.len() != 2 {
+        return Err(eyre!(
+            "Environment variable must be in the format KEY=VALUE or KEY=INNER_KEY=VALUE.\nMultiple key-value pairs can be given with a comma between them."
+        ));
+    }
+    Ok((parts[0].to_string(), parts[1].to_string()))
 }
