@@ -77,10 +77,11 @@ enum Commands {
         /// If not provided, the default feature set specified for the safenode binary are used.
         #[clap(long)]
         safenode_features: Option<Vec<String>>,
-        /// Provide the environmental variable that is set for the safenode service.
+        /// Provide environment variables for the safenode service.
         ///
         /// This is useful to set the safenode's log levels. Each variable should be comma separated without any space.
-        /// Example usage `--env SN_LOG=all,RUST_LOG=libp2p=debug`
+        ///
+        /// Example: --env SN_LOG=all,RUST_LOG=libp2p=debug
         #[clap(name = "env", long, use_value_delimiter = true, value_parser = parse_environment_variables)]
         env_variables: Option<Vec<(String, String)>>,
         /// Optionally supply the name of a branch on the Github repository to be used for the
@@ -195,11 +196,12 @@ enum Commands {
         /// Valid values are "aws" or "digital-ocean".
         #[clap(long, default_value_t = CloudProvider::DigitalOcean, value_parser = parse_provider, verbatim_doc_comment)]
         provider: CloudProvider,
-        /// Provide the environmental variable that is set for the upgraded safenode service. This will override any
-        /// previously set values.
+        /// Provide environment variables for the safenode service. This will override the values set during the Add
+        /// command.
         ///
         /// This is useful to set the safenode's log levels. Each variable should be comma separated without any space.
-        /// Example usage `--env SN_LOG=all,RUST_LOG=libp2p=debug`
+        ///
+        /// Example: --env SN_LOG=all,RUST_LOG=libp2p=debug
         #[clap(name = "env", long, use_value_delimiter = true, value_parser = parse_environment_variables)]
         env_variables: Option<Vec<(String, String)>>,
         /// Set to run Ansible with more verbose output.
