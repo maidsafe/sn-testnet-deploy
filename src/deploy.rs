@@ -19,6 +19,7 @@ pub struct DeployCmd {
     public_rpc: bool,
     logstash_details: Option<(String, Vec<SocketAddr>)>,
     sn_codebase_type: SnCodebaseType,
+    env_variables: Option<Vec<(String, String)>>,
 }
 
 impl DeployCmd {
@@ -31,6 +32,7 @@ impl DeployCmd {
         public_rpc: bool,
         logstash_details: Option<(String, Vec<SocketAddr>)>,
         sn_codebase_type: SnCodebaseType,
+        env_variables: Option<Vec<(String, String)>>,
     ) -> Self {
         Self {
             testnet_deploy,
@@ -40,6 +42,7 @@ impl DeployCmd {
             public_rpc,
             logstash_details,
             sn_codebase_type,
+            env_variables,
         }
     }
 
@@ -402,6 +405,15 @@ impl DeployCmd {
                     "https://sn-node-manager.s3.eu-west-2.amazonaws.com/safenode-manager-latest-x86_64-unknown-linux-musl.tar.gz",
                 );
             }
+        }
+
+        if let Some(env_vars) = &self.env_variables {
+            // the values are sanitized and reconstructed here. Better to error out at the deployer than at the manager.
+            let mut env_vars_strs = Vec::new();
+            for (key, val) in env_vars {
+                env_vars_strs.push(format!("{key}={val}"));
+            }
+            Self::add_value(&mut extra_vars, "env_variables", &env_vars_strs.join(","));
         }
 
         if let Some((logstash_stack_name, logstash_hosts)) = &self.logstash_details {

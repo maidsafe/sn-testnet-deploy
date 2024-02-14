@@ -3,4 +3,8 @@
   hosts: all
   tasks:
     - name: upgrade
-      ansible.builtin.command: safenode-manager upgrade
+      ansible.builtin.command:
+        argv:
+          - safenode-manager
+          - upgrade
+          - "{{ '--env=' + env_variables if env_variables is defined else '' }}"
