@@ -18,7 +18,19 @@
   become: True
   ansible.builtin.unarchive:
     src: "/tmp/{{ node_manager_archive_filename }}"
-    dest: "{{ node_manager_archive_dest_path }}"
+    dest: "{{ binary_dir }}"
+    remote_src: True
+
+- name: download the manager daemon binary
+  ansible.builtin.get_url:
+    url: "{{ node_manager_daemon_archive_url }}"
+    dest: /tmp/{{ node_manager_daemon_archive_filename }}
+
+- name: extract the manager daemon binary to /usr/local/bin
+  become: True
+  ansible.builtin.unarchive:
+    src: "/tmp/{{ node_manager_daemon_archive_filename }}"
+    dest: "{{ binary_dir }}"
     remote_src: True
 
 #
@@ -45,7 +57,7 @@
     argv: "{{ command_args | reject('equalto', omit) | list }}"
   vars:
     command_args:
-      - "{{ node_manager_archive_dest_path }}/safenode-manager"
+      - "{{ binary_dir }}/safenode-manager"
       - -v
       - add
       - --first
@@ -81,7 +93,7 @@
     argv: "{{ command_args | reject('equalto', omit) | list }}"
   vars:
     command_args:
-      - "{{ node_manager_archive_dest_path }}/safenode-manager"
+      - "{{ binary_dir }}/safenode-manager"
       - -v
       - add
       - "--count={{ nodes_to_add }}"
@@ -94,3 +106,7 @@
 - name: start the node services
   become: True
   command: safenode-manager -v start
+
+- name: start safenode manager daemon
+  become: true
+  command: safenode-manager -v daemon --address {{ node_rpc_ip }} --path "{{ binary_dir }}/safenode-manager-daemon"
