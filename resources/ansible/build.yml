@@ -29,3 +29,8 @@
         bin_name: "safenode-manager",
         when: custom_bin == "true"
       }
+    - {
+        role: build_safe_network_binary,
+        bin_name: "safenode-manager-daemon",
+        when: custom_bin == "true"
+      }

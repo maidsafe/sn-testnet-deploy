@@ -2,13 +2,15 @@
 is_genesis: False
 public_rpc: False
 node_rpc_ip: "127.0.0.1"
-node_archive_filename: safenode-latest-x86_64-unknown-linux-musl.tar.gz
+node_instance_count: 20
+binary_dir: /usr/local/bin
 # If a custom branch / version is specified, this value must be overwritten.
 node_archive_url: https://sn-node.s3.eu-west-2.amazonaws.com/safenode-latest-x86_64-unknown-linux-musl.tar.gz
+node_archive_filename: safenode-latest-x86_64-unknown-linux-musl.tar.gz
 # If a custom branch is specified, the URL must be changed to 
 # "https://sn-node.s3.eu-west-2.amazonaws.com/{org}/{branch}/{bin_name}-{testnet_name}-x86_64-unknown-linux-musl.tar.gz"
 # Currently it is done directly inside the code
 node_manager_archive_filename: safenode-manager-latest-x86_64-unknown-linux-musl.tar.gz
 node_manager_archive_url: https://sn-node-manager.s3.eu-west-2.amazonaws.com/{{ node_manager_archive_filename }}
-node_manager_archive_dest_path: /usr/local/bin
-node_instance_count: 20
+node_manager_daemon_archive_filename: safenode-manager-daemon-latest-x86_64-unknown-linux-musl.tar.gz
+node_manager_daemon_archive_url: https://sn-node-manager.s3.eu-west-2.amazonaws.com/{{ node_manager_daemon_archive_filename }}
