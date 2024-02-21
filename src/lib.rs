@@ -97,10 +97,11 @@ impl CloudProvider {
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct DeploymentInventory {
     pub name: String,
+    pub node_count: u16,
     pub sn_codebase_type: SnCodebaseType,
     pub vm_list: Vec<(String, IpAddr)>,
     pub rpc_endpoints: Vec<SocketAddr>,
-    pub node_count: u16,
+    pub manager_daemon_endpoints: Vec<SocketAddr>,
     pub ssh_user: String,
     pub genesis_multiaddr: String,
     pub peers: Vec<String>,
@@ -537,7 +538,6 @@ impl TestnetDeploy {
 
         println!("Retrieving node manager inventory. This can take a minute.");
 
-        // Get peer ids and rpc addr from node manager inventory file
         let node_manager_inventories = {
             debug!("Fetching node manager inventory");
             let temp_dir_path = tempfile::tempdir()?.into_path();
@@ -590,9 +590,14 @@ impl TestnetDeploy {
                 .collect::<Result<Vec<NodeManagerInventory>>>()?
         };
 
-        let rpc_endpoints = node_manager_inventories
+        let safenode_rpc_endpoints = node_manager_inventories
             .iter()
-            .flat_map(|nodes| nodes.nodes.iter().map(|node| node.rpc_socket_addr))
+            .flat_map(|inv| inv.nodes.iter().map(|node| node.rpc_socket_addr))
+            .collect();
+
+        let manager_daemon_endpoints: Vec<SocketAddr> = node_manager_inventories
+            .iter()
+            .flat_map(|inv| inv.daemon_socket_addr)
             .collect();
 
         // The scripts are relative to the `resources` directory, so we need to change the current
@@ -627,10 +632,11 @@ impl TestnetDeploy {
         node_count += 1;
         let inventory = DeploymentInventory {
             name: name.to_string(),
+            node_count,
             sn_codebase_type,
             vm_list,
-            rpc_endpoints,
-            node_count,
+            rpc_endpoints: safenode_rpc_endpoints,
+            manager_daemon_endpoints,
             ssh_user: self.cloud_provider.get_ssh_user(),
             genesis_multiaddr,
             peers,
@@ -953,6 +959,7 @@ pub fn get_progress_bar(length: u64) -> Result<ProgressBar> {
 
 #[derive(Deserialize)]
 struct NodeManagerInventory {
+    daemon_socket_addr: Option<SocketAddr>,
     nodes: Vec<Node>,
 }
 #[derive(Deserialize)]
