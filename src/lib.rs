@@ -34,6 +34,7 @@ use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 use std::{
+    collections::BTreeMap,
     fs::File,
     io::{BufRead, BufReader, BufWriter, Write},
     net::{IpAddr, SocketAddr},
@@ -100,7 +101,8 @@ pub struct DeploymentInventory {
     pub node_count: u16,
     pub sn_codebase_type: SnCodebaseType,
     pub vm_list: Vec<(String, IpAddr)>,
-    pub rpc_endpoints: Vec<SocketAddr>,
+    // Map of PeerId to SocketAddr
+    pub rpc_endpoints: BTreeMap<String, SocketAddr>,
     pub manager_daemon_endpoints: Vec<SocketAddr>,
     pub ssh_user: String,
     pub genesis_multiaddr: String,
@@ -590,9 +592,13 @@ impl TestnetDeploy {
                 .collect::<Result<Vec<NodeManagerInventory>>>()?
         };
 
-        let safenode_rpc_endpoints = node_manager_inventories
+        let safenode_rpc_endpoints: BTreeMap<String, SocketAddr> = node_manager_inventories
             .iter()
-            .flat_map(|inv| inv.nodes.iter().map(|node| node.rpc_socket_addr))
+            .flat_map(|inv| {
+                inv.nodes
+                    .iter()
+                    .flat_map(|node| node.peer_id.clone().map(|id| (id, node.rpc_socket_addr)))
+            })
             .collect();
 
         let manager_daemon_endpoints: Vec<SocketAddr> = node_manager_inventories
@@ -965,6 +971,7 @@ struct NodeManagerInventory {
 #[derive(Deserialize)]
 struct Node {
     rpc_socket_addr: SocketAddr,
+    peer_id: Option<String>,
 }
 
 fn get_node_manager_inventory(inventory_file_path: &PathBuf) -> Result<NodeManagerInventory> {
