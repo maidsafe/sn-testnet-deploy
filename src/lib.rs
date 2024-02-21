@@ -103,7 +103,8 @@ pub struct DeploymentInventory {
     pub vm_list: Vec<(String, IpAddr)>,
     // Map of PeerId to SocketAddr
     pub rpc_endpoints: BTreeMap<String, SocketAddr>,
-    pub manager_daemon_endpoints: Vec<SocketAddr>,
+    // Map of PeerId to manager daemon SocketAddr
+    pub manager_daemon_endpoints: BTreeMap<String, SocketAddr>,
     pub ssh_user: String,
     pub genesis_multiaddr: String,
     pub peers: Vec<String>,
@@ -592,6 +593,8 @@ impl TestnetDeploy {
                 .collect::<Result<Vec<NodeManagerInventory>>>()?
         };
 
+        // todo: filter out nodes that are running currently. Nodes can be restarted, which can lead to us collecting
+        // RPCs to nodes that do not exists.
         let safenode_rpc_endpoints: BTreeMap<String, SocketAddr> = node_manager_inventories
             .iter()
             .flat_map(|inv| {
@@ -601,9 +604,19 @@ impl TestnetDeploy {
             })
             .collect();
 
-        let manager_daemon_endpoints: Vec<SocketAddr> = node_manager_inventories
+        let manager_daemon_endpoints: BTreeMap<String, SocketAddr> = node_manager_inventories
             .iter()
-            .flat_map(|inv| inv.daemon_socket_addr)
+            .flat_map(|inv| {
+                inv.nodes.iter().flat_map(|node| {
+                    if let (Some(peer_id), Some(daemon_socket_addr)) =
+                        (node.peer_id.clone(), inv.daemon_socket_addr)
+                    {
+                        Some((peer_id, daemon_socket_addr))
+                    } else {
+                        None
+                    }
+                })
+            })
             .collect();
 
         // The scripts are relative to the `resources` directory, so we need to change the current
