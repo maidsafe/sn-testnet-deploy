@@ -21,15 +21,15 @@
     dest: "{{ binary_dir }}"
     remote_src: True
 
-- name: download the manager daemon binary
+- name: download the safenodemand binary
   ansible.builtin.get_url:
-    url: "{{ node_manager_daemon_archive_url }}"
-    dest: /tmp/{{ node_manager_daemon_archive_filename }}
+    url: "{{ safenodemand_archive_url }}"
+    dest: /tmp/{{ safenodemand_archive_filename }}
 
-- name: extract the manager daemon binary to /usr/local/bin
+- name: extract the safenodemand binary to /usr/local/bin
   become: True
   ansible.builtin.unarchive:
-    src: "/tmp/{{ node_manager_daemon_archive_filename }}"
+    src: "/tmp/{{ safenodemand_archive_filename }}"
     dest: "{{ binary_dir }}"
     remote_src: True
 
@@ -107,6 +107,6 @@
   become: True
   command: safenode-manager -v start
 
-- name: start safenode manager daemon
+- name: start safenodemand
   become: true
-  command: safenode-manager -v daemon --address {{ node_rpc_ip }} --path "{{ binary_dir }}/safenode-manager-daemon"
+  command: safenode-manager -v daemon --address {{ node_rpc_ip }} --path "{{ binary_dir }}/safenodemand"
