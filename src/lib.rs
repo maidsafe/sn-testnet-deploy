@@ -608,9 +608,10 @@ impl TestnetDeploy {
             .iter()
             .flat_map(|inv| {
                 inv.nodes.iter().flat_map(|node| {
-                    if let (Some(peer_id), Some(daemon_socket_addr)) =
-                        (node.peer_id.clone(), inv.safenodemand_endpoint)
-                    {
+                    if let (Some(peer_id), Some(Some(daemon_socket_addr))) = (
+                        node.peer_id.clone(),
+                        inv.daemon.clone().map(|daemon| daemon.endpoint),
+                    ) {
                         Some((peer_id, daemon_socket_addr))
                     } else {
                         None
@@ -978,9 +979,14 @@ pub fn get_progress_bar(length: u64) -> Result<ProgressBar> {
 
 #[derive(Deserialize)]
 struct NodeManagerInventory {
-    safenodemand_endpoint: Option<SocketAddr>,
+    daemon: Option<Daemon>,
     nodes: Vec<Node>,
 }
+#[derive(Deserialize, Clone)]
+struct Daemon {
+    endpoint: Option<SocketAddr>,
+}
+
 #[derive(Deserialize)]
 struct Node {
     rpc_socket_addr: SocketAddr,

@@ -107,6 +107,10 @@
   become: True
   command: safenode-manager -v start
 
+- name: add safenodemand
+  become: true
+  command: safenode-manager -v daemon add --address {{ node_rpc_ip }} --path "{{ binary_dir }}/safenodemand"
+
 - name: start safenodemand
   become: true
-  command: safenode-manager -v daemon --address {{ node_rpc_ip }} --path "{{ binary_dir }}/safenodemand"
+  command: safenode-manager -v daemon start
