@@ -104,7 +104,7 @@ pub struct DeploymentInventory {
     // Map of PeerId to SocketAddr
     pub rpc_endpoints: BTreeMap<String, SocketAddr>,
     // Map of PeerId to manager daemon SocketAddr
-    pub manager_daemon_endpoints: BTreeMap<String, SocketAddr>,
+    pub safenodemand_endpoints: BTreeMap<String, SocketAddr>,
     pub ssh_user: String,
     pub genesis_multiaddr: String,
     pub peers: Vec<String>,
@@ -604,12 +604,12 @@ impl TestnetDeploy {
             })
             .collect();
 
-        let manager_daemon_endpoints: BTreeMap<String, SocketAddr> = node_manager_inventories
+        let safenodemand_endpoints: BTreeMap<String, SocketAddr> = node_manager_inventories
             .iter()
             .flat_map(|inv| {
                 inv.nodes.iter().flat_map(|node| {
                     if let (Some(peer_id), Some(daemon_socket_addr)) =
-                        (node.peer_id.clone(), inv.daemon_socket_addr)
+                        (node.peer_id.clone(), inv.safenodemand_endpoint)
                     {
                         Some((peer_id, daemon_socket_addr))
                     } else {
@@ -655,7 +655,7 @@ impl TestnetDeploy {
             sn_codebase_type,
             vm_list,
             rpc_endpoints: safenode_rpc_endpoints,
-            manager_daemon_endpoints,
+            safenodemand_endpoints,
             ssh_user: self.cloud_provider.get_ssh_user(),
             genesis_multiaddr,
             peers,
@@ -978,7 +978,7 @@ pub fn get_progress_bar(length: u64) -> Result<ProgressBar> {
 
 #[derive(Deserialize)]
 struct NodeManagerInventory {
-    daemon_socket_addr: Option<SocketAddr>,
+    safenodemand_endpoint: Option<SocketAddr>,
     nodes: Vec<Node>,
 }
 #[derive(Deserialize)]

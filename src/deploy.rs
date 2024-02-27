@@ -408,7 +408,7 @@ impl DeployCmd {
             }
         }
 
-        // add in node manager daemon url
+        // add in safenodemand url
         match &self.sn_codebase_type {
             SnCodebaseType::Branch {
                 repo_owner, branch, ..
@@ -417,9 +417,9 @@ impl DeployCmd {
                 Self::add_value(&mut extra_vars, "org", repo_owner);
                 Self::add_value(
                 &mut extra_vars,
-                "node_manager_daemon_archive_url",
+                "safenodemand_archive_url",
                 &format!(
-                    "https://sn-node.s3.eu-west-2.amazonaws.com/{}/{}/safenode-manager-daemon-{}-x86_64-unknown-linux-musl.tar.gz",
+                    "https://sn-node.s3.eu-west-2.amazonaws.com/{}/{}/safenodemand-{}-x86_64-unknown-linux-musl.tar.gz",
                     repo_owner,
                     branch,
                     &self.name),
@@ -429,7 +429,7 @@ impl DeployCmd {
                 Self::add_value(
                     &mut extra_vars,
                     "node_manager_archive_url",
-                    "https://sn-node-manager.s3.eu-west-2.amazonaws.com/safenode-manager-daemon-latest-x86_64-unknown-linux-musl.tar.gz",
+                    "https://sn-node-manager.s3.eu-west-2.amazonaws.com/safenodemand-latest-x86_64-unknown-linux-musl.tar.gz",
                 );
             }
         }
