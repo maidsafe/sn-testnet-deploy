@@ -428,7 +428,7 @@ impl DeployCmd {
             _ => {
                 Self::add_value(
                     &mut extra_vars,
-                    "node_manager_archive_url",
+                    "safenodemand_archive_url",
                     "https://sn-node-manager.s3.eu-west-2.amazonaws.com/safenodemand-latest-x86_64-unknown-linux-musl.tar.gz",
                 );
             }
