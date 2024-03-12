@@ -26,11 +26,11 @@
     url: "{{ safenodemand_archive_url }}"
     dest: /tmp/{{ safenodemand_archive_filename }}
 
-- name: extract the safenodemand binary to /usr/local/bin
+- name: extract the safenodemand binary to /tmp/safenodemand
   become: True
   ansible.builtin.unarchive:
     src: "/tmp/{{ safenodemand_archive_filename }}"
-    dest: "{{ binary_dir }}"
+    dest: /tmp/
     remote_src: True
 
 #
@@ -109,7 +109,7 @@
 
 - name: add safenodemand
   become: true
-  command: safenode-manager -v daemon add --address {{ node_rpc_ip }} --path "{{ binary_dir }}/safenodemand"
+  command: safenode-manager -v daemon add --address {{ node_rpc_ip }} --path /tmp/safenodemand
 
 - name: start safenodemand
   become: true
