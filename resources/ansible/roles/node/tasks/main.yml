@@ -44,7 +44,7 @@
 
 - name: parse genesis node status
   set_fact:
-    genesis_exists: "{{ (genesis_status.stdout | from_json | selectattr('genesis', 'equalto', true) | list | length) > 0 }}"
+    genesis_exists: "{{ (genesis_status.stdout | from_json).nodes | selectattr('genesis', 'equalto', true) | list | length > 0 }}"
   when: is_genesis and genesis_status.stdout != ""
 
 - name: add genesis node service
@@ -76,7 +76,7 @@
 
 - name: calculate current non-genesis node count
   set_fact:
-    current_node_count: "{{ (node_status.stdout | from_json | selectattr('genesis', 'equalto', false) | list | length) }}"
+    current_node_count: "{{ (node_status.stdout | from_json).nodes | selectattr('genesis', 'equalto', false) | list | length }}"
   when: node_status.stdout != ""
 
 - name: calculate number of nodes to add
