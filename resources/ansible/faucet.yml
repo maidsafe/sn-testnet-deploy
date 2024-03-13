@@ -11,6 +11,7 @@
           { name: "{{ node_data_mount_path }}", owner: "root", group: "root", mode: 0755 },
         when: provider == "aws"
       }
+    - node-manager
     - faucet
   tasks:
     # Something is wrong with the journal service on Ubuntu that causes no

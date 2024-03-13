@@ -715,13 +715,13 @@ impl TestnetDeploy {
         };
 
         self.ansible_runner.run_playbook(
-            PathBuf::from("node_manager_upgrade.yml"),
+            PathBuf::from("upgrade_nodes.yml"),
             remaining_nodes_inventory_path,
             self.cloud_provider.get_ssh_user(),
             extra_vars.clone(),
         )?;
         self.ansible_runner.run_playbook(
-            PathBuf::from("node_manager_upgrade.yml"),
+            PathBuf::from("upgrade_nodes.yml"),
             genesis_inventory_path,
             self.cloud_provider.get_ssh_user(),
             extra_vars,

@@ -1,4 +1,5 @@
 ---
+# This role assumes the existence of the node manager, which is setup using another role.
 - name: get the private IP for the instance
   set_fact:
     node_rpc_ip: "{{ instance_facts.instances[0].network_interfaces[0].private_ip_address }}"
@@ -8,31 +9,6 @@
   set_fact:
     node_rpc_ip: "{{ ansible_host }}"
   when: provider == "digital-ocean" and public_rpc
-
-- name: download the node manager binary
-  ansible.builtin.get_url:
-    url: "{{ node_manager_archive_url }}"
-    dest: /tmp/{{ node_manager_archive_filename }}
-
-- name: extract the node manager binary to /usr/local/bin
-  become: True
-  ansible.builtin.unarchive:
-    src: "/tmp/{{ node_manager_archive_filename }}"
-    dest: "{{ binary_dir }}"
-    remote_src: True
-
-- name: download the safenodemand binary
-  ansible.builtin.get_url:
-    url: "{{ safenodemand_archive_url }}"
-    dest: /tmp/{{ safenodemand_archive_filename }}
-
-- name: extract the safenodemand binary to /tmp/safenodemand
-  become: True
-  ansible.builtin.unarchive:
-    src: "/tmp/{{ safenodemand_archive_filename }}"
-    dest: /tmp/
-    remote_src: True
-
 #
 # Setup genesis node on genesis run
 #
@@ -106,11 +82,3 @@
 - name: start the node services
   become: True
   command: safenode-manager -v start
-
-- name: add safenodemand
-  become: true
-  command: safenode-manager -v daemon add --address {{ node_rpc_ip }} --path /tmp/safenodemand
-
-- name: start safenodemand
-  become: true
-  command: safenode-manager -v daemon start
