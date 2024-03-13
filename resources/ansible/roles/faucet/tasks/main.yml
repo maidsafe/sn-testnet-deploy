@@ -1,31 +1,29 @@
 ---
-- name: get the faucet archive
-  ansible.builtin.get_url:
-    url: "{{ faucet_archive_url }}"
-    dest: /tmp/{{ faucet_archive_filename }}
+# This role assumes the existence of the node manager, which is setup using another role.
+- name: check if the faucet binary exists
+  ansible.builtin.stat:
+    path: "{{ binary_dir}}/faucet"
+  register: faucet_bin
 
-- name: extract the faucet binary
+- name: add faucet service
   become: True
-  ansible.builtin.unarchive:
-    src: "/tmp/{{ faucet_archive_filename }}"
-    dest: "{{ faucet_archive_dest_path }}"
-    remote_src: True
+  ansible.builtin.command:
+    # The `omit` filter is used to remove the `--env` argument if the
+    # `env_variables` variable is not defined. If the argv would be otherwise
+    # defined as '', the command would fail as it doesn't expect an empty
+    # argument, so it's omitted instead.
+    argv: "{{ command_args | reject('equalto', omit) | list }}"
+  vars:
+    command_args:
+      - "{{ binary_dir }}/safenode-manager"
+      - -v
+      - faucet
+      - add
+      - "--peer={{ genesis_multiaddr }}"
+      - "{{ ('--env=' + env_variables) if env_variables is defined else omit }}"
+      - "{{ ('--version=' + version) if version is defined else ('--url=' + faucet_archive_url) }}"
+  when: not faucet_bin.stat.exists
 
-- name: copy service file
+- name: start the faucet
   become: True
-  template:
-    src: faucet.service.j2
-    dest: /etc/systemd/system/faucet.service
-  register: service_template_created
-
-- name: reload the system manager configuration
-  become: True
-  command: systemctl daemon-reload
-  when: service_template_created.changed
-
-- name: start the faucet service
-  become: True
-  systemd:
-    name: faucet
-    state: started
-    enabled: yes
+  command: safenode-manager -v faucet start

@@ -1,0 +1,17 @@
+---
+- name: upgrade faucet binary with the node manager
+  hosts: all
+  tasks:
+    - name: upgrade
+      ansible.builtin.command:
+        # The `omit` filter is used to remove the `--env` argument if the
+        # `env_variables` variable is not defined. If the argv would be otherwise
+        # defined as '', the command would fail as it doesn't expect an empty
+        # argument, so it's omitted instead.
+        argv: "{{ command_args | reject('equalto', omit) | list }}"
+      vars:
+        command_args:
+          - safenode-manager
+          - faucet
+          - upgrade
+          - "{{ ('--env=' + env_variables) if env_variables is defined else omit }}"

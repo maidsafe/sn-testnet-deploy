@@ -26,6 +26,7 @@
           { name: "{{ node_data_mount_path }}", owner: "root", group: "root", mode: 0755 },
         when: provider == "aws"
       }
+    - node-manager
     - node
     - role: resource_usage
       become: True
