@@ -5,11 +5,16 @@
 // Please see the LICENSE file for more details.
 use crate::{
     error::{Error, Result},
-    is_binary_on_path, run_external_command, CloudProvider,
+    is_binary_on_path, run_external_command, CloudProvider, SnCodebaseType,
 };
 use log::{debug, warn};
 use serde::Deserialize;
 use std::{collections::HashMap, net::IpAddr, path::PathBuf, time::Duration};
+
+const NODE_S3_BUCKET_URL: &str = "https://sn-node.s3.eu-west-2.amazonaws.com";
+const NODE_MANAGER_S3_BUCKET_URL: &str = "https://sn-node-manager.s3.eu-west-2.amazonaws.com";
+const FAUCET_S3_BUCKET_URL: &str = "https://sn-faucet.s3.eu-west-2.amazonaws.com";
+const RPC_CLIENT_BUCKET_URL: &str = "https://sn-node-rpc-client.s3.eu-west-2.amazonaws.com";
 
 /// Ansible has multiple 'binaries', e.g., `ansible-playbook`, `ansible-inventory` etc. that are
 /// wrappers around the main `ansible` program. It would be a bit cumbersome to create a different
@@ -193,6 +198,7 @@ impl AnsibleRunner {
 #[derive(Default)]
 pub struct ExtraVarsDocBuilder {
     variables: Vec<(String, String)>,
+    list_variables: HashMap<String, Vec<String>>,
 }
 
 impl ExtraVarsDocBuilder {
@@ -202,6 +208,15 @@ impl ExtraVarsDocBuilder {
 
     pub fn add_variable(&mut self, name: &str, value: &str) -> &mut Self {
         self.variables.push((name.to_string(), value.to_string()));
+        self
+    }
+
+    pub fn add_list_variable(&mut self, name: &str, values: Vec<String>) -> &mut Self {
+        if let Some(list) = self.list_variables.get_mut(name) {
+            list.extend(values);
+        } else {
+            self.list_variables.insert(name.to_string(), values);
+        }
         self
     }
 
@@ -220,14 +235,230 @@ impl ExtraVarsDocBuilder {
         self
     }
 
+    pub fn add_build_variables(&mut self, deployment_name: &str, codebase_type: &SnCodebaseType) {
+        match codebase_type {
+            SnCodebaseType::Main { safenode_features } => {
+                if let Some(features) = safenode_features {
+                    self.add_variable("custom_bin", "true");
+                    self.add_variable("testnet_name", deployment_name);
+                    self.add_variable("org", "maidsafe");
+                    self.add_variable("branch", "main");
+                    self.add_variable("safenode_features_list", features);
+                } else {
+                    self.add_variable("custom_bin", "false");
+                }
+            }
+            SnCodebaseType::Branch {
+                repo_owner,
+                branch,
+                safenode_features,
+            } => {
+                self.add_variable("custom_bin", "true");
+                self.add_variable("testnet_name", deployment_name);
+                self.add_variable("org", repo_owner);
+                self.add_variable("branch", branch);
+                if let Some(features) = safenode_features {
+                    self.add_variable("safenode_features_list", features);
+                }
+            }
+            SnCodebaseType::Versioned { .. } => {
+                self.add_variable("custom_bin", "false");
+            }
+        }
+    }
+
+    pub fn add_rpc_client_url_or_version(
+        &mut self,
+        deployment_name: &str,
+        codebase_type: &SnCodebaseType,
+    ) {
+        match codebase_type {
+            SnCodebaseType::Branch {
+                repo_owner, branch, ..
+            } => {
+                self.add_branch_url_variable(
+                    "safenode_rpc_client_archive_url",
+                    &format!(
+                        "{}/{}/{}/safenode_rpc_client-{}-x86_64-unknown-linux-musl.tar.gz",
+                        NODE_S3_BUCKET_URL, repo_owner, branch, deployment_name
+                    ),
+                    branch,
+                    repo_owner,
+                );
+            }
+            _ => {
+                self.add_variable(
+                    "safenode_rpc_client_archive_url",
+                    &format!(
+                        "{}/safenode_rpc_client-latest-x86_64-unknown-linux-musl.tar.gz",
+                        RPC_CLIENT_BUCKET_URL
+                    ),
+                );
+            }
+        }
+    }
+
+    pub fn add_faucet_url_or_version(
+        &mut self,
+        deployment_name: &str,
+        codebase_type: &SnCodebaseType,
+    ) {
+        match codebase_type {
+            SnCodebaseType::Branch {
+                repo_owner, branch, ..
+            } => {
+                self.add_branch_url_variable(
+                    "faucet_archive_url",
+                    &format!(
+                        "{}/{}/{}/faucet-{}-x86_64-unknown-linux-musl.tar.gz",
+                        NODE_S3_BUCKET_URL, repo_owner, branch, deployment_name
+                    ),
+                    branch,
+                    repo_owner,
+                );
+            }
+            _ => {
+                self.add_variable(
+                    "faucet_archive_url",
+                    &format!(
+                        "{}/faucet-latest-x86_64-unknown-linux-musl.tar.gz",
+                        FAUCET_S3_BUCKET_URL
+                    ),
+                );
+            }
+        }
+    }
+
+    pub fn add_node_url_or_version(
+        &mut self,
+        deployment_name: &str,
+        codebase_type: &SnCodebaseType,
+    ) {
+        match codebase_type {
+            SnCodebaseType::Main { safenode_features } => {
+                if safenode_features.is_some() {
+                    self.variables.push((
+                        "node_archive_url".to_string(),
+                        format!(
+                            "{}/maidsafe/main/safenode-{}-x86_64-unknown-linux-musl.tar.gz",
+                            NODE_S3_BUCKET_URL, deployment_name
+                        ),
+                    ));
+                } else {
+                    self.variables.push((
+                        "node_archive_url".to_string(),
+                        format!(
+                            "{}/safenode-latest-x86_64-unknown-linux-musl.tar.gz",
+                            NODE_S3_BUCKET_URL
+                        ),
+                    ));
+                }
+            }
+            SnCodebaseType::Branch {
+                repo_owner, branch, ..
+            } => {
+                self.add_branch_url_variable(
+                    "node_archive_url",
+                    &format!(
+                        "{}/{}/{}/safenode-{}-x86_64-unknown-linux-musl.tar.gz",
+                        NODE_S3_BUCKET_URL, repo_owner, branch, deployment_name
+                    ),
+                    branch,
+                    repo_owner,
+                );
+            }
+            SnCodebaseType::Versioned {
+                safenode_version, ..
+            } => self
+                .variables
+                .push(("version".to_string(), safenode_version.clone())),
+        }
+    }
+
+    pub fn add_node_manager_url(&mut self, deployment_name: &str, codebase_type: &SnCodebaseType) {
+        match codebase_type {
+            SnCodebaseType::Branch {
+                repo_owner, branch, ..
+            } => {
+                self.add_branch_url_variable(
+                    "node_manager_archive_url",
+                    &format!(
+                        "{}/{}/{}/safenode-manager-{}-x86_64-unknown-linux-musl.tar.gz",
+                        NODE_S3_BUCKET_URL, repo_owner, branch, deployment_name
+                    ),
+                    branch,
+                    repo_owner,
+                );
+            }
+            _ => {
+                self.variables.push((
+                    "node_manager_archive_url".to_string(),
+                    format!(
+                        "{}/safenode-manager-latest-x86_64-unknown-linux-musl.tar.gz",
+                        NODE_MANAGER_S3_BUCKET_URL
+                    ),
+                ));
+            }
+        }
+    }
+
+    pub fn add_node_manager_daemon_url(
+        &mut self,
+        deployment_name: &str,
+        codebase_type: &SnCodebaseType,
+    ) {
+        match codebase_type {
+            SnCodebaseType::Branch {
+                repo_owner, branch, ..
+            } => {
+                self.add_branch_url_variable(
+                    "safenodemand_archive_url",
+                    &format!(
+                        "{}/{}/{}/safenodemand-{}-x86_64-unknown-linux-musl.tar.gz",
+                        NODE_S3_BUCKET_URL, repo_owner, branch, deployment_name
+                    ),
+                    branch,
+                    repo_owner,
+                );
+            }
+            _ => {
+                self.variables.push((
+                    "safenodemand_archive_url".to_string(),
+                    format!(
+                        "{}/safenodemand-latest-x86_64-unknown-linux-musl.tar.gz",
+                        NODE_MANAGER_S3_BUCKET_URL,
+                    ),
+                ));
+            }
+        }
+    }
+
     pub fn build(&self) -> String {
         let mut doc = String::new();
         doc.push_str("{ ");
+
         for (name, value) in self.variables.iter() {
             doc.push_str(&format!("\"{name}\": \"{value}\", "));
         }
+        for (name, list) in &self.list_variables {
+            doc.push_str(&format!("\"{name}\": ["));
+            for val in list.iter() {
+                doc.push_str(&format!("\"{val}\", "));
+            }
+            let mut doc = doc.strip_suffix(", ").unwrap().to_string();
+            doc.push_str("], ");
+        }
+
         let mut doc = doc.strip_suffix(", ").unwrap().to_string();
         doc.push_str(" }");
         doc
+    }
+
+    fn add_branch_url_variable(&mut self, name: &str, value: &str, branch: &str, repo_owner: &str) {
+        self.variables
+            .push(("branch".to_string(), branch.to_string()));
+        self.variables
+            .push(("org".to_string(), repo_owner.to_string()));
+        self.variables.push((name.to_string(), value.to_string()));
     }
 }
