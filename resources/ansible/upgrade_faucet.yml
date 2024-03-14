@@ -9,8 +9,8 @@
       vars:
         command_args:
           - safenode-manager
-          - upgrade
           - faucet
+          - upgrade
           - "{{ '--force' if force_faucet is defined else omit }}"
           - "{{ ('--env=' + env_variables) if env_variables is defined else omit }}"
           - "{{ ('--version=' + faucet_version) if faucet_version is defined else omit }}"
