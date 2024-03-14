@@ -219,13 +219,13 @@ impl UpgradeOptions {
             extra_vars.add_variable("force_faucet", &self.force_faucet.to_string());
         }
         if let Some(version) = &self.faucet_version {
-            extra_vars.add_variable("faucet_version", &version);
+            extra_vars.add_variable("faucet_version", version);
         }
         if self.force_safenode {
             extra_vars.add_variable("force_safenode", &self.force_safenode.to_string());
         }
         if let Some(version) = &self.safenode_version {
-            extra_vars.add_variable("safenode_version", &version);
+            extra_vars.add_variable("safenode_version", version);
         }
         extra_vars.build()
     }
