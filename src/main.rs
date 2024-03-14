@@ -15,7 +15,7 @@ use sn_testnet_deploy::{
     deploy::DeployCmd, error::Error, get_data_directory, get_wallet_directory,
     logstash::LogstashDeployBuilder, manage_test_data::TestDataClientBuilder, notify_slack,
     setup::setup_dotenv_file, CloudProvider, DeploymentInventory, SnCodebaseType,
-    TestnetDeployBuilder,
+    TestnetDeployBuilder, UpgradeOptions,
 };
 
 pub fn parse_provider(val: &str) -> Result<CloudProvider> {
@@ -104,8 +104,9 @@ enum Commands {
         /// branch, not both.
         #[arg(long)]
         repo_owner: Option<String>,
-        /// Optionally supply a version number to be used for the safe binary. There should be no
-        /// 'v' prefix.
+        /// Optionally supply a version number to be used for the safe binary.
+        ///
+        /// There should be no 'v' prefix.
         ///
         /// This argument must be used in conjunction with the --safenode-version argument.
         ///
@@ -185,6 +186,37 @@ enum Commands {
     },
     /// Upgrade the node binaries of a testnet environment to the latest version.
     Upgrade {
+        /// Set to run Ansible with more verbose output.
+        #[arg(long)]
+        ansible_verbose: bool,
+        /// Provide environment variables for the safenode service.
+        ///
+        /// These will override the values provided initially.
+        ///
+        /// This is useful to set safenode's log levels. Each variable should be comma separated
+        /// without any space.
+        ///
+        /// Example: --env SN_LOG=all,RUST_LOG=libp2p=debug
+        #[clap(name = "env", long, use_value_delimiter = true, value_parser = parse_environment_variables)]
+        env_variables: Option<Vec<(String, String)>>,
+        /// Optionally supply a version for the faucet binary to be upgraded to.
+        ///
+        /// If not provided, the latest version will be used. A lower version number can be
+        /// specified to downgrade to a known good version.
+        ///
+        /// There should be no 'v' prefix.
+        #[arg(long)]
+        faucet_version: Option<String>,
+        /// Set to force the node manager to accept the faucet version provided.
+        ///
+        /// This can be used to downgrade the faucet to a known good version.
+        #[clap(long)]
+        force_faucet: bool,
+        /// Set to force the node manager to accept the safenode version provided.
+        ///
+        /// This can be used to downgrade safenode to a known good version.
+        #[clap(long)]
+        force_safenode: bool,
         /// Maximum number of forks Ansible will use to execute tasks on target hosts.
         #[clap(long, default_value_t = 2)]
         forks: usize,
@@ -196,17 +228,14 @@ enum Commands {
         /// Valid values are "aws" or "digital-ocean".
         #[clap(long, default_value_t = CloudProvider::DigitalOcean, value_parser = parse_provider, verbatim_doc_comment)]
         provider: CloudProvider,
-        /// Provide environment variables for the safenode service. This will override the values set during the Add
-        /// command.
-        ///
-        /// This is useful to set the safenode's log levels. Each variable should be comma separated without any space.
-        ///
-        /// Example: --env SN_LOG=all,RUST_LOG=libp2p=debug
-        #[clap(name = "env", long, use_value_delimiter = true, value_parser = parse_environment_variables)]
-        env_variables: Option<Vec<(String, String)>>,
-        /// Set to run Ansible with more verbose output.
         #[arg(long)]
-        ansible_verbose: bool,
+        /// Optionally supply a version for the faucet binary to be upgraded to.
+        ///
+        /// If not provided, the latest version will be used. A lower version number can be
+        /// specified to downgrade to a known good version.
+        ///
+        /// There should be no 'v' prefix.
+        safenode_version: Option<String>,
     },
     /// Clean a deployed testnet environment.
     #[clap(name = "upload-test-data")]
@@ -529,17 +558,33 @@ async fn main() -> Result<()> {
             Ok(())
         }
         Some(Commands::Upgrade {
+            ansible_verbose,
+            env_variables,
+            faucet_version,
+            force_faucet,
+            force_safenode,
+            forks,
             name,
             provider,
-            env_variables,
-            forks,
-            ansible_verbose,
+            safenode_version,
         }) => {
             let testnet_deploy = TestnetDeployBuilder::default()
                 .ansible_verbose_mode(ansible_verbose)
-                .provider(provider)
+                .provider(provider.clone())
                 .build()?;
-            testnet_deploy.upgrade(&name, env_variables, forks).await?;
+            testnet_deploy
+                .upgrade(UpgradeOptions {
+                    ansible_verbose,
+                    env_variables,
+                    faucet_version,
+                    force_faucet,
+                    force_safenode,
+                    forks,
+                    name,
+                    provider,
+                    safenode_version,
+                })
+                .await?;
             Ok(())
         }
         Some(Commands::UploadTestData { name }) => {

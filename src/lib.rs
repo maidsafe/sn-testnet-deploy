@@ -19,7 +19,7 @@ pub mod ssh;
 pub mod terraform;
 
 use crate::{
-    ansible::AnsibleRunner,
+    ansible::{AnsibleRunner, ExtraVarsDocBuilder},
     error::{Error, Result},
     rpc_client::RpcClient,
     s3::S3Repository,
@@ -193,6 +193,41 @@ impl DeploymentInventory {
             }
         }
         Ok(())
+    }
+}
+
+#[derive(Clone)]
+pub struct UpgradeOptions {
+    pub ansible_verbose: bool,
+    pub env_variables: Option<Vec<(String, String)>>,
+    pub faucet_version: Option<String>,
+    pub force_faucet: bool,
+    pub force_safenode: bool,
+    pub forks: usize,
+    pub name: String,
+    pub provider: CloudProvider,
+    pub safenode_version: Option<String>,
+}
+
+impl UpgradeOptions {
+    pub fn get_ansible_vars(&self) -> String {
+        let mut extra_vars = ExtraVarsDocBuilder::default();
+        if let Some(env_variables) = &self.env_variables {
+            extra_vars.add_env_variable_list("env_variables", env_variables.clone());
+        }
+        if self.force_faucet {
+            extra_vars.add_variable("force_faucet", &self.force_faucet.to_string());
+        }
+        if let Some(version) = &self.faucet_version {
+            extra_vars.add_variable("faucet_version", &version);
+        }
+        if self.force_safenode {
+            extra_vars.add_variable("force_safenode", &self.force_safenode.to_string());
+        }
+        if let Some(version) = &self.safenode_version {
+            extra_vars.add_variable("safenode_version", &version);
+        }
+        extra_vars.build()
     }
 }
 
@@ -669,19 +704,14 @@ impl TestnetDeploy {
         Ok(())
     }
 
-    pub async fn upgrade(
-        &self,
-        name: &str,
-        env_variables: Option<Vec<(String, String)>>,
-        forks: usize,
-    ) -> Result<()> {
+    pub async fn upgrade(&self, options: UpgradeOptions) -> Result<()> {
         // Set the `forks` config value for Ansible. This environment variable will override
         // whatever is in the ansible.cfg file.
-        std::env::set_var("ANSIBLE_FORKS", forks.to_string());
+        std::env::set_var("ANSIBLE_FORKS", options.forks.to_string());
 
         let environments = self.terraform_runner.workspace_list()?;
-        if !environments.contains(&name.to_string()) {
-            return Err(Error::EnvironmentDoesNotExist(name.to_string()));
+        if !environments.contains(&options.name.to_string()) {
+            return Err(Error::EnvironmentDoesNotExist(options.name.to_string()));
         }
 
         // The ansible runner will have its working directory set to this location. We need the
@@ -689,42 +719,35 @@ impl TestnetDeploy {
         let ansible_dir_path = self.working_directory_path.join("ansible");
         std::env::set_current_dir(ansible_dir_path.clone())?;
 
-        let genesis_inventory_path =
-            PathBuf::from("inventory").join(format!(".{name}_genesis_inventory_digital_ocean.yml"));
-        let remaining_nodes_inventory_path =
-            PathBuf::from("inventory").join(format!(".{name}_node_inventory_digital_ocean.yml"));
+        let genesis_inventory_path = PathBuf::from("inventory").join(format!(
+            ".{}_genesis_inventory_digital_ocean.yml",
+            options.name
+        ));
+        let remaining_nodes_inventory_path = PathBuf::from("inventory").join(format!(
+            ".{}_node_inventory_digital_ocean.yml",
+            options.name
+        ));
         if !genesis_inventory_path.exists() || !remaining_nodes_inventory_path.exists() {
-            return Err(Error::EnvironmentDoesNotExist(name.to_string()));
+            return Err(Error::EnvironmentDoesNotExist(options.name.to_string()));
         }
-
-        // construct extra vars
-        let extra_vars = if let Some(env_variables) = env_variables {
-            let mut extra_vars = String::new();
-            extra_vars.push_str("{ ");
-            // the values are sanitized and reconstructed here. Better to error out at the deployer than at the manager.
-            let mut env_vars_strs = Vec::new();
-            for (key, val) in env_variables {
-                env_vars_strs.push(format!("{key}={val}"));
-            }
-            let env_vars_strs = env_vars_strs.join(",");
-            extra_vars.push_str(&format!("\"env_variables\": \"{env_vars_strs}\", "));
-            extra_vars.push('}');
-            Some(extra_vars)
-        } else {
-            None
-        };
 
         self.ansible_runner.run_playbook(
             PathBuf::from("upgrade_nodes.yml"),
             remaining_nodes_inventory_path,
             self.cloud_provider.get_ssh_user(),
-            extra_vars.clone(),
+            Some(options.get_ansible_vars()),
         )?;
         self.ansible_runner.run_playbook(
             PathBuf::from("upgrade_nodes.yml"),
+            genesis_inventory_path.clone(),
+            self.cloud_provider.get_ssh_user(),
+            Some(options.get_ansible_vars()),
+        )?;
+        self.ansible_runner.run_playbook(
+            PathBuf::from("upgrade_faucet.yml"),
             genesis_inventory_path,
             self.cloud_provider.get_ssh_user(),
-            extra_vars,
+            Some(options.get_ansible_vars()),
         )?;
 
         Ok(())
@@ -747,6 +770,7 @@ impl TestnetDeploy {
 ///
 /// Shared Helpers
 ///
+
 pub async fn get_and_extract_archive_from_s3(
     s3_repository: &S3Repository,
     bucket_name: &str,

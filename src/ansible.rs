@@ -189,3 +189,45 @@ impl AnsibleRunner {
         Ok(())
     }
 }
+
+#[derive(Default)]
+pub struct ExtraVarsDocBuilder {
+    variables: Vec<(String, String)>,
+}
+
+impl ExtraVarsDocBuilder {
+    pub fn new() -> Self {
+        Default::default()
+    }
+
+    pub fn add_variable(&mut self, name: &str, value: &str) -> &mut Self {
+        self.variables.push((name.to_string(), value.to_string()));
+        self
+    }
+
+    pub fn add_env_variable_list(
+        &mut self,
+        name: &str,
+        variables: Vec<(String, String)>,
+    ) -> &mut Self {
+        let mut joined_env_vars = Vec::new();
+        for (name, val) in variables {
+            joined_env_vars.push(format!("{name}={val}"));
+        }
+        let joined_env_vars = joined_env_vars.join(",");
+        self.variables
+            .push((name.to_string(), joined_env_vars.to_string()));
+        self
+    }
+
+    pub fn build(&self) -> String {
+        let mut doc = String::new();
+        doc.push_str("{ ");
+        for (name, value) in self.variables.iter() {
+            doc.push_str(&format!("\"{name}\": \"{value}\", "));
+        }
+        let mut doc = doc.strip_suffix(", ").unwrap().to_string();
+        doc.push_str(" }");
+        doc
+    }
+}
