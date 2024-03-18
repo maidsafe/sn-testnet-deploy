@@ -13,10 +13,11 @@ use dotenv::dotenv;
 use rand::Rng;
 use sn_testnet_deploy::{
     deploy::DeployCmd, error::Error, get_data_directory, get_wallet_directory,
-    logstash::LogstashDeployBuilder, manage_test_data::TestDataClientBuilder, notify_slack,
-    setup::setup_dotenv_file, CloudProvider, DeploymentInventory, SnCodebaseType,
+    logstash::LogstashDeployBuilder, manage_test_data::TestDataClientBuilder, network_commands,
+    notify_slack, setup::setup_dotenv_file, CloudProvider, DeploymentInventory, SnCodebaseType,
     TestnetDeployBuilder, UpgradeOptions,
 };
+use std::time::Duration;
 
 pub fn parse_provider(val: &str) -> Result<CloudProvider> {
     match val {
@@ -32,7 +33,7 @@ pub fn parse_provider(val: &str) -> Result<CloudProvider> {
 #[clap(name = "sn-testnet-deploy", version = env!("CARGO_PKG_VERSION"))]
 struct Opt {
     #[command(subcommand)]
-    command: Option<Commands>,
+    command: Commands,
 }
 
 #[derive(Subcommand, Debug)]
@@ -129,6 +130,7 @@ enum Commands {
         #[arg(long)]
         ansible_verbose: bool,
     },
+
     Inventory {
         /// The name of the environment
         #[arg(short = 'n', long)]
@@ -170,6 +172,8 @@ enum Commands {
     Logs(LogCommands),
     #[clap(name = "logstash", subcommand)]
     Logstash(LogstashCommands),
+    #[clap(name = "network", subcommand)]
+    Network(NetworkCommands),
     /// Send a notification to Slack with testnet inventory details
     Notify {
         /// The name of the environment.
@@ -351,6 +355,43 @@ enum LogstashCommands {
     },
 }
 
+// Administer or perform activities on a deployed network.
+#[derive(Subcommand, Debug)]
+enum NetworkCommands {
+    /// Restart nodes in the testnet to simulate the churn of nodes.
+    ChurnNodes {
+        /// The name of the environment.
+        #[arg(short = 'n', long)]
+        name: String,
+        /// The interval at which the nodes should be restarted.
+        #[clap(long, value_parser = |t: &str| -> Result<Duration> { Ok(t.parse().map(Duration::from_secs)?)}, default_value = "60")]
+        interval: Duration,
+        /// The number of nodes to restart concurrently per VM.
+        #[clap(long, short = 'c', default_value_t = 2)]
+        concurrent_churns: usize,
+        /// Set to false to restart the node with a different PeerId.
+        #[clap(long, default_value_t = false)]
+        retain_peer_id: bool,
+        /// The number of time each node in the network is restarted.
+        #[clap(long, default_value_t = 1)]
+        churn_cycles: usize,
+    },
+    /// Modifies the log levels for all the safenode services through RPC requests.
+    UpdateNodeLogLevel {
+        /// The name of the environment
+        #[arg(short = 'n', long)]
+        name: String,
+        /// The log level to set.
+        ///
+        /// Example: --log-level SN_LOG=all,RUST_LOG=libp2p=debug
+        #[clap(long)]
+        log_level: String,
+        /// The number of nodes to update concurrently.
+        #[clap(long, short = 'c', default_value_t = 10)]
+        concurrent_updates: usize,
+    },
+}
+
 #[tokio::main]
 async fn main() -> Result<()> {
     color_eyre::install()?;
@@ -359,12 +400,12 @@ async fn main() -> Result<()> {
 
     let opt = Opt::parse();
     match opt.command {
-        Some(Commands::Clean { name, provider }) => {
+        Commands::Clean { name, provider } => {
             let testnet_deploy = TestnetDeployBuilder::default().provider(provider).build()?;
             testnet_deploy.clean(&name).await?;
             Ok(())
         }
-        Some(Commands::Deploy {
+        Commands::Deploy {
             name,
             node_count,
             vm_count,
@@ -378,7 +419,7 @@ async fn main() -> Result<()> {
             safe_version,
             safenode_version,
             ansible_verbose,
-        }) => {
+        } => {
             let sn_codebase_type = get_sn_codebase_type(
                 branch,
                 repo_owner,
@@ -439,13 +480,13 @@ async fn main() -> Result<()> {
             deploy_cmd.execute().await?;
             Ok(())
         }
-        Some(Commands::Inventory {
+        Commands::Inventory {
             name,
             provider,
             branch,
             repo_owner,
             node_count,
-        }) => {
+        } => {
             let sn_codebase_type =
                 get_sn_codebase_type(branch, repo_owner, None, None, None).await?;
 
@@ -455,7 +496,7 @@ async fn main() -> Result<()> {
                 .await?;
             Ok(())
         }
-        Some(Commands::Logs(log_cmd)) => match log_cmd {
+        Commands::Logs(log_cmd) => match log_cmd {
             LogCommands::Rsync {
                 name,
                 resources_only,
@@ -499,7 +540,7 @@ async fn main() -> Result<()> {
                 Ok(())
             }
         },
-        Some(Commands::Logstash(logstash_cmd)) => match logstash_cmd {
+        Commands::Logstash(logstash_cmd) => match logstash_cmd {
             LogstashCommands::Clean { name, provider } => {
                 let logstash_deploy = LogstashDeployBuilder::default()
                     .provider(provider)
@@ -520,7 +561,48 @@ async fn main() -> Result<()> {
                 Ok(())
             }
         },
-        Some(Commands::Notify { name }) => {
+        Commands::Network(NetworkCommands::ChurnNodes {
+            name,
+            interval,
+            concurrent_churns,
+            retain_peer_id,
+            churn_cycles,
+        }) => {
+            let inventory_path = get_data_directory()?.join(format!("{name}-inventory.json"));
+            if !inventory_path.exists() {
+                return Err(eyre!("There is no inventory for the {name} testnet")
+                    .suggestion("Please run the inventory command to generate it"));
+            }
+
+            let inventory = DeploymentInventory::read(&inventory_path)?;
+            network_commands::perform_network_churns(
+                inventory,
+                interval,
+                concurrent_churns,
+                retain_peer_id,
+                churn_cycles,
+            )
+            .await?;
+            Ok(())
+        }
+        Commands::Network(NetworkCommands::UpdateNodeLogLevel {
+            name,
+            log_level,
+            concurrent_updates,
+        }) => {
+            let inventory_path = get_data_directory()?.join(format!("{name}-inventory.json"));
+            if !inventory_path.exists() {
+                return Err(eyre!("There is no inventory for the {name} testnet")
+                    .suggestion("Please run the inventory command to generate it"));
+            }
+
+            let inventory = DeploymentInventory::read(&inventory_path)?;
+            network_commands::update_node_log_levels(inventory, log_level, concurrent_updates)
+                .await?;
+
+            Ok(())
+        }
+        Commands::Notify { name } => {
             let inventory_path = get_data_directory()?.join(format!("{name}-inventory.json"));
             if !inventory_path.exists() {
                 return Err(eyre!("There is no inventory for the {name} testnet")
@@ -531,11 +613,11 @@ async fn main() -> Result<()> {
             notify_slack(inventory).await?;
             Ok(())
         }
-        Some(Commands::Setup {}) => {
+        Commands::Setup {} => {
             setup_dotenv_file()?;
             Ok(())
         }
-        Some(Commands::SmokeTest { name }) => {
+        Commands::SmokeTest { name } => {
             let wallet_dir_path = get_wallet_directory()?;
             if wallet_dir_path.exists() {
                 return Err(eyre!(
@@ -557,7 +639,7 @@ async fn main() -> Result<()> {
             inventory.save(&inventory_path)?;
             Ok(())
         }
-        Some(Commands::Upgrade {
+        Commands::Upgrade {
             ansible_verbose,
             env_variables,
             faucet_version,
@@ -567,7 +649,7 @@ async fn main() -> Result<()> {
             name,
             provider,
             safenode_version,
-        }) => {
+        } => {
             let testnet_deploy = TestnetDeployBuilder::default()
                 .ansible_verbose_mode(ansible_verbose)
                 .provider(provider.clone())
@@ -587,7 +669,7 @@ async fn main() -> Result<()> {
                 .await?;
             Ok(())
         }
-        Some(Commands::UploadTestData { name }) => {
+        Commands::UploadTestData { name } => {
             let inventory_path = get_data_directory()?.join(format!("{name}-inventory.json"));
             if !inventory_path.exists() {
                 return Err(eyre!("There is no inventory for the {name} testnet")
@@ -613,7 +695,6 @@ async fn main() -> Result<()> {
 
             Ok(())
         }
-        None => Ok(()),
     }
 }
 
