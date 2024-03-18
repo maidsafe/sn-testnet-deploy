@@ -11,6 +11,7 @@ pub mod error;
 pub mod logs;
 pub mod logstash;
 pub mod manage_test_data;
+pub mod network_commands;
 pub mod rpc_client;
 pub mod s3;
 pub mod safe;
