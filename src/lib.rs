@@ -684,8 +684,14 @@ impl TestnetDeploy {
         // The VM list includes the genesis node and the build machine, hence the subtraction of 2
         // from the total VM count. After that, add one node for genesis, since this machine only
         // runs a single node.
-        let mut node_count = (vm_list.len() - 2) as u16 * node_instance_count.unwrap_or(0);
-        node_count += 1;
+        let node_count = {
+            let vms_to_ignore = if build_inventory.is_empty() { 1 } else { 2 };
+            let mut node_count =
+                (vm_list.len() - vms_to_ignore) as u16 * node_instance_count.unwrap_or(0);
+            node_count += 1;
+            node_count
+        };
+
         let inventory = DeploymentInventory {
             name: name.to_string(),
             node_count,
