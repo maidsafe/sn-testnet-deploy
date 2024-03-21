@@ -359,23 +359,8 @@ enum LogstashCommands {
 #[derive(Subcommand, Debug)]
 enum NetworkCommands {
     /// Restart nodes in the testnet to simulate the churn of nodes.
-    ChurnNodes {
-        /// The name of the environment.
-        #[arg(short = 'n', long)]
-        name: String,
-        /// The interval at which the nodes should be restarted.
-        #[clap(long, value_parser = |t: &str| -> Result<Duration> { Ok(t.parse().map(Duration::from_secs)?)}, default_value = "60")]
-        interval: Duration,
-        /// The number of nodes to restart concurrently per VM.
-        #[clap(long, short = 'c', default_value_t = 2)]
-        concurrent_churns: usize,
-        /// Set to false to restart the node with a different PeerId.
-        #[clap(long, default_value_t = false)]
-        retain_peer_id: bool,
-        /// The number of time each node in the network is restarted.
-        #[clap(long, default_value_t = 1)]
-        churn_cycles: usize,
-    },
+    #[clap(name = "churn", subcommand)]
+    ChurnCommands(ChurnCommands),
     /// Modifies the log levels for all the safenode services through RPC requests.
     UpdateNodeLogLevel {
         /// The name of the environment
@@ -389,6 +374,47 @@ enum NetworkCommands {
         /// The number of nodes to update concurrently.
         #[clap(long, short = 'c', default_value_t = 10)]
         concurrent_updates: usize,
+    },
+}
+
+#[derive(Subcommand, Debug)]
+enum ChurnCommands {
+    /// Churn nodes at fixed intervals.
+    FixedInterval {
+        /// The name of the environment.
+        #[arg(short = 'n', long)]
+        name: String,
+        /// The interval between each node churn.
+        #[clap(long, value_parser = |t: &str| -> Result<Duration> { Ok(t.parse().map(Duration::from_secs)?)}, default_value = "60")]
+        interval: Duration,
+        /// The number of nodes to restart concurrently per VM.
+        #[clap(long, short = 'c', default_value_t = 2)]
+        concurrent_churns: usize,
+        /// Whether to retain the same PeerId on restart.
+        #[clap(long, default_value_t = false)]
+        retain_peer_id: bool,
+        /// The number of time each node in the network is restarted.
+        #[clap(long, default_value_t = 1)]
+        churn_cycles: usize,
+    },
+    /// Churn nodes at random intervals.
+    RandomInterval {
+        /// The name of the environment.
+        #[arg(short = 'n', long)]
+        name: String,
+        /// The time frame in which the churn_count nodes are restarted.
+        /// Nodes are restarted at a rate of churn_count/time_frame with random delays between each restart.
+        #[clap(long, value_parser = |t: &str| -> Result<Duration> { Ok(t.parse().map(Duration::from_secs)?)}, default_value = "600")]
+        time_frame: Duration,
+        /// Number of nodes to restart in the given time frame.
+        #[clap(long, default_value_t = 10)]
+        churn_count: usize,
+        /// Whether to retain the same PeerId on restart.
+        #[clap(long, default_value_t = false)]
+        retain_peer_id: bool,
+        /// The number of time each node in the network is restarted.
+        #[clap(long, default_value_t = 1)]
+        churn_cycles: usize,
     },
 }
 
@@ -561,13 +587,11 @@ async fn main() -> Result<()> {
                 Ok(())
             }
         },
-        Commands::Network(NetworkCommands::ChurnNodes {
-            name,
-            interval,
-            concurrent_churns,
-            retain_peer_id,
-            churn_cycles,
-        }) => {
+        Commands::Network(NetworkCommands::ChurnCommands(churn_cmds)) => {
+            let name = match &churn_cmds {
+                ChurnCommands::FixedInterval { name, .. } => name,
+                ChurnCommands::RandomInterval { name, .. } => name,
+            };
             let inventory_path = get_data_directory()?.join(format!("{name}-inventory.json"));
             if !inventory_path.exists() {
                 return Err(eyre!("There is no inventory for the {name} testnet")
@@ -575,14 +599,41 @@ async fn main() -> Result<()> {
             }
 
             let inventory = DeploymentInventory::read(&inventory_path)?;
-            network_commands::perform_network_churns(
-                inventory,
-                interval,
-                concurrent_churns,
-                retain_peer_id,
-                churn_cycles,
-            )
-            .await?;
+
+            match churn_cmds {
+                ChurnCommands::FixedInterval {
+                    name: _,
+                    interval,
+                    concurrent_churns,
+                    retain_peer_id,
+                    churn_cycles,
+                } => {
+                    network_commands::perform_fixed_interval_network_churn(
+                        inventory,
+                        interval,
+                        concurrent_churns,
+                        retain_peer_id,
+                        churn_cycles,
+                    )
+                    .await?;
+                }
+                ChurnCommands::RandomInterval {
+                    name: _,
+                    time_frame,
+                    churn_count,
+                    retain_peer_id,
+                    churn_cycles,
+                } => {
+                    network_commands::perform_random_interval_network_churn(
+                        inventory,
+                        time_frame,
+                        churn_count,
+                        retain_peer_id,
+                        churn_cycles,
+                    )
+                    .await?;
+                }
+            }
             Ok(())
         }
         Commands::Network(NetworkCommands::UpdateNodeLogLevel {
