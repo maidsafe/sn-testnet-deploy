@@ -136,7 +136,7 @@ impl TestnetDeploy {
         let all_node_inventory = self.get_all_node_inventory(name).await?;
         let log_abs_dest = create_initial_log_dir_setup(&root_dir, name, &all_node_inventory)?;
 
-        let rg_cmd = format!("rg {rg_args} .local/share/safe/");
+        let rg_cmd = format!("rg {rg_args} /var/log/safenode/");
         println!("Running ripgrep with command: {rg_cmd}");
 
         let progress_bar = get_progress_bar(all_node_inventory.len() as u64)?;
