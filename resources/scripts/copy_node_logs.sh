@@ -10,4 +10,4 @@ else
 fi
 
 # Find all .log files and copy them to tmpdir preserving the same directory structure
-rsync -avm --include='*.log*' -f 'hide,! */' ~/var/log/safenode/ tmpdir/
+rsync -avm --include='*.log*' -f 'hide,! */' /var/log/safenode/ tmpdir/
