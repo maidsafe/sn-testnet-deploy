@@ -10,6 +10,7 @@ variable "droplet_ssh_keys" {
     30643816, # Anselme Grumbach
     30113222, # Qi Ma
     30878672, # Chris O'Neil
+    41483452, # Jason Paul
     31216015, # QA
     34183228, # GH Actions Automation
     38596814  # sn-testnet-workflows automation
