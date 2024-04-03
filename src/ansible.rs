@@ -434,6 +434,10 @@ impl ExtraVarsDocBuilder {
     }
 
     pub fn build(&self) -> String {
+        if self.variables.is_empty() && self.list_variables.is_empty() {
+            return "{}".to_string();
+        }
+
         let mut doc = String::new();
         doc.push_str("{ ");
 
