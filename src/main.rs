@@ -11,6 +11,7 @@ use color_eyre::{
 };
 use dotenv::dotenv;
 use rand::Rng;
+use sn_releases::{ReleaseType, SafeReleaseRepoActions};
 use sn_testnet_deploy::{
     deploy::DeployCmd, error::Error, get_data_directory, get_wallet_directory,
     logstash::LogstashDeployBuilder, manage_test_data::TestDataClientBuilder, network_commands,
@@ -74,8 +75,6 @@ enum Commands {
         ///
         /// There should be no 'v' prefix.
         ///
-        /// This argument must be used in conjunction with the other version arguments.
-        ///
         /// The version arguments are mutually exclusive with the --branch and --repo-owner arguments.
         /// You can only supply version numbers or a custom branch, not both.
         #[arg(long)]
@@ -114,8 +113,6 @@ enum Commands {
         ///
         /// There should be no 'v' prefix.
         ///
-        /// If one of the version arguments are supplied, they all must be used.
-        ///
         /// The version arguments are mutually exclusive with the --branch and --repo-owner arguments.
         /// You can only supply version numbers or a custom branch, not both.
         #[arg(long)]
@@ -128,8 +125,6 @@ enum Commands {
         /// Supply a version number for the safenode binary.
         ///
         /// There should be no 'v' prefix.
-        ///
-        /// If one of the version arguments are supplied, they all must be used.
         ///
         /// The version arguments are mutually exclusive with the --branch and --repo-owner
         /// arguments. You can only supply version numbers or a custom branch, not both.
@@ -769,56 +764,53 @@ async fn get_sn_codebase_type(
     faucet_version: Option<String>,
     safenode_features: Option<Vec<String>>,
 ) -> Result<SnCodebaseType> {
+    let use_versioning =
+        safe_version.is_some() || safenode_version.is_some() || faucet_version.is_some();
+    let build_binaries = branch.is_some() || repo_owner.is_some();
+    if build_binaries && use_versioning {
+        return Err(
+            eyre!("Version numbers and branches cannot be supplied at the same time").suggestion(
+                "Please choose whether you want to use version numbers or build the binaries",
+            ),
+        );
+    }
+    if use_versioning && safenode_features.is_some() {
+        return Err(eyre!(
+            "The --safenode-features argument only applies if we are building binaries"
+        ));
+    }
     if let (Some(_), None) | (None, Some(_)) = (&repo_owner, &branch) {
         return Err(eyre!(
-            "Both 'repository owner' and 'branch name' must be supplied together."
-        ));
-    }
-    if let (Some(_), None) | (None, Some(_)) = (&safe_version, &safenode_version) {
-        return Err(eyre!(
-            "Both 'safe' and 'safenode' versions must be supplied together."
-        ));
-    }
-    if safe_version.is_some() && safenode_features.is_some() {
-        return Err(eyre!(
-            "Cannot enable custom safenode features if the 'safe, safenode' versions are provided."
-        ));
-    }
-
-    if branch.is_some()
-        && repo_owner.is_some()
-        && safe_version.is_some()
-        && safenode_version.is_some()
-    {
-        return Err(eyre!(
-            "Custom version numbers and custom branches cannot be supplied at the same time"
-        )
-        .suggestion(
-            "Please choose whether you want to use specific versions or a custom \
-                    branch, then run again.",
+            "The --branch and --repo-owner arguments must be supplied together"
         ));
     }
 
     let safenode_features = safenode_features.map(|list| list.join(","));
+    let codebase_type = if use_versioning {
+        let safe_version = get_version_from_option(safe_version, &ReleaseType::Safe).await?;
+        let safenode_version =
+            get_version_from_option(safenode_version, &ReleaseType::Safenode).await?;
+        let faucet_version = get_version_from_option(faucet_version, &ReleaseType::Faucet).await?;
+        SnCodebaseType::Versioned {
+            faucet_version,
+            safe_version,
+            safenode_version,
+        }
+    } else if build_binaries {
+        // Unwraps are justified here because it's already been asserted that both must have
+        // values.
+        let repo_owner = repo_owner.unwrap();
+        let branch = branch.unwrap();
 
-    let codebase_type = if let (Some(repo_owner), Some(branch)) = (repo_owner, branch) {
         let url = format!("https://github.com/{repo_owner}/safe_network/tree/{branch}",);
         let response = reqwest::get(&url).await?;
         if !response.status().is_success() {
-            bail!("The provided branch or owner does not exists: {url:?}");
+            bail!("The provided branch or owner does not exist: {url:?}");
         }
         SnCodebaseType::Branch {
             repo_owner,
             branch,
             safenode_features,
-        }
-    } else if let (Some(safe_version), Some(safenode_version), Some(faucet_version)) =
-        (safe_version, safenode_version, faucet_version)
-    {
-        SnCodebaseType::Versioned {
-            safe_version,
-            safenode_version,
-            faucet_version,
         }
     } else {
         SnCodebaseType::Main { safenode_features }
@@ -836,4 +828,24 @@ fn parse_environment_variables(env_var: &str) -> Result<(String, String)> {
         ));
     }
     Ok((parts[0].to_string(), parts[1].to_string()))
+}
+
+async fn get_version_from_option(
+    version: Option<String>,
+    release_type: &ReleaseType,
+) -> Result<String> {
+    let release_repo = <dyn SafeReleaseRepoActions>::default_config();
+    let version = if let Some(version) = version {
+        println!("Using {version} for {release_type}");
+        version
+    } else {
+        println!("Getting latest version for {release_type}...");
+        let version = release_repo
+            .get_latest_version(release_type)
+            .await?
+            .to_string();
+        println!("Using {version} for {release_type}");
+        version
+    };
+    Ok(version)
 }
