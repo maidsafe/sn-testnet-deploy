@@ -49,35 +49,20 @@ enum Commands {
     },
     /// Deploy a new testnet environment using the latest version of the safenode binary.
     Deploy {
-        /// The name of the environment
-        #[arg(short = 'n', long)]
-        name: String,
-        /// The number of safenode processes to run on each VM.
-        #[clap(long, default_value = "40")]
-        node_count: u16,
-        /// The number of node VMs to create.
+        /// Set to run Ansible with more verbose output.
+        #[arg(long)]
+        ansible_verbose: bool,
+        /// The branch of the Github repository to build from.
         ///
-        /// Each VM will run many safenode processes.
-        #[clap(long, default_value = "10")]
-        vm_count: u16,
-        /// The cloud provider to deploy to.
+        /// If used, all binaries will be built from this branch. It is typically used for testing
+        /// changes on a fork.
         ///
-        /// Valid values are "aws" or "digital-ocean".
-        #[clap(long, default_value_t = CloudProvider::DigitalOcean, value_parser = parse_provider, verbatim_doc_comment)]
-        provider: CloudProvider,
-        /// The name of the Logstash stack to forward logs to.
-        #[clap(long, default_value = "main")]
-        logstash_stack_name: String,
-        /// If set to true, the RPC of the node will be accessible remotely.
+        /// This argument must be used in conjunction with the --repo-owner argument.
         ///
-        /// By default, the safenode RPC is only accessible via the 'localhost' and is not exposed for security reasons.
-        #[clap(long, default_value = "false")]
-        public_rpc: bool,
-        /// The features to enable on the safenode binary.
-        ///
-        /// If not provided, the default feature set specified for the safenode binary are used.
-        #[clap(long)]
-        safenode_features: Option<Vec<String>>,
+        /// The --branch and --repo-owner arguments are mutually exclusive with the binary version
+        /// arguments. You can only supply version numbers or a custom branch, not both.
+        #[arg(long)]
+        branch: Option<String>,
         /// Provide environment variables for the safenode service.
         ///
         /// This is useful to set the safenode's log levels. Each variable should be comma separated without any space.
@@ -85,68 +70,79 @@ enum Commands {
         /// Example: --env SN_LOG=all,RUST_LOG=libp2p=debug
         #[clap(name = "env", long, use_value_delimiter = true, value_parser = parse_environment_variables)]
         env_variables: Option<Vec<(String, String)>>,
-        /// Optionally supply the name of a branch on the Github repository to be used for the
-        /// safenode binary. A safenode binary will be built from this repository.
-        ///
-        /// This argument must be used in conjunction with the --repo-owner argument.
-        ///
-        /// The --branch and --repo-owner arguments are mutually exclusive with the --safe-version
-        /// and --safenode-version arguments. You can only supply version numbers or a custom
-        /// branch, not both.
-        #[arg(long)]
-        branch: Option<String>,
-        /// Optionally supply the owner or organisation of the Github repository to be used for the
-        /// safenode binary. A safenode binary will be built from this repository.
-        ///
-        /// This argument must be used in conjunction with the --branch argument.
-        ///
-        /// The --branch and --repo-owner arguments are mutually exclusive with the --safe-version
-        /// and --safenode-version arguments. You can only supply version numbers or a custom
-        /// branch, not both.
-        #[arg(long)]
-        repo_owner: Option<String>,
-        /// Optionally supply a version number to be used for the safe binary.
+        /// Supply a version number to be used for the faucet binary.
         ///
         /// There should be no 'v' prefix.
         ///
-        /// This argument must be used in conjunction with the --safenode-version and --faucet-version arguments.
-        ///
-        /// The version arguments are mutually exclusive with the --branch and --repo-owner arguments.
-        /// You can only supply version numbers or a custom branch, not both.
-        #[arg(long)]
-        safe_version: Option<String>,
-        /// Optionally supply a version number to be used for the safenode binary. There should be
-        /// no 'v' prefix.
-        ///
-        /// This argument must be used in conjunction with the --safe-version and --faucet-version arguments.
-        ///
-        /// The version arguments are mutually exclusive with the --branch and --repo-owner arguments.
-        /// You can only supply version numbers or a custom branch, not both.
-        #[arg(long)]
-        safenode_version: Option<String>,
-        /// Optionally supply a version number to be used for the faucet binary. There should be
-        /// no 'v' prefix.
-        ///
-        /// This argument must be used in conjunction with the --safe-version and --safenode-version arguments.
+        /// This argument must be used in conjunction with the other version arguments.
         ///
         /// The version arguments are mutually exclusive with the --branch and --repo-owner arguments.
         /// You can only supply version numbers or a custom branch, not both.
         #[arg(long)]
         faucet_version: Option<String>,
-        /// Set to run Ansible with more verbose output.
-        #[arg(long)]
-        ansible_verbose: bool,
-    },
-
-    Inventory {
+        /// The name of the Logstash stack to forward logs to.
+        #[clap(long, default_value = "main")]
+        logstash_stack_name: String,
         /// The name of the environment
         #[arg(short = 'n', long)]
         name: String,
-        /// The cloud provider that was used.
+        /// The number of safenode processes to run on each VM.
+        #[clap(long, default_value = "40")]
+        node_count: u16,
+        /// The cloud provider to deploy to.
+        ///
+        /// Valid values are "aws" or "digital-ocean".
         #[clap(long, default_value_t = CloudProvider::DigitalOcean, value_parser = parse_provider, verbatim_doc_comment)]
         provider: CloudProvider,
-        /// Optionally supply the name of the custom branch that was used when creating the
-        /// testnet.
+        /// If set to true, the RPC of the node will be accessible remotely.
+        ///
+        /// By default, the safenode RPC is only accessible via the 'localhost' and is not exposed for security reasons.
+        #[clap(long, default_value = "false")]
+        public_rpc: bool,
+        /// The owner/org of the Github repository to build from.
+        ///
+        /// If used, all binaries will be built from this repository. It is typically used for
+        /// testing changes on a fork.
+        ///
+        /// This argument must be used in conjunction with the --repo-owner argument.
+        ///
+        /// The --branch and --repo-owner arguments are mutually exclusive with the binary version
+        /// arguments. You can only supply version numbers or a custom branch, not both.
+        #[arg(long)]
+        repo_owner: Option<String>,
+        /// Supply a version number for the safe binary.
+        ///
+        /// There should be no 'v' prefix.
+        ///
+        /// If one of the version arguments are supplied, they all must be used.
+        ///
+        /// The version arguments are mutually exclusive with the --branch and --repo-owner arguments.
+        /// You can only supply version numbers or a custom branch, not both.
+        #[arg(long)]
+        safe_version: Option<String>,
+        /// The features to enable on the safenode binary.
+        ///
+        /// If not provided, the default feature set specified for the safenode binary are used.
+        #[clap(long)]
+        safenode_features: Option<Vec<String>>,
+        /// Supply a version number for the safenode binary.
+        ///
+        /// There should be no 'v' prefix.
+        ///
+        /// If one of the version arguments are supplied, they all must be used.
+        ///
+        /// The version arguments are mutually exclusive with the --branch and --repo-owner
+        /// arguments. You can only supply version numbers or a custom branch, not both.
+        #[arg(long)]
+        safenode_version: Option<String>,
+        /// The number of node VMs to create.
+        ///
+        /// Each VM will run many safenode processes.
+        #[clap(long, default_value = "10")]
+        vm_count: u16,
+    },
+    Inventory {
+        /// Supply the name of the branch used when creating the testnet.
         ///
         /// You can supply this if you are running the command on a different machine from where
         /// the testnet was deployed. It will then get written to the cached inventory on the local
@@ -156,6 +152,19 @@ enum Commands {
         /// This argument must be used in conjunction with the --repo-owner argument.
         #[arg(long)]
         branch: Option<String>,
+        /// The name of the environment
+        #[arg(short = 'n', long)]
+        name: String,
+        /// Optionally supply the node count.
+        ///
+        /// You can supply this if you are running the command on a different machine from where
+        /// the testnet was deployed. It will then get written to the cached inventory on the local
+        /// machine. This information gets used for Slack notifications.
+        #[arg(long)]
+        node_count: Option<u16>,
+        /// The cloud provider that was used.
+        #[clap(long, default_value_t = CloudProvider::DigitalOcean, value_parser = parse_provider, verbatim_doc_comment)]
+        provider: CloudProvider,
         /// Optionally supply the repo owner of the custom branch that was used when creating the
         /// testnet.
         ///
@@ -167,13 +176,6 @@ enum Commands {
         /// This argument must be used in conjunction with the --branch argument.
         #[arg(long)]
         repo_owner: Option<String>,
-        /// Optionally supply the node count.
-        ///
-        /// You can supply this if you are running the command on a different machine from where
-        /// the testnet was deployed. It will then get written to the cached inventory on the local
-        /// machine. This information gets used for Slack notifications.
-        #[arg(long)]
-        node_count: Option<u16>,
     },
     #[clap(name = "logs", subcommand)]
     Logs(LogCommands),
@@ -259,39 +261,6 @@ enum Commands {
 
 #[derive(Subcommand, Debug)]
 enum LogCommands {
-    /// Rsync the logs from all the VMs for a given environment.
-    /// Rerunning the same command will sync only the changed log files without copying everything from the beginning.
-    ///
-    /// This will write the logs to 'logs/<name>', relative to the current directory.
-    Rsync {
-        /// The name of the environment
-        #[arg(short = 'n', long)]
-        name: String,
-        /// Should we copy the resource-usage.logs only
-        #[arg(short = 'r', long)]
-        resources_only: bool,
-        /// The cloud provider that was used.
-        #[clap(long, default_value_t = CloudProvider::DigitalOcean, value_parser = parse_provider, verbatim_doc_comment)]
-        provider: CloudProvider,
-    },
-    /// Run a ripgrep query through all the logs from all the VMs and copy the results.
-    ///
-    /// The results will be written to `logs/<name>/<vm>/rg-timestamp.log`
-    Rg {
-        /// The name of the environment
-        #[arg(short = 'n', long)]
-        name: String,
-        /// The ripgrep arguments that are directly passed to ripgrep. The text to search for should be put inside
-        /// single quotes. The dir to search for is set automatically, so do not provide one.
-        ///
-        /// Example command: `cargo run --release -- logs rg --name <name> --args "'ValidSpendRecordPutFromNetwork' -c"`
-        #[arg(short = 'a', long, allow_hyphen_values(true))]
-        args: String,
-        /// The cloud provider that was used.
-        #[clap(long, default_value_t = CloudProvider::DigitalOcean, value_parser = parse_provider, verbatim_doc_comment)]
-        provider: CloudProvider,
-    },
-
     /// Retrieve the logs for a given environment by copying them from all the VMs.
     ///
     /// This will write the logs to 'logs/<name>', relative to the current directory.
@@ -299,12 +268,12 @@ enum LogCommands {
         /// The name of the environment
         #[arg(short = 'n', long)]
         name: String,
-        /// Should we copy the resource-usage.logs only
-        #[arg(short = 'r', long)]
-        resources_only: bool,
         /// The cloud provider that was used.
         #[clap(long, default_value_t = CloudProvider::DigitalOcean, value_parser = parse_provider, verbatim_doc_comment)]
         provider: CloudProvider,
+        /// Should we copy the resource-usage.logs only
+        #[arg(short = 'r', long)]
+        resources_only: bool,
     },
     /// Retrieve the logs for a given environment from S3.
     ///
@@ -327,11 +296,43 @@ enum LogCommands {
         #[arg(short = 'n', long)]
         name: String,
     },
+    /// Run a ripgrep query through all the logs from all the VMs and copy the results.
+    ///
+    /// The results will be written to `logs/<name>/<vm>/rg-timestamp.log`
+    Rg {
+        /// The ripgrep arguments that are directly passed to ripgrep. The text to search for should be put inside
+        /// single quotes. The dir to search for is set automatically, so do not provide one.
+        ///
+        /// Example command: `cargo run --release -- logs rg --name <name> --args "'ValidSpendRecordPutFromNetwork' -c"`
+        #[arg(short = 'a', long, allow_hyphen_values(true))]
+        args: String,
+        /// The name of the environment
+        #[arg(short = 'n', long)]
+        name: String,
+        /// The cloud provider that was used.
+        #[clap(long, default_value_t = CloudProvider::DigitalOcean, value_parser = parse_provider, verbatim_doc_comment)]
+        provider: CloudProvider,
+    },
     /// Remove the logs from a given environment from the bucket on S3.
     Rm {
         /// The name of the environment for which logs have already been retrieved
         #[arg(short = 'n', long)]
         name: String,
+    },
+    /// Rsync the logs from all the VMs for a given environment.
+    /// Rerunning the same command will sync only the changed log files without copying everything from the beginning.
+    ///
+    /// This will write the logs to 'logs/<name>', relative to the current directory.
+    Rsync {
+        /// The name of the environment
+        #[arg(short = 'n', long)]
+        name: String,
+        /// The cloud provider that was used.
+        #[clap(long, default_value_t = CloudProvider::DigitalOcean, value_parser = parse_provider, verbatim_doc_comment)]
+        provider: CloudProvider,
+        /// Should we copy the resource-usage.logs only
+        #[arg(short = 'r', long)]
+        resources_only: bool,
     },
 }
 
@@ -370,17 +371,17 @@ enum NetworkCommands {
     ChurnCommands(ChurnCommands),
     /// Modifies the log levels for all the safenode services through RPC requests.
     UpdateNodeLogLevel {
-        /// The name of the environment
-        #[arg(short = 'n', long)]
-        name: String,
+        /// The number of nodes to update concurrently.
+        #[clap(long, short = 'c', default_value_t = 10)]
+        concurrent_updates: usize,
         /// The log level to set.
         ///
         /// Example: --log-level SN_LOG=all,RUST_LOG=libp2p=debug
         #[clap(long)]
         log_level: String,
-        /// The number of nodes to update concurrently.
-        #[clap(long, short = 'c', default_value_t = 10)]
-        concurrent_updates: usize,
+        /// The name of the environment
+        #[arg(short = 'n', long)]
+        name: String,
     },
 }
 
@@ -388,40 +389,40 @@ enum NetworkCommands {
 enum ChurnCommands {
     /// Churn nodes at fixed intervals.
     FixedInterval {
-        /// The name of the environment.
-        #[arg(short = 'n', long)]
-        name: String,
-        /// The interval between each node churn.
-        #[clap(long, value_parser = |t: &str| -> Result<Duration> { Ok(t.parse().map(Duration::from_secs)?)}, default_value = "60")]
-        interval: Duration,
-        /// The number of nodes to restart concurrently per VM.
-        #[clap(long, short = 'c', default_value_t = 2)]
-        concurrent_churns: usize,
-        /// Whether to retain the same PeerId on restart.
-        #[clap(long, default_value_t = false)]
-        retain_peer_id: bool,
         /// The number of time each node in the network is restarted.
         #[clap(long, default_value_t = 1)]
         churn_cycles: usize,
-    },
-    /// Churn nodes at random intervals.
-    RandomInterval {
+        /// The number of nodes to restart concurrently per VM.
+        #[clap(long, short = 'c', default_value_t = 2)]
+        concurrent_churns: usize,
+        /// The interval between each node churn.
+        #[clap(long, value_parser = |t: &str| -> Result<Duration> { Ok(t.parse().map(Duration::from_secs)?)}, default_value = "60")]
+        interval: Duration,
         /// The name of the environment.
         #[arg(short = 'n', long)]
         name: String,
+        /// Whether to retain the same PeerId on restart.
+        #[clap(long, default_value_t = false)]
+        retain_peer_id: bool,
+    },
+    /// Churn nodes at random intervals.
+    RandomInterval {
+        /// Number of nodes to restart in the given time frame.
+        #[clap(long, default_value_t = 10)]
+        churn_count: usize,
+        /// The number of time each node in the network is restarted.
+        #[clap(long, default_value_t = 1)]
+        churn_cycles: usize,
+        /// The name of the environment.
+        #[arg(short = 'n', long)]
+        name: String,
+        /// Whether to retain the same PeerId on restart.
+        #[clap(long, default_value_t = false)]
+        retain_peer_id: bool,
         /// The time frame in which the churn_count nodes are restarted.
         /// Nodes are restarted at a rate of churn_count/time_frame with random delays between each restart.
         #[clap(long, value_parser = |t: &str| -> Result<Duration> { Ok(t.parse().map(Duration::from_secs)?)}, default_value = "600")]
         time_frame: Duration,
-        /// Number of nodes to restart in the given time frame.
-        #[clap(long, default_value_t = 10)]
-        churn_count: usize,
-        /// Whether to retain the same PeerId on restart.
-        #[clap(long, default_value_t = false)]
-        retain_peer_id: bool,
-        /// The number of time each node in the network is restarted.
-        #[clap(long, default_value_t = 1)]
-        churn_cycles: usize,
     },
 }
 
@@ -439,20 +440,20 @@ async fn main() -> Result<()> {
             Ok(())
         }
         Commands::Deploy {
+            ansible_verbose,
+            branch,
+            env_variables,
+            faucet_version,
+            logstash_stack_name,
             name,
             node_count,
-            vm_count,
             provider,
             public_rpc,
-            safenode_features,
-            env_variables,
-            branch,
             repo_owner,
-            logstash_stack_name,
             safe_version,
+            safenode_features,
             safenode_version,
-            faucet_version,
-            ansible_verbose,
+            vm_count,
         } => {
             let sn_codebase_type = get_sn_codebase_type(
                 branch,
@@ -516,11 +517,11 @@ async fn main() -> Result<()> {
             Ok(())
         }
         Commands::Inventory {
+            branch,
             name,
             provider,
-            branch,
-            repo_owner,
             node_count,
+            repo_owner,
         } => {
             let sn_codebase_type =
                 get_sn_codebase_type(branch, repo_owner, None, None, None, None).await?;
@@ -534,8 +535,8 @@ async fn main() -> Result<()> {
         Commands::Logs(log_cmd) => match log_cmd {
             LogCommands::Rsync {
                 name,
-                resources_only,
                 provider,
+                resources_only,
             } => {
                 let testnet_deploy = TestnetDeployBuilder::default().provider(provider).build()?;
                 testnet_deploy.init(&name).await?;
@@ -543,9 +544,9 @@ async fn main() -> Result<()> {
                 Ok(())
             }
             LogCommands::Rg {
+                args,
                 name,
                 provider,
-                args,
             } => {
                 let testnet_deploy = TestnetDeployBuilder::default().provider(provider).build()?;
                 testnet_deploy.init(&name).await?;
@@ -611,11 +612,11 @@ async fn main() -> Result<()> {
 
             match churn_cmds {
                 ChurnCommands::FixedInterval {
-                    name: _,
-                    interval,
-                    concurrent_churns,
-                    retain_peer_id,
                     churn_cycles,
+                    concurrent_churns,
+                    interval,
+                    name: _,
+                    retain_peer_id,
                 } => {
                     network_commands::perform_fixed_interval_network_churn(
                         inventory,
@@ -627,11 +628,11 @@ async fn main() -> Result<()> {
                     .await?;
                 }
                 ChurnCommands::RandomInterval {
-                    name: _,
-                    time_frame,
                     churn_count,
-                    retain_peer_id,
                     churn_cycles,
+                    name: _,
+                    retain_peer_id,
+                    time_frame,
                 } => {
                     network_commands::perform_random_interval_network_churn(
                         inventory,
@@ -646,9 +647,9 @@ async fn main() -> Result<()> {
             Ok(())
         }
         Commands::Network(NetworkCommands::UpdateNodeLogLevel {
-            name,
-            log_level,
             concurrent_updates,
+            log_level,
+            name,
         }) => {
             let inventory_path = get_data_directory()?.join(format!("{name}-inventory.json"));
             if !inventory_path.exists() {
@@ -798,12 +799,9 @@ async fn get_sn_codebase_type(
         ));
     }
 
-    // get the CSV features list
     let safenode_features = safenode_features.map(|list| list.join(","));
 
     let codebase_type = if let (Some(repo_owner), Some(branch)) = (repo_owner, branch) {
-        // check if the custom branch exists.
-
         let url = format!("https://github.com/{repo_owner}/safe_network/tree/{branch}",);
         let response = reqwest::get(&url).await?;
         if !response.status().is_success() {
