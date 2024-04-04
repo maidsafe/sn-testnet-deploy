@@ -304,6 +304,15 @@ impl ExtraVarsDocBuilder {
         codebase_type: &SnCodebaseType,
     ) {
         match codebase_type {
+            SnCodebaseType::Main { .. } => {
+                self.add_variable(
+                    "faucet_archive_url",
+                    &format!(
+                        "{}/faucet-latest-x86_64-unknown-linux-musl.tar.gz",
+                        FAUCET_S3_BUCKET_URL
+                    ),
+                );
+            }
             SnCodebaseType::Branch {
                 repo_owner, branch, ..
             } => {
@@ -317,15 +326,9 @@ impl ExtraVarsDocBuilder {
                     repo_owner,
                 );
             }
-            _ => {
-                self.add_variable(
-                    "faucet_archive_url",
-                    &format!(
-                        "{}/faucet-latest-x86_64-unknown-linux-musl.tar.gz",
-                        FAUCET_S3_BUCKET_URL
-                    ),
-                );
-            }
+            SnCodebaseType::Versioned { faucet_version, .. } => self
+                .variables
+                .push(("version".to_string(), faucet_version.clone())),
         }
     }
 

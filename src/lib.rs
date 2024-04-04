@@ -68,7 +68,8 @@ pub enum SnCodebaseType {
     Versioned {
         safe_version: String,
         safenode_version: String,
-        // todo: make `faucet, rpc` versions optional?
+        faucet_version: String,
+        // todo: make `rpc, node manager` versions optional?
     },
 }
 
@@ -159,11 +160,13 @@ impl DeploymentInventory {
             SnCodebaseType::Versioned {
                 safe_version,
                 safenode_version,
+                faucet_version,
             } => {
                 println!("Version Details");
                 println!("===============");
                 println!("safenode version: {}", safenode_version);
                 println!("safe version: {}", safe_version);
+                println!("faucet version: {}", faucet_version);
             }
         }
 
@@ -957,10 +960,12 @@ pub async fn notify_slack(inventory: DeploymentInventory) -> Result<()> {
         SnCodebaseType::Versioned {
             safe_version,
             safenode_version,
+            faucet_version,
         } => {
             message.push_str("*Version Details*\n");
             message.push_str(&format!("safenode version: {}\n", safenode_version));
             message.push_str(&format!("safe version: {}\n", safe_version));
+            message.push_str(&format!("faucet version: {}\n", faucet_version));
         }
     }
 

@@ -109,23 +109,30 @@ enum Commands {
         ///
         /// There should be no 'v' prefix.
         ///
-        /// This argument must be used in conjunction with the --safenode-version argument.
+        /// This argument must be used in conjunction with the --safenode-version and --faucet-version arguments.
         ///
-        /// The --safe-version and --safenode-version arguments are mutually exclusive with the
-        /// --branch and --repo-owner arguments. You can only supply version numbers or a custom
-        /// branch, not both.
+        /// The version arguments are mutually exclusive with the --branch and --repo-owner arguments.
+        /// You can only supply version numbers or a custom branch, not both.
         #[arg(long)]
         safe_version: Option<String>,
-        #[arg(long)]
         /// Optionally supply a version number to be used for the safenode binary. There should be
         /// no 'v' prefix.
         ///
-        /// This argument must be used in conjunction with the --safe-version argument.
+        /// This argument must be used in conjunction with the --safe-version and --faucet-version arguments.
         ///
-        /// The --safe-version and --safenode-version arguments are mutually exclusive with the
-        /// --branch and --repo-owner arguments. You can only supply version numbers or a custom
-        /// branch, not both.
+        /// The version arguments are mutually exclusive with the --branch and --repo-owner arguments.
+        /// You can only supply version numbers or a custom branch, not both.
+        #[arg(long)]
         safenode_version: Option<String>,
+        /// Optionally supply a version number to be used for the faucet binary. There should be
+        /// no 'v' prefix.
+        ///
+        /// This argument must be used in conjunction with the --safe-version and --safenode-version arguments.
+        ///
+        /// The version arguments are mutually exclusive with the --branch and --repo-owner arguments.
+        /// You can only supply version numbers or a custom branch, not both.
+        #[arg(long)]
+        faucet_version: Option<String>,
         /// Set to run Ansible with more verbose output.
         #[arg(long)]
         ansible_verbose: bool,
@@ -444,6 +451,7 @@ async fn main() -> Result<()> {
             logstash_stack_name,
             safe_version,
             safenode_version,
+            faucet_version,
             ansible_verbose,
         } => {
             let sn_codebase_type = get_sn_codebase_type(
@@ -451,6 +459,7 @@ async fn main() -> Result<()> {
                 repo_owner,
                 safe_version,
                 safenode_version,
+                faucet_version,
                 safenode_features,
             )
             .await?;
@@ -514,7 +523,7 @@ async fn main() -> Result<()> {
             node_count,
         } => {
             let sn_codebase_type =
-                get_sn_codebase_type(branch, repo_owner, None, None, None).await?;
+                get_sn_codebase_type(branch, repo_owner, None, None, None, None).await?;
 
             let testnet_deploy = TestnetDeployBuilder::default().provider(provider).build()?;
             testnet_deploy
@@ -756,6 +765,7 @@ async fn get_sn_codebase_type(
     repo_owner: Option<String>,
     safe_version: Option<String>,
     safenode_version: Option<String>,
+    faucet_version: Option<String>,
     safenode_features: Option<Vec<String>>,
 ) -> Result<SnCodebaseType> {
     if let (Some(_), None) | (None, Some(_)) = (&repo_owner, &branch) {
@@ -804,10 +814,13 @@ async fn get_sn_codebase_type(
             branch,
             safenode_features,
         }
-    } else if let (Some(safe_version), Some(safenode_version)) = (safe_version, safenode_version) {
+    } else if let (Some(safe_version), Some(safenode_version), Some(faucet_version)) =
+        (safe_version, safenode_version, faucet_version)
+    {
         SnCodebaseType::Versioned {
             safe_version,
             safenode_version,
+            faucet_version,
         }
     } else {
         SnCodebaseType::Main { safenode_features }
