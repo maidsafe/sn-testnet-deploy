@@ -254,6 +254,27 @@ enum Commands {
         /// There should be no 'v' prefix.
         safenode_version: Option<String>,
     },
+    /// Upgrade the safenode-manager binaries to a particular version.
+    ///
+    /// Simple mechanism that simply copies over the existing binary.
+    #[clap(name = "upgrade-node-manager")]
+    UpgradeNodeManager {
+        /// The name of the environment
+        #[arg(short = 'n', long)]
+        name: String,
+        #[arg(long)]
+        /// The cloud provider of the environment.
+        ///
+        /// Valid values are "aws" or "digital-ocean".
+        #[clap(long, default_value_t = CloudProvider::DigitalOcean, value_parser = parse_provider, verbatim_doc_comment)]
+        provider: CloudProvider,
+        /// Supply a version for the binary to be upgraded to.
+        ///
+        /// There should be no 'v' prefix.
+        /// The name of the environment
+        #[arg(short = 'v', long)]
+        version: String,
+    },
     /// Clean a deployed testnet environment.
     #[clap(name = "upload-test-data")]
     UploadTestData {
@@ -733,6 +754,21 @@ async fn main() -> Result<()> {
                     provider,
                     safenode_version,
                 })
+                .await?;
+            Ok(())
+        }
+        Commands::UpgradeNodeManager {
+            name,
+            provider,
+            version,
+        } => {
+            println!("Upgrading the node manager binaries...");
+            let testnet_deploy = TestnetDeployBuilder::default()
+                .ansible_verbose_mode(false)
+                .provider(provider.clone())
+                .build()?;
+            testnet_deploy
+                .upgrade_node_manager(&name, version.parse()?)
                 .await?;
             Ok(())
         }
