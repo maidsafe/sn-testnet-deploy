@@ -11,6 +11,7 @@ use color_eyre::{
 };
 use dotenv::dotenv;
 use rand::Rng;
+use semver::Version;
 use sn_releases::{ReleaseType, SafeReleaseRepoActions};
 use sn_testnet_deploy::{
     deploy::DeployCmd, error::Error, get_data_directory, get_wallet_directory,
@@ -130,6 +131,14 @@ enum Commands {
         /// arguments. You can only supply version numbers or a custom branch, not both.
         #[arg(long)]
         safenode_version: Option<String>,
+        /// Supply a version number for the safenode-manager binary.
+        ///
+        /// There should be no 'v' prefix.
+        ///
+        /// The version arguments are mutually exclusive with the --branch and --repo-owner
+        /// arguments. You can only supply version numbers or a custom branch, not both.
+        #[arg(long)]
+        safenode_manager_version: Option<String>,
         /// The number of node VMs to create.
         ///
         /// Each VM will run many safenode processes.
@@ -448,6 +457,7 @@ async fn main() -> Result<()> {
             safe_version,
             safenode_features,
             safenode_version,
+            safenode_manager_version,
             vm_count,
         } => {
             let sn_codebase_type = get_sn_codebase_type(
@@ -455,6 +465,7 @@ async fn main() -> Result<()> {
                 repo_owner,
                 safe_version,
                 safenode_version,
+                safenode_manager_version,
                 faucet_version,
                 safenode_features,
             )
@@ -519,7 +530,7 @@ async fn main() -> Result<()> {
             repo_owner,
         } => {
             let sn_codebase_type =
-                get_sn_codebase_type(branch, repo_owner, None, None, None, None).await?;
+                get_sn_codebase_type(branch, repo_owner, None, None, None, None, None).await?;
 
             let testnet_deploy = TestnetDeployBuilder::default().provider(provider).build()?;
             testnet_deploy
@@ -761,11 +772,14 @@ async fn get_sn_codebase_type(
     repo_owner: Option<String>,
     safe_version: Option<String>,
     safenode_version: Option<String>,
+    safenode_manager_version: Option<String>,
     faucet_version: Option<String>,
     safenode_features: Option<Vec<String>>,
 ) -> Result<SnCodebaseType> {
-    let use_versioning =
-        safe_version.is_some() || safenode_version.is_some() || faucet_version.is_some();
+    let use_versioning = faucet_version.is_some()
+        || safe_version.is_some()
+        || safenode_version.is_some()
+        || safenode_manager_version.is_some();
     let build_binaries = branch.is_some() || repo_owner.is_some();
     if build_binaries && use_versioning {
         return Err(
@@ -787,14 +801,18 @@ async fn get_sn_codebase_type(
 
     let safenode_features = safenode_features.map(|list| list.join(","));
     let codebase_type = if use_versioning {
+        let faucet_version = get_version_from_option(faucet_version, &ReleaseType::Faucet).await?;
         let safe_version = get_version_from_option(safe_version, &ReleaseType::Safe).await?;
         let safenode_version =
             get_version_from_option(safenode_version, &ReleaseType::Safenode).await?;
-        let faucet_version = get_version_from_option(faucet_version, &ReleaseType::Faucet).await?;
+        let safenode_manager_version =
+            get_version_from_option(safenode_manager_version, &ReleaseType::SafenodeManager)
+                .await?;
         SnCodebaseType::Versioned {
             faucet_version,
             safe_version,
             safenode_version,
+            safenode_manager_version,
         }
     } else if build_binaries {
         // Unwraps are justified here because it's already been asserted that both must have
@@ -833,7 +851,7 @@ fn parse_environment_variables(env_var: &str) -> Result<(String, String)> {
 async fn get_version_from_option(
     version: Option<String>,
     release_type: &ReleaseType,
-) -> Result<String> {
+) -> Result<Version> {
     let release_repo = <dyn SafeReleaseRepoActions>::default_config();
     let version = if let Some(version) = version {
         println!("Using {version} for {release_type}");
@@ -847,5 +865,5 @@ async fn get_version_from_option(
         println!("Using {version} for {release_type}");
         version
     };
-    Ok(version)
+    Ok(version.parse()?)
 }
