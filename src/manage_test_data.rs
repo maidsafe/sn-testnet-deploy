@@ -104,7 +104,7 @@ impl TestDataClient {
             crate::SnCodebaseType::Versioned { safe_version, .. } => {
                 Self::download_and_extract_safe_client_from_url(
                     &self.safe_binary_repository,
-                    safe_version,
+                    &safe_version.to_string(),
                     &self.working_directory_path,
                 )
                 .await?;
@@ -209,7 +209,7 @@ impl TestDataClient {
             SnCodebaseType::Versioned { safe_version, .. } => {
                 Self::download_and_extract_safe_client_from_url(
                     &self.safe_binary_repository,
-                    safe_version,
+                    &safe_version.to_string(),
                     &self.working_directory_path,
                 )
                 .await?;

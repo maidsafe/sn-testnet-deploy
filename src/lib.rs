@@ -32,6 +32,7 @@ use indicatif::{ProgressBar, ProgressStyle};
 use log::{debug, trace};
 use rand::Rng;
 use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
+use semver::Version;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 use std::{
@@ -66,10 +67,10 @@ pub enum SnCodebaseType {
     },
     /// The specific versions of `safe` and `safenode` are fetched from `maidsafe/safe_network/releases`
     Versioned {
-        safe_version: String,
-        safenode_version: String,
-        faucet_version: String,
-        // todo: make `rpc, node manager` versions optional?
+        faucet_version: Version,
+        safe_version: Version,
+        safenode_version: Version,
+        safenode_manager_version: Version,
     },
 }
 
@@ -158,15 +159,17 @@ impl DeploymentInventory {
                 println!("Branch name: {}", branch);
             }
             SnCodebaseType::Versioned {
+                faucet_version,
                 safe_version,
                 safenode_version,
-                faucet_version,
+                safenode_manager_version,
             } => {
                 println!("Version Details");
                 println!("===============");
-                println!("safenode version: {}", safenode_version);
-                println!("safe version: {}", safe_version);
                 println!("faucet version: {}", faucet_version);
+                println!("safe version: {}", safe_version);
+                println!("safenode version: {}", safenode_version);
+                println!("safenode-manager version: {}", safenode_manager_version);
             }
         }
 
@@ -958,14 +961,19 @@ pub async fn notify_slack(inventory: DeploymentInventory) -> Result<()> {
             message.push_str(&format!("Branch: {}\n", branch));
         }
         SnCodebaseType::Versioned {
+            faucet_version,
             safe_version,
             safenode_version,
-            faucet_version,
+            safenode_manager_version,
         } => {
             message.push_str("*Version Details*\n");
-            message.push_str(&format!("safenode version: {}\n", safenode_version));
-            message.push_str(&format!("safe version: {}\n", safe_version));
             message.push_str(&format!("faucet version: {}\n", faucet_version));
+            message.push_str(&format!("safe version: {}\n", safe_version));
+            message.push_str(&format!("safenode version: {}\n", safenode_version));
+            message.push_str(&format!(
+                "safenode-manager version: {}\n",
+                safenode_manager_version
+            ));
         }
     }
 

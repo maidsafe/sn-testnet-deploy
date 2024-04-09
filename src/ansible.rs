@@ -328,7 +328,7 @@ impl ExtraVarsDocBuilder {
             }
             SnCodebaseType::Versioned { faucet_version, .. } => self
                 .variables
-                .push(("version".to_string(), faucet_version.clone())),
+                .push(("version".to_string(), faucet_version.to_string())),
         }
     }
 
@@ -374,12 +374,21 @@ impl ExtraVarsDocBuilder {
                 safenode_version, ..
             } => self
                 .variables
-                .push(("version".to_string(), safenode_version.clone())),
+                .push(("version".to_string(), safenode_version.to_string())),
         }
     }
 
     pub fn add_node_manager_url(&mut self, deployment_name: &str, codebase_type: &SnCodebaseType) {
         match codebase_type {
+            SnCodebaseType::Main { .. } => {
+                self.variables.push((
+                    "node_manager_archive_url".to_string(),
+                    format!(
+                        "{}/safenode-manager-latest-x86_64-unknown-linux-musl.tar.gz",
+                        NODE_MANAGER_S3_BUCKET_URL
+                    ),
+                ));
+            }
             SnCodebaseType::Branch {
                 repo_owner, branch, ..
             } => {
@@ -387,18 +396,21 @@ impl ExtraVarsDocBuilder {
                     "node_manager_archive_url",
                     &format!(
                         "{}/{}/{}/safenode-manager-{}-x86_64-unknown-linux-musl.tar.gz",
-                        NODE_S3_BUCKET_URL, repo_owner, branch, deployment_name
+                        NODE_MANAGER_S3_BUCKET_URL, repo_owner, branch, deployment_name
                     ),
                     branch,
                     repo_owner,
                 );
             }
-            _ => {
+            SnCodebaseType::Versioned {
+                safenode_manager_version,
+                ..
+            } => {
                 self.variables.push((
                     "node_manager_archive_url".to_string(),
                     format!(
-                        "{}/safenode-manager-latest-x86_64-unknown-linux-musl.tar.gz",
-                        NODE_MANAGER_S3_BUCKET_URL
+                        "{}/safenode-manager-{}-x86_64-unknown-linux-musl.tar.gz",
+                        NODE_MANAGER_S3_BUCKET_URL, safenode_manager_version
                     ),
                 ));
             }
