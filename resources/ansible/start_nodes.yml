@@ -1,0 +1,7 @@
+---
+- name: ensure all nodes are started using the node manager
+  hosts: all
+  become: True
+  tasks:
+    - name: start
+      ansible.builtin.command: safenode-manager start --interval 2000
