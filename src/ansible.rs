@@ -396,7 +396,7 @@ impl ExtraVarsDocBuilder {
                     "node_manager_archive_url",
                     &format!(
                         "{}/{}/{}/safenode-manager-{}-x86_64-unknown-linux-musl.tar.gz",
-                        NODE_MANAGER_S3_BUCKET_URL, repo_owner, branch, deployment_name
+                        NODE_S3_BUCKET_URL, repo_owner, branch, deployment_name
                     ),
                     branch,
                     repo_owner,
