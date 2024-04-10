@@ -20,7 +20,7 @@ pub mod ssh;
 pub mod terraform;
 
 use crate::{
-    ansible::{AnsibleRunner, ExtraVarsDocBuilder},
+    ansible::{generate_inventory, AnsibleRunner, ExtraVarsDocBuilder},
     error::{Error, Result},
     rpc_client::RpcClient,
     s3::S3Repository,
@@ -448,29 +448,15 @@ impl TestnetDeploy {
             std::fs::set_permissions(&rpc_client_path, permissions)?;
         }
 
-        let inventory_files = ["build", "genesis", "node"];
-        for inventory_type in inventory_files.iter() {
-            let src_path = self.inventory_file_path.clone();
-            let dest_path = self
+        generate_inventory(
+            name,
+            &self.inventory_file_path,
+            &self
                 .working_directory_path
                 .join("ansible")
-                .join("inventory")
-                .join(format!(
-                    ".{}_{}_inventory_digital_ocean.yml",
-                    name, inventory_type
-                ));
-            if dest_path.is_file() {
-                // In this case 'init' has already been called before and the value has been
-                // replaced, so just move on.
-                continue;
-            }
-
-            let mut contents = std::fs::read_to_string(&src_path)?;
-            contents = contents.replace("env_value", name);
-            contents = contents.replace("type_value", inventory_type);
-            std::fs::write(&dest_path, contents)?;
-            debug!("Created inventory file at {dest_path:#?}");
-        }
+                .join("inventory"),
+        )
+        .await?;
 
         Ok(())
     }
@@ -535,21 +521,40 @@ impl TestnetDeploy {
         let ansible_dir_path = self.working_directory_path.join("ansible");
         std::env::set_current_dir(ansible_dir_path.clone())?;
 
-        // Somehow it might be possible that the workspace wasn't cleared out, but the environment
-        // was actually torn down and the generated inventory files were deleted. If the files
-        // don't exist, we can reasonably consider the environment non-existent.
-        let genesis_inventory_path =
-            PathBuf::from("inventory").join(format!(".{name}_genesis_inventory_digital_ocean.yml"));
-        let build_inventory_path =
-            PathBuf::from("inventory").join(format!(".{name}_build_inventory_digital_ocean.yml"));
-        let remaining_nodes_inventory_path =
-            PathBuf::from("inventory").join(format!(".{name}_node_inventory_digital_ocean.yml"));
-        if !genesis_inventory_path.exists()
-            || !build_inventory_path.exists()
-            || !remaining_nodes_inventory_path.exists()
-        {
-            return Err(Error::EnvironmentDoesNotExist(name.to_string()));
-        }
+        let (build_inventory_path, genesis_inventory_path, remaining_nodes_inventory_path) =
+            if force_regeneration {
+                generate_inventory(
+                    name,
+                    &self.inventory_file_path,
+                    &self
+                        .working_directory_path
+                        .join("ansible")
+                        .join("inventory"),
+                )
+                .await?
+            } else {
+                // Somehow it might be possible that the workspace wasn't cleared out, but the
+                // environment was actually torn down and the generated inventory files were deleted.
+                // If the files don't exist, we can reasonably consider the environment non-existent.
+                let genesis_inventory_path = PathBuf::from("inventory")
+                    .join(format!(".{name}_genesis_inventory_digital_ocean.yml"));
+                let build_inventory_path = PathBuf::from("inventory")
+                    .join(format!(".{name}_build_inventory_digital_ocean.yml"));
+                let remaining_nodes_inventory_path = PathBuf::from("inventory")
+                    .join(format!(".{name}_node_inventory_digital_ocean.yml"));
+                if !genesis_inventory_path.exists()
+                    || !build_inventory_path.exists()
+                    || !remaining_nodes_inventory_path.exists()
+                {
+                    return Err(Error::EnvironmentDoesNotExist(name.to_string()));
+                }
+
+                (
+                    build_inventory_path,
+                    genesis_inventory_path,
+                    remaining_nodes_inventory_path,
+                )
+            };
 
         let genesis_inventory = self
             .ansible_runner

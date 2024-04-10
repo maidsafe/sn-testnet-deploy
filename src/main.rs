@@ -156,6 +156,11 @@ enum Commands {
         /// This argument must be used in conjunction with the --repo-owner argument.
         #[arg(long)]
         branch: Option<String>,
+        /// If set to true, the inventory will be regenerated.
+        ///
+        /// This is useful if the testnet was created on another machine.
+        #[clap(long, default_value = "false")]
+        force_regeneration: bool,
         /// The name of the environment
         #[arg(short = 'n', long)]
         name: String,
@@ -545,6 +550,7 @@ async fn main() -> Result<()> {
         }
         Commands::Inventory {
             branch,
+            force_regeneration,
             name,
             provider,
             node_count,
@@ -555,7 +561,7 @@ async fn main() -> Result<()> {
 
             let testnet_deploy = TestnetDeployBuilder::default().provider(provider).build()?;
             testnet_deploy
-                .list_inventory(&name, false, sn_codebase_type, node_count)
+                .list_inventory(&name, force_regeneration, sn_codebase_type, node_count)
                 .await?;
             Ok(())
         }
