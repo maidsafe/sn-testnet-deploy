@@ -206,6 +206,17 @@ enum Commands {
         #[arg(short = 'n', long)]
         name: String,
     },
+    /// Start all nodes in an environment.
+    ///
+    /// This can be useful if all nodes did not upgrade successfully.
+    Start {
+        /// The name of the environment.
+        #[arg(short = 'n', long)]
+        name: String,
+        /// The cloud provider for the environment.
+        #[clap(long, value_parser = parse_provider, verbatim_doc_comment, default_value_t = CloudProvider::DigitalOcean)]
+        provider: CloudProvider,
+    },
     /// Upgrade the node binaries of a testnet environment to the latest version.
     Upgrade {
         /// Set to run Ansible with more verbose output.
@@ -731,6 +742,11 @@ async fn main() -> Result<()> {
             let test_data_client = TestDataClientBuilder::default().build()?;
             test_data_client.smoke_test(&mut inventory).await?;
             inventory.save(&inventory_path)?;
+            Ok(())
+        }
+        Commands::Start { name, provider } => {
+            let testnet_deploy = TestnetDeployBuilder::default().provider(provider).build()?;
+            testnet_deploy.start(&name).await?;
             Ok(())
         }
         Commands::Upgrade {
