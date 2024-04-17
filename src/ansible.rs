@@ -242,21 +242,32 @@ impl ExtraVarsDocBuilder {
 
     pub fn add_build_variables(&mut self, deployment_name: &str, codebase_type: &SnCodebaseType) {
         match codebase_type {
-            SnCodebaseType::Main { safenode_features } => {
-                if let Some(features) = safenode_features {
+            SnCodebaseType::Main {
+                safenode_features,
+                protocol_version,
+            } => {
+                if safenode_features.is_some() || protocol_version.is_some() {
                     self.add_variable("custom_bin", "true");
                     self.add_variable("testnet_name", deployment_name);
                     self.add_variable("org", "maidsafe");
                     self.add_variable("branch", "main");
-                    self.add_variable("safenode_features_list", features);
                 } else {
                     self.add_variable("custom_bin", "false");
+                }
+
+                if let Some(features) = safenode_features {
+                    self.add_variable("safenode_features_list", features);
+                }
+
+                if let Some(protocol_version) = protocol_version {
+                    self.add_variable("protocol_version", protocol_version);
                 }
             }
             SnCodebaseType::Branch {
                 repo_owner,
                 branch,
                 safenode_features,
+                protocol_version,
             } => {
                 self.add_variable("custom_bin", "true");
                 self.add_variable("testnet_name", deployment_name);
@@ -264,6 +275,9 @@ impl ExtraVarsDocBuilder {
                 self.add_variable("branch", branch);
                 if let Some(features) = safenode_features {
                     self.add_variable("safenode_features_list", features);
+                }
+                if let Some(protocol_version) = protocol_version {
+                    self.add_variable("protocol_version", protocol_version);
                 }
             }
             SnCodebaseType::Versioned { .. } => {
@@ -343,8 +357,11 @@ impl ExtraVarsDocBuilder {
         codebase_type: &SnCodebaseType,
     ) {
         match codebase_type {
-            SnCodebaseType::Main { safenode_features } => {
-                if safenode_features.is_some() {
+            SnCodebaseType::Main {
+                safenode_features,
+                protocol_version,
+            } => {
+                if safenode_features.is_some() || protocol_version.is_some() {
                     self.variables.push((
                         "node_archive_url".to_string(),
                         format!(

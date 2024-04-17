@@ -87,8 +87,17 @@ enum Commands {
         #[arg(short = 'n', long)]
         name: String,
         /// The number of safenode processes to run on each VM.
-        #[clap(long, default_value = "40")]
+        #[clap(long, default_value_t = 40)]
         node_count: u16,
+        /// Protocol version is used to partition the network and would not allow nodes with different protocol versions
+        /// to join us.
+        ///
+        /// If set to 'restricted' then the branch name is used as the protocol version string else the passed in value
+        /// is used as the version string.
+        ///
+        /// The protocol version argument is mutually exclusive with the --safenode-version argument.
+        #[arg(long)]
+        protocol_version: Option<String>,
         /// The cloud provider to deploy to.
         ///
         /// Valid values are "aws" or "digital-ocean".
@@ -97,7 +106,7 @@ enum Commands {
         /// If set to true, the RPC of the node will be accessible remotely.
         ///
         /// By default, the safenode RPC is only accessible via the 'localhost' and is not exposed for security reasons.
-        #[clap(long, default_value = "false")]
+        #[clap(long, default_value_t = false)]
         public_rpc: bool,
         /// The owner/org of the Github repository to build from.
         ///
@@ -121,6 +130,8 @@ enum Commands {
         /// The features to enable on the safenode binary.
         ///
         /// If not provided, the default feature set specified for the safenode binary are used.
+        ///
+        /// The features argument is mutually exclusive with the --safenode-version argument.
         #[clap(long)]
         safenode_features: Option<Vec<String>>,
         /// Supply a version number for the safenode binary.
@@ -142,7 +153,7 @@ enum Commands {
         /// The number of node VMs to create.
         ///
         /// Each VM will run many safenode processes.
-        #[clap(long, default_value = "10")]
+        #[clap(long, default_value_t = 10)]
         vm_count: u16,
     },
     Inventory {
@@ -159,7 +170,7 @@ enum Commands {
         /// If set to true, the inventory will be regenerated.
         ///
         /// This is useful if the testnet was created on another machine.
-        #[clap(long, default_value = "false")]
+        #[clap(long, default_value_t = false)]
         force_regeneration: bool,
         /// The name of the environment
         #[arg(short = 'n', long)]
@@ -488,6 +499,7 @@ async fn main() -> Result<()> {
             logstash_stack_name,
             name,
             node_count,
+            protocol_version,
             provider,
             public_rpc,
             repo_owner,
@@ -499,6 +511,7 @@ async fn main() -> Result<()> {
         } => {
             let sn_codebase_type = get_sn_codebase_type(
                 branch,
+                protocol_version,
                 repo_owner,
                 safe_version,
                 safenode_version,
@@ -568,7 +581,8 @@ async fn main() -> Result<()> {
             repo_owner,
         } => {
             let sn_codebase_type =
-                get_sn_codebase_type(branch, repo_owner, None, None, None, None, None).await?;
+                get_sn_codebase_type(branch, None, repo_owner, None, None, None, None, None)
+                    .await?;
 
             let testnet_deploy = TestnetDeployBuilder::default().provider(provider).build()?;
             testnet_deploy
@@ -824,9 +838,10 @@ async fn main() -> Result<()> {
 }
 
 // Validate the branch and version args along with the feature list
-#[allow(clippy::type_complexity)]
+#[allow(clippy::type_complexity, clippy::too_many_arguments)]
 async fn get_sn_codebase_type(
     branch: Option<String>,
+    protocol_version: Option<String>,
     repo_owner: Option<String>,
     safe_version: Option<String>,
     safenode_version: Option<String>,
@@ -834,21 +849,25 @@ async fn get_sn_codebase_type(
     faucet_version: Option<String>,
     safenode_features: Option<Vec<String>>,
 ) -> Result<SnCodebaseType> {
-    let use_versioning = faucet_version.is_some()
+    let use_binary_version = faucet_version.is_some()
         || safe_version.is_some()
         || safenode_version.is_some()
         || safenode_manager_version.is_some();
-    let build_binaries = branch.is_some() || repo_owner.is_some();
-    if build_binaries && use_versioning {
+    if (branch.is_some() || repo_owner.is_some()) && use_binary_version {
         return Err(
             eyre!("Version numbers and branches cannot be supplied at the same time").suggestion(
                 "Please choose whether you want to use version numbers or build the binaries",
             ),
         );
     }
-    if use_versioning && safenode_features.is_some() {
+    if use_binary_version && safenode_features.is_some() {
         return Err(eyre!(
             "The --safenode-features argument only applies if we are building binaries"
+        ));
+    }
+    if use_binary_version && protocol_version.is_some() {
+        return Err(eyre!(
+            "The --protocol-version argument cannot be used along with custom binary versions"
         ));
     }
     if let (Some(_), None) | (None, Some(_)) = (&repo_owner, &branch) {
@@ -858,7 +877,7 @@ async fn get_sn_codebase_type(
     }
 
     let safenode_features = safenode_features.map(|list| list.join(","));
-    let codebase_type = if use_versioning {
+    let codebase_type = if use_binary_version {
         let faucet_version = get_version_from_option(faucet_version, &ReleaseType::Faucet).await?;
         let safe_version = get_version_from_option(safe_version, &ReleaseType::Safe).await?;
         let safenode_version =
@@ -872,7 +891,7 @@ async fn get_sn_codebase_type(
             safenode_version,
             safenode_manager_version,
         }
-    } else if build_binaries {
+    } else if branch.is_some() || repo_owner.is_some() {
         // Unwraps are justified here because it's already been asserted that both must have
         // values.
         let repo_owner = repo_owner.unwrap();
@@ -887,9 +906,13 @@ async fn get_sn_codebase_type(
             repo_owner,
             branch,
             safenode_features,
+            protocol_version,
         }
     } else {
-        SnCodebaseType::Main { safenode_features }
+        SnCodebaseType::Main {
+            safenode_features,
+            protocol_version,
+        }
     };
 
     Ok(codebase_type)

@@ -57,6 +57,7 @@ pub enum SnCodebaseType {
     Main {
         // CSV of features to enable on main::safenode
         safenode_features: Option<String>,
+        protocol_version: Option<String>,
     },
     /// The build VM is used to build all the binaries that we will be using.
     Branch {
@@ -64,6 +65,7 @@ pub enum SnCodebaseType {
         branch: String,
         // CSV of features to enable on the custom branch::safenode
         safenode_features: Option<String>,
+        protocol_version: Option<String>,
     },
     /// The specific versions of `safe` and `safenode` are fetched from `maidsafe/safe_network/releases`
     Versioned {

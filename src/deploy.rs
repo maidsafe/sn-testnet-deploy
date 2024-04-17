@@ -50,7 +50,10 @@ impl DeployCmd {
     pub async fn execute(self) -> Result<()> {
         let build_custom_binaries = {
             match &self.sn_codebase_type {
-                SnCodebaseType::Main { safenode_features } => safenode_features.is_some(),
+                SnCodebaseType::Main {
+                    safenode_features,
+                    protocol_version,
+                } => safenode_features.is_some() || protocol_version.is_some(),
                 SnCodebaseType::Branch { .. } => true,
                 SnCodebaseType::Versioned { .. } => false,
             }
