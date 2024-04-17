@@ -513,9 +513,13 @@ impl TestnetDeploy {
             return Ok(());
         }
 
-        let environments = self.terraform_runner.workspace_list()?;
-        if !environments.contains(&name.to_string()) {
-            return Err(Error::EnvironmentDoesNotExist(name.to_string()));
+        // This allows for the inventory to be generated without a Terraform workspace to be
+        // initialised, which is the case in the workflow for printing an inventory.
+        if !force_regeneration {
+            let environments = self.terraform_runner.workspace_list()?;
+            if !environments.contains(&name.to_string()) {
+                return Err(Error::EnvironmentDoesNotExist(name.to_string()));
+            }
         }
 
         // The ansible runner will have its working directory set to this location. We need the
