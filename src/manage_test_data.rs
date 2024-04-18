@@ -9,7 +9,7 @@ use crate::{
     extract_archive, get_and_extract_archive_from_s3,
     s3::S3Repository,
     safe::{SafeBinaryRepository, SafeClient},
-    DeploymentInventory, SnCodebaseType,
+    BinaryOption, DeploymentInventory,
 };
 use rand::Rng;
 use sha2::{Digest, Sha256};
@@ -87,9 +87,8 @@ impl TestDataClient {
     }
 
     pub async fn smoke_test(&self, inventory: &mut DeploymentInventory) -> Result<()> {
-        match &inventory.sn_codebase_type {
-            crate::SnCodebaseType::Main { .. } => {}
-            crate::SnCodebaseType::Branch {
+        match &inventory.binary_option {
+            crate::BinaryOption::BuildFromSource {
                 repo_owner, branch, ..
             } => {
                 Self::download_and_extract_safe_client_from_s3(
@@ -101,7 +100,7 @@ impl TestDataClient {
                 )
                 .await?;
             }
-            crate::SnCodebaseType::Versioned { safe_version, .. } => {
+            crate::BinaryOption::Versioned { safe_version, .. } => {
                 Self::download_and_extract_safe_client_from_url(
                     &self.safe_binary_repository,
                     &safe_version.to_string(),
@@ -183,18 +182,10 @@ impl TestDataClient {
         &self,
         name: &str,
         peer_multiaddr: &str,
-        sn_codebase_type: &SnCodebaseType,
+        binary_option: &BinaryOption,
     ) -> Result<Vec<(String, String)>> {
-        match sn_codebase_type {
-            SnCodebaseType::Main { .. } => {
-                Self::download_and_extract_safe_client_from_url(
-                    &self.safe_binary_repository,
-                    "latest",
-                    &self.working_directory_path,
-                )
-                .await?;
-            }
-            SnCodebaseType::Branch {
+        match binary_option {
+            BinaryOption::BuildFromSource {
                 repo_owner, branch, ..
             } => {
                 Self::download_and_extract_safe_client_from_s3(
@@ -206,7 +197,7 @@ impl TestDataClient {
                 )
                 .await?;
             }
-            SnCodebaseType::Versioned { safe_version, .. } => {
+            BinaryOption::Versioned { safe_version, .. } => {
                 Self::download_and_extract_safe_client_from_url(
                     &self.safe_binary_repository,
                     &safe_version.to_string(),

@@ -13,7 +13,7 @@
 - name: "build {{ bin_name }} binary"
   ansible.builtin.shell: |
     source $HOME/.cargo/env
-    {% if protocol_version != "" %}
+    {% if protocol_version is defined and protocol_version != "" %}
     export NETWORK_VERSION_MODE={{ protocol_version }}
     {% endif %}
 
