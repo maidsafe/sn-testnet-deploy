@@ -5,7 +5,7 @@
 // Please see the LICENSE file for more details.
 use crate::{
     error::{Error, Result},
-    is_binary_on_path, run_external_command, CloudProvider, SnCodebaseType,
+    is_binary_on_path, run_external_command, BinaryOption, CloudProvider,
 };
 use log::{debug, warn};
 use serde::Deserialize;
@@ -18,7 +18,6 @@ use std::{
 
 const NODE_S3_BUCKET_URL: &str = "https://sn-node.s3.eu-west-2.amazonaws.com";
 const NODE_MANAGER_S3_BUCKET_URL: &str = "https://sn-node-manager.s3.eu-west-2.amazonaws.com";
-const FAUCET_S3_BUCKET_URL: &str = "https://sn-faucet.s3.eu-west-2.amazonaws.com";
 const RPC_CLIENT_BUCKET_URL: &str = "https://sn-node-rpc-client.s3.eu-west-2.amazonaws.com";
 
 /// Ansible has multiple 'binaries', e.g., `ansible-playbook`, `ansible-inventory` etc. that are
@@ -240,30 +239,9 @@ impl ExtraVarsDocBuilder {
         self
     }
 
-    pub fn add_build_variables(&mut self, deployment_name: &str, codebase_type: &SnCodebaseType) {
+    pub fn add_build_variables(&mut self, deployment_name: &str, codebase_type: &BinaryOption) {
         match codebase_type {
-            SnCodebaseType::Main {
-                safenode_features,
-                protocol_version,
-            } => {
-                if safenode_features.is_some() || protocol_version.is_some() {
-                    self.add_variable("custom_bin", "true");
-                    self.add_variable("testnet_name", deployment_name);
-                    self.add_variable("org", "maidsafe");
-                    self.add_variable("branch", "main");
-                } else {
-                    self.add_variable("custom_bin", "false");
-                }
-
-                if let Some(features) = safenode_features {
-                    self.add_variable("safenode_features_list", features);
-                }
-
-                if let Some(protocol_version) = protocol_version {
-                    self.add_variable("protocol_version", protocol_version);
-                }
-            }
-            SnCodebaseType::Branch {
+            BinaryOption::BuildFromSource {
                 repo_owner,
                 branch,
                 safenode_features,
@@ -280,7 +258,7 @@ impl ExtraVarsDocBuilder {
                     self.add_variable("protocol_version", protocol_version);
                 }
             }
-            SnCodebaseType::Versioned { .. } => {
+            BinaryOption::Versioned { .. } => {
                 self.add_variable("custom_bin", "false");
             }
         }
@@ -289,10 +267,10 @@ impl ExtraVarsDocBuilder {
     pub fn add_rpc_client_url_or_version(
         &mut self,
         deployment_name: &str,
-        codebase_type: &SnCodebaseType,
+        codebase_type: &BinaryOption,
     ) {
         match codebase_type {
-            SnCodebaseType::Branch {
+            BinaryOption::BuildFromSource {
                 repo_owner, branch, ..
             } => {
                 self.add_branch_url_variable(
@@ -320,19 +298,10 @@ impl ExtraVarsDocBuilder {
     pub fn add_faucet_url_or_version(
         &mut self,
         deployment_name: &str,
-        codebase_type: &SnCodebaseType,
+        codebase_type: &BinaryOption,
     ) {
         match codebase_type {
-            SnCodebaseType::Main { .. } => {
-                self.add_variable(
-                    "faucet_archive_url",
-                    &format!(
-                        "{}/faucet-latest-x86_64-unknown-linux-musl.tar.gz",
-                        FAUCET_S3_BUCKET_URL
-                    ),
-                );
-            }
-            SnCodebaseType::Branch {
+            BinaryOption::BuildFromSource {
                 repo_owner, branch, ..
             } => {
                 self.add_branch_url_variable(
@@ -345,41 +314,15 @@ impl ExtraVarsDocBuilder {
                     repo_owner,
                 );
             }
-            SnCodebaseType::Versioned { faucet_version, .. } => self
+            BinaryOption::Versioned { faucet_version, .. } => self
                 .variables
                 .push(("version".to_string(), faucet_version.to_string())),
         }
     }
 
-    pub fn add_node_url_or_version(
-        &mut self,
-        deployment_name: &str,
-        codebase_type: &SnCodebaseType,
-    ) {
+    pub fn add_node_url_or_version(&mut self, deployment_name: &str, codebase_type: &BinaryOption) {
         match codebase_type {
-            SnCodebaseType::Main {
-                safenode_features,
-                protocol_version,
-            } => {
-                if safenode_features.is_some() || protocol_version.is_some() {
-                    self.variables.push((
-                        "node_archive_url".to_string(),
-                        format!(
-                            "{}/maidsafe/main/safenode-{}-x86_64-unknown-linux-musl.tar.gz",
-                            NODE_S3_BUCKET_URL, deployment_name
-                        ),
-                    ));
-                } else {
-                    self.variables.push((
-                        "node_archive_url".to_string(),
-                        format!(
-                            "{}/safenode-latest-x86_64-unknown-linux-musl.tar.gz",
-                            NODE_S3_BUCKET_URL
-                        ),
-                    ));
-                }
-            }
-            SnCodebaseType::Branch {
+            BinaryOption::BuildFromSource {
                 repo_owner, branch, ..
             } => {
                 self.add_branch_url_variable(
@@ -392,7 +335,7 @@ impl ExtraVarsDocBuilder {
                     repo_owner,
                 );
             }
-            SnCodebaseType::Versioned {
+            BinaryOption::Versioned {
                 safenode_version, ..
             } => self
                 .variables
@@ -400,18 +343,9 @@ impl ExtraVarsDocBuilder {
         }
     }
 
-    pub fn add_node_manager_url(&mut self, deployment_name: &str, codebase_type: &SnCodebaseType) {
+    pub fn add_node_manager_url(&mut self, deployment_name: &str, codebase_type: &BinaryOption) {
         match codebase_type {
-            SnCodebaseType::Main { .. } => {
-                self.variables.push((
-                    "node_manager_archive_url".to_string(),
-                    format!(
-                        "{}/safenode-manager-latest-x86_64-unknown-linux-musl.tar.gz",
-                        NODE_MANAGER_S3_BUCKET_URL
-                    ),
-                ));
-            }
-            SnCodebaseType::Branch {
+            BinaryOption::BuildFromSource {
                 repo_owner, branch, ..
             } => {
                 self.add_branch_url_variable(
@@ -424,7 +358,7 @@ impl ExtraVarsDocBuilder {
                     repo_owner,
                 );
             }
-            SnCodebaseType::Versioned {
+            BinaryOption::Versioned {
                 safenode_manager_version,
                 ..
             } => {
@@ -442,10 +376,10 @@ impl ExtraVarsDocBuilder {
     pub fn add_node_manager_daemon_url(
         &mut self,
         deployment_name: &str,
-        codebase_type: &SnCodebaseType,
+        codebase_type: &BinaryOption,
     ) {
         match codebase_type {
-            SnCodebaseType::Branch {
+            BinaryOption::BuildFromSource {
                 repo_owner, branch, ..
             } => {
                 self.add_branch_url_variable(

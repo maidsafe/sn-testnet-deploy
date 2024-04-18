@@ -48,26 +48,30 @@ use std::{
 use tar::Archive;
 use walkdir::WalkDir;
 
-/// How or where to build the binaries from.
+/// Specify the binary option for the deployment.
+///
+/// There are several binaries involved in the deployment:
+/// * safenode
+/// * safenode_rpc_client
+/// * faucet
+/// * safe
+///
+/// The `safe` binary is only used for smoke testing the deployment, although we don't really do
+/// that at the moment.
+///
+/// The options are to build from source, or supply a pre-built, versioned binary, which will be
+/// fetched from S3. Building from source adds significant time to the deployment.
 #[derive(Clone, Debug, Serialize, Deserialize)]
-pub enum SnCodebaseType {
-    /// The latest release binaries from `maidsafe/safe_network` is used if the `safenode_features` are not provided.
-    /// If the `safenode_features` are provided, the build VM is used to build the `safenode` binary, while the latest
-    /// release are fetched for the rest of the binaries.
-    Main {
-        // CSV of features to enable on main::safenode
-        safenode_features: Option<String>,
-        protocol_version: Option<String>,
-    },
-    /// The build VM is used to build all the binaries that we will be using.
-    Branch {
+pub enum BinaryOption {
+    /// Binaries will be built from source.
+    BuildFromSource {
         repo_owner: String,
         branch: String,
-        // CSV of features to enable on the custom branch::safenode
+        /// A comma-separated list that will be passed to the `--features` argument.
         safenode_features: Option<String>,
         protocol_version: Option<String>,
     },
-    /// The specific versions of `safe` and `safenode` are fetched from `maidsafe/safe_network/releases`
+    /// Pre-built, versioned binaries will be fetched from S3.
     Versioned {
         faucet_version: Version,
         safe_version: Version,
@@ -104,7 +108,7 @@ impl CloudProvider {
 pub struct DeploymentInventory {
     pub name: String,
     pub node_count: u16,
-    pub sn_codebase_type: SnCodebaseType,
+    pub binary_option: BinaryOption,
     pub vm_list: Vec<(String, IpAddr)>,
     // Map of PeerId to SocketAddr
     pub rpc_endpoints: BTreeMap<String, SocketAddr>,
@@ -150,9 +154,8 @@ impl DeploymentInventory {
         println!("**************************************");
 
         println!("Name: {}", self.name);
-        match &self.sn_codebase_type {
-            SnCodebaseType::Main { .. } => {}
-            SnCodebaseType::Branch {
+        match &self.binary_option {
+            BinaryOption::BuildFromSource {
                 repo_owner, branch, ..
             } => {
                 println!("Branch Details");
@@ -160,7 +163,7 @@ impl DeploymentInventory {
                 println!("Repo owner: {}", repo_owner);
                 println!("Branch name: {}", branch);
             }
-            SnCodebaseType::Versioned {
+            BinaryOption::Versioned {
                 faucet_version,
                 safe_version,
                 safenode_version,
@@ -503,7 +506,7 @@ impl TestnetDeploy {
         &self,
         name: &str,
         force_regeneration: bool,
-        sn_codebase_type: SnCodebaseType,
+        binary_option: BinaryOption,
         node_instance_count: Option<u16>,
     ) -> Result<()> {
         let inventory_path = get_data_directory()?.join(format!("{name}-inventory.json"));
@@ -712,7 +715,7 @@ impl TestnetDeploy {
         let inventory = DeploymentInventory {
             name: name.to_string(),
             node_count,
-            sn_codebase_type,
+            binary_option,
             vm_list,
             rpc_endpoints: safenode_rpc_endpoints,
             safenodemand_endpoints,
@@ -1034,16 +1037,15 @@ pub async fn notify_slack(inventory: DeploymentInventory) -> Result<()> {
     message.push_str(&format!("Name: {}\n", inventory.name));
     message.push_str(&format!("Node count: {}\n", inventory.node_count));
     message.push_str(&format!("Faucet address: {}\n", inventory.faucet_address));
-    match inventory.sn_codebase_type {
-        SnCodebaseType::Main { .. } => {}
-        SnCodebaseType::Branch {
+    match inventory.binary_option {
+        BinaryOption::BuildFromSource {
             repo_owner, branch, ..
         } => {
             message.push_str("*Branch Details*\n");
             message.push_str(&format!("Repo owner: {}\n", repo_owner));
             message.push_str(&format!("Branch: {}\n", branch));
         }
-        SnCodebaseType::Versioned {
+        BinaryOption::Versioned {
             faucet_version,
             safe_version,
             safenode_version,

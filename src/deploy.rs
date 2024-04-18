@@ -7,7 +7,7 @@
 use crate::{
     ansible::ExtraVarsDocBuilder,
     error::{Error, Result},
-    print_duration, SnCodebaseType, TestnetDeploy,
+    print_duration, BinaryOption, TestnetDeploy,
 };
 use colored::Colorize;
 use std::{net::SocketAddr, path::PathBuf, time::Instant};
@@ -19,7 +19,7 @@ pub struct DeployCmd {
     vm_count: u16,
     public_rpc: bool,
     logstash_details: Option<(String, Vec<SocketAddr>)>,
-    sn_codebase_type: SnCodebaseType,
+    binary_option: BinaryOption,
     env_variables: Option<Vec<(String, String)>>,
 }
 
@@ -32,7 +32,7 @@ impl DeployCmd {
         vm_count: u16,
         public_rpc: bool,
         logstash_details: Option<(String, Vec<SocketAddr>)>,
-        sn_codebase_type: SnCodebaseType,
+        binary_option: BinaryOption,
         env_variables: Option<Vec<(String, String)>>,
     ) -> Self {
         Self {
@@ -42,20 +42,16 @@ impl DeployCmd {
             vm_count,
             public_rpc,
             logstash_details,
-            sn_codebase_type,
+            binary_option,
             env_variables,
         }
     }
 
     pub async fn execute(self) -> Result<()> {
         let build_custom_binaries = {
-            match &self.sn_codebase_type {
-                SnCodebaseType::Main {
-                    safenode_features,
-                    protocol_version,
-                } => safenode_features.is_some() || protocol_version.is_some(),
-                SnCodebaseType::Branch { .. } => true,
-                SnCodebaseType::Versioned { .. } => false,
+            match &self.binary_option {
+                BinaryOption::BuildFromSource { .. } => true,
+                BinaryOption::Versioned { .. } => false,
             }
         };
         self.create_infra(build_custom_binaries)
@@ -124,12 +120,7 @@ impl DeployCmd {
             })?;
 
         self.testnet_deploy
-            .list_inventory(
-                &self.name,
-                true,
-                self.sn_codebase_type,
-                Some(self.node_count),
-            )
+            .list_inventory(&self.name, true, self.binary_option, Some(self.node_count))
             .await
             .map_err(|err| {
                 println!("Failed to list inventory {err:?}");
@@ -284,7 +275,7 @@ impl DeployCmd {
 
     fn build_binaries_extra_vars_doc(&self) -> Result<String> {
         let mut extra_vars = ExtraVarsDocBuilder::default();
-        extra_vars.add_build_variables(&self.name, &self.sn_codebase_type);
+        extra_vars.add_build_variables(&self.name, &self.binary_option);
         Ok(extra_vars.build())
     }
 
@@ -312,9 +303,9 @@ impl DeployCmd {
             extra_vars.add_variable("public_rpc", "true");
         }
 
-        extra_vars.add_node_url_or_version(&self.name, &self.sn_codebase_type);
-        extra_vars.add_node_manager_url(&self.name, &self.sn_codebase_type);
-        extra_vars.add_node_manager_daemon_url(&self.name, &self.sn_codebase_type);
+        extra_vars.add_node_url_or_version(&self.name, &self.binary_option);
+        extra_vars.add_node_manager_url(&self.name, &self.binary_option);
+        extra_vars.add_node_manager_daemon_url(&self.name, &self.binary_option);
 
         if let Some(env_vars) = &self.env_variables {
             extra_vars.add_env_variable_list("env_variables", env_vars.clone());
@@ -339,7 +330,7 @@ impl DeployCmd {
         extra_vars.add_variable("provider", &self.testnet_deploy.cloud_provider.to_string());
         extra_vars.add_variable("testnet_name", &self.name);
         extra_vars.add_variable("genesis_multiaddr", genesis_multiaddr);
-        extra_vars.add_faucet_url_or_version(&self.name, &self.sn_codebase_type);
+        extra_vars.add_faucet_url_or_version(&self.name, &self.binary_option);
         Ok(extra_vars.build())
     }
 
@@ -348,7 +339,7 @@ impl DeployCmd {
         extra_vars.add_variable("provider", &self.testnet_deploy.cloud_provider.to_string());
         extra_vars.add_variable("testnet_name", &self.name);
         extra_vars.add_variable("genesis_multiaddr", genesis_multiaddr);
-        extra_vars.add_rpc_client_url_or_version(&self.name, &self.sn_codebase_type);
+        extra_vars.add_rpc_client_url_or_version(&self.name, &self.binary_option);
         Ok(extra_vars.build())
     }
 }

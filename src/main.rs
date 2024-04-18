@@ -16,7 +16,7 @@ use sn_releases::{ReleaseType, SafeReleaseRepoActions};
 use sn_testnet_deploy::{
     deploy::DeployCmd, error::Error, get_data_directory, get_wallet_directory,
     logstash::LogstashDeployBuilder, manage_test_data::TestDataClientBuilder, network_commands,
-    notify_slack, setup::setup_dotenv_file, CloudProvider, DeploymentInventory, SnCodebaseType,
+    notify_slack, setup::setup_dotenv_file, BinaryOption, CloudProvider, DeploymentInventory,
     TestnetDeployBuilder, UpgradeOptions,
 };
 use std::time::Duration;
@@ -509,7 +509,7 @@ async fn main() -> Result<()> {
             safenode_manager_version,
             vm_count,
         } => {
-            let sn_codebase_type = get_sn_codebase_type(
+            let binary_option = get_binary_option(
                 branch,
                 protocol_version,
                 repo_owner,
@@ -566,7 +566,7 @@ async fn main() -> Result<()> {
                 vm_count,
                 public_rpc,
                 logstash_details,
-                sn_codebase_type,
+                binary_option,
                 env_variables,
             );
             deploy_cmd.execute().await?;
@@ -580,13 +580,12 @@ async fn main() -> Result<()> {
             node_count,
             repo_owner,
         } => {
-            let sn_codebase_type =
-                get_sn_codebase_type(branch, None, repo_owner, None, None, None, None, None)
-                    .await?;
+            let binary_option =
+                get_binary_option(branch, None, repo_owner, None, None, None, None, None).await?;
 
             let testnet_deploy = TestnetDeployBuilder::default().provider(provider).build()?;
             testnet_deploy
-                .list_inventory(&name, force_regeneration, sn_codebase_type, node_count)
+                .list_inventory(&name, force_regeneration, binary_option, node_count)
                 .await?;
             Ok(())
         }
@@ -822,7 +821,7 @@ async fn main() -> Result<()> {
 
             let test_data_client = TestDataClientBuilder::default().build()?;
             let uploaded_files = test_data_client
-                .upload_test_data(&name, random_peer, &inventory.sn_codebase_type)
+                .upload_test_data(&name, random_peer, &inventory.binary_option)
                 .await?;
 
             println!("Uploaded files:");
@@ -837,9 +836,18 @@ async fn main() -> Result<()> {
     }
 }
 
-// Validate the branch and version args along with the feature list
+/// Get the binary option for the deployment.
+///
+/// Versioned binaries are preferred first, since building from source adds significant time to the
+/// deployment. There are two options here. If no version arguments were supplied, the latest
+/// versions will be used. Otherwise, the specified versions will be used, and if any were not
+/// specified, the latest version will be used in its place.
+///
+/// The second option is to build from source, which is useful for testing changes from forks.
+///
+/// The usage of arguments are also validated here.
 #[allow(clippy::type_complexity, clippy::too_many_arguments)]
-async fn get_sn_codebase_type(
+async fn get_binary_option(
     branch: Option<String>,
     protocol_version: Option<String>,
     repo_owner: Option<String>,
@@ -848,36 +856,47 @@ async fn get_sn_codebase_type(
     safenode_manager_version: Option<String>,
     faucet_version: Option<String>,
     safenode_features: Option<Vec<String>>,
-) -> Result<SnCodebaseType> {
-    let use_binary_version = faucet_version.is_some()
+) -> Result<BinaryOption> {
+    let mut use_versions = true;
+
+    let branch_specified = branch.is_some() || repo_owner.is_some();
+    let versions_specified = faucet_version.is_some()
         || safe_version.is_some()
         || safenode_version.is_some()
         || safenode_manager_version.is_some();
-    if (branch.is_some() || repo_owner.is_some()) && use_binary_version {
+    if branch_specified && versions_specified {
         return Err(
             eyre!("Version numbers and branches cannot be supplied at the same time").suggestion(
                 "Please choose whether you want to use version numbers or build the binaries",
             ),
         );
     }
-    if use_binary_version && safenode_features.is_some() {
-        return Err(eyre!(
-            "The --safenode-features argument only applies if we are building binaries"
-        ));
-    }
-    if use_binary_version && protocol_version.is_some() {
-        return Err(eyre!(
-            "The --protocol-version argument cannot be used along with custom binary versions"
-        ));
-    }
-    if let (Some(_), None) | (None, Some(_)) = (&repo_owner, &branch) {
-        return Err(eyre!(
-            "The --branch and --repo-owner arguments must be supplied together"
-        ));
+
+    if versions_specified {
+        if safenode_features.is_some() {
+            return Err(eyre!(
+                "The --safenode-features argument only applies if we are building binaries"
+            ));
+        }
+        if protocol_version.is_some() {
+            return Err(eyre!(
+                "The --protocol-version argument only applies if we are building binaries"
+            ));
+        }
     }
 
-    let safenode_features = safenode_features.map(|list| list.join(","));
-    let codebase_type = if use_binary_version {
+    if branch_specified {
+        if let (Some(_), None) | (None, Some(_)) = (&repo_owner, &branch) {
+            return Err(eyre!(
+                "The --branch and --repo-owner arguments must be supplied together"
+            ));
+        }
+        use_versions = false;
+    }
+
+    let binary_option = if use_versions {
+        print_with_banner("Binaries will be supplied from pre-built versions");
+
         let faucet_version = get_version_from_option(faucet_version, &ReleaseType::Faucet).await?;
         let safe_version = get_version_from_option(safe_version, &ReleaseType::Safe).await?;
         let safenode_version =
@@ -885,37 +904,42 @@ async fn get_sn_codebase_type(
         let safenode_manager_version =
             get_version_from_option(safenode_manager_version, &ReleaseType::SafenodeManager)
                 .await?;
-        SnCodebaseType::Versioned {
+        BinaryOption::Versioned {
             faucet_version,
             safe_version,
             safenode_version,
             safenode_manager_version,
         }
-    } else if branch.is_some() || repo_owner.is_some() {
+    } else {
         // Unwraps are justified here because it's already been asserted that both must have
         // values.
         let repo_owner = repo_owner.unwrap();
         let branch = branch.unwrap();
+
+        print_with_banner(&format!(
+            "Binaries will be built from {}/{}",
+            repo_owner, branch
+        ));
 
         let url = format!("https://github.com/{repo_owner}/safe_network/tree/{branch}",);
         let response = reqwest::get(&url).await?;
         if !response.status().is_success() {
             bail!("The provided branch or owner does not exist: {url:?}");
         }
-        SnCodebaseType::Branch {
+        BinaryOption::BuildFromSource {
             repo_owner,
             branch,
-            safenode_features,
-            protocol_version,
-        }
-    } else {
-        SnCodebaseType::Main {
-            safenode_features,
+            safenode_features: safenode_features.map(|list| list.join(",")),
             protocol_version,
         }
     };
 
-    Ok(codebase_type)
+    Ok(binary_option)
+}
+
+fn print_with_banner(s: &str) {
+    let banner = "=".repeat(s.len());
+    println!("{}\n{}\n{}", banner, s, banner);
 }
 
 // Since delimiter is on, we get element of the csv and not the entire csv.
