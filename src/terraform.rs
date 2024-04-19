@@ -10,6 +10,7 @@ use crate::{
 };
 use std::path::PathBuf;
 
+#[derive(Clone)]
 pub struct TerraformRunner {
     pub binary_path: PathBuf,
     pub provider: CloudProvider,

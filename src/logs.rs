@@ -5,6 +5,7 @@
 // Please see the LICENSE file for more details.
 
 use crate::{
+    ansible::{AnsibleInventoryType, AnsiblePlaybook},
     error::{Error, Result},
     get_progress_bar, run_external_command,
     s3::S3Repository,
@@ -202,20 +203,16 @@ impl TestnetDeploy {
         }
         std::fs::create_dir_all(&dest)?;
 
-        // The logs destination does not get passed to Ansible because the playbook assumes it's at
-        // a relative location.
         self.ansible_runner.run_playbook(
-            PathBuf::from("logs.yml"),
-            PathBuf::from("inventory").join(format!(".{name}_genesis_inventory_digital_ocean.yml")),
-            self.cloud_provider.get_ssh_user(),
+            AnsiblePlaybook::Logs,
+            AnsibleInventoryType::Genesis,
             Some(format!(
                 "{{ \"env_name\": \"{name}\", \"resources_only\" : \"{resources_only}\" }}"
             )),
         )?;
         self.ansible_runner.run_playbook(
-            PathBuf::from("logs.yml"),
-            PathBuf::from("inventory").join(format!(".{name}_node_inventory_digital_ocean.yml")),
-            self.cloud_provider.get_ssh_user(),
+            AnsiblePlaybook::Logs,
+            AnsibleInventoryType::Nodes,
             Some(format!(
                 "{{ \"env_name\": \"{name}\", \"resources_only\" : \"{resources_only}\" }}"
             )),
@@ -245,14 +242,13 @@ impl TestnetDeploy {
             return Err(Error::EnvironmentDoesNotExist(name.to_string()));
         }
 
-        // Get the inventory of all the nodes
         let mut all_node_inventory = self
             .ansible_runner
-            .inventory_list(genesis_inventory_path, false)
+            .get_inventory(AnsibleInventoryType::Genesis, false)
             .await?;
         all_node_inventory.extend(
             self.ansible_runner
-                .inventory_list(remaining_nodes_inventory_path, false)
+                .get_inventory(AnsibleInventoryType::Nodes, false)
                 .await?,
         );
         Ok(all_node_inventory)

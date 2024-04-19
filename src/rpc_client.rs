@@ -16,6 +16,7 @@ pub struct NodeInfo {
     pub last_restart: u32,
 }
 
+#[derive(Clone)]
 pub struct RpcClient {
     pub binary_path: PathBuf,
     pub working_directory_path: PathBuf,

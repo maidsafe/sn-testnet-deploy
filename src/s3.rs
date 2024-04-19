@@ -11,6 +11,7 @@ use std::path::{Path, PathBuf};
 use tokio::io::AsyncWriteExt;
 use tokio_stream::StreamExt;
 
+#[derive(Clone)]
 pub struct S3Repository {}
 
 impl S3Repository {

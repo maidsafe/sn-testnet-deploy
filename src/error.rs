@@ -35,6 +35,8 @@ pub enum Error {
     DigitalOceanPublicIpAddressNotFound,
     #[error("The '{0}' environment does not exist")]
     EnvironmentDoesNotExist(String),
+    #[error("The environment name is required")]
+    EnvironmentNameRequired,
     #[error("Command that executed with {0} failed. See output for details.")]
     ExternalCommandRunFailed(String),
     #[error("The provided inventory file is empty or does not exists {0}")]
