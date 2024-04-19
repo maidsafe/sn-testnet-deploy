@@ -72,7 +72,6 @@ pub enum BinaryOption {
     /// Pre-built, versioned binaries will be fetched from S3.
     Versioned {
         faucet_version: Version,
-        safe_version: Version,
         safenode_version: Version,
         safenode_manager_version: Version,
     },
@@ -507,7 +506,7 @@ impl TestnetDeploy {
 /// Shared Helpers
 ///
 
-pub async fn get_genesis_multiaddr(name: &str, ansible_runner: &AnsibleRunner, ssh_client: &SshClient) -> Result<(String, IpAddr)> {
+pub async fn get_genesis_multiaddr(ansible_runner: &AnsibleRunner, ssh_client: &SshClient) -> Result<(String, IpAddr)> {
     let genesis_inventory = 
         ansible_runner
         .get_inventory(
@@ -700,13 +699,11 @@ pub async fn notify_slack(inventory: DeploymentInventory) -> Result<()> {
         }
         BinaryOption::Versioned {
             faucet_version,
-            safe_version,
             safenode_version,
             safenode_manager_version,
         } => {
             message.push_str("*Version Details*\n");
             message.push_str(&format!("faucet version: {}\n", faucet_version));
-            message.push_str(&format!("safe version: {}\n", safe_version));
             message.push_str(&format!("safenode version: {}\n", safenode_version));
             message.push_str(&format!(
                 "safenode-manager version: {}\n",
