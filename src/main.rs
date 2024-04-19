@@ -14,10 +14,15 @@ use rand::Rng;
 use semver::Version;
 use sn_releases::{ReleaseType, SafeReleaseRepoActions};
 use sn_testnet_deploy::{
-    deploy::DeployCmd, error::Error, get_data_directory, get_wallet_directory,
-    logstash::LogstashDeployBuilder, manage_test_data::TestDataClientBuilder, network_commands,
-    notify_slack, setup::setup_dotenv_file, BinaryOption, CloudProvider, DeploymentInventory,
-    TestnetDeployBuilder, UpgradeOptions,
+    deploy::DeployCmd,
+    error::Error,
+    get_wallet_directory,
+    inventory::{get_data_directory, DeploymentInventory, DeploymentInventoryService},
+    logstash::LogstashDeployBuilder,
+    manage_test_data::TestDataClientBuilder,
+    network_commands, notify_slack,
+    setup::setup_dotenv_file,
+    BinaryOption, CloudProvider, TestnetDeployBuilder, UpgradeOptions,
 };
 use std::time::Duration;
 
@@ -523,10 +528,11 @@ async fn main() -> Result<()> {
 
             let testnet_deploy = TestnetDeployBuilder::default()
                 .ansible_verbose_mode(ansible_verbose)
+                .environment_name(&name)
                 .provider(provider.clone())
                 .build()?;
 
-            match testnet_deploy.init(&name).await {
+            match testnet_deploy.init().await {
                 Ok(_) => {}
                 Err(e @ Error::LogsForPreviousTestnetExist(_)) => {
                     return Err(eyre!(e)
@@ -548,6 +554,7 @@ async fn main() -> Result<()> {
 
             let logstash_details = {
                 let logstash_deploy = LogstashDeployBuilder::default()
+                    .environment_name(&name)
                     .provider(provider)
                     .build()?;
                 let stack_hosts = logstash_deploy
@@ -560,16 +567,24 @@ async fn main() -> Result<()> {
                 }
             };
             let deploy_cmd = DeployCmd::new(
-                testnet_deploy,
-                name,
+                testnet_deploy.clone(),
+                name.clone(),
                 node_count,
                 vm_count,
                 public_rpc,
                 logstash_details,
-                binary_option,
+                binary_option.clone(),
                 env_variables,
             );
             deploy_cmd.execute().await?;
+
+            let inventory_service = DeploymentInventoryService::from(testnet_deploy);
+            let inventory = inventory_service
+                .generate_inventory(&name, true, binary_option, Some(node_count))
+                .await?;
+            inventory.print_report()?;
+            inventory.save()?;
+
             Ok(())
         }
         Commands::Inventory {
@@ -583,10 +598,16 @@ async fn main() -> Result<()> {
             let binary_option =
                 get_binary_option(branch, None, repo_owner, None, None, None, None, None).await?;
 
-            let testnet_deploy = TestnetDeployBuilder::default().provider(provider).build()?;
-            testnet_deploy
-                .list_inventory(&name, force_regeneration, binary_option, node_count)
+            let testnet_deploy = TestnetDeployBuilder::default()
+                .environment_name(&name)
+                .provider(provider)
+                .build()?;
+            let inventory_service = DeploymentInventoryService::from(testnet_deploy);
+            let inventory = inventory_service
+                .generate_inventory(&name, force_regeneration, binary_option, node_count)
                 .await?;
+            inventory.print_report()?;
+
             Ok(())
         }
         Commands::Logs(log_cmd) => match log_cmd {
@@ -595,8 +616,11 @@ async fn main() -> Result<()> {
                 provider,
                 resources_only,
             } => {
-                let testnet_deploy = TestnetDeployBuilder::default().provider(provider).build()?;
-                testnet_deploy.init(&name).await?;
+                let testnet_deploy = TestnetDeployBuilder::default()
+                    .environment_name(&name)
+                    .provider(provider)
+                    .build()?;
+                testnet_deploy.init().await?;
                 testnet_deploy.rsync_logs(&name, resources_only).await?;
                 Ok(())
             }
@@ -605,8 +629,11 @@ async fn main() -> Result<()> {
                 name,
                 provider,
             } => {
-                let testnet_deploy = TestnetDeployBuilder::default().provider(provider).build()?;
-                testnet_deploy.init(&name).await?;
+                let testnet_deploy = TestnetDeployBuilder::default()
+                    .environment_name(&name)
+                    .provider(provider)
+                    .build()?;
+                testnet_deploy.init().await?;
                 testnet_deploy.ripgrep_logs(&name, &args).await?;
                 Ok(())
             }
@@ -615,8 +642,11 @@ async fn main() -> Result<()> {
                 provider,
                 resources_only,
             } => {
-                let testnet_deploy = TestnetDeployBuilder::default().provider(provider).build()?;
-                testnet_deploy.init(&name).await?;
+                let testnet_deploy = TestnetDeployBuilder::default()
+                    .environment_name(&name)
+                    .provider(provider)
+                    .build()?;
+                testnet_deploy.init().await?;
                 testnet_deploy.copy_logs(&name, resources_only).await?;
                 Ok(())
             }
@@ -754,7 +784,7 @@ async fn main() -> Result<()> {
             let mut inventory = DeploymentInventory::read(&inventory_path)?;
             let test_data_client = TestDataClientBuilder::default().build()?;
             test_data_client.smoke_test(&mut inventory).await?;
-            inventory.save(&inventory_path)?;
+            inventory.save()?;
             Ok(())
         }
         Commands::Start { name, provider } => {
@@ -829,7 +859,7 @@ async fn main() -> Result<()> {
                 println!("{path}: {address}");
             }
             inventory.add_uploaded_files(uploaded_files.clone());
-            inventory.save(&inventory_path)?;
+            inventory.save()?;
 
             Ok(())
         }

@@ -5,7 +5,7 @@
 // Please see the LICENSE file for more details.
 
 use crate::{
-    ansible::AnsibleRunner,
+    ansible::{AnsibleInventoryType, AnsiblePlaybook, AnsibleRunner},
     digital_ocean::{DigitalOceanClient, DIGITAL_OCEAN_API_BASE_URL, DIGITAL_OCEAN_API_PAGE_SIZE},
     do_clean,
     error::{Error, Result},
@@ -23,17 +23,23 @@ pub const LOGSTASH_PORT: u16 = 5044;
 
 #[derive(Default)]
 pub struct LogstashDeployBuilder {
+    environment_name: String,
     provider: Option<CloudProvider>,
+    ssh_secret_key_path: Option<PathBuf>,
     state_bucket_name: Option<String>,
     terraform_binary_path: Option<PathBuf>,
-    working_directory_path: Option<PathBuf>,
-    ssh_secret_key_path: Option<PathBuf>,
     vault_password_path: Option<PathBuf>,
+    working_directory_path: Option<PathBuf>,
 }
 
 impl LogstashDeployBuilder {
     pub fn new() -> Self {
         Default::default()
+    }
+
+    pub fn environment_name(&mut self, name: &str) -> &mut Self {
+        self.environment_name = name.to_string();
+        self
     }
 
     pub fn provider(&mut self, provider: CloudProvider) -> &mut Self {
@@ -131,12 +137,13 @@ impl LogstashDeployBuilder {
             &state_bucket_name,
         )?;
         let ansible_runner = AnsibleRunner::new(
-            working_directory_path.join("ansible"),
+            &self.environment_name,
             provider.clone(),
             ssh_secret_key_path.clone(),
             vault_password_path,
             false,
-        );
+            working_directory_path.join("ansible"),
+        )?;
 
         let logstash = LogstashDeploy::new(
             terraform_runner,
@@ -224,20 +231,14 @@ impl LogstashDeploy {
         println!("Obtaining IP address for Logstash VM...");
         let logstash_inventory = self
             .ansible_runner
-            .inventory_list(
-                PathBuf::from("inventory")
-                    .join(format!(".{name}_logstash_inventory_digital_ocean.yml")),
-                false,
-            )
+            .get_inventory(AnsibleInventoryType::Logstash, false)
             .await?;
         let logstash_ip = logstash_inventory[0].1;
         self.ssh_client
             .wait_for_ssh_availability(&logstash_ip, &self.cloud_provider.get_ssh_user())?;
         self.ansible_runner.run_playbook(
-            PathBuf::from("logstash.yml"),
-            PathBuf::from("inventory")
-                .join(format!(".{name}_logstash_inventory_digital_ocean.yml")),
-            self.cloud_provider.get_ssh_user(),
+            AnsiblePlaybook::Logstash,
+            AnsibleInventoryType::Logstash,
             Some(format!(
                 "{{ \"provider\": \"{}\", \"stack_name\": \"{name}\", \"logstash_host_ip_address\": \"{logstash_ip}\" }}",
                 self.cloud_provider

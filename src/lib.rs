@@ -8,6 +8,7 @@ pub mod ansible;
 pub mod deploy;
 pub mod digital_ocean;
 pub mod error;
+pub mod inventory;
 pub mod logs;
 pub mod logstash;
 pub mod manage_test_data;
@@ -20,8 +21,9 @@ pub mod ssh;
 pub mod terraform;
 
 use crate::{
-    ansible::{generate_inventory, AnsibleRunner, ExtraVarsDocBuilder},
+    ansible::{generate_environment_inventory, AnsibleRunner, AnsiblePlaybook, AnsibleInventoryType, ExtraVarsDocBuilder},
     error::{Error, Result},
+    inventory::DeploymentInventory,
     rpc_client::RpcClient,
     s3::S3Repository,
     ssh::SshClient,
@@ -29,16 +31,13 @@ use crate::{
 };
 use flate2::read::GzDecoder;
 use indicatif::{ProgressBar, ProgressStyle};
-use log::{debug, trace};
-use rand::Rng;
-use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
+use log::debug;
 use semver::Version;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 use std::{
-    collections::BTreeMap,
     fs::File,
-    io::{BufRead, BufReader, BufWriter, Write},
+    io::{BufRead, BufReader, BufWriter},
     net::{IpAddr, SocketAddr},
     os::unix::fs::PermissionsExt,
     path::{Path, PathBuf},
@@ -46,7 +45,6 @@ use std::{
     time::Duration,
 };
 use tar::Archive;
-use walkdir::WalkDir;
 
 /// Specify the binary option for the deployment.
 ///
@@ -104,110 +102,6 @@ impl CloudProvider {
     }
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize)]
-pub struct DeploymentInventory {
-    pub name: String,
-    pub node_count: u16,
-    pub binary_option: BinaryOption,
-    pub vm_list: Vec<(String, IpAddr)>,
-    // Map of PeerId to SocketAddr
-    pub rpc_endpoints: BTreeMap<String, SocketAddr>,
-    // Map of PeerId to manager daemon SocketAddr
-    pub safenodemand_endpoints: BTreeMap<String, SocketAddr>,
-    pub ssh_user: String,
-    pub genesis_multiaddr: String,
-    pub peers: Vec<String>,
-    pub faucet_address: String,
-    pub uploaded_files: Vec<(String, String)>,
-}
-
-impl DeploymentInventory {
-    pub fn save(&self, file_path: &PathBuf) -> Result<()> {
-        let serialized_data = serde_json::to_string_pretty(self)?;
-        let mut file = File::create(file_path)?;
-        file.write_all(serialized_data.as_bytes())?;
-        Ok(())
-    }
-
-    pub fn read(file_path: &PathBuf) -> Result<Self> {
-        let data = std::fs::read_to_string(file_path)?;
-        let deserialized_data: DeploymentInventory = serde_json::from_str(&data)?;
-        Ok(deserialized_data)
-    }
-
-    pub fn add_uploaded_files(&mut self, uploaded_files: Vec<(String, String)>) {
-        self.uploaded_files.extend_from_slice(&uploaded_files);
-    }
-
-    pub fn get_random_peer(&self) -> String {
-        let mut rng = rand::thread_rng();
-        let i = rng.gen_range(0..self.peers.len());
-        let random_peer = &self.peers[i];
-        random_peer.to_string()
-    }
-
-    pub fn print_report(&self) -> Result<()> {
-        println!("**************************************");
-        println!("*                                    *");
-        println!("*          Inventory Report          *");
-        println!("*                                    *");
-        println!("**************************************");
-
-        println!("Name: {}", self.name);
-        match &self.binary_option {
-            BinaryOption::BuildFromSource {
-                repo_owner, branch, ..
-            } => {
-                println!("Branch Details");
-                println!("==============");
-                println!("Repo owner: {}", repo_owner);
-                println!("Branch name: {}", branch);
-            }
-            BinaryOption::Versioned {
-                faucet_version,
-                safe_version,
-                safenode_version,
-                safenode_manager_version,
-            } => {
-                println!("Version Details");
-                println!("===============");
-                println!("faucet version: {}", faucet_version);
-                println!("safe version: {}", safe_version);
-                println!("safenode version: {}", safenode_version);
-                println!("safenode-manager version: {}", safenode_manager_version);
-            }
-        }
-
-        for vm in self.vm_list.iter() {
-            println!("{}: {}", vm.0, vm.1);
-        }
-        println!("SSH user: {}", self.ssh_user);
-        let testnet_dir = get_data_directory()?;
-        println!("Sample Peers",);
-        println!("============");
-        for peer in self.peers.iter().take(10) {
-            println!("{peer}");
-        }
-        println!("The entire peer list can be found at {testnet_dir:?}",);
-
-        println!("\nGenesis multiaddr: {}", self.genesis_multiaddr);
-        println!("Faucet address: {}", self.faucet_address);
-        println!("Check the faucet:");
-        println!(
-            "safe --peer {} wallet get-faucet {}",
-            self.genesis_multiaddr, self.faucet_address
-        );
-
-        if !self.uploaded_files.is_empty() {
-            println!("Uploaded files:");
-            for file in self.uploaded_files.iter() {
-                println!("{}: {}", file.0, file.1);
-            }
-        }
-        Ok(())
-    }
-}
-
 #[derive(Clone)]
 pub struct UpgradeOptions {
     pub ansible_verbose: bool,
@@ -246,12 +140,13 @@ impl UpgradeOptions {
 #[derive(Default)]
 pub struct TestnetDeployBuilder {
     ansible_verbose_mode: bool,
+    environment_name: String,
     provider: Option<CloudProvider>,
+    ssh_secret_key_path: Option<PathBuf>,
     state_bucket_name: Option<String>,
     terraform_binary_path: Option<PathBuf>,
-    working_directory_path: Option<PathBuf>,
-    ssh_secret_key_path: Option<PathBuf>,
     vault_password_path: Option<PathBuf>,
+    working_directory_path: Option<PathBuf>,
 }
 
 impl TestnetDeployBuilder {
@@ -261,6 +156,11 @@ impl TestnetDeployBuilder {
 
     pub fn ansible_verbose_mode(&mut self, ansible_verbose_mode: bool) -> &mut Self {
         self.ansible_verbose_mode = ansible_verbose_mode;
+        self
+    }
+
+    pub fn environment_name(&mut self, name: &str) -> &mut Self {
+        self.environment_name = name.to_string();
         self
     }
 
@@ -351,12 +251,13 @@ impl TestnetDeployBuilder {
             &state_bucket_name,
         )?;
         let ansible_runner = AnsibleRunner::new(
-            working_directory_path.join("ansible"),
+            &self.environment_name,
             provider.clone(),
             ssh_secret_key_path.clone(),
             vault_password_path,
             self.ansible_verbose_mode,
-        );
+            working_directory_path.join("ansible"),
+        )?;
         let rpc_client = RpcClient::new(
             PathBuf::from("/usr/local/bin/safenode_rpc_client"),
             working_directory_path.clone(),
@@ -370,71 +271,79 @@ impl TestnetDeployBuilder {
         }
 
         let testnet = TestnetDeploy::new(
-            terraform_runner,
             ansible_runner,
-            rpc_client,
-            SshClient::new(ssh_secret_key_path),
-            working_directory_path,
             provider.clone(),
+            &self.environment_name,
+            rpc_client,
             S3Repository {},
-        );
+            SshClient::new(ssh_secret_key_path),
+            terraform_runner,
+            working_directory_path,
+        )?;
 
         Ok(testnet)
     }
 }
 
+#[derive(Clone)]
 pub struct TestnetDeploy {
-    pub terraform_runner: TerraformRunner,
     pub ansible_runner: AnsibleRunner,
-    pub rpc_client: RpcClient,
-    pub ssh_client: SshClient,
-    pub working_directory_path: PathBuf,
     pub cloud_provider: CloudProvider,
-    pub s3_repository: S3Repository,
+    pub environment_name: String,
     pub inventory_file_path: PathBuf,
+    pub rpc_client: RpcClient,
+    pub s3_repository: S3Repository,
+    pub ssh_client: SshClient,
+    pub terraform_runner: TerraformRunner,
+    pub working_directory_path: PathBuf,
 }
 
 impl TestnetDeploy {
     pub fn new(
-        terraform_runner: TerraformRunner,
         ansible_runner: AnsibleRunner,
-        rpc_client: RpcClient,
-        ssh_client: SshClient,
-        working_directory_path: PathBuf,
         cloud_provider: CloudProvider,
+        environment_name: &str,
+        rpc_client: RpcClient,
         s3_repository: S3Repository,
-    ) -> TestnetDeploy {
+        ssh_client: SshClient,
+        terraform_runner: TerraformRunner,
+        working_directory_path: PathBuf,
+    ) -> Result<TestnetDeploy> {
+        if environment_name.is_empty() {
+            return Err(Error::EnvironmentNameRequired);
+        }
         let inventory_file_path = working_directory_path
             .join("ansible")
             .join("inventory")
             .join("dev_inventory_digital_ocean.yml");
-        TestnetDeploy {
-            terraform_runner,
+        Ok(TestnetDeploy {
             ansible_runner,
+            cloud_provider,
+            environment_name: environment_name.to_string(),
+            inventory_file_path,
             rpc_client,
             ssh_client,
-            working_directory_path,
-            cloud_provider,
             s3_repository,
-            inventory_file_path,
-        }
+            terraform_runner,
+            working_directory_path,
+        })
     }
 
-    pub async fn init(&self, name: &str) -> Result<()> {
+    pub async fn init(&self) -> Result<()> {
         if self
             .s3_repository
-            .folder_exists("sn-testnet", &format!("testnet-logs/{name}"))
+            .folder_exists("sn-testnet", &format!("testnet-logs/{}", self.environment_name))
             .await?
         {
-            return Err(Error::LogsForPreviousTestnetExist(name.to_string()));
+            return Err(Error::LogsForPreviousTestnetExist(self.environment_name.clone()));
         }
 
         self.terraform_runner.init()?;
         let workspaces = self.terraform_runner.workspace_list()?;
-        if !workspaces.contains(&name.to_string()) {
-            self.terraform_runner.workspace_new(name)?;
+        if !workspaces.contains(&self.environment_name) {
+            self.terraform_runner.workspace_new(&self.environment_name)?;
         } else {
-            println!("Workspace {name} already exists")
+            println!("Workspace {} already exists", self.environment_name);
         }
 
         let rpc_client_path = self.working_directory_path.join("safenode_rpc_client");
@@ -453,8 +362,8 @@ impl TestnetDeploy {
             std::fs::set_permissions(&rpc_client_path, permissions)?;
         }
 
-        generate_inventory(
-            name,
+        generate_environment_inventory(
+            &self.environment_name,
             &self.inventory_file_path,
             &self
                 .working_directory_path
@@ -462,271 +371,6 @@ impl TestnetDeploy {
                 .join("inventory"),
         )
         .await?;
-
-        Ok(())
-    }
-
-    pub async fn get_genesis_multiaddr(&self, name: &str) -> Result<(String, IpAddr)> {
-        let genesis_inventory = self
-            .ansible_runner
-            .inventory_list(
-                PathBuf::from("inventory")
-                    .join(format!(".{name}_genesis_inventory_digital_ocean.yml")),
-                true,
-            )
-            .await?;
-        let genesis_ip = genesis_inventory[0].1;
-
-        let multiaddr = self
-            .ssh_client
-            .run_command(
-                &genesis_ip,
-                "root",
-                // fetch the first multiaddr if genesis is true and which does not contain the localhost addr.
-                "jq -r '.nodes[] | select(.genesis == true) | .listen_addr[] | select(contains(\"127.0.0.1\") | not)' /var/safenode-manager/node_registry.json | head -n 1",
-                false,
-            )?.first()
-            .cloned()
-            .ok_or_else(|| Error::GenesisListenAddress)?;
-
-        // The genesis_ip is obviously inside the multiaddr, but it's just being returned as a
-        // separate item for convenience.
-        Ok((multiaddr, genesis_ip))
-    }
-
-    /// Print the inventory for the deployment.
-    ///
-    /// It will be cached for the purposes of quick display later and also for use with the test
-    /// data upload.
-    ///
-    /// The `force_regeneration` flag is used when the `deploy` command runs, to make sure that a
-    /// new inventory is generated, because it's possible that an old one with the same deployment
-    /// name has been cached.
-    pub async fn list_inventory(
-        &self,
-        name: &str,
-        force_regeneration: bool,
-        binary_option: BinaryOption,
-        node_instance_count: Option<u16>,
-    ) -> Result<()> {
-        let inventory_path = get_data_directory()?.join(format!("{name}-inventory.json"));
-        if inventory_path.exists() && !force_regeneration {
-            let inventory = DeploymentInventory::read(&inventory_path)?;
-            inventory.print_report()?;
-            return Ok(());
-        }
-
-        // This allows for the inventory to be generated without a Terraform workspace to be
-        // initialised, which is the case in the workflow for printing an inventory.
-        if !force_regeneration {
-            let environments = self.terraform_runner.workspace_list()?;
-            if !environments.contains(&name.to_string()) {
-                return Err(Error::EnvironmentDoesNotExist(name.to_string()));
-            }
-        }
-
-        // The ansible runner will have its working directory set to this location. We need the
-        // same here to test the inventory paths, which are relative to the `ansible` directory.
-        let ansible_dir_path = self.working_directory_path.join("ansible");
-        std::env::set_current_dir(ansible_dir_path.clone())?;
-
-        let (build_inventory_path, genesis_inventory_path, remaining_nodes_inventory_path) =
-            if force_regeneration {
-                generate_inventory(
-                    name,
-                    &self.inventory_file_path,
-                    &self
-                        .working_directory_path
-                        .join("ansible")
-                        .join("inventory"),
-                )
-                .await?
-            } else {
-                // Somehow it might be possible that the workspace wasn't cleared out, but the
-                // environment was actually torn down and the generated inventory files were deleted.
-                // If the files don't exist, we can reasonably consider the environment non-existent.
-                let genesis_inventory_path = PathBuf::from("inventory")
-                    .join(format!(".{name}_genesis_inventory_digital_ocean.yml"));
-                let build_inventory_path = PathBuf::from("inventory")
-                    .join(format!(".{name}_build_inventory_digital_ocean.yml"));
-                let remaining_nodes_inventory_path = PathBuf::from("inventory")
-                    .join(format!(".{name}_node_inventory_digital_ocean.yml"));
-                if !genesis_inventory_path.exists()
-                    || !build_inventory_path.exists()
-                    || !remaining_nodes_inventory_path.exists()
-                {
-                    return Err(Error::EnvironmentDoesNotExist(name.to_string()));
-                }
-
-                (
-                    build_inventory_path,
-                    genesis_inventory_path,
-                    remaining_nodes_inventory_path,
-                )
-            };
-
-        let genesis_inventory = self
-            .ansible_runner
-            .inventory_list(genesis_inventory_path.clone(), false)
-            .await?;
-        let build_inventory = self
-            .ansible_runner
-            .inventory_list(build_inventory_path, false)
-            .await?;
-        let remaining_nodes_inventory = self
-            .ansible_runner
-            .inventory_list(remaining_nodes_inventory_path.clone(), false)
-            .await?;
-
-        // It also seems to be possible for a workspace and inventory files to still exist, but
-        // there to be no inventory items returned. Perhaps someone deleted the VMs manually. We
-        // only need to test the genesis node in this case, since that must always exist.
-        if genesis_inventory.is_empty() {
-            return Err(Error::EnvironmentDoesNotExist(name.to_string()));
-        }
-
-        let mut vm_list = Vec::new();
-        vm_list.push((genesis_inventory[0].0.clone(), genesis_inventory[0].1));
-        if !build_inventory.is_empty() {
-            vm_list.push((build_inventory[0].0.clone(), build_inventory[0].1));
-        }
-        for entry in remaining_nodes_inventory.iter() {
-            vm_list.push((entry.0.clone(), entry.1));
-        }
-        let (genesis_multiaddr, genesis_ip) = self.get_genesis_multiaddr(name).await?;
-
-        println!("Retrieving node manager inventory. This can take a minute.");
-
-        let node_manager_inventories = {
-            debug!("Fetching node manager inventory");
-            let temp_dir_path = tempfile::tempdir()?.into_path();
-            let temp_dir_json = serde_json::to_string(&temp_dir_path)?;
-
-            self.ansible_runner.run_playbook(
-                PathBuf::from("node_manager_inventory.yml"),
-                remaining_nodes_inventory_path,
-                self.cloud_provider.get_ssh_user(),
-                Some(format!("{{ \"dest\": {temp_dir_json} }}")),
-            )?;
-            self.ansible_runner.run_playbook(
-                PathBuf::from("node_manager_inventory.yml"),
-                genesis_inventory_path,
-                self.cloud_provider.get_ssh_user(),
-                Some(format!("{{ \"dest\": {temp_dir_json} }}")),
-            )?;
-
-            // collect the manager inventory file paths along with their respective ip addr
-            let manager_inventory_files = WalkDir::new(temp_dir_path)
-                .into_iter()
-                .flatten()
-                .filter_map(|entry| {
-                    if entry.file_type().is_file()
-                        && entry.path().extension().is_some_and(|ext| ext == "json")
-                    {
-                        // tempdir/<testnet_name>-node/var/safenode-manager/node_registry.json
-                        let mut vm_name = entry.path().to_path_buf();
-                        trace!("Found file with json extension: {vm_name:?}");
-                        vm_name.pop();
-                        vm_name.pop();
-                        vm_name.pop();
-                        // Extract the <testnet_name>-node string
-                        trace!("Extracting the vm name from the path");
-                        let vm_name = vm_name.file_name()?.to_str()?;
-                        trace!("Extracted vm name from path: {vm_name}");
-                        Some(entry.path().to_path_buf())
-                    } else {
-                        None
-                    }
-                })
-                .collect::<Vec<PathBuf>>();
-
-            manager_inventory_files
-                .par_iter()
-                .flat_map(|file_path| match get_node_manager_inventory(file_path) {
-                    Ok(inventory) => vec![Ok(inventory)],
-                    Err(err) => vec![Err(err)],
-                })
-                .collect::<Result<Vec<NodeManagerInventory>>>()?
-        };
-
-        // todo: filter out nodes that are running currently. Nodes can be restarted, which can lead to us collecting
-        // RPCs to nodes that do not exists.
-        let safenode_rpc_endpoints: BTreeMap<String, SocketAddr> = node_manager_inventories
-            .iter()
-            .flat_map(|inv| {
-                inv.nodes
-                    .iter()
-                    .flat_map(|node| node.peer_id.clone().map(|id| (id, node.rpc_socket_addr)))
-            })
-            .collect();
-
-        let safenodemand_endpoints: BTreeMap<String, SocketAddr> = node_manager_inventories
-            .iter()
-            .flat_map(|inv| {
-                inv.nodes.iter().flat_map(|node| {
-                    if let (Some(peer_id), Some(Some(daemon_socket_addr))) = (
-                        node.peer_id.clone(),
-                        inv.daemon.clone().map(|daemon| daemon.endpoint),
-                    ) {
-                        Some((peer_id, daemon_socket_addr))
-                    } else {
-                        None
-                    }
-                })
-            })
-            .collect();
-
-        // The scripts are relative to the `resources` directory, so we need to change the current
-        // working directory back to that location first.
-        std::env::set_current_dir(self.working_directory_path.clone())?;
-        println!("Retrieving sample peers. This can take a minute.");
-        // Todo: RPC into nodes to fetch the multiaddr.
-        let peers = remaining_nodes_inventory
-            .par_iter()
-            .filter_map(|(vm_name, ip_address)| {
-                let ip_address = *ip_address;
-                match self.ssh_client.run_script(
-                    ip_address,
-                    "safe",
-                    PathBuf::from("scripts").join("get_peer_multiaddr.sh"),
-                    true,
-                ) {
-                    Ok(output) => Some(output),
-                    Err(err) => {
-                        println!("Failed to SSH into {vm_name:?}: {ip_address} with err: {err:?}");
-                        None
-                    }
-                }
-            })
-            .flatten()
-            .collect::<Vec<_>>();
-
-        // The VM list includes the genesis node and the build machine, hence the subtraction of 2
-        // from the total VM count. After that, add one node for genesis, since this machine only
-        // runs a single node.
-        let node_count = {
-            let vms_to_ignore = if build_inventory.is_empty() { 1 } else { 2 };
-            let mut node_count =
-                (vm_list.len() - vms_to_ignore) as u16 * node_instance_count.unwrap_or(0);
-            node_count += 1;
-            node_count
-        };
-
-        let inventory = DeploymentInventory {
-            name: name.to_string(),
-            node_count,
-            binary_option,
-            vm_list,
-            rpc_endpoints: safenode_rpc_endpoints,
-            safenodemand_endpoints,
-            ssh_user: self.cloud_provider.get_ssh_user(),
-            genesis_multiaddr,
-            peers,
-            faucet_address: format!("{}:8000", genesis_ip),
-            uploaded_files: Vec::new(),
-        };
-        inventory.print_report()?;
-        inventory.save(&inventory_path)?;
 
         Ok(())
     }
@@ -751,15 +395,13 @@ impl TestnetDeploy {
         }
 
         self.ansible_runner.run_playbook(
-            PathBuf::from("start_nodes.yml"),
-            genesis_inventory_path,
-            self.cloud_provider.get_ssh_user(),
+            AnsiblePlaybook::StartNodes,
+            AnsibleInventoryType::Genesis,
             None,
         )?;
         self.ansible_runner.run_playbook(
-            PathBuf::from("start_nodes.yml"),
-            remaining_nodes_inventory_path,
-            self.cloud_provider.get_ssh_user(),
+            AnsiblePlaybook::StartNodes,
+            AnsibleInventoryType::Nodes,
             None,
         )?;
 
@@ -794,21 +436,18 @@ impl TestnetDeploy {
         }
 
         self.ansible_runner.run_playbook(
-            PathBuf::from("upgrade_nodes.yml"),
-            remaining_nodes_inventory_path,
-            self.cloud_provider.get_ssh_user(),
+            AnsiblePlaybook::UpgradeNodes,
+            AnsibleInventoryType::Nodes,
             Some(options.get_ansible_vars()),
         )?;
         self.ansible_runner.run_playbook(
-            PathBuf::from("upgrade_nodes.yml"),
-            genesis_inventory_path.clone(),
-            self.cloud_provider.get_ssh_user(),
+            AnsiblePlaybook::UpgradeNodes,
+            AnsibleInventoryType::Genesis,
             Some(options.get_ansible_vars()),
         )?;
         self.ansible_runner.run_playbook(
-            PathBuf::from("upgrade_faucet.yml"),
-            genesis_inventory_path,
-            self.cloud_provider.get_ssh_user(),
+            AnsiblePlaybook::UpgradeFaucet,
+            AnsibleInventoryType::Genesis,
             Some(options.get_ansible_vars()),
         )?;
 
@@ -837,15 +476,13 @@ impl TestnetDeploy {
         let mut extra_vars = ExtraVarsDocBuilder::default();
         extra_vars.add_variable("version", &version.to_string());
         self.ansible_runner.run_playbook(
-            PathBuf::from("upgrade_node_manager.yml"),
-            genesis_inventory_path,
-            self.cloud_provider.get_ssh_user(),
+            AnsiblePlaybook::UpgradeNodeManager,
+            AnsibleInventoryType::Genesis,
             Some(extra_vars.build()),
         )?;
         self.ansible_runner.run_playbook(
-            PathBuf::from("upgrade_node_manager.yml"),
-            remaining_nodes_inventory_path,
-            self.cloud_provider.get_ssh_user(),
+            AnsiblePlaybook::UpgradeNodeManager,
+            AnsibleInventoryType::Nodes,
             Some(extra_vars.build()),
         )?;
 
@@ -869,6 +506,33 @@ impl TestnetDeploy {
 ///
 /// Shared Helpers
 ///
+
+pub async fn get_genesis_multiaddr(name: &str, ansible_runner: &AnsibleRunner, ssh_client: &SshClient) -> Result<(String, IpAddr)> {
+    let genesis_inventory = 
+        ansible_runner
+        .get_inventory(
+            AnsibleInventoryType::Genesis,
+            true,
+        )
+        .await?;
+    let genesis_ip = genesis_inventory[0].1;
+
+    let multiaddr = 
+        ssh_client
+        .run_command(
+            &genesis_ip,
+            "root",
+            // fetch the first multiaddr if genesis is true and which does not contain the localhost addr.
+            "jq -r '.nodes[] | select(.genesis == true) | .listen_addr[] | select(contains(\"127.0.0.1\") | not)' /var/safenode-manager/node_registry.json | head -n 1",
+            false,
+        )?.first()
+        .cloned()
+        .ok_or_else(|| Error::GenesisListenAddress)?;
+
+    // The genesis_ip is obviously inside the multiaddr, but it's just being returned as a
+    // separate item for convenience.
+    Ok((multiaddr, genesis_ip))
+}
 
 pub async fn get_and_extract_archive_from_s3(
     s3_repository: &S3Repository,
@@ -1009,17 +673,6 @@ pub fn do_clean(
     Ok(())
 }
 
-pub fn get_data_directory() -> Result<PathBuf> {
-    let path = dirs_next::data_dir()
-        .ok_or_else(|| Error::CouldNotRetrieveDataDirectory)?
-        .join("safe")
-        .join("testnet-deploy");
-    if !path.exists() {
-        std::fs::create_dir_all(path.clone())?;
-    }
-    Ok(path)
-}
-
 pub fn get_wallet_directory() -> Result<PathBuf> {
     Ok(dirs_next::data_dir()
         .ok_or_else(|| Error::CouldNotRetrieveDataDirectory)?
@@ -1107,24 +760,7 @@ pub fn get_progress_bar(length: u64) -> Result<ProgressBar> {
 }
 
 #[derive(Deserialize)]
-struct NodeManagerInventory {
-    daemon: Option<Daemon>,
-    nodes: Vec<Node>,
-}
-#[derive(Deserialize, Clone)]
-struct Daemon {
-    endpoint: Option<SocketAddr>,
-}
-
-#[derive(Deserialize)]
 struct Node {
     rpc_socket_addr: SocketAddr,
     peer_id: Option<String>,
-}
-
-fn get_node_manager_inventory(inventory_file_path: &PathBuf) -> Result<NodeManagerInventory> {
-    let file = File::open(inventory_file_path)?;
-    let reader = BufReader::new(file);
-    let inventory = serde_json::from_reader(reader)?;
-    Ok(inventory)
 }

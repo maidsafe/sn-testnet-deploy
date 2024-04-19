@@ -52,12 +52,114 @@ impl AnsibleBinary {
     }
 }
 
+/// Represents the playbooks that apply to our own domain.
+pub enum AnsiblePlaybook {
+    /// The build playbook will build the `faucet`, `safe`, `safenode` and `safenode-manager`
+    /// binaries and upload them to S3.
+    ///
+    /// Use it it combination with `AnsibleInventoryType::Build`.
+    Build,
+    /// The faucet playbook will provision setup the faucet to run as a service. The faucet is
+    /// typically running on the genesis node.
+    ///
+    /// Use it it combination with `AnsibleInventoryType::Genesis`.
+    // Get the inventory of all the nodes
+    Faucet,
+    /// The genesis playbook will use the node manager to setup the genesis node, which the other
+    /// nodes will bootstrap against.
+    ///
+    /// Use it it combination with `AnsibleInventoryType::Genesis`.
+    Genesis,
+    /// The logs playbook will retrieve node logs from any machines it is run against.
+    ///
+    /// Use it it combination with `AnsibleInventoryType::Genesis` or `AnsibleInventoryType::Nodes`.
+    Logs,
+    /// The Logstash playbook will provision machines to run Logstash.
+    ///
+    /// Use it it combination with `AnsibleInventoryType::Logstash`.
+    Logstash,
+    /// The node manager inventory playbook will retrieve the node manager's inventory from any
+    /// machines it is run against.
+    ///
+    /// Use it it combination with `AnsibleInventoryType::Genesis` or `AnsibleInventoryType::Nodes`.
+    NodeManagerInventory,
+    /// The node playbook will setup any nodes except the genesis node. These nodes will bootstrap
+    /// using genesis as a peer reference.
+    ///
+    /// Use it it combination with `AnsibleInventoryType::Genesis` or `AnsibleInventoryType::Nodes`.
+    Nodes,
+    /// The rpc client playbook will setup the `safenode_rpc_client` binary on the genesis node.
+    ///
+    /// Use it it combination with `AnsibleInventoryType::Genesis`.
+    RpcClient,
+    /// The start nodes playbook will use the node manager to start any node services on any
+    /// machines it runs against.
+    ///
+    /// It is useful for starting any nodes that failed to start after they were upgraded. The node
+    /// manager's `start` command is idempotent, so it will skip nodes that are already running.
+    ///
+    /// Use it it combination with `AnsibleInventoryType::Genesis` or `AnsibleInventoryType::Nodes`.
+    StartNodes,
+    /// The upgrade faucet playbook will upgrade the faucet to the latest version.
+    ///
+    /// Use it it combination with `AnsibleInventoryType::Genesis`.
+    UpgradeFaucet,
+    /// The upgrade node manager playbook will upgrade the node manager to the latest version.
+    ///
+    /// Use it it combination with `AnsibleInventoryType::Genesis` or `AnsibleInventoryType::Nodes`.
+    UpgradeNodeManager,
+    /// The upgrade node manager playbook will upgrade node services to the latest version.
+    ///
+    /// Use it it combination with `AnsibleInventoryType::Genesis` or `AnsibleInventoryType::Nodes`.
+    UpgradeNodes,
+}
+
+impl AnsiblePlaybook {
+    pub fn get_playbook_name(&self) -> String {
+        match self {
+            AnsiblePlaybook::Build => "build.yml".to_string(),
+            AnsiblePlaybook::Genesis => "genesis_node.yml".to_string(),
+            AnsiblePlaybook::Faucet => "faucet.yml".to_string(),
+            AnsiblePlaybook::Logs => "logs.yml".to_string(),
+            AnsiblePlaybook::Logstash => "logstash.yml".to_string(),
+            AnsiblePlaybook::NodeManagerInventory => "node_manager_inventory.yml".to_string(),
+            AnsiblePlaybook::Nodes => "nodes.yml".to_string(),
+            AnsiblePlaybook::RpcClient => "safenode_rpc_client.yml".to_string(),
+            AnsiblePlaybook::StartNodes => "start_nodes.yml".to_string(),
+            AnsiblePlaybook::UpgradeFaucet => "upgrade_faucet.yml".to_string(),
+            AnsiblePlaybook::UpgradeNodeManager => "upgrade_node_manager.yml".to_string(),
+            AnsiblePlaybook::UpgradeNodes => "upgrade_nodes.yml".to_string(),
+        }
+    }
+}
+
+/// Represents the inventory types that apply to our own domain.
+#[derive(Clone)]
+pub enum AnsibleInventoryType {
+    // Use to run a playbook against the build machine.
+    //
+    // This is a larger machine that is used for building binaries from source.
+    //
+    // Only one machine will be returned in this inventory.
+    Build,
+    // Use to run a playbook against the genesis node.
+    //
+    // Only one machine will be returned in this inventory.
+    Genesis,
+    // Use to run a playbook against the Logstash servers.
+    Logstash,
+    // Use to run a playbook against all nodes except the genesis node.
+    Nodes,
+}
+
+#[derive(Clone)]
 pub struct AnsibleRunner {
+    pub environment_name: String,
     pub provider: CloudProvider,
-    pub working_directory_path: PathBuf,
     pub ssh_sk_path: PathBuf,
     pub vault_password_file_path: PathBuf,
     pub verbose_mode: bool,
+    pub working_directory_path: PathBuf,
 }
 
 // The following three structs are utilities that are used to parse the output of the
@@ -77,32 +179,32 @@ struct Output {
 
 impl AnsibleRunner {
     pub fn new(
-        working_directory_path: PathBuf,
+        environment_name: &str,
         provider: CloudProvider,
         ssh_sk_path: PathBuf,
         vault_password_file_path: PathBuf,
         verbose_mode: bool,
-    ) -> AnsibleRunner {
-        AnsibleRunner {
+        working_directory_path: PathBuf,
+    ) -> Result<AnsibleRunner> {
+        if environment_name.is_empty() {
+            return Err(Error::EnvironmentNameRequired);
+        }
+        Ok(AnsibleRunner {
+            environment_name: environment_name.to_string(),
             provider,
             working_directory_path,
             ssh_sk_path,
             vault_password_file_path,
             verbose_mode,
-        }
+        })
     }
 
-    // This function is used to list the inventory of the ansible runner.
-    // It takes a PathBuf as an argument which represents the inventory path.
-    // It returns a Result containing a vector of tuples. Each tuple contains a string representing the name and the ansible host.
-    //
-    // Set re_attempt to re-run the ansible runner if the inventory list is empty
-    pub async fn inventory_list(
+    /// Runs Ansible's inventory command and returns a list of machine name and IP address pairs.
+    pub async fn get_inventory(
         &self,
-        inventory_path: PathBuf,
+        inventory_type: AnsibleInventoryType,
         re_attempt: bool,
     ) -> Result<Vec<(String, IpAddr)>> {
-        // Run the external command and store the output.
         let retry_count = if re_attempt { 3 } else { 0 };
         let mut count = 0;
         let mut inventory = Vec::new();
@@ -114,29 +216,26 @@ impl AnsibleRunner {
                 self.working_directory_path.clone(),
                 vec![
                     "--inventory".to_string(),
-                    inventory_path.to_string_lossy().to_string(),
+                    self.get_inventory_path(inventory_type.clone())
+                        .to_string_lossy()
+                        .to_string(),
                     "--list".to_string(),
                 ],
                 true,
                 false,
             )?;
 
-            // Debug the output of the inventory list.
             debug!("Inventory list output:");
             debug!("{output:#?}");
-            // Convert the output into a string and remove any lines that do not start with '{'.
             let mut output_string = output
                 .into_iter()
                 .skip_while(|line| !line.starts_with('{'))
                 .collect::<Vec<String>>()
                 .join("\n");
-            // Truncate the string at the last '}' character.
             if let Some(end_index) = output_string.rfind('}') {
                 output_string.truncate(end_index + 1);
             }
-            // Parse the output string into the Output struct.
             let parsed: Output = serde_json::from_str(&output_string)?;
-            // Convert the parsed output into a vector of tuples containing the name and ansible host.
             inventory = parsed
                 ._meta
                 .hostvars
@@ -155,15 +254,13 @@ impl AnsibleRunner {
             warn!("Inventory list is empty after {retry_count} retries");
         }
 
-        // Return the inventory.
         Ok(inventory)
     }
 
     pub fn run_playbook(
         &self,
-        playbook_path: PathBuf,
-        inventory_path: PathBuf,
-        user: String,
+        playbook: AnsiblePlaybook,
+        inventory_type: AnsibleInventoryType,
         extra_vars_document: Option<String>,
     ) -> Result<()> {
         // Using `to_string_lossy` will suffice here. With `to_str` returning an `Option`, to avoid
@@ -172,11 +269,13 @@ impl AnsibleRunner {
         // unicode characters in them.
         let mut args = vec![
             "--inventory".to_string(),
-            inventory_path.to_string_lossy().to_string(),
+            self.get_inventory_path(inventory_type)
+                .to_string_lossy()
+                .to_string(),
             "--private-key".to_string(),
             self.ssh_sk_path.to_string_lossy().to_string(),
             "--user".to_string(),
-            user,
+            self.provider.get_ssh_user(),
             "--vault-password-file".to_string(),
             self.vault_password_file_path.to_string_lossy().to_string(),
         ];
@@ -187,7 +286,7 @@ impl AnsibleRunner {
         if self.verbose_mode {
             args.push("-v".to_string());
         }
-        args.push(playbook_path.to_string_lossy().to_string());
+        args.push(playbook.get_playbook_name());
         run_external_command(
             PathBuf::from(AnsibleBinary::AnsiblePlaybook.to_string()),
             self.working_directory_path.clone(),
@@ -196,6 +295,31 @@ impl AnsibleRunner {
             false,
         )?;
         Ok(())
+    }
+
+    fn get_inventory_path(&self, inventory_type: AnsibleInventoryType) -> PathBuf {
+        let provider = match self.provider {
+            CloudProvider::Aws => "aws",
+            CloudProvider::DigitalOcean => "digital_ocean",
+        };
+        match inventory_type {
+            AnsibleInventoryType::Build => PathBuf::from("inventory").join(format!(
+                ".{}_build_inventory_{}.yml",
+                self.environment_name, provider
+            )),
+            AnsibleInventoryType::Genesis => PathBuf::from("inventory").join(format!(
+                ".{}_genesis_inventory_{}.yml",
+                self.environment_name, provider
+            )),
+            AnsibleInventoryType::Logstash => PathBuf::from("inventory").join(format!(
+                ".{}_logstash_inventory_{}.yml",
+                self.environment_name, provider
+            )),
+            AnsibleInventoryType::Nodes => PathBuf::from("inventory").join(format!(
+                ".{}_node_inventory_{}.yml",
+                self.environment_name, provider
+            )),
+        }
     }
 }
 
@@ -438,15 +562,17 @@ impl ExtraVarsDocBuilder {
     }
 }
 
-/// Generates inventory files for a given environment.
+/// Generate necessary inventory files for a given environment.
+///
+/// These files are based from a template in the base directory.
 ///
 /// Returns a three-element tuple with the paths of the generated build, genesis, and node
 /// inventories, respectively.
-pub async fn generate_inventory(
+pub async fn generate_environment_inventory(
     environment_name: &str,
     base_inventory_path: &Path,
     output_inventory_dir_path: &Path,
-) -> Result<(PathBuf, PathBuf, PathBuf)> {
+) -> Result<()> {
     let mut generated_inventory_paths = vec![];
     let inventory_files = ["build", "genesis", "node"];
     for inventory_type in inventory_files.iter() {
@@ -469,10 +595,5 @@ pub async fn generate_inventory(
         generated_inventory_paths.push(dest_path);
     }
 
-    let mut iter = generated_inventory_paths.into_iter();
-    Ok((
-        iter.next().unwrap(),
-        iter.next().unwrap(),
-        iter.next().unwrap(),
-    ))
+    Ok(())
 }

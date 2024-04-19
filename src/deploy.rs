@@ -5,12 +5,12 @@
 // Please see the LICENSE file for more details.
 
 use crate::{
-    ansible::ExtraVarsDocBuilder,
+    ansible::{AnsibleInventoryType, AnsiblePlaybook, ExtraVarsDocBuilder},
     error::{Error, Result},
-    print_duration, BinaryOption, TestnetDeploy,
+    get_genesis_multiaddr, print_duration, BinaryOption, TestnetDeploy,
 };
 use colored::Colorize;
-use std::{net::SocketAddr, path::PathBuf, time::Instant};
+use std::{net::SocketAddr, time::Instant};
 
 pub struct DeployCmd {
     testnet_deploy: TestnetDeploy,
@@ -79,14 +79,16 @@ impl DeployCmd {
         })?;
         n += 1;
 
-        let (genesis_multiaddr, _) = self
-            .testnet_deploy
-            .get_genesis_multiaddr(&self.name)
-            .await
-            .map_err(|err| {
-                println!("Failed to get genesis multiaddr {err:?}");
-                err
-            })?;
+        let (genesis_multiaddr, _) = get_genesis_multiaddr(
+            &self.name,
+            &self.testnet_deploy.ansible_runner,
+            &self.testnet_deploy.ssh_client,
+        )
+        .await
+        .map_err(|err| {
+            println!("Failed to get genesis multiaddr {err:?}");
+            err
+        })?;
         println!("Obtained multiaddr for genesis node: {genesis_multiaddr}");
 
         let mut node_provision_failed = false;
@@ -116,14 +118,6 @@ impl DeployCmd {
             .await
             .map_err(|err| {
                 println!("Failed to provision safenode rpc client {err:?}");
-                err
-            })?;
-
-        self.testnet_deploy
-            .list_inventory(&self.name, true, self.binary_option, Some(self.node_count))
-            .await
-            .map_err(|err| {
-                println!("Failed to list inventory {err:?}");
                 err
             })?;
 
@@ -161,11 +155,7 @@ impl DeployCmd {
         let build_inventory = self
             .testnet_deploy
             .ansible_runner
-            .inventory_list(
-                PathBuf::from("inventory")
-                    .join(format!(".{}_build_inventory_digital_ocean.yml", self.name)),
-                true,
-            )
+            .get_inventory(AnsibleInventoryType::Build, true)
             .await?;
         let build_ip = build_inventory[0].1;
         self.testnet_deploy.ssh_client.wait_for_ssh_availability(
@@ -176,10 +166,8 @@ impl DeployCmd {
         println!("Running ansible against build VM...");
         let extra_vars = self.build_binaries_extra_vars_doc()?;
         self.testnet_deploy.ansible_runner.run_playbook(
-            PathBuf::from("build.yml"),
-            PathBuf::from("inventory")
-                .join(format!(".{}_build_inventory_digital_ocean.yml", self.name)),
-            self.testnet_deploy.cloud_provider.get_ssh_user(),
+            AnsiblePlaybook::Build,
+            AnsibleInventoryType::Build,
             Some(extra_vars),
         )?;
         print_duration(start.elapsed());
@@ -191,13 +179,7 @@ impl DeployCmd {
         let genesis_inventory = self
             .testnet_deploy
             .ansible_runner
-            .inventory_list(
-                PathBuf::from("inventory").join(format!(
-                    ".{}_genesis_inventory_digital_ocean.yml",
-                    self.name
-                )),
-                true,
-            )
+            .get_inventory(AnsibleInventoryType::Genesis, true)
             .await?;
         let genesis_ip = genesis_inventory[0].1;
         self.testnet_deploy.ssh_client.wait_for_ssh_availability(
@@ -205,12 +187,8 @@ impl DeployCmd {
             &self.testnet_deploy.cloud_provider.get_ssh_user(),
         )?;
         self.testnet_deploy.ansible_runner.run_playbook(
-            PathBuf::from("genesis_node.yml"),
-            PathBuf::from("inventory").join(format!(
-                ".{}_genesis_inventory_digital_ocean.yml",
-                self.name
-            )),
-            self.testnet_deploy.cloud_provider.get_ssh_user(),
+            AnsiblePlaybook::Genesis,
+            AnsibleInventoryType::Genesis,
             Some(self.build_node_extra_vars_doc(None, None)?),
         )?;
         print_duration(start.elapsed());
@@ -221,12 +199,8 @@ impl DeployCmd {
         let start = Instant::now();
         println!("Running ansible against genesis node to deploy faucet...");
         self.testnet_deploy.ansible_runner.run_playbook(
-            PathBuf::from("faucet.yml"),
-            PathBuf::from("inventory").join(format!(
-                ".{}_genesis_inventory_digital_ocean.yml",
-                self.name
-            )),
-            self.testnet_deploy.cloud_provider.get_ssh_user(),
+            AnsiblePlaybook::Faucet,
+            AnsibleInventoryType::Genesis,
             Some(self.build_faucet_extra_vars_doc(genesis_multiaddr)?),
         )?;
         print_duration(start.elapsed());
@@ -237,12 +211,8 @@ impl DeployCmd {
         let start = Instant::now();
         println!("Running ansible against genesis node to start safenode_rpc_client service...");
         self.testnet_deploy.ansible_runner.run_playbook(
-            PathBuf::from("safenode_rpc_client.yml"),
-            PathBuf::from("inventory").join(format!(
-                ".{}_genesis_inventory_digital_ocean.yml",
-                self.name
-            )),
-            self.testnet_deploy.cloud_provider.get_ssh_user(),
+            AnsiblePlaybook::RpcClient,
+            AnsibleInventoryType::Genesis,
             Some(self.build_safenode_rpc_client_extra_vars_doc(genesis_multiaddr)?),
         )?;
         print_duration(start.elapsed());
@@ -252,10 +222,8 @@ impl DeployCmd {
     pub async fn provision_remaining_nodes(&self, genesis_multiaddr: &str) -> Result<()> {
         let start = Instant::now();
         self.testnet_deploy.ansible_runner.run_playbook(
-            PathBuf::from("nodes.yml"),
-            PathBuf::from("inventory")
-                .join(format!(".{}_node_inventory_digital_ocean.yml", self.name)),
-            self.testnet_deploy.cloud_provider.get_ssh_user(),
+            AnsiblePlaybook::Nodes,
+            AnsibleInventoryType::Nodes,
             Some(self.build_node_extra_vars_doc(
                 Some(genesis_multiaddr.to_string()),
                 Some(self.node_count),
