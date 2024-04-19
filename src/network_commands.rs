@@ -54,7 +54,7 @@ pub async fn perform_fixed_interval_network_churn(
         .ok_or_eyre("Could not get the genesis VM's addr")?;
     let safenodemand_endpoints = inventory
         .safenodemand_endpoints
-        .values()
+        .iter()
         .filter(|addr| addr.ip() != genesis_ip)
         .cloned()
         .collect::<BTreeSet<_>>();
@@ -67,7 +67,7 @@ pub async fn perform_fixed_interval_network_churn(
             }
         });
         // subtract 1 node for genesis. And ignore build & genesis node.
-        (inventory.node_count as usize - 1) / (inventory.vm_list.len() - vms_to_ignore)
+        (inventory.peers.len() - 1) / (inventory.vm_list.len() - vms_to_ignore)
     };
 
     let max_concurrent_churns = std::cmp::min(concurrent_churns, nodes_per_vm);
@@ -133,7 +133,7 @@ pub async fn perform_random_interval_network_churn(
         .ok_or_eyre("Could not get the genesis VM's addr")?;
     let safenodemand_endpoints = inventory
         .safenodemand_endpoints
-        .values()
+        .iter()
         .filter(|addr| addr.ip() != genesis_ip)
         .cloned()
         .collect::<BTreeSet<_>>();
@@ -143,7 +143,7 @@ pub async fn perform_random_interval_network_churn(
 
     // print the time to churn all these nodes
     {
-        let total_num_nodes = inventory.node_count as usize - 1;
+        let total_num_nodes = inventory.peers.len() - 1;
         let n_timeframes_to_churn_all_nodes = if total_num_nodes % churn_count > 0 {
             total_num_nodes / churn_count + 1
         } else {
