@@ -141,7 +141,7 @@ impl DeploymentInventoryService {
             vm_list.push((entry.0.clone(), entry.1));
         }
         let (genesis_multiaddr, genesis_ip) =
-            get_genesis_multiaddr(name, &self.ansible_runner, &self.ssh_client).await?;
+            get_genesis_multiaddr(&self.ansible_runner, &self.ssh_client).await?;
 
         println!("Retrieving node manager inventory. This can take a minute.");
 
@@ -337,14 +337,12 @@ impl DeploymentInventory {
             }
             BinaryOption::Versioned {
                 faucet_version,
-                safe_version,
                 safenode_version,
                 safenode_manager_version,
             } => {
                 println!("Version Details");
                 println!("===============");
                 println!("faucet version: {}", faucet_version);
-                println!("safe version: {}", safe_version);
                 println!("safenode version: {}", safenode_version);
                 println!("safenode-manager version: {}", safenode_manager_version);
             }

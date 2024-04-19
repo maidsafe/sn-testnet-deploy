@@ -5,12 +5,12 @@
 // Please see the LICENSE file for more details.
 
 use crate::{
-    error::{Error, Result},
     extract_archive, get_and_extract_archive_from_s3,
     s3::S3Repository,
     safe::{SafeBinaryRepository, SafeClient},
     BinaryOption, DeploymentInventory,
 };
+use color_eyre::{eyre::eyre, Help, Result};
 use rand::Rng;
 use sha2::{Digest, Sha256};
 use std::{
@@ -86,9 +86,13 @@ impl TestDataClient {
         }
     }
 
-    pub async fn smoke_test(&self, inventory: &mut DeploymentInventory) -> Result<()> {
+    pub async fn smoke_test(
+        &self,
+        inventory: &mut DeploymentInventory,
+        safe_version: Option<String>,
+    ) -> Result<()> {
         match &inventory.binary_option {
-            crate::BinaryOption::BuildFromSource {
+            BinaryOption::BuildFromSource {
                 repo_owner, branch, ..
             } => {
                 Self::download_and_extract_safe_client_from_s3(
@@ -100,13 +104,24 @@ impl TestDataClient {
                 )
                 .await?;
             }
-            crate::BinaryOption::Versioned { safe_version, .. } => {
-                Self::download_and_extract_safe_client_from_url(
-                    &self.safe_binary_repository,
-                    &safe_version.to_string(),
-                    &self.working_directory_path,
-                )
-                .await?;
+            BinaryOption::Versioned { .. } => {
+                if let Some(version) = safe_version {
+                    Self::download_and_extract_safe_client_from_url(
+                        &self.safe_binary_repository,
+                        &version,
+                        &self.working_directory_path,
+                    )
+                    .await?;
+                } else {
+                    return Err(eyre!(
+                        "The '{}' environment was deployed using versioned binaries.",
+                        inventory.name
+                    )
+                    .suggestion(
+                        "For this kind of deployment, the --safe-version argument must be \
+                            used to specify the client version.",
+                    ));
+                }
             }
         }
 
@@ -164,10 +179,7 @@ impl TestDataClient {
                     if *stored_hash == hash {
                         println!("Hash match for file {}", file_name);
                     } else {
-                        return Err(Error::SmokeTestFailed(format!(
-                            "Hash mismatch for file {}",
-                            file_name
-                        )));
+                        return Err(eyre!("Hash mismatch for file {}", file_name));
                     }
                 }
             }
@@ -183,6 +195,7 @@ impl TestDataClient {
         name: &str,
         peer_multiaddr: &str,
         binary_option: &BinaryOption,
+        safe_version: Option<String>,
     ) -> Result<Vec<(String, String)>> {
         match binary_option {
             BinaryOption::BuildFromSource {
@@ -197,13 +210,24 @@ impl TestDataClient {
                 )
                 .await?;
             }
-            BinaryOption::Versioned { safe_version, .. } => {
-                Self::download_and_extract_safe_client_from_url(
-                    &self.safe_binary_repository,
-                    &safe_version.to_string(),
-                    &self.working_directory_path,
-                )
-                .await?;
+            BinaryOption::Versioned { .. } => {
+                if let Some(version) = safe_version {
+                    Self::download_and_extract_safe_client_from_url(
+                        &self.safe_binary_repository,
+                        &version,
+                        &self.working_directory_path,
+                    )
+                    .await?;
+                } else {
+                    return Err(eyre!(
+                        "The '{}' environment was deployed using versioned binaries.",
+                        name
+                    )
+                    .suggestion(
+                        "For this kind of deployment, the --safe-version argument must be \
+                            used to specify the client version.",
+                    ));
+                }
             }
         }
 
@@ -230,11 +254,7 @@ impl TestDataClient {
                 let hex_address = self.safe_client.upload_file(peer_multiaddr, &path)?;
                 uploaded_files.push((
                     path.file_name()
-                        .ok_or_else(|| {
-                            Error::UploadTestDataError(
-                                "Could not retrieve file name from test data item".to_string(),
-                            )
-                        })?
+                        .ok_or_else(|| eyre!("Could not retrieve file name from test data item"))?
                         .to_string_lossy()
                         .to_string(),
                     hex_address,
@@ -248,7 +268,7 @@ impl TestDataClient {
 
     fn get_downloaded_files_dir_path() -> Result<PathBuf> {
         Ok(dirs_next::data_dir()
-            .ok_or_else(|| Error::CouldNotRetrieveDataDirectory)?
+            .ok_or_else(|| eyre!("Could not retrieve data directory"))?
             .join("safe")
             .join("client")
             .join("downloaded_files"))

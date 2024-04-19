@@ -79,8 +79,6 @@ pub enum Error {
     SetupError,
     #[error("The SLACK_WEBHOOK_URL variable was not set")]
     SlackWebhookUrlNotSupplied,
-    #[error("Smoke test failed for this testnet: {0}")]
-    SmokeTestFailed(String),
     #[error("SSH command failed: {0}")]
     SshCommandFailed(String),
     #[error("After several retry attempts an SSH connection could not be established")]
@@ -93,8 +91,6 @@ pub enum Error {
         "The '{0}' binary was not found. It is required for the deploy process. Make sure it is installed."
     )]
     ToolBinaryNotFound(String),
-    #[error("{0}")]
-    UploadTestDataError(String),
     #[error(transparent)]
     VarError(#[from] std::env::VarError),
 }

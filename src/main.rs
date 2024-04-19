@@ -124,14 +124,6 @@ enum Commands {
         /// arguments. You can only supply version numbers or a custom branch, not both.
         #[arg(long)]
         repo_owner: Option<String>,
-        /// Supply a version number for the safe binary.
-        ///
-        /// There should be no 'v' prefix.
-        ///
-        /// The version arguments are mutually exclusive with the --branch and --repo-owner arguments.
-        /// You can only supply version numbers or a custom branch, not both.
-        #[arg(long)]
-        safe_version: Option<String>,
         /// The features to enable on the safenode binary.
         ///
         /// If not provided, the default feature set specified for the safenode binary are used.
@@ -221,6 +213,15 @@ enum Commands {
         /// The name of the environment
         #[arg(short = 'n', long)]
         name: String,
+        /// Supply a version number for the safe binary to be used in the smoke test.
+        ///
+        /// This does not apply to a testnet that was deployed with a custom branch reference, in
+        /// which case, the safe binary used for the test will be the one that was built along with
+        /// the deployment.
+        ///
+        /// There should be no 'v' prefix.
+        #[arg(long)]
+        safe_version: Option<String>,
     },
     /// Start all nodes in an environment.
     ///
@@ -313,6 +314,15 @@ enum Commands {
         /// The name of the environment.
         #[arg(short = 'n', long)]
         name: String,
+        /// Supply a version number for the safe binary to be used in the smoke test.
+        ///
+        /// This does not apply to a testnet that was deployed with a custom branch reference, in
+        /// which case, the safe binary used for the test will be the one that was built along with
+        /// the deployment.
+        ///
+        /// There should be no 'v' prefix.
+        #[arg(long)]
+        safe_version: Option<String>,
     },
 }
 
@@ -508,7 +518,6 @@ async fn main() -> Result<()> {
             provider,
             public_rpc,
             repo_owner,
-            safe_version,
             safenode_features,
             safenode_version,
             safenode_manager_version,
@@ -518,7 +527,6 @@ async fn main() -> Result<()> {
                 branch,
                 protocol_version,
                 repo_owner,
-                safe_version,
                 safenode_version,
                 safenode_manager_version,
                 faucet_version,
@@ -596,7 +604,7 @@ async fn main() -> Result<()> {
             repo_owner,
         } => {
             let binary_option =
-                get_binary_option(branch, None, repo_owner, None, None, None, None, None).await?;
+                get_binary_option(branch, None, repo_owner, None, None, None, None).await?;
 
             let testnet_deploy = TestnetDeployBuilder::default()
                 .environment_name(&name)
@@ -765,7 +773,7 @@ async fn main() -> Result<()> {
             setup_dotenv_file()?;
             Ok(())
         }
-        Commands::SmokeTest { name } => {
+        Commands::SmokeTest { name, safe_version } => {
             let wallet_dir_path = get_wallet_directory()?;
             if wallet_dir_path.exists() {
                 return Err(eyre!(
@@ -783,7 +791,9 @@ async fn main() -> Result<()> {
 
             let mut inventory = DeploymentInventory::read(&inventory_path)?;
             let test_data_client = TestDataClientBuilder::default().build()?;
-            test_data_client.smoke_test(&mut inventory).await?;
+            test_data_client
+                .smoke_test(&mut inventory, safe_version)
+                .await?;
             inventory.save()?;
             Ok(())
         }
@@ -837,7 +847,7 @@ async fn main() -> Result<()> {
                 .await?;
             Ok(())
         }
-        Commands::UploadTestData { name } => {
+        Commands::UploadTestData { name, safe_version } => {
             let inventory_path = get_data_directory()?.join(format!("{name}-inventory.json"));
             if !inventory_path.exists() {
                 return Err(eyre!("There is no inventory for the {name} testnet")
@@ -851,7 +861,7 @@ async fn main() -> Result<()> {
 
             let test_data_client = TestDataClientBuilder::default().build()?;
             let uploaded_files = test_data_client
-                .upload_test_data(&name, random_peer, &inventory.binary_option)
+                .upload_test_data(&name, random_peer, &inventory.binary_option, safe_version)
                 .await?;
 
             println!("Uploaded files:");
@@ -881,7 +891,6 @@ async fn get_binary_option(
     branch: Option<String>,
     protocol_version: Option<String>,
     repo_owner: Option<String>,
-    safe_version: Option<String>,
     safenode_version: Option<String>,
     safenode_manager_version: Option<String>,
     faucet_version: Option<String>,
@@ -891,7 +900,6 @@ async fn get_binary_option(
 
     let branch_specified = branch.is_some() || repo_owner.is_some();
     let versions_specified = faucet_version.is_some()
-        || safe_version.is_some()
         || safenode_version.is_some()
         || safenode_manager_version.is_some();
     if branch_specified && versions_specified {
@@ -928,7 +936,6 @@ async fn get_binary_option(
         print_with_banner("Binaries will be supplied from pre-built versions");
 
         let faucet_version = get_version_from_option(faucet_version, &ReleaseType::Faucet).await?;
-        let safe_version = get_version_from_option(safe_version, &ReleaseType::Safe).await?;
         let safenode_version =
             get_version_from_option(safenode_version, &ReleaseType::Safenode).await?;
         let safenode_manager_version =
@@ -936,7 +943,6 @@ async fn get_binary_option(
                 .await?;
         BinaryOption::Versioned {
             faucet_version,
-            safe_version,
             safenode_version,
             safenode_manager_version,
         }

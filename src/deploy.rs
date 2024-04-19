@@ -80,7 +80,6 @@ impl DeployCmd {
         n += 1;
 
         let (genesis_multiaddr, _) = get_genesis_multiaddr(
-            &self.name,
             &self.testnet_deploy.ansible_runner,
             &self.testnet_deploy.ssh_client,
         )
