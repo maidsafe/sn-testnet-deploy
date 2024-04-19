@@ -363,8 +363,8 @@ impl ExtraVarsDocBuilder {
         self
     }
 
-    pub fn add_build_variables(&mut self, deployment_name: &str, codebase_type: &BinaryOption) {
-        match codebase_type {
+    pub fn add_build_variables(&mut self, deployment_name: &str, binary_option: &BinaryOption) {
+        match binary_option {
             BinaryOption::BuildFromSource {
                 repo_owner,
                 branch,
@@ -391,9 +391,9 @@ impl ExtraVarsDocBuilder {
     pub fn add_rpc_client_url_or_version(
         &mut self,
         deployment_name: &str,
-        codebase_type: &BinaryOption,
+        binary_option: &BinaryOption,
     ) {
-        match codebase_type {
+        match binary_option {
             BinaryOption::BuildFromSource {
                 repo_owner, branch, ..
             } => {
@@ -422,9 +422,9 @@ impl ExtraVarsDocBuilder {
     pub fn add_faucet_url_or_version(
         &mut self,
         deployment_name: &str,
-        codebase_type: &BinaryOption,
+        binary_option: &BinaryOption,
     ) {
-        match codebase_type {
+        match binary_option {
             BinaryOption::BuildFromSource {
                 repo_owner, branch, ..
             } => {
@@ -444,8 +444,8 @@ impl ExtraVarsDocBuilder {
         }
     }
 
-    pub fn add_node_url_or_version(&mut self, deployment_name: &str, codebase_type: &BinaryOption) {
-        match codebase_type {
+    pub fn add_node_url_or_version(&mut self, deployment_name: &str, binary_option: &BinaryOption) {
+        match binary_option {
             BinaryOption::BuildFromSource {
                 repo_owner, branch, ..
             } => {
@@ -467,8 +467,8 @@ impl ExtraVarsDocBuilder {
         }
     }
 
-    pub fn add_node_manager_url(&mut self, deployment_name: &str, codebase_type: &BinaryOption) {
-        match codebase_type {
+    pub fn add_node_manager_url(&mut self, deployment_name: &str, binary_option: &BinaryOption) {
+        match binary_option {
             BinaryOption::BuildFromSource {
                 repo_owner, branch, ..
             } => {
@@ -500,9 +500,9 @@ impl ExtraVarsDocBuilder {
     pub fn add_node_manager_daemon_url(
         &mut self,
         deployment_name: &str,
-        codebase_type: &BinaryOption,
+        binary_option: &BinaryOption,
     ) {
-        match codebase_type {
+        match binary_option {
             BinaryOption::BuildFromSource {
                 repo_owner, branch, ..
             } => {

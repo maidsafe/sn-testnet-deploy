@@ -154,16 +154,6 @@ enum Commands {
         vm_count: u16,
     },
     Inventory {
-        /// Supply the name of the branch used when creating the testnet.
-        ///
-        /// You can supply this if you are running the command on a different machine from where
-        /// the testnet was deployed. It will then get written to the cached inventory on the local
-        /// machine. This information gets used with the upload-test-data command for retrieving
-        /// the safe client that was built when the testnet was deployed.
-        ///
-        /// This argument must be used in conjunction with the --repo-owner argument.
-        #[arg(long)]
-        branch: Option<String>,
         /// If set to true, the inventory will be regenerated.
         ///
         /// This is useful if the testnet was created on another machine.
@@ -172,27 +162,9 @@ enum Commands {
         /// The name of the environment
         #[arg(short = 'n', long)]
         name: String,
-        /// Optionally supply the node count.
-        ///
-        /// You can supply this if you are running the command on a different machine from where
-        /// the testnet was deployed. It will then get written to the cached inventory on the local
-        /// machine. This information gets used for Slack notifications.
-        #[arg(long)]
-        node_count: Option<u16>,
         /// The cloud provider that was used.
         #[clap(long, default_value_t = CloudProvider::DigitalOcean, value_parser = parse_provider, verbatim_doc_comment)]
         provider: CloudProvider,
-        /// Optionally supply the repo owner of the custom branch that was used when creating the
-        /// testnet.
-        ///
-        /// You can supply this if you are running the command on a different machine from where
-        /// the testnet was deployed. It will then get written to the cached inventory on the local
-        /// machine. This information gets used with the upload-test-data command for retrieving
-        /// the safe client that was built when the testnet was deployed.
-        ///
-        /// This argument must be used in conjunction with the --branch argument.
-        #[arg(long)]
-        repo_owner: Option<String>,
     },
     #[clap(name = "logs", subcommand)]
     Logs(LogCommands),
@@ -502,8 +474,11 @@ async fn main() -> Result<()> {
     let opt = Opt::parse();
     match opt.command {
         Commands::Clean { name, provider } => {
-            let testnet_deploy = TestnetDeployBuilder::default().provider(provider).build()?;
-            testnet_deploy.clean(&name).await?;
+            let testnet_deploy = TestnetDeployBuilder::default()
+                .environment_name(&name)
+                .provider(provider)
+                .build()?;
+            testnet_deploy.clean().await?;
             Ok(())
         }
         Commands::Deploy {
@@ -588,7 +563,7 @@ async fn main() -> Result<()> {
 
             let inventory_service = DeploymentInventoryService::from(testnet_deploy);
             let inventory = inventory_service
-                .generate_inventory(&name, true, binary_option, Some(node_count))
+                .generate_inventory(&name, true, Some(binary_option))
                 .await?;
             inventory.print_report()?;
             inventory.save()?;
@@ -596,26 +571,20 @@ async fn main() -> Result<()> {
             Ok(())
         }
         Commands::Inventory {
-            branch,
             force_regeneration,
             name,
             provider,
-            node_count,
-            repo_owner,
         } => {
-            let binary_option =
-                get_binary_option(branch, None, repo_owner, None, None, None, None).await?;
-
             let testnet_deploy = TestnetDeployBuilder::default()
                 .environment_name(&name)
                 .provider(provider)
                 .build()?;
             let inventory_service = DeploymentInventoryService::from(testnet_deploy);
             let inventory = inventory_service
-                .generate_inventory(&name, force_regeneration, binary_option, node_count)
+                .generate_inventory(&name, force_regeneration, None)
                 .await?;
             inventory.print_report()?;
-
+            inventory.save()?;
             Ok(())
         }
         Commands::Logs(log_cmd) => match log_cmd {

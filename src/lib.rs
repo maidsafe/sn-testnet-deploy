@@ -21,7 +21,10 @@ pub mod ssh;
 pub mod terraform;
 
 use crate::{
-    ansible::{generate_environment_inventory, AnsibleRunner, AnsiblePlaybook, AnsibleInventoryType, ExtraVarsDocBuilder},
+    ansible::{
+        generate_environment_inventory, AnsibleInventoryType, AnsiblePlaybook, AnsibleRunner,
+        ExtraVarsDocBuilder,
+    },
     error::{Error, Result},
     inventory::DeploymentInventory,
     rpc_client::RpcClient,
@@ -38,7 +41,7 @@ use serde_json::json;
 use std::{
     fs::File,
     io::{BufRead, BufReader, BufWriter},
-    net::{IpAddr, SocketAddr},
+    net::IpAddr,
     os::unix::fs::PermissionsExt,
     path::{Path, PathBuf},
     process::{Command, Stdio},
@@ -298,6 +301,7 @@ pub struct TestnetDeploy {
 }
 
 impl TestnetDeploy {
+    #[allow(clippy::too_many_arguments)]
     pub fn new(
         ansible_runner: AnsibleRunner,
         cloud_provider: CloudProvider,
@@ -331,16 +335,22 @@ impl TestnetDeploy {
     pub async fn init(&self) -> Result<()> {
         if self
             .s3_repository
-            .folder_exists("sn-testnet", &format!("testnet-logs/{}", self.environment_name))
+            .folder_exists(
+                "sn-testnet",
+                &format!("testnet-logs/{}", self.environment_name),
+            )
             .await?
         {
-            return Err(Error::LogsForPreviousTestnetExist(self.environment_name.clone()));
+            return Err(Error::LogsForPreviousTestnetExist(
+                self.environment_name.clone(),
+            ));
         }
 
         self.terraform_runner.init()?;
         let workspaces = self.terraform_runner.workspace_list()?;
         if !workspaces.contains(&self.environment_name) {
-            self.terraform_runner.workspace_new(&self.environment_name)?;
+            self.terraform_runner
+                .workspace_new(&self.environment_name)?;
         } else {
             println!("Workspace {} already exists", self.environment_name);
         }
@@ -488,9 +498,9 @@ impl TestnetDeploy {
         Ok(())
     }
 
-    pub async fn clean(&self, name: &str) -> Result<()> {
+    pub async fn clean(&self) -> Result<()> {
         do_clean(
-            name,
+            &self.environment_name,
             self.working_directory_path.clone(),
             &self.terraform_runner,
             vec![
@@ -506,17 +516,16 @@ impl TestnetDeploy {
 /// Shared Helpers
 ///
 
-pub async fn get_genesis_multiaddr(ansible_runner: &AnsibleRunner, ssh_client: &SshClient) -> Result<(String, IpAddr)> {
-    let genesis_inventory = 
-        ansible_runner
-        .get_inventory(
-            AnsibleInventoryType::Genesis,
-            true,
-        )
+pub async fn get_genesis_multiaddr(
+    ansible_runner: &AnsibleRunner,
+    ssh_client: &SshClient,
+) -> Result<(String, IpAddr)> {
+    let genesis_inventory = ansible_runner
+        .get_inventory(AnsibleInventoryType::Genesis, true)
         .await?;
     let genesis_ip = genesis_inventory[0].1;
 
-    let multiaddr = 
+    let multiaddr =
         ssh_client
         .run_command(
             &genesis_ip,
@@ -687,7 +696,7 @@ pub async fn notify_slack(inventory: DeploymentInventory) -> Result<()> {
     let mut message = String::new();
     message.push_str("*Testnet Details*\n");
     message.push_str(&format!("Name: {}\n", inventory.name));
-    message.push_str(&format!("Node count: {}\n", inventory.node_count));
+    message.push_str(&format!("Node count: {}\n", inventory.peers.len()));
     message.push_str(&format!("Faucet address: {}\n", inventory.faucet_address));
     match inventory.binary_option {
         BinaryOption::BuildFromSource {
@@ -754,10 +763,4 @@ pub fn get_progress_bar(length: u64) -> Result<ProgressBar> {
     );
     progress_bar.enable_steady_tick(Duration::from_millis(100));
     Ok(progress_bar)
-}
-
-#[derive(Deserialize)]
-struct Node {
-    rpc_socket_addr: SocketAddr,
-    peer_id: Option<String>,
 }

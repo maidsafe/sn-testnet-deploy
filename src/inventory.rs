@@ -8,36 +8,25 @@ use crate::{
     ansible::{
         generate_environment_inventory, AnsibleInventoryType, AnsiblePlaybook, AnsibleRunner,
     },
-    error::{Error, Result},
     get_genesis_multiaddr,
     ssh::SshClient,
     terraform::TerraformRunner,
-    BinaryOption, CloudProvider, Node, TestnetDeploy,
+    BinaryOption, CloudProvider, TestnetDeploy,
 };
+use color_eyre::{eyre::eyre, Result};
 use log::{debug, trace};
 use rand::Rng;
-use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
 use serde::{Deserialize, Serialize};
+use sn_service_management::NodeRegistry;
 use std::{
     collections::BTreeMap,
     convert::From,
     fs::File,
-    io::{BufReader, Write},
+    io::Write,
     net::{IpAddr, SocketAddr},
     path::PathBuf,
 };
 use walkdir::WalkDir;
-
-#[derive(Deserialize)]
-struct NodeManagerInventory {
-    daemon: Option<Daemon>,
-    nodes: Vec<Node>,
-}
-
-#[derive(Deserialize, Clone)]
-struct Daemon {
-    endpoint: Option<SocketAddr>,
-}
 
 pub struct DeploymentInventoryService {
     pub ansible_runner: AnsibleRunner,
@@ -78,12 +67,18 @@ impl DeploymentInventoryService {
     /// The `force` flag is used when the `deploy` command runs, to make sure that a new inventory
     /// is generated, because it's possible that an old one with the same environment name has been
     /// cached.
+    ///
+    /// The binary option will only be present on the first generation of the inventory, when the
+    /// testnet is initially deployed. On any subsequent runs to generate the inventory, we don't
+    /// have access to the initial arguments that the deployment was launched with. This will mean
+    /// that any branch specification is lost. In this case, we will just retrieve the version
+    /// numbers from the genesis node in the node registry. Most of the time it is the version
+    /// numbers that will be of interest.
     pub async fn generate_inventory(
         &self,
         name: &str,
         force: bool,
-        binary_option: BinaryOption,
-        node_instance_count: Option<u16>,
+        binary_option: Option<BinaryOption>,
     ) -> Result<DeploymentInventory> {
         let inventory_path = get_data_directory()?.join(format!("{name}-inventory.json"));
         if inventory_path.exists() && !force {
@@ -96,7 +91,7 @@ impl DeploymentInventoryService {
         if !force {
             let environments = self.terraform_runner.workspace_list()?;
             if !environments.contains(&name.to_string()) {
-                return Err(Error::EnvironmentDoesNotExist(name.to_string()));
+                return Err(eyre!("The '{}' environment does not exist", name));
             }
         }
 
@@ -129,7 +124,7 @@ impl DeploymentInventoryService {
         // there to be no inventory items returned. Perhaps someone deleted the VMs manually. We
         // only need to test the genesis node in this case, since that must always exist.
         if genesis_inventory.is_empty() {
-            return Err(Error::EnvironmentDoesNotExist(name.to_string()));
+            return Err(eyre!("The '{}' environment does not exist", name));
         }
 
         let mut vm_list = Vec::new();
@@ -140,12 +135,9 @@ impl DeploymentInventoryService {
         for entry in remaining_nodes_inventory.iter() {
             vm_list.push((entry.0.clone(), entry.1));
         }
-        let (genesis_multiaddr, genesis_ip) =
-            get_genesis_multiaddr(&self.ansible_runner, &self.ssh_client).await?;
 
-        println!("Retrieving node manager inventory. This can take a minute.");
-
-        let node_manager_inventories = {
+        println!("Retrieving node registries from all VMs...");
+        let node_registries = {
             debug!("Fetching node manager inventory");
             let temp_dir_path = tempfile::tempdir()?.into_path();
             let temp_dir_json = serde_json::to_string(&temp_dir_path)?;
@@ -161,8 +153,7 @@ impl DeploymentInventoryService {
                 Some(format!("{{ \"dest\": {temp_dir_json} }}")),
             )?;
 
-            // collect the manager inventory file paths along with their respective ip addr
-            let manager_inventory_files = WalkDir::new(temp_dir_path)
+            let node_registry_paths = WalkDir::new(temp_dir_path)
                 .into_iter()
                 .flatten()
                 .filter_map(|entry| {
@@ -186,89 +177,88 @@ impl DeploymentInventoryService {
                 })
                 .collect::<Vec<PathBuf>>();
 
-            manager_inventory_files
-                .par_iter()
-                .flat_map(|file_path| match get_node_manager_inventory(file_path) {
-                    Ok(inventory) => vec![Ok(inventory)],
-                    Err(err) => vec![Err(err)],
-                })
-                .collect::<Result<Vec<NodeManagerInventory>>>()?
+            node_registry_paths
+                .iter()
+                .map(|file_path| NodeRegistry::load(file_path).unwrap())
+                .collect::<Vec<NodeRegistry>>()
         };
 
-        // todo: filter out nodes that are running currently. Nodes can be restarted, which can lead to us collecting
-        // RPCs to nodes that do not exists.
-        let safenode_rpc_endpoints: BTreeMap<String, SocketAddr> = node_manager_inventories
+        let safenode_rpc_endpoints: BTreeMap<String, SocketAddr> = node_registries
             .iter()
             .flat_map(|inv| {
-                inv.nodes
-                    .iter()
-                    .flat_map(|node| node.peer_id.clone().map(|id| (id, node.rpc_socket_addr)))
-            })
-            .collect();
-
-        let safenodemand_endpoints: BTreeMap<String, SocketAddr> = node_manager_inventories
-            .iter()
-            .flat_map(|inv| {
-                inv.nodes.iter().flat_map(|node| {
-                    if let (Some(peer_id), Some(Some(daemon_socket_addr))) = (
-                        node.peer_id.clone(),
-                        inv.daemon.clone().map(|daemon| daemon.endpoint),
-                    ) {
-                        Some((peer_id, daemon_socket_addr))
+                inv.nodes.iter().map(|node| {
+                    let id = if let Some(peer_id) = node.peer_id {
+                        peer_id.to_string().clone()
                     } else {
-                        None
-                    }
+                        "-".to_string()
+                    };
+                    (id, node.rpc_socket_addr)
                 })
             })
             .collect();
 
-        // The scripts are relative to the `resources` directory, so we need to change the current
-        // working directory back to that location first.
-        std::env::set_current_dir(self.working_directory_path.clone())?;
-        println!("Retrieving sample peers. This can take a minute.");
-        // Todo: RPC into nodes to fetch the multiaddr.
-        let peers = remaining_nodes_inventory
-            .par_iter()
-            .filter_map(|(vm_name, ip_address)| {
-                let ip_address = *ip_address;
-                match self.ssh_client.run_script(
-                    ip_address,
-                    "safe",
-                    PathBuf::from("scripts").join("get_peer_multiaddr.sh"),
-                    true,
-                ) {
-                    Ok(output) => Some(output),
-                    Err(err) => {
-                        println!("Failed to SSH into {vm_name:?}: {ip_address} with err: {err:?}");
-                        None
-                    }
-                }
-            })
-            .flatten()
-            .collect::<Vec<_>>();
+        let safenodemand_endpoints: Vec<SocketAddr> = node_registries
+            .iter()
+            .filter_map(|reg| reg.daemon.clone())
+            .filter_map(|daemon| daemon.endpoint)
+            .collect();
 
-        // The VM list includes the genesis node and the build machine, hence the subtraction of 2
-        // from the total VM count. After that, add one node for genesis, since this machine only
-        // runs a single node.
-        let node_count = {
-            let vms_to_ignore = if build_inventory.is_empty() { 1 } else { 2 };
-            let mut node_count =
-                (vm_list.len() - vms_to_ignore) as u16 * node_instance_count.unwrap_or(0);
-            node_count += 1;
-            node_count
+        let peers = node_registries
+            .iter()
+            .flat_map(|reg| {
+                reg.nodes.iter().map(|node| {
+                    if let Some(listen_addresses) = &node.listen_addr {
+                        // It seems to be the case that the listening address with the public IP is
+                        // always in the second position. If this ever changes, we could do some
+                        // filtering to find the address that does not start with "127." or "10.".
+                        listen_addresses[1].to_string()
+                    } else {
+                        "-".to_string()
+                    }
+                })
+            })
+            .collect::<Vec<String>>();
+
+        let (genesis_multiaddr, genesis_ip) =
+            get_genesis_multiaddr(&self.ansible_runner, &self.ssh_client).await?;
+
+        let binary_option = if let Some(binary_option) = binary_option {
+            binary_option
+        } else {
+            let genesis_node_registry = node_registries
+                .iter()
+                .find(|reg| reg.faucet.is_some())
+                .ok_or_else(|| eyre!("Unable to retrieve genesis node registry"))?;
+            let faucet_version = &genesis_node_registry.faucet.as_ref().unwrap().version;
+            let safenode_version = genesis_node_registry
+                .nodes
+                .first()
+                .ok_or_else(|| eyre!("Unable to obtain the genesis node"))?
+                .version
+                .clone();
+            let safenode_manager_version = genesis_node_registry
+                .daemon
+                .as_ref()
+                .ok_or_else(|| eyre!("Unable to obtain the daemon"))?
+                .version
+                .clone();
+            BinaryOption::Versioned {
+                faucet_version: faucet_version.parse()?,
+                safenode_version: safenode_version.parse()?,
+                safenode_manager_version: safenode_manager_version.parse()?,
+            }
         };
 
         let inventory = DeploymentInventory {
-            name: name.to_string(),
-            node_count,
             binary_option,
-            vm_list,
+            faucet_address: format!("{}:8000", genesis_ip),
+            genesis_multiaddr,
+            name: name.to_string(),
+            peers,
             rpc_endpoints: safenode_rpc_endpoints,
             safenodemand_endpoints,
             ssh_user: self.cloud_provider.get_ssh_user(),
-            genesis_multiaddr,
-            peers,
-            faucet_address: format!("{}:8000", genesis_ip),
+            vm_list,
             uploaded_files: Vec::new(),
         };
         Ok(inventory)
@@ -277,19 +267,16 @@ impl DeploymentInventoryService {
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct DeploymentInventory {
-    pub name: String,
-    pub node_count: u16,
     pub binary_option: BinaryOption,
-    pub vm_list: Vec<(String, IpAddr)>,
-    // Map of PeerId to SocketAddr
-    pub rpc_endpoints: BTreeMap<String, SocketAddr>,
-    // Map of PeerId to manager daemon SocketAddr
-    pub safenodemand_endpoints: BTreeMap<String, SocketAddr>,
-    pub ssh_user: String,
-    pub genesis_multiaddr: String,
-    pub peers: Vec<String>,
     pub faucet_address: String,
+    pub genesis_multiaddr: String,
+    pub name: String,
+    pub peers: Vec<String>,
+    pub rpc_endpoints: BTreeMap<String, SocketAddr>,
+    pub safenodemand_endpoints: Vec<SocketAddr>,
+    pub ssh_user: String,
     pub uploaded_files: Vec<(String, String)>,
+    pub vm_list: Vec<(String, IpAddr)>,
 }
 
 impl DeploymentInventory {
@@ -325,42 +312,66 @@ impl DeploymentInventory {
         println!("*                                    *");
         println!("**************************************");
 
-        println!("Name: {}", self.name);
+        println!("Environment Name: {}", self.name);
+        println!();
         match &self.binary_option {
             BinaryOption::BuildFromSource {
                 repo_owner, branch, ..
             } => {
+                println!("==============");
                 println!("Branch Details");
                 println!("==============");
                 println!("Repo owner: {}", repo_owner);
                 println!("Branch name: {}", branch);
+                println!();
             }
             BinaryOption::Versioned {
                 faucet_version,
                 safenode_version,
                 safenode_manager_version,
             } => {
+                println!("===============");
                 println!("Version Details");
                 println!("===============");
                 println!("faucet version: {}", faucet_version);
                 println!("safenode version: {}", safenode_version);
                 println!("safenode-manager version: {}", safenode_manager_version);
+                println!();
             }
         }
 
+        println!("=======");
+        println!("VM List");
+        println!("=======");
         for vm in self.vm_list.iter() {
             println!("{}: {}", vm.0, vm.1);
         }
         println!("SSH user: {}", self.ssh_user);
-        let testnet_dir = get_data_directory()?;
-        println!("Sample Peers",);
-        println!("============");
-        for peer in self.peers.iter().take(10) {
-            println!("{peer}");
-        }
-        println!("The entire peer list can be found at {testnet_dir:?}",);
+        println!();
 
-        println!("\nGenesis multiaddr: {}", self.genesis_multiaddr);
+        // Take the first peer from each VM. If you just take, say, the first 10 on the peer list,
+        // they will all be from the same machine. They will be unique peers, but they won't look
+        // very random.
+        println!("============");
+        println!("Sample Peers");
+        println!("============");
+        for ip in self.vm_list.iter().map(|vm| vm.1.to_string()) {
+            if let Some(peer) = self.peers.iter().find(|p| p.contains(&ip)) {
+                println!("{peer}");
+            }
+        }
+        println!("Genesis: {}", self.genesis_multiaddr);
+        let inventory_file_path =
+            get_data_directory()?.join(format!("{}-inventory.json", self.name));
+        println!(
+            "The entire peer list can be found at {}",
+            inventory_file_path.to_string_lossy()
+        );
+        println!();
+
+        println!("==============");
+        println!("Faucet Details");
+        println!("==============");
         println!("Faucet address: {}", self.faucet_address);
         println!("Check the faucet:");
         println!(
@@ -380,18 +391,11 @@ impl DeploymentInventory {
 
 pub fn get_data_directory() -> Result<PathBuf> {
     let path = dirs_next::data_dir()
-        .ok_or_else(|| Error::CouldNotRetrieveDataDirectory)?
+        .ok_or_else(|| eyre!("Could not retrieve data directory"))?
         .join("safe")
         .join("testnet-deploy");
     if !path.exists() {
         std::fs::create_dir_all(path.clone())?;
     }
     Ok(path)
-}
-
-fn get_node_manager_inventory(inventory_file_path: &PathBuf) -> Result<NodeManagerInventory> {
-    let file = File::open(inventory_file_path)?;
-    let reader = BufReader::new(file);
-    let inventory = serde_json::from_reader(reader)?;
-    Ok(inventory)
 }
