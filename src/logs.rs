@@ -227,21 +227,6 @@ impl TestnetDeploy {
             return Err(Error::EnvironmentDoesNotExist(name.to_string()));
         }
 
-        // The ansible runner will have its working directory set to this location. We need the
-        // same here to test the inventory paths, which are relative to the `ansible` directory.
-        let ansible_dir_path = self.working_directory_path.join("ansible");
-        std::env::set_current_dir(ansible_dir_path.clone())?;
-        // Somehow it might be possible that the workspace wasn't cleared out, but the environment
-        // was actually torn down and the generated inventory files were deleted. If the files
-        // don't exist, we can reasonably consider the environment non-existent.
-        let genesis_inventory_path =
-            PathBuf::from("inventory").join(format!(".{name}_genesis_inventory_digital_ocean.yml"));
-        let remaining_nodes_inventory_path =
-            PathBuf::from("inventory").join(format!(".{name}_node_inventory_digital_ocean.yml"));
-        if !genesis_inventory_path.exists() || !remaining_nodes_inventory_path.exists() {
-            return Err(Error::EnvironmentDoesNotExist(name.to_string()));
-        }
-
         let mut all_node_inventory = self
             .ansible_runner
             .get_inventory(AnsibleInventoryType::Genesis, false)
