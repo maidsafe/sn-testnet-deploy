@@ -57,40 +57,39 @@ pub enum AnsiblePlaybook {
     /// The build playbook will build the `faucet`, `safe`, `safenode` and `safenode-manager`
     /// binaries and upload them to S3.
     ///
-    /// Use it it combination with `AnsibleInventoryType::Build`.
+    /// Use in combination with `AnsibleInventoryType::Build`.
     Build,
     /// The faucet playbook will provision setup the faucet to run as a service. The faucet is
     /// typically running on the genesis node.
     ///
-    /// Use it it combination with `AnsibleInventoryType::Genesis`.
-    // Get the inventory of all the nodes
+    /// Use in combination with `AnsibleInventoryType::Genesis`.
     Faucet,
     /// The genesis playbook will use the node manager to setup the genesis node, which the other
     /// nodes will bootstrap against.
     ///
-    /// Use it it combination with `AnsibleInventoryType::Genesis`.
+    /// Use in combination with `AnsibleInventoryType::Genesis`.
     Genesis,
     /// The logs playbook will retrieve node logs from any machines it is run against.
     ///
-    /// Use it it combination with `AnsibleInventoryType::Genesis` or `AnsibleInventoryType::Nodes`.
+    /// Use in combination with `AnsibleInventoryType::Genesis` or `AnsibleInventoryType::Nodes`.
     Logs,
     /// The Logstash playbook will provision machines to run Logstash.
     ///
-    /// Use it it combination with `AnsibleInventoryType::Logstash`.
+    /// Use in combination with `AnsibleInventoryType::Logstash`.
     Logstash,
     /// The node manager inventory playbook will retrieve the node manager's inventory from any
     /// machines it is run against.
     ///
-    /// Use it it combination with `AnsibleInventoryType::Genesis` or `AnsibleInventoryType::Nodes`.
+    /// Use in combination with `AnsibleInventoryType::Genesis` or `AnsibleInventoryType::Nodes`.
     NodeManagerInventory,
     /// The node playbook will setup any nodes except the genesis node. These nodes will bootstrap
     /// using genesis as a peer reference.
     ///
-    /// Use it it combination with `AnsibleInventoryType::Genesis` or `AnsibleInventoryType::Nodes`.
+    /// Use in combination with `AnsibleInventoryType::Genesis` or `AnsibleInventoryType::Nodes`.
     Nodes,
     /// The rpc client playbook will setup the `safenode_rpc_client` binary on the genesis node.
     ///
-    /// Use it it combination with `AnsibleInventoryType::Genesis`.
+    /// Use in combination with `AnsibleInventoryType::Genesis`.
     RpcClient,
     /// The start nodes playbook will use the node manager to start any node services on any
     /// machines it runs against.
@@ -98,19 +97,19 @@ pub enum AnsiblePlaybook {
     /// It is useful for starting any nodes that failed to start after they were upgraded. The node
     /// manager's `start` command is idempotent, so it will skip nodes that are already running.
     ///
-    /// Use it it combination with `AnsibleInventoryType::Genesis` or `AnsibleInventoryType::Nodes`.
+    /// Use in combination with `AnsibleInventoryType::Genesis` or `AnsibleInventoryType::Nodes`.
     StartNodes,
     /// The upgrade faucet playbook will upgrade the faucet to the latest version.
     ///
-    /// Use it it combination with `AnsibleInventoryType::Genesis`.
+    /// Use in combination with `AnsibleInventoryType::Genesis`.
     UpgradeFaucet,
     /// The upgrade node manager playbook will upgrade the node manager to the latest version.
     ///
-    /// Use it it combination with `AnsibleInventoryType::Genesis` or `AnsibleInventoryType::Nodes`.
+    /// Use in combination with `AnsibleInventoryType::Genesis` or `AnsibleInventoryType::Nodes`.
     UpgradeNodeManager,
     /// The upgrade node manager playbook will upgrade node services to the latest version.
     ///
-    /// Use it it combination with `AnsibleInventoryType::Genesis` or `AnsibleInventoryType::Nodes`.
+    /// Use in combination with `AnsibleInventoryType::Genesis` or `AnsibleInventoryType::Nodes`.
     UpgradeNodes,
 }
 
@@ -216,7 +215,7 @@ impl AnsibleRunner {
                 self.working_directory_path.clone(),
                 vec![
                     "--inventory".to_string(),
-                    self.get_inventory_path(inventory_type.clone())
+                    self.get_inventory_path(&inventory_type)?
                         .to_string_lossy()
                         .to_string(),
                     "--list".to_string(),
@@ -269,7 +268,7 @@ impl AnsibleRunner {
         // unicode characters in them.
         let mut args = vec![
             "--inventory".to_string(),
-            self.get_inventory_path(inventory_type)
+            self.get_inventory_path(&inventory_type)?
                 .to_string_lossy()
                 .to_string(),
             "--private-key".to_string(),
@@ -297,12 +296,12 @@ impl AnsibleRunner {
         Ok(())
     }
 
-    fn get_inventory_path(&self, inventory_type: AnsibleInventoryType) -> PathBuf {
+    fn get_inventory_path(&self, inventory_type: &AnsibleInventoryType) -> Result<PathBuf> {
         let provider = match self.provider {
             CloudProvider::Aws => "aws",
             CloudProvider::DigitalOcean => "digital_ocean",
         };
-        match inventory_type {
+        let path = match inventory_type {
             AnsibleInventoryType::Build => PathBuf::from("inventory").join(format!(
                 ".{}_build_inventory_{}.yml",
                 self.environment_name, provider
@@ -318,6 +317,12 @@ impl AnsibleRunner {
             AnsibleInventoryType::Nodes => PathBuf::from("inventory").join(format!(
                 ".{}_node_inventory_{}.yml",
                 self.environment_name, provider
+            )),
+        };
+        match path.exists() {
+            true => Ok(path),
+            false => Err(Error::EnvironmentDoesNotExist(
+                self.environment_name.clone(),
             )),
         }
     }

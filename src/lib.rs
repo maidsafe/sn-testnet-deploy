@@ -390,19 +390,6 @@ impl TestnetDeploy {
             return Err(Error::EnvironmentDoesNotExist(name.to_string()));
         }
 
-        // The ansible runner will have its working directory set to this location. We need the
-        // same here to test the inventory paths, which are relative to the `ansible` directory.
-        let ansible_dir_path = self.working_directory_path.join("ansible");
-        std::env::set_current_dir(ansible_dir_path.clone())?;
-
-        let genesis_inventory_path = PathBuf::from("inventory")
-            .join(format!(".{}_genesis_inventory_digital_ocean.yml", name));
-        let remaining_nodes_inventory_path =
-            PathBuf::from("inventory").join(format!(".{}_node_inventory_digital_ocean.yml", name));
-        if !genesis_inventory_path.exists() || !remaining_nodes_inventory_path.exists() {
-            return Err(Error::EnvironmentDoesNotExist(name.to_string()));
-        }
-
         self.ansible_runner.run_playbook(
             AnsiblePlaybook::StartNodes,
             AnsibleInventoryType::Genesis,
@@ -424,23 +411,6 @@ impl TestnetDeploy {
 
         let environments = self.terraform_runner.workspace_list()?;
         if !environments.contains(&options.name.to_string()) {
-            return Err(Error::EnvironmentDoesNotExist(options.name.to_string()));
-        }
-
-        // The ansible runner will have its working directory set to this location. We need the
-        // same here to test the inventory paths, which are relative to the `ansible` directory.
-        let ansible_dir_path = self.working_directory_path.join("ansible");
-        std::env::set_current_dir(ansible_dir_path.clone())?;
-
-        let genesis_inventory_path = PathBuf::from("inventory").join(format!(
-            ".{}_genesis_inventory_digital_ocean.yml",
-            options.name
-        ));
-        let remaining_nodes_inventory_path = PathBuf::from("inventory").join(format!(
-            ".{}_node_inventory_digital_ocean.yml",
-            options.name
-        ));
-        if !genesis_inventory_path.exists() || !remaining_nodes_inventory_path.exists() {
             return Err(Error::EnvironmentDoesNotExist(options.name.to_string()));
         }
 
@@ -466,19 +436,6 @@ impl TestnetDeploy {
     pub async fn upgrade_node_manager(&self, name: &str, version: Version) -> Result<()> {
         let environments = self.terraform_runner.workspace_list()?;
         if !environments.contains(&name.to_string()) {
-            return Err(Error::EnvironmentDoesNotExist(name.to_string()));
-        }
-
-        // The ansible runner will have its working directory set to this location. We need the
-        // same here to test the inventory paths, which are relative to the `ansible` directory.
-        let ansible_dir_path = self.working_directory_path.join("ansible");
-        std::env::set_current_dir(ansible_dir_path.clone())?;
-
-        let genesis_inventory_path = PathBuf::from("inventory")
-            .join(format!(".{}_genesis_inventory_digital_ocean.yml", name));
-        let remaining_nodes_inventory_path =
-            PathBuf::from("inventory").join(format!(".{}_node_inventory_digital_ocean.yml", name));
-        if !genesis_inventory_path.exists() || !remaining_nodes_inventory_path.exists() {
             return Err(Error::EnvironmentDoesNotExist(name.to_string()));
         }
 
