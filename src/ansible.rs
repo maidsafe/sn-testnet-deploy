@@ -319,6 +319,7 @@ impl AnsibleRunner {
                 self.environment_name, provider
             )),
         };
+        let path = self.working_directory_path.join(path);
         match path.exists() {
             true => Ok(path),
             false => Err(Error::EnvironmentDoesNotExist(
