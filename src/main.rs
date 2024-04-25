@@ -91,6 +91,11 @@ enum Commands {
         /// The name of the environment
         #[arg(short = 'n', long)]
         name: String,
+        /// Provide a name for the network contacts file to be uploaded to S3.
+        ///
+        /// If not used, the contacts file will have the same name as the environment.
+        #[arg(long)]
+        network_contacts_file_name: Option<String>,
         /// The number of safenode processes to run on each VM.
         #[clap(long, default_value_t = 40)]
         node_count: u16,
@@ -162,6 +167,11 @@ enum Commands {
         /// The name of the environment
         #[arg(short = 'n', long)]
         name: String,
+        /// Provide a name for the network contacts file to be uploaded to S3.
+        ///
+        /// If not used, the contacts file will have the same name as the environment.
+        #[arg(long)]
+        network_contacts_file_name: Option<String>,
         /// The cloud provider that was used.
         #[clap(long, default_value_t = CloudProvider::DigitalOcean, value_parser = parse_provider, verbatim_doc_comment)]
         provider: CloudProvider,
@@ -488,6 +498,7 @@ async fn main() -> Result<()> {
             faucet_version,
             logstash_stack_name,
             name,
+            network_contacts_file_name,
             node_count,
             protocol_version,
             provider,
@@ -568,23 +579,34 @@ async fn main() -> Result<()> {
             inventory.print_report()?;
             inventory.save()?;
 
+            inventory_service
+                .upload_network_contacts(&inventory, network_contacts_file_name)
+                .await?;
+
             Ok(())
         }
         Commands::Inventory {
             force_regeneration,
             name,
+            network_contacts_file_name,
             provider,
         } => {
             let testnet_deploy = TestnetDeployBuilder::default()
                 .environment_name(&name)
                 .provider(provider)
                 .build()?;
+
             let inventory_service = DeploymentInventoryService::from(testnet_deploy);
             let inventory = inventory_service
                 .generate_inventory(&name, force_regeneration, None)
                 .await?;
             inventory.print_report()?;
             inventory.save()?;
+
+            inventory_service
+                .upload_network_contacts(&inventory, network_contacts_file_name)
+                .await?;
+
             Ok(())
         }
         Commands::Logs(log_cmd) => match log_cmd {

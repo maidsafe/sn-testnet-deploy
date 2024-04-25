@@ -47,6 +47,8 @@ pub enum Error {
     GenesisListenAddress,
     #[error("Failed to retrieve '{0}' from '{1}")]
     GetS3ObjectError(String, String),
+    #[error("Failed to retrieve filename")]
+    FilenameNotRetrieved,
     #[error(transparent)]
     FsExtraError(#[from] fs_extra::error::Error),
     #[error(transparent)]
@@ -67,6 +69,8 @@ pub enum Error {
     ReqwestError(#[from] reqwest::Error),
     #[error(transparent)]
     RegexError(#[from] regex::Error),
+    #[error("Failed to upload {0} to S3 bucket {1}")]
+    PutS3ObjectError(String, String),
     #[error("Safe client command failed: {0}")]
     SafeCmdError(String),
     #[error("Failed to download the safe or safenode binary")]

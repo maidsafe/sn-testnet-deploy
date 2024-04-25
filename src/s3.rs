@@ -6,15 +6,51 @@
 
 use crate::error::{Error, Result};
 use async_recursion::async_recursion;
-use aws_sdk_s3::{error::ProvideErrorMetadata, Client};
+use aws_sdk_s3::{error::ProvideErrorMetadata, types::ObjectCannedAcl, Client};
 use std::path::{Path, PathBuf};
-use tokio::io::AsyncWriteExt;
+use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio_stream::StreamExt;
 
 #[derive(Clone)]
 pub struct S3Repository {}
 
 impl S3Repository {
+    pub async fn upload_file(
+        &self,
+        bucket_name: &str,
+        file_path: &Path,
+        public: bool,
+    ) -> Result<()> {
+        let conf = aws_config::from_env().region("eu-west-2").load().await;
+        let client = Client::new(&conf);
+        let object_key = file_path
+            .file_name()
+            .ok_or_else(|| Error::FilenameNotRetrieved)?
+            .to_str()
+            .ok_or_else(|| Error::FilenameNotRetrieved)?;
+
+        println!("Uploading {} to bucket {}", object_key, bucket_name);
+
+        let mut file = tokio::fs::File::open(file_path).await?;
+        let mut contents = Vec::new();
+        file.read_to_end(&mut contents).await?;
+
+        let mut req = client
+            .put_object()
+            .bucket(bucket_name)
+            .key(object_key)
+            .body(contents.into());
+        if public {
+            req = req.acl(ObjectCannedAcl::PublicRead);
+        }
+        req.send().await.map_err(|_| {
+            Error::PutS3ObjectError(object_key.to_string(), bucket_name.to_string())
+        })?;
+
+        println!("{} has been uploaded to {}", object_key, bucket_name);
+        Ok(())
+    }
+
     pub async fn download_object(
         &self,
         bucket_name: &str,
