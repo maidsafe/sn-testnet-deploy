@@ -9,6 +9,7 @@ use crate::{
         generate_environment_inventory, AnsibleInventoryType, AnsiblePlaybook, AnsibleRunner,
     },
     get_genesis_multiaddr,
+    s3::S3Repository,
     ssh::SshClient,
     terraform::TerraformRunner,
     BinaryOption, CloudProvider, TestnetDeploy,
@@ -26,12 +27,18 @@ use std::{
     net::{IpAddr, SocketAddr},
     path::PathBuf,
 };
+use tokio::io::AsyncWriteExt;
 use walkdir::WalkDir;
+
+const DEFAULT_CONTACTS_COUNT: usize = 50;
+const STOPPED_PEER_ID: &str = "-";
+const TESTNET_BUCKET_NAME: &str = "sn-testnet";
 
 pub struct DeploymentInventoryService {
     pub ansible_runner: AnsibleRunner,
     pub cloud_provider: CloudProvider,
     pub inventory_file_path: PathBuf,
+    pub s3_repository: S3Repository,
     pub ssh_client: SshClient,
     pub terraform_runner: TerraformRunner,
     pub working_directory_path: PathBuf,
@@ -51,6 +58,7 @@ impl From<TestnetDeploy> for DeploymentInventoryService {
                 .join("ansible")
                 .join("inventory")
                 .join(format!("dev_inventory_{}.yml", provider)),
+            s3_repository: item.s3_repository.clone(),
             ssh_client: item.ssh_client.clone(),
             terraform_runner: item.terraform_runner.clone(),
             working_directory_path: item.working_directory_path.clone(),
@@ -262,6 +270,39 @@ impl DeploymentInventoryService {
             uploaded_files: Vec::new(),
         };
         Ok(inventory)
+    }
+
+    pub async fn upload_network_contacts(
+        &self,
+        inventory: &DeploymentInventory,
+        contacts_file_name: Option<String>,
+    ) -> Result<()> {
+        let temp_dir_path = tempfile::tempdir()?.into_path();
+        let temp_file_path = if let Some(file_name) = contacts_file_name {
+            temp_dir_path.join(file_name)
+        } else {
+            temp_dir_path.join(inventory.name.clone())
+        };
+
+        let count = if inventory.peers.len() < DEFAULT_CONTACTS_COUNT {
+            inventory.peers.len()
+        } else {
+            DEFAULT_CONTACTS_COUNT
+        };
+
+        let mut file = tokio::fs::File::create(&temp_file_path).await?;
+        for _ in 0..count {
+            let peer = inventory.get_random_peer();
+            if peer != STOPPED_PEER_ID {
+                file.write_all(format!("{}\n", peer).as_bytes()).await?;
+            }
+        }
+
+        self.s3_repository
+            .upload_file(TESTNET_BUCKET_NAME, &temp_file_path, true)
+            .await?;
+
+        Ok(())
     }
 }
 
