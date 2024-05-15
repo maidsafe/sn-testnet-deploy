@@ -77,6 +77,7 @@ pub enum BinaryOption {
         faucet_version: Version,
         safenode_version: Version,
         safenode_manager_version: Version,
+        sn_auditor_version: Version,
     },
 }
 
@@ -667,6 +668,7 @@ pub async fn notify_slack(inventory: DeploymentInventory) -> Result<()> {
             faucet_version,
             safenode_version,
             safenode_manager_version,
+            sn_auditor_version,
         } => {
             message.push_str("*Version Details*\n");
             message.push_str(&format!("faucet version: {}\n", faucet_version));
@@ -675,6 +677,7 @@ pub async fn notify_slack(inventory: DeploymentInventory) -> Result<()> {
                 "safenode-manager version: {}\n",
                 safenode_manager_version
             ));
+            message.push_str(&format!("sn_auditor version: {}\n", sn_auditor_version));
         }
     }
 

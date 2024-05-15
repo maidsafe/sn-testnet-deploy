@@ -152,6 +152,14 @@ enum Commands {
         /// arguments. You can only supply version numbers or a custom branch, not both.
         #[arg(long)]
         safenode_manager_version: Option<String>,
+        /// Supply a version number for the sn_auditor binary.
+        ///
+        /// There should be no 'v' prefix.
+        ///
+        /// The version arguments are mutually exclusive with the --branch and --repo-owner
+        /// arguments. You can only supply version numbers or a custom branch, not both.
+        #[arg(long)]
+        sn_auditor_version: Option<String>,
         /// The number of node VMs to create.
         ///
         /// Each VM will run many safenode processes.
@@ -507,15 +515,17 @@ async fn main() -> Result<()> {
             safenode_features,
             safenode_version,
             safenode_manager_version,
+            sn_auditor_version,
             vm_count,
         } => {
             let binary_option = get_binary_option(
                 branch,
                 protocol_version,
                 repo_owner,
+                faucet_version,
                 safenode_version,
                 safenode_manager_version,
-                faucet_version,
+                sn_auditor_version,
                 safenode_features,
             )
             .await?;
@@ -882,9 +892,10 @@ async fn get_binary_option(
     branch: Option<String>,
     protocol_version: Option<String>,
     repo_owner: Option<String>,
+    faucet_version: Option<String>,
     safenode_version: Option<String>,
     safenode_manager_version: Option<String>,
-    faucet_version: Option<String>,
+    sn_auditor_version: Option<String>,
     safenode_features: Option<Vec<String>>,
 ) -> Result<BinaryOption> {
     let mut use_versions = true;
@@ -932,10 +943,13 @@ async fn get_binary_option(
         let safenode_manager_version =
             get_version_from_option(safenode_manager_version, &ReleaseType::SafenodeManager)
                 .await?;
+        let sn_auditor_version =
+            get_version_from_option(sn_auditor_version, &ReleaseType::SnAuditor).await?;
         BinaryOption::Versioned {
             faucet_version,
             safenode_version,
             safenode_manager_version,
+            sn_auditor_version,
         }
     } else {
         // Unwraps are justified here because it's already been asserted that both must have

@@ -54,6 +54,11 @@ impl AnsibleBinary {
 
 /// Represents the playbooks that apply to our own domain.
 pub enum AnsiblePlaybook {
+    /// The auditor playbook will provision setup the auditor to run as a service. The auditor is
+    /// typically running on a separate auditor machine, but can be run from any machine.
+    ///
+    /// Use in combination with `AnsibleInventoryType::Auditor` or `AnsibleInventoryType::Nodes`.
+    Auditor,
     /// The build playbook will build the `faucet`, `safe`, `safenode` and `safenode-manager`
     /// binaries and upload them to S3.
     ///
@@ -116,6 +121,7 @@ pub enum AnsiblePlaybook {
 impl AnsiblePlaybook {
     pub fn get_playbook_name(&self) -> String {
         match self {
+            AnsiblePlaybook::Auditor => "auditor.yml".to_string(),
             AnsiblePlaybook::Build => "build.yml".to_string(),
             AnsiblePlaybook::Genesis => "genesis_node.yml".to_string(),
             AnsiblePlaybook::Faucet => "faucet.yml".to_string(),
@@ -135,6 +141,10 @@ impl AnsiblePlaybook {
 /// Represents the inventory types that apply to our own domain.
 #[derive(Clone)]
 pub enum AnsibleInventoryType {
+    // Use to run a playbook against the auditor.
+    //
+    // Only one machine will be returned in this inventory.
+    Auditor,
     // Use to run a playbook against the build machine.
     //
     // This is a larger machine that is used for building binaries from source.
@@ -302,6 +312,10 @@ impl AnsibleRunner {
             CloudProvider::DigitalOcean => "digital_ocean",
         };
         let path = match inventory_type {
+            AnsibleInventoryType::Auditor => PathBuf::from("inventory").join(format!(
+                ".{}_auditor_inventory_{}.yml",
+                self.environment_name, provider
+            )),
             AnsibleInventoryType::Build => PathBuf::from("inventory").join(format!(
                 ".{}_build_inventory_{}.yml",
                 self.environment_name, provider
@@ -531,6 +545,31 @@ impl ExtraVarsDocBuilder {
                     ),
                 ));
             }
+        }
+    }
+
+    pub fn add_sn_auditor_url_or_version(
+        &mut self,
+        deployment_name: &str,
+        binary_option: &BinaryOption,
+    ) {
+        match binary_option {
+            BinaryOption::BuildFromSource {
+                repo_owner, branch, ..
+            } => {
+                self.add_branch_url_variable(
+                    "sn_auditor_archive_url",
+                    &format!(
+                        "{}/{}/{}/sn-auditor-{}-x86_64-unknown-linux-musl.tar.gz",
+                        NODE_S3_BUCKET_URL, repo_owner, branch, deployment_name
+                    ),
+                    branch,
+                    repo_owner,
+                );
+            }
+            BinaryOption::Versioned { faucet_version, .. } => self
+                .variables
+                .push(("version".to_string(), faucet_version.to_string())),
         }
     }
 

@@ -1,0 +1,29 @@
+---
+# This role assumes the existence of the node manager, which is setup using another role.
+- name: check if the sn_auditor binary exists
+  ansible.builtin.stat:
+    path: "{{ binary_dir}}/sn_auditor"
+  register: auditor_bin
+
+- name: add sn_auditor service
+  become: True
+  ansible.builtin.command:
+    # The `omit` filter is used to remove the `--env` argument if the
+    # `env_variables` variable is not defined. If the argv would be otherwise
+    # defined as '', the command would fail as it doesn't expect an empty
+    # argument, so it's omitted instead.
+    argv: "{{ command_args | reject('equalto', omit) | list }}"
+  vars:
+    command_args:
+      - "{{ binary_dir }}/safenode-manager"
+      - -v
+      - auditor
+      - add
+      - "--peer={{ genesis_multiaddr }}"
+      - "{{ ('--env=' + env_variables) if env_variables is defined else omit }}"
+      - "{{ ('--version=' + version) if version is defined else ('--url=' + sn_auditor_archive_url) }}"
+  when: not auditor_bin.stat.exists
+
+- name: start the auditor
+  become: True
+  command: safenode-manager -v auditor start
