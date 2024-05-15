@@ -250,10 +250,17 @@ impl DeploymentInventoryService {
                 .ok_or_else(|| eyre!("Unable to obtain the daemon"))?
                 .version
                 .clone();
+            let auditor_node_registry = node_registries
+                .iter()
+                .find(|reg| reg.faucet.is_some())
+                .ok_or_else(|| eyre!("Unable to retrieve auditor node registry"))?;
+            let sn_auditor_version = &auditor_node_registry.auditor.as_ref().unwrap().version;
+
             BinaryOption::Versioned {
                 faucet_version: faucet_version.parse()?,
                 safenode_version: safenode_version.parse()?,
                 safenode_manager_version: safenode_manager_version.parse()?,
+                sn_auditor_version: sn_auditor_version.parse()?,
             }
         };
 
@@ -362,21 +369,24 @@ impl DeploymentInventory {
                 println!("==============");
                 println!("Branch Details");
                 println!("==============");
-                println!("Repo owner: {}", repo_owner);
-                println!("Branch name: {}", branch);
+                println!("Repo owner: {repo_owner}");
+                println!("Branch name: {branch}");
                 println!();
             }
             BinaryOption::Versioned {
                 faucet_version,
                 safenode_version,
                 safenode_manager_version,
+                sn_auditor_version,
             } => {
                 println!("===============");
                 println!("Version Details");
                 println!("===============");
-                println!("faucet version: {}", faucet_version);
-                println!("safenode version: {}", safenode_version);
-                println!("safenode-manager version: {}", safenode_manager_version);
+                println!("faucet version: {faucet_version}");
+                println!("safenode version: {safenode_version}");
+                println!("safenode-manager version: {safenode_manager_version}");
+                println!("sn_auditor version: {sn_auditor_version}");
+
                 println!();
             }
         }
