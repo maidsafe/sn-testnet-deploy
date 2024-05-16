@@ -88,6 +88,9 @@ impl DeploymentInventoryService {
         force: bool,
         binary_option: Option<BinaryOption>,
     ) -> Result<DeploymentInventory> {
+        println!("=============================");
+        println!("     Generating Inventory    ");
+        println!("=============================");
         let inventory_path = get_data_directory()?.join(format!("{name}-inventory.json"));
         if inventory_path.exists() && !force {
             let inventory = DeploymentInventory::read(&inventory_path)?;
@@ -127,6 +130,11 @@ impl DeploymentInventoryService {
             .ansible_runner
             .get_inventory(AnsibleInventoryType::Nodes, false)
             .await?;
+        let auditor_inventory = self
+            .ansible_runner
+            .get_inventory(AnsibleInventoryType::Auditor, true)
+            .await?;
+        let auditor_ip = auditor_inventory[0].1;
 
         // It also seems to be possible for a workspace and inventory files to still exist, but
         // there to be no inventory items returned. Perhaps someone deleted the VMs manually. We
@@ -158,6 +166,11 @@ impl DeploymentInventoryService {
             self.ansible_runner.run_playbook(
                 AnsiblePlaybook::NodeManagerInventory,
                 AnsibleInventoryType::Genesis,
+                Some(format!("{{ \"dest\": {temp_dir_json} }}")),
+            )?;
+            self.ansible_runner.run_playbook(
+                AnsiblePlaybook::NodeManagerInventory,
+                AnsibleInventoryType::Auditor,
                 Some(format!("{{ \"dest\": {temp_dir_json} }}")),
             )?;
 
@@ -252,7 +265,7 @@ impl DeploymentInventoryService {
                 .clone();
             let auditor_node_registry = node_registries
                 .iter()
-                .find(|reg| reg.faucet.is_some())
+                .find(|reg| reg.auditor.is_some())
                 .ok_or_else(|| eyre!("Unable to retrieve auditor node registry"))?;
             let sn_auditor_version = &auditor_node_registry.auditor.as_ref().unwrap().version;
 
@@ -265,8 +278,9 @@ impl DeploymentInventoryService {
         };
 
         let inventory = DeploymentInventory {
+            auditor_address: format!("{auditor_ip}:4242"),
             binary_option,
-            faucet_address: format!("{}:8000", genesis_ip),
+            faucet_address: format!("{genesis_ip}:8000"),
             genesis_multiaddr,
             name: name.to_string(),
             peers,
@@ -315,6 +329,7 @@ impl DeploymentInventoryService {
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct DeploymentInventory {
+    pub auditor_address: String,
     pub binary_option: BinaryOption,
     pub faucet_address: String,
     pub genesis_multiaddr: String,
@@ -429,6 +444,13 @@ impl DeploymentInventory {
             "safe --peer {} wallet get-faucet {}",
             self.genesis_multiaddr, self.faucet_address
         );
+        println!();
+
+        println!("===============");
+        println!("Auditor Details");
+        println!("===============");
+        println!("Auditor address: {}", self.auditor_address);
+        println!();
 
         if !self.uploaded_files.is_empty() {
             println!("Uploaded files:");
