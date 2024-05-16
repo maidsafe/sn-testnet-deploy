@@ -39,24 +39,29 @@ resource "digitalocean_droplet" "build" {
   tags     = ["environment:${terraform.workspace}", "type:build"]
 }
 
-resource "digitalocean_firewall" "auditor_fw" {
-  name = "auditor-firewall"
+# resource "digitalocean_firewall" "auditor_fw" {
+#   name = "auditor-firewall"
 
-  # No access by default. Use the GUI to set inbound access.
-  inbound_rule {
-    protocol    = "tcp"
-    port_range  = "80"
-    source_addresses = ["127.0.0.1"]
-  }
-  outbound_rule {
-    protocol    = "udp"
-    port_range  = "1-65535"
-    destination_addresses = ["0.0.0.0/0"]
-  }
+#   inbound_rule {
+#     protocol         = "tcp"
+#     port_range       = "80"
+#     source_addresses = ["127.0.0.1"]
+#   }
+#   # Allow SSH connections
+#   inbound_rule {
+#     protocol         = "tcp"
+#     port_range       = "22"
+#     source_addresses = ["0.0.0.0/0"]
+#   }
+#   outbound_rule {
+#     protocol               = "udp"
+#     port_range             = "1-65535"
+#     destination_addresses  = ["0.0.0.0/0"]
+#   }
 
-  # Associate the firewall with the auditor droplet
-  droplet_ids = [digitalocean_droplet.auditor.id]
-}
+#   # Associate the firewall with the auditor droplet
+#   droplet_ids = [digitalocean_droplet.auditor.id]
+# }
 
 resource "digitalocean_droplet" "auditor" {
   image    = var.auditor_droplet_image_id
