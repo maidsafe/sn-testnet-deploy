@@ -2186,7 +2186,7 @@ dependencies = [
  "httpdate",
  "itoa",
  "pin-project-lite",
- "socket2 0.4.10",
+ "socket2 0.5.6",
  "tokio",
  "tower-service",
  "tracing",
@@ -3762,15 +3762,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "serde_bytes"
-version = "0.11.14"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8b8497c313fd43ab992087548117643f6fcd935cbf36f176ffda0aacf9591734"
-dependencies = [
- "serde",
-]
-
-[[package]]
 name = "serde_derive"
 version = "1.0.197"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3946,8 +3937,9 @@ checksum = "e6ecd384b10a64542d77071bd64bd7b231f4ed5940fba55e98c3de13824cf3d7"
 
 [[package]]
 name = "sn-releases"
-version = "0.2.2"
-source = "git+https://github.com/RolandSherwin/sn-releases?branch=auditor_release#cea2826298a5f9a2c5a1d060754c6495048c380f"
+version = "0.2.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "11de63ee973703243d61d67099fdd1b6aa25a3b1592358a91f7bf66cb9a8f3b3"
 dependencies = [
  "async-trait",
  "chrono",
@@ -4008,7 +4000,8 @@ dependencies = [
 [[package]]
 name = "sn_build_info"
 version = "0.1.7"
-source = "git+https://github.com/RolandSherwin/safe_network?branch=auditor#9c33e0a8cac715191b5bd5cf6ea2bf0aad030ac6"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "1b8a3a098cc6fdd0a49e2de921634c84a2cf083a84d89c3cc33ae9bcc1b28e6d"
 dependencies = [
  "vergen",
 ]
@@ -4016,7 +4009,8 @@ dependencies = [
 [[package]]
 name = "sn_protocol"
 version = "0.16.6"
-source = "git+https://github.com/RolandSherwin/safe_network?branch=auditor#9c33e0a8cac715191b5bd5cf6ea2bf0aad030ac6"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "3acb080236e12fa05fe90ed60765ed0755e2975b3e1141a8db28494b46449b5f"
 dependencies = [
  "blsttc",
  "bytes",
@@ -4046,7 +4040,8 @@ dependencies = [
 [[package]]
 name = "sn_registers"
 version = "0.3.13"
-source = "git+https://github.com/RolandSherwin/safe_network?branch=auditor#9c33e0a8cac715191b5bd5cf6ea2bf0aad030ac6"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "52df960337a47cd3eae36d5ed0ad3639c67fdab9ac43be589f0d2a50628a3f50"
 dependencies = [
  "blsttc",
  "crdts",
@@ -4060,8 +4055,9 @@ dependencies = [
 
 [[package]]
 name = "sn_service_management"
-version = "0.2.7"
-source = "git+https://github.com/RolandSherwin/safe_network?branch=auditor#9c33e0a8cac715191b5bd5cf6ea2bf0aad030ac6"
+version = "0.2.8"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "13dcad57c54dff30ce11db94e2fc306f2b693d81f7de9d61c2da9d5529778cae"
 dependencies = [
  "async-trait",
  "dirs-next",
@@ -4086,7 +4082,8 @@ dependencies = [
 [[package]]
 name = "sn_transfers"
 version = "0.18.0"
-source = "git+https://github.com/RolandSherwin/safe_network?branch=auditor#9c33e0a8cac715191b5bd5cf6ea2bf0aad030ac6"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "6b176fd12d76895599b32b351cdca712d5a5d4de00868d193fac39f16763d700"
 dependencies = [
  "blsttc",
  "custom_debug",
@@ -4099,7 +4096,6 @@ dependencies = [
  "rayon",
  "rmp-serde",
  "serde",
- "serde_bytes",
  "serde_json",
  "thiserror",
  "tiny-keccak",
