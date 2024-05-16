@@ -62,7 +62,7 @@ impl DeployCmd {
             })?;
 
         let mut n = 1;
-        let total = if build_custom_binaries { 5 } else { 4 };
+        let total = if build_custom_binaries { 6 } else { 5 };
         if build_custom_binaries {
             self.print_ansible_run_banner(n, total, "Build Custom Binaries");
             self.build_safe_network_binaries().await.map_err(|err| {
@@ -119,6 +119,7 @@ impl DeployCmd {
                 println!("Failed to provision safenode rpc client {err:?}");
                 err
             })?;
+        self.print_ansible_run_banner(n, total, "Provision Auditor");
         self.provision_sn_auditor(&genesis_multiaddr)
             .await
             .map_err(|err| {
@@ -226,7 +227,7 @@ impl DeployCmd {
 
     pub async fn provision_sn_auditor(&self, genesis_multiaddr: &str) -> Result<()> {
         let start = Instant::now();
-        println!("Running ansible against genesis node to start sn_auditor service...");
+        println!("Running ansible against auditor machine to start sn_auditor service...");
         self.testnet_deploy.ansible_runner.run_playbook(
             AnsiblePlaybook::Auditor,
             AnsibleInventoryType::Auditor,
@@ -315,6 +316,7 @@ impl DeployCmd {
         extra_vars.add_variable("provider", &self.testnet_deploy.cloud_provider.to_string());
         extra_vars.add_variable("testnet_name", &self.name);
         extra_vars.add_variable("genesis_multiaddr", genesis_multiaddr);
+        extra_vars.add_node_manager_url(&self.name, &self.binary_option);
         extra_vars.add_faucet_url_or_version(&self.name, &self.binary_option);
         Ok(extra_vars.build())
     }
@@ -333,6 +335,7 @@ impl DeployCmd {
         extra_vars.add_variable("provider", &self.testnet_deploy.cloud_provider.to_string());
         extra_vars.add_variable("testnet_name", &self.name);
         extra_vars.add_variable("genesis_multiaddr", genesis_multiaddr);
+        extra_vars.add_node_manager_url(&self.name, &self.binary_option);
         extra_vars.add_sn_auditor_url_or_version(&self.name, &self.binary_option);
         Ok(extra_vars.build())
     }

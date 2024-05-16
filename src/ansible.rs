@@ -560,7 +560,7 @@ impl ExtraVarsDocBuilder {
                 self.add_branch_url_variable(
                     "sn_auditor_archive_url",
                     &format!(
-                        "{}/{}/{}/sn-auditor-{}-x86_64-unknown-linux-musl.tar.gz",
+                        "{}/{}/{}/sn_auditor-{}-x86_64-unknown-linux-musl.tar.gz",
                         NODE_S3_BUCKET_URL, repo_owner, branch, deployment_name
                     ),
                     branch,
@@ -619,7 +619,7 @@ pub async fn generate_environment_inventory(
     output_inventory_dir_path: &Path,
 ) -> Result<()> {
     let mut generated_inventory_paths = vec![];
-    let inventory_files = ["build", "genesis", "node"];
+    let inventory_files = ["build", "genesis", "node", "auditor"];
     for inventory_type in inventory_files.iter() {
         let src_path = base_inventory_path;
         let dest_path = output_inventory_dir_path.join(format!(

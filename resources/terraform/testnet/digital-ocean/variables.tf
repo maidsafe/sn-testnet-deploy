@@ -25,9 +25,9 @@ variable "build_machine_size" {
   default = "s-8vcpu-16gb"
 }
 
-# This corresponds to the 'safe_network-auditor-1715854153' image/snapshot.
+# This corresponds to the 'safe_network-auditor-1715864456' image/snapshot.
 variable "auditor_droplet_image_id" {
-  default = "156286531"
+  default = "156295663"
 }
 
 # This corresponds to the 'safe_network-build-1715854128' image/snapshot.

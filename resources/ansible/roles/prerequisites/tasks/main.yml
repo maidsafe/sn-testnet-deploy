@@ -15,6 +15,7 @@
     - ripgrep
     - zip
     - jq
+    - graphviz # for the sn_auditor
   register: result
   until: result is succeeded
   retries: 20

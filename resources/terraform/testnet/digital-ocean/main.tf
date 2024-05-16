@@ -59,7 +59,6 @@ resource "digitalocean_firewall" "auditor_fw" {
 }
 
 resource "digitalocean_droplet" "auditor" {
-  count    = 1
   image    = var.auditor_droplet_image_id
   name     = "${terraform.workspace}-auditor"
   region   = var.region
