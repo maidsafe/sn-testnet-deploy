@@ -25,19 +25,19 @@ variable "build_machine_size" {
   default = "s-8vcpu-16gb"
 }
 
-# This corresponds to the 'safe_network-build-' image/snapshot.
+# This corresponds to the 'safe_network-auditor-1715854153' image/snapshot.
 variable "auditor_droplet_image_id" {
-  default = ""
+  default = "156286531"
 }
 
-# This corresponds to the 'safe_network-build-1708589497' image/snapshot.
+# This corresponds to the 'safe_network-build-1715854128' image/snapshot.
 variable "build_droplet_image_id" {
-  default = "150625831"
+  default = "156286538"
 }
 
-# This corresponds to the 'safe_network-node-1708591050' image/snapshot.2
+# This corresponds to the 'safe_network-node-1715853390' image/snapshot.2
 variable "node_droplet_image_id" {
-  default = "150627826"
+  default = "156286412"
 }
 
 variable "region" {
