@@ -64,9 +64,7 @@ resource "digitalocean_firewall" "auditor_fw" {
     destination_addresses  = ["0.0.0.0/0"]
   }
 
-
-  # Associate the firewall with the auditor droplet
-  droplet_ids = [digitalocean_droplet.auditor.id]
+#   droplet_ids = [digitalocean_droplet.auditor.id]
 }
 
 resource "digitalocean_droplet" "auditor" {
