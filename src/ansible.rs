@@ -567,9 +567,11 @@ impl ExtraVarsDocBuilder {
                     repo_owner,
                 );
             }
-            BinaryOption::Versioned { faucet_version, .. } => self
+            BinaryOption::Versioned {
+                sn_auditor_version, ..
+            } => self
                 .variables
-                .push(("version".to_string(), faucet_version.to_string())),
+                .push(("version".to_string(), sn_auditor_version.to_string())),
         }
     }
 
