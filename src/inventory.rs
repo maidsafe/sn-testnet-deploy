@@ -145,6 +145,7 @@ impl DeploymentInventoryService {
 
         let mut vm_list = Vec::new();
         vm_list.push((genesis_inventory[0].0.clone(), genesis_inventory[0].1));
+        vm_list.push((auditor_inventory[0].0.clone(), auditor_ip));
         if !build_inventory.is_empty() {
             vm_list.push((build_inventory[0].0.clone(), build_inventory[0].1));
         }

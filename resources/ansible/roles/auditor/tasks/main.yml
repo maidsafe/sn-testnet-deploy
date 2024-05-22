@@ -22,6 +22,7 @@
       - "--peer={{ genesis_multiaddr }}"
       - "{{ ('--env=' + env_variables) if env_variables is defined else omit }}"
       - "{{ ('--version=' + version) if version is defined else ('--url=' + sn_auditor_archive_url) }}"
+      - "--beta-encryption-key={{ beta_encryption_key }}"
   when: not auditor_bin.stat.exists
 
 - name: start the auditor
