@@ -43,6 +43,7 @@ struct Opt {
     command: Commands,
 }
 
+#[allow(clippy::large_enum_variant)]
 #[derive(Subcommand, Debug)]
 enum Commands {
     /// Clean a deployed testnet environment.
@@ -59,6 +60,11 @@ enum Commands {
         /// Set to run Ansible with more verbose output.
         #[arg(long)]
         ansible_verbose: bool,
+        /// Supply the beta encryption key for the auditor.
+        ///
+        /// If not used a default key will be supplied.
+        #[arg(long)]
+        beta_encryption_key: Option<String>,
         /// The branch of the Github repository to build from.
         ///
         /// If used, all binaries will be built from this branch. It is typically used for testing
@@ -501,6 +507,7 @@ async fn main() -> Result<()> {
         }
         Commands::Deploy {
             ansible_verbose,
+            beta_encryption_key,
             branch,
             env_variables,
             faucet_version,
@@ -579,6 +586,7 @@ async fn main() -> Result<()> {
                 logstash_details,
                 binary_option.clone(),
                 env_variables,
+                beta_encryption_key,
             );
             deploy_cmd.execute().await?;
 
