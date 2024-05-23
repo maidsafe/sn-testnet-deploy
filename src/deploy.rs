@@ -12,15 +12,19 @@ use crate::{
 use colored::Colorize;
 use std::{net::SocketAddr, time::Instant};
 
+const DEFAULT_BETA_ENCRYPTION_KEY: &str =
+    "49113d2083f57a976076adbe85decb75115820de1e6e74b47e0429338cef124a";
+
 pub struct DeployCmd {
-    testnet_deploy: TestnetDeploy,
-    name: String,
-    node_count: u16,
-    vm_count: u16,
-    public_rpc: bool,
-    logstash_details: Option<(String, Vec<SocketAddr>)>,
+    beta_encryption_key: Option<String>,
     binary_option: BinaryOption,
     env_variables: Option<Vec<(String, String)>>,
+    logstash_details: Option<(String, Vec<SocketAddr>)>,
+    name: String,
+    node_count: u16,
+    public_rpc: bool,
+    testnet_deploy: TestnetDeploy,
+    vm_count: u16,
 }
 
 impl DeployCmd {
@@ -34,6 +38,7 @@ impl DeployCmd {
         logstash_details: Option<(String, Vec<SocketAddr>)>,
         binary_option: BinaryOption,
         env_variables: Option<Vec<(String, String)>>,
+        beta_encryption_key: Option<String>,
     ) -> Self {
         Self {
             testnet_deploy,
@@ -44,6 +49,7 @@ impl DeployCmd {
             logstash_details,
             binary_option,
             env_variables,
+            beta_encryption_key,
         }
     }
 
@@ -231,7 +237,14 @@ impl DeployCmd {
         self.testnet_deploy.ansible_runner.run_playbook(
             AnsiblePlaybook::Auditor,
             AnsibleInventoryType::Auditor,
-            Some(self.build_sn_auditor_extra_vars_doc(genesis_multiaddr)?),
+            Some(
+                self.build_sn_auditor_extra_vars_doc(
+                    genesis_multiaddr,
+                    self.beta_encryption_key
+                        .as_ref()
+                        .unwrap_or(&DEFAULT_BETA_ENCRYPTION_KEY.to_string()),
+                )?,
+            ),
         )?;
         print_duration(start.elapsed());
         Ok(())
@@ -330,11 +343,16 @@ impl DeployCmd {
         Ok(extra_vars.build())
     }
 
-    fn build_sn_auditor_extra_vars_doc(&self, genesis_multiaddr: &str) -> Result<String> {
+    fn build_sn_auditor_extra_vars_doc(
+        &self,
+        genesis_multiaddr: &str,
+        beta_encryption_key: &str,
+    ) -> Result<String> {
         let mut extra_vars: ExtraVarsDocBuilder = ExtraVarsDocBuilder::default();
         extra_vars.add_variable("provider", &self.testnet_deploy.cloud_provider.to_string());
         extra_vars.add_variable("testnet_name", &self.name);
         extra_vars.add_variable("genesis_multiaddr", genesis_multiaddr);
+        extra_vars.add_variable("beta_encryption_key", beta_encryption_key);
         extra_vars.add_node_manager_url(&self.name, &self.binary_option);
         extra_vars.add_sn_auditor_url_or_version(&self.name, &self.binary_option);
         Ok(extra_vars.build())
