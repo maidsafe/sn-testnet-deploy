@@ -1,11 +1,11 @@
 ---
 # This role assumes the existence of the node manager, which is setup using another role.
-- name: check if the sn_auditor binary exists
+- name: check if the auditor binary exists
   ansible.builtin.stat:
-    path: "{{ binary_dir}}/sn_auditor"
+    path: "{{ binary_dir }}/auditor"
   register: auditor_bin
 
-- name: add sn_auditor service
+- name: add auditor service
   become: True
   ansible.builtin.command:
     # The `omit` filter is used to remove the `--env` argument if the
