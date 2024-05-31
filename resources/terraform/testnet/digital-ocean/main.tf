@@ -6,7 +6,7 @@ terraform {
     }
   }
   backend "s3" {
-    key    = "sn-testnet-tool-digital-ocean.tfstate"
+    key = "sn-testnet-tool-digital-ocean.tfstate"
   }
 }
 
@@ -74,6 +74,7 @@ resource "digitalocean_droplet" "auditor" {
   name     = "${terraform.workspace}-auditor"
   region   = var.region
   size     = var.droplet_size
+  backups  = true
   ssh_keys = var.droplet_ssh_keys
   tags     = ["environment:${terraform.workspace}", "type:auditor"]
 }
