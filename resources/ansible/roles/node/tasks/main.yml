@@ -26,10 +26,7 @@
 - name: add genesis node service
   become: True
   ansible.builtin.command:
-    # The `omit` filter is used to remove the `--env` argument if the
-    # `env_variables` variable is not defined. If the argv would be otherwise
-    # defined as '', the command would fail as it doesn't expect an empty
-    # argument, so it's omitted instead.
+    # The `omit` filter is used to remove arguments that don't have values
     argv: "{{ command_args | reject('equalto', omit) | list }}"
   vars:
     command_args:
@@ -59,13 +56,22 @@
   set_fact:
     nodes_to_add: "{{ node_instance_count | int - (current_node_count | default(0)) | int }}"
 
+- name: calculate start port
+  set_fact:
+    rpc_start_port: "{{ initial_rpc_start_port | int + (current_node_count | default(0)) | int }}"
+    metrics_start_port: "{{ initial_metrics_start_port | int + (current_node_count | default(0)) | int }}"
+  when: nodes_to_add | default(0) | int > 0
+
+- name: calculate end port
+  set_fact:
+    rpc_end_port: "{{ rpc_start_port | int + nodes_to_add | int - 1 }}"
+    metrics_end_port: "{{ metrics_start_port | int + nodes_to_add | int - 1 }}"
+  when: nodes_to_add | default(0) | int > 0
+
 - name: add node services
   become: True
   ansible.builtin.command:
-    # The `omit` filter is used to remove the `--env` argument if the
-    # `env_variables` variable is not defined. If the argv would be otherwise
-    # defined as '', the command would fail as it doesn't expect an empty
-    # argument, so it's omitted instead.
+    # The `omit` filter is used to remove arguments that don't have values
     argv: "{{ command_args | reject('equalto', omit) | list }}"
   vars:
     command_args:
@@ -75,6 +81,8 @@
       - "--count={{ nodes_to_add }}"
       - "--peer={{ genesis_multiaddr }}"
       - --rpc-address={{ node_rpc_ip }}
+      - --rpc-port={{ rpc_start_port }}-{{ rpc_end_port }}
+      - --metrics-port={{ metrics_start_port }}-{{ metrics_end_port }}
       - "{{ ('--env=' + env_variables) if env_variables is defined else omit }}"
       - "{{ ('--version=' + version) if version is defined else ('--url=' + node_archive_url) }}"
   when: not is_genesis and nodes_to_add | default(0) | int > 0

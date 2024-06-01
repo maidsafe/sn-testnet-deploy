@@ -98,8 +98,7 @@ impl DeployCmd {
 
         let mut node_provision_failed = false;
         self.print_ansible_run_banner(n, total, "Provision Remaining Nodes");
-        let result = self.provision_remaining_nodes(&genesis_multiaddr).await;
-        match result {
+        match self.provision_remaining_nodes(&genesis_multiaddr).await {
             Ok(()) => {
                 println!("Provisioned all remaining nodes");
             }

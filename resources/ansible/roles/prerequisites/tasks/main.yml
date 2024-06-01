@@ -9,13 +9,14 @@
     name: "{{ item }}"
     state: present
   with_items:
+    - graphviz # for the sn_auditor
     - heaptrack
+    - jq
     - python3
     - python3-pip
     - ripgrep
+    - telegraf
     - zip
-    - jq
-    - graphviz # for the sn_auditor
   register: result
   until: result is succeeded
   retries: 20
