@@ -28,5 +28,3 @@
       }
     - node-manager
     - node
-    - role: resource_usage
-      become: True
