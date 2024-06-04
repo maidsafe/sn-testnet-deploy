@@ -79,6 +79,7 @@
       - -v
       - add
       - "--count={{ nodes_to_add }}"
+      - "--owner=maidsafe"
       - "--peer={{ genesis_multiaddr }}"
       - --rpc-address={{ node_rpc_ip }}
       - --rpc-port={{ rpc_start_port }}-{{ rpc_end_port }}
