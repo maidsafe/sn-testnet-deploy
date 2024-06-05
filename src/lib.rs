@@ -478,7 +478,7 @@ impl TestnetDeploy {
         }
         self.ansible_runner.run_playbook(
             AnsiblePlaybook::UpgradeAuditor,
-            AnsibleInventoryType::Genesis,
+            AnsibleInventoryType::Auditor,
             Some(extra_vars.build()),
         )?;
 

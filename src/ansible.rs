@@ -106,7 +106,7 @@ pub enum AnsiblePlaybook {
     StartNodes,
     /// The upgrade auditor manager playbook will upgrade the auditor to the latest version.
     ///
-    /// Use in combination with `AnsibleInventoryType::Genesis`.
+    /// Use in combination with `AnsibleInventoryType::Auditor`.
     UpgradeAuditor,
     /// The upgrade faucet playbook will upgrade the faucet to the latest version.
     ///
