@@ -456,6 +456,35 @@ impl TestnetDeploy {
         Ok(())
     }
 
+    pub async fn upgrade_auditor(
+        &self,
+        name: &str,
+        version: Version,
+        env_variables: Option<Vec<(String, String)>>,
+        force: bool,
+    ) -> Result<()> {
+        let environments = self.terraform_runner.workspace_list()?;
+        if !environments.contains(&name.to_string()) {
+            return Err(Error::EnvironmentDoesNotExist(name.to_string()));
+        }
+
+        let mut extra_vars = ExtraVarsDocBuilder::default();
+        extra_vars.add_variable("version", &version.to_string());
+        if let Some(env_variables) = env_variables {
+            extra_vars.add_env_variable_list("env_variables", env_variables.clone());
+        }
+        if force {
+            extra_vars.add_variable("force", &force.to_string());
+        }
+        self.ansible_runner.run_playbook(
+            AnsiblePlaybook::UpgradeAuditor,
+            AnsibleInventoryType::Genesis,
+            Some(extra_vars.build()),
+        )?;
+
+        Ok(())
+    }
+
     pub async fn clean(&self) -> Result<()> {
         do_clean(
             &self.environment_name,

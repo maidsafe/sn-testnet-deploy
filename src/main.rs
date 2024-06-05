@@ -283,6 +283,42 @@ enum Commands {
         /// There should be no 'v' prefix.
         safenode_version: Option<String>,
     },
+    /// Upgrade the auditor binaries to a particular version.
+    ///
+    /// Simple mechanism that simply copies over the existing binary.
+    #[clap(name = "upgrade-auditor")]
+    UpgradeAuditor {
+        /// The name of the environment
+        #[arg(short = 'n', long)]
+        name: String,
+        #[arg(long)]
+        /// The cloud provider of the environment.
+        ///
+        /// Valid values are "aws" or "digital-ocean".
+        #[clap(long, default_value_t = CloudProvider::DigitalOcean, value_parser = parse_provider, verbatim_doc_comment)]
+        provider: CloudProvider,
+        /// Provide environment variables for the auditor service.
+        ///
+        /// These will override the values provided initially.
+        ///
+        /// This is useful to set the log levels. Each variable should be comma separated
+        /// without any space.
+        ///
+        /// Example: --env SN_LOG=all,RUST_LOG=libp2p=debug
+        #[clap(name = "env", long, use_value_delimiter = true, value_parser = parse_environment_variables)]
+        env_variables: Option<Vec<(String, String)>>,
+        /// Set to force the node manager to accept the auditor version provided.
+        ///
+        /// This can be used to downgrade auditor to a known good version.
+        #[clap(long)]
+        force: bool,
+        /// Supply a version for the binary to be upgraded to.
+        ///
+        /// There should be no 'v' prefix.
+        /// The name of the environment
+        #[arg(short = 'v', long)]
+        version: String,
+    },
     /// Upgrade the safenode-manager binaries to a particular version.
     ///
     /// Simple mechanism that simply copies over the existing binary.
@@ -838,6 +874,23 @@ async fn main() -> Result<()> {
                     provider,
                     safenode_version,
                 })
+                .await?;
+            Ok(())
+        }
+        Commands::UpgradeAuditor {
+            name,
+            provider,
+            version,
+            env_variables,
+            force,
+        } => {
+            println!("Upgrading the auditor binaries...");
+            let testnet_deploy = TestnetDeployBuilder::default()
+                .ansible_verbose_mode(false)
+                .provider(provider.clone())
+                .build()?;
+            testnet_deploy
+                .upgrade_auditor(&name, version.parse()?, env_variables, force)
                 .await?;
             Ok(())
         }

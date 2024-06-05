@@ -104,6 +104,10 @@ pub enum AnsiblePlaybook {
     ///
     /// Use in combination with `AnsibleInventoryType::Genesis` or `AnsibleInventoryType::Nodes`.
     StartNodes,
+    /// The upgrade auditor manager playbook will upgrade the auditor to the latest version.
+    ///
+    /// Use in combination with `AnsibleInventoryType::Genesis`.
+    UpgradeAuditor,
     /// The upgrade faucet playbook will upgrade the faucet to the latest version.
     ///
     /// Use in combination with `AnsibleInventoryType::Genesis`.
@@ -131,6 +135,7 @@ impl AnsiblePlaybook {
             AnsiblePlaybook::Nodes => "nodes.yml".to_string(),
             AnsiblePlaybook::RpcClient => "safenode_rpc_client.yml".to_string(),
             AnsiblePlaybook::StartNodes => "start_nodes.yml".to_string(),
+            AnsiblePlaybook::UpgradeAuditor => "upgrade_auditor.yml".to_string(),
             AnsiblePlaybook::UpgradeFaucet => "upgrade_faucet.yml".to_string(),
             AnsiblePlaybook::UpgradeNodeManager => "upgrade_node_manager.yml".to_string(),
             AnsiblePlaybook::UpgradeNodes => "upgrade_nodes.yml".to_string(),
