@@ -459,7 +459,7 @@ impl TestnetDeploy {
     pub async fn upgrade_auditor(
         &self,
         name: &str,
-        version: Version,
+        version: Option<Version>,
         env_variables: Option<Vec<(String, String)>>,
         force: bool,
     ) -> Result<()> {
@@ -469,7 +469,9 @@ impl TestnetDeploy {
         }
 
         let mut extra_vars = ExtraVarsDocBuilder::default();
-        extra_vars.add_variable("version", &version.to_string());
+        if let Some(version) = version {
+            extra_vars.add_variable("version", &version.to_string());
+        }
         if let Some(env_variables) = env_variables {
             extra_vars.add_env_variable_list("env_variables", env_variables.clone());
         }

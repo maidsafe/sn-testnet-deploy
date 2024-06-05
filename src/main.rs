@@ -317,7 +317,7 @@ enum Commands {
         /// There should be no 'v' prefix.
         /// The name of the environment
         #[arg(short = 'v', long)]
-        version: String,
+        version: Option<String>,
     },
     /// Upgrade the safenode-manager binaries to a particular version.
     ///
@@ -889,8 +889,13 @@ async fn main() -> Result<()> {
                 .ansible_verbose_mode(false)
                 .provider(provider.clone())
                 .build()?;
+            let version = if let Some(v) = version {
+                Some(v.parse()?)
+            } else {
+                None
+            };
             testnet_deploy
-                .upgrade_auditor(&name, version.parse()?, env_variables, force)
+                .upgrade_auditor(&name, version, env_variables, force)
                 .await?;
             Ok(())
         }
