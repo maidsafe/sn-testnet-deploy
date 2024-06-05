@@ -275,7 +275,7 @@ enum Commands {
         #[clap(long, default_value_t = CloudProvider::DigitalOcean, value_parser = parse_provider, verbatim_doc_comment)]
         provider: CloudProvider,
         #[arg(long)]
-        /// Optionally supply a version for the faucet binary to be upgraded to.
+        /// Optionally supply a version number for the safenode binary to upgrade to.
         ///
         /// If not provided, the latest version will be used. A lower version number can be
         /// specified to downgrade to a known good version.
