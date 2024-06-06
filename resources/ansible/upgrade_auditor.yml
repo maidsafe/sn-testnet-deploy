@@ -1,0 +1,16 @@
+---
+- name: upgrade auditor binary using the node manager
+  hosts: all
+  tasks:
+    - name: upgrade
+      ansible.builtin.command:
+        # The `omit` filter removes arguments without values
+        argv: "{{ command_args | reject('equalto', omit) | list }}"
+      vars:
+        command_args:
+          - safenode-manager
+          - auditor
+          - upgrade
+          - "{{ '--force' if force is defined else omit }}"
+          - "{{ ('--env=' + env_variables) if env_variables is defined else omit }}"
+          - "{{ ('--version=' + version) if version is defined else omit }}"
