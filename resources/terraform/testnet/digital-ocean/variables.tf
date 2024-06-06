@@ -1,5 +1,5 @@
 variable "droplet_ssh_keys" {
-  type    = list(number)
+  type = list(number)
   default = [
     37243057, # Benno Zeeman
     38313409, # Roland Sherwin
@@ -18,7 +18,7 @@ variable "droplet_ssh_keys" {
 }
 
 variable "droplet_size" {
-  default = "s-2vcpu-4gb"
+  default = "s-8vcpu-16gb-480gb-intel"
 }
 
 variable "build_machine_size" {
@@ -45,12 +45,12 @@ variable "region" {
 }
 
 variable "node_count" {
-  default = 30
+  default     = 30
   description = "The number of droplets to launch for the nodes"
 }
 
 variable "use_custom_bin" {
-  type = bool
-  default = false
+  type        = bool
+  default     = false
   description = "A boolean to enable use of a custom bin"
 }
