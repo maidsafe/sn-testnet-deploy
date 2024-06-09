@@ -22,6 +22,7 @@ pub struct DeployCmd {
     logstash_details: Option<(String, Vec<SocketAddr>)>,
     name: String,
     node_count: u16,
+    peer: Option<String>,
     public_rpc: bool,
     testnet_deploy: TestnetDeploy,
     vm_count: u16,
@@ -34,6 +35,7 @@ impl DeployCmd {
         name: String,
         node_count: u16,
         vm_count: u16,
+        peer: Option<String>,
         public_rpc: bool,
         logstash_details: Option<(String, Vec<SocketAddr>)>,
         binary_option: BinaryOption,
@@ -45,6 +47,7 @@ impl DeployCmd {
             name,
             node_count,
             vm_count,
+            peer,
             public_rpc,
             logstash_details,
             binary_option,
@@ -79,26 +82,36 @@ impl DeployCmd {
         }
 
         self.print_ansible_run_banner(n, total, "Provision Genesis Node");
-        self.provision_genesis_node().await.map_err(|err| {
-            println!("Failed to provision genesis node {err:?}");
-            err
-        })?;
-        n += 1;
 
-        let (genesis_multiaddr, _) = get_genesis_multiaddr(
-            &self.testnet_deploy.ansible_runner,
-            &self.testnet_deploy.ssh_client,
-        )
-        .await
-        .map_err(|err| {
-            println!("Failed to get genesis multiaddr {err:?}");
-            err
-        })?;
-        println!("Obtained multiaddr for genesis node: {genesis_multiaddr}");
+        let this_is_a_new_network = self.peer.is_none();
+        let initial_point_of_contact = if let Some(contact) = &self.peer {
+            contact.clone()
+        } else {
+            self.provision_genesis_node().await.map_err(|err| {
+                println!("Failed to provision genesis node {err:?}");
+                err
+            })?;
+            n += 1;
+            let (genesis_multiaddr, _) = get_genesis_multiaddr(
+                &self.testnet_deploy.ansible_runner,
+                &self.testnet_deploy.ssh_client,
+            )
+            .await
+            .map_err(|err| {
+                println!("Failed to get genesis multiaddr {err:?}");
+                err
+            })?;
+            println!("Obtained multiaddr for genesis node: {genesis_multiaddr}");
+
+            genesis_multiaddr
+        };
 
         let mut node_provision_failed = false;
         self.print_ansible_run_banner(n, total, "Provision Remaining Nodes");
-        match self.provision_remaining_nodes(&genesis_multiaddr).await {
+        match self
+            .provision_remaining_nodes(&initial_point_of_contact)
+            .await
+        {
             Ok(()) => {
                 println!("Provisioned all remaining nodes");
             }
@@ -108,29 +121,30 @@ impl DeployCmd {
         }
         n += 1;
 
-        self.print_ansible_run_banner(n, total, "Deploy Faucet");
-        self.provision_faucet(&genesis_multiaddr)
-            .await
-            .map_err(|err| {
-                println!("Failed to provision faucet {err:?}");
-                err
-            })?;
-        n += 1;
-
-        self.print_ansible_run_banner(n, total, "Provision RPC Client on Genesis Node");
-        self.provision_safenode_rpc_client(&genesis_multiaddr)
-            .await
-            .map_err(|err| {
-                println!("Failed to provision safenode rpc client {err:?}");
-                err
-            })?;
-        self.print_ansible_run_banner(n, total, "Provision Auditor");
-        self.provision_sn_auditor(&genesis_multiaddr)
-            .await
-            .map_err(|err| {
-                println!("Failed to provision sn_auditor {err:?}");
-                err
-            })?;
+        if this_is_a_new_network {
+            self.print_ansible_run_banner(n, total, "Deploy Faucet");
+            self.provision_faucet(&initial_point_of_contact)
+                .await
+                .map_err(|err| {
+                    println!("Failed to provision faucet {err:?}");
+                    err
+                })?;
+            n += 1;
+            self.print_ansible_run_banner(n, total, "Provision RPC Client on Genesis Node");
+            self.provision_safenode_rpc_client(&initial_point_of_contact)
+                .await
+                .map_err(|err| {
+                    println!("Failed to provision safenode rpc client {err:?}");
+                    err
+                })?;
+            self.print_ansible_run_banner(n, total, "Provision Auditor");
+            self.provision_sn_auditor(&initial_point_of_contact)
+                .await
+                .map_err(|err| {
+                    println!("Failed to provision sn_auditor {err:?}");
+                    err
+                })?;
+        }
 
         if node_provision_failed {
             println!();
@@ -249,13 +263,13 @@ impl DeployCmd {
         Ok(())
     }
 
-    pub async fn provision_remaining_nodes(&self, genesis_multiaddr: &str) -> Result<()> {
+    pub async fn provision_remaining_nodes(&self, initial_contact_peer: &str) -> Result<()> {
         let start = Instant::now();
         self.testnet_deploy.ansible_runner.run_playbook(
             AnsiblePlaybook::Nodes,
             AnsibleInventoryType::Nodes,
             Some(self.build_node_extra_vars_doc(
-                Some(genesis_multiaddr.to_string()),
+                Some(initial_contact_peer.to_string()),
                 Some(self.node_count),
             )?),
         )?;

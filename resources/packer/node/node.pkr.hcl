@@ -27,7 +27,7 @@ variable "region" {
 
 variable "size" {
   type = string
-  default = "s-8vcpu-16gb-480gb-intel"
+  default = "s-2vcpu-4gb-480gb-intel"
   description = "Node VMs only require moderate resources."
 }
 

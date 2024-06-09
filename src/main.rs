@@ -102,6 +102,12 @@ enum Commands {
         /// If not used, the contacts file will have the same name as the environment.
         #[arg(long)]
         network_contacts_file_name: Option<String>,
+        /// Peer multiaddress to connect to.
+        /// This is useful to connect to a specific preexisting peer
+        ///
+        /// If this is supplied then no genesis node will be started.
+        #[arg(long)]
+        peer: Option<String>,
         /// The number of safenode processes to run on each VM.
         #[clap(long, default_value_t = 40)]
         node_count: u16,
@@ -515,6 +521,7 @@ async fn main() -> Result<()> {
             name,
             network_contacts_file_name,
             node_count,
+            peer,
             protocol_version,
             provider,
             public_rpc,
@@ -582,6 +589,7 @@ async fn main() -> Result<()> {
                 name.clone(),
                 node_count,
                 vm_count,
+                peer,
                 public_rpc,
                 logstash_details,
                 binary_option.clone(),
