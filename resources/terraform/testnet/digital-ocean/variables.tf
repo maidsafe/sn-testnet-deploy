@@ -44,8 +44,9 @@ variable "region" {
   default = "lon1"
 }
 
+# 25*80 = 2k. A good node sample size. Should provide enough bandwidth per droplet to survive on defualt limits.
 variable "node_count" {
-  default     = 30
+  default     = 25
   description = "The number of droplets to launch for the nodes"
 }
 
