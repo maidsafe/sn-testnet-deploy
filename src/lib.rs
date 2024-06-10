@@ -655,7 +655,7 @@ pub async fn notify_slack(inventory: DeploymentInventory) -> Result<()> {
     message.push_str("*Testnet Details*\n");
     message.push_str(&format!("Name: {}\n", inventory.name));
     message.push_str(&format!("Node count: {}\n", inventory.peers.len()));
-    message.push_str(&format!("Faucet address: {}\n", inventory.faucet_address));
+    message.push_str(&format!("Faucet address: {:?}\n", inventory.faucet_address));
     match inventory.binary_option {
         BinaryOption::BuildFromSource {
             repo_owner, branch, ..

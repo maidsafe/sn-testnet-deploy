@@ -65,6 +65,12 @@ enum Commands {
         /// If not used a default key will be supplied.
         #[arg(long)]
         beta_encryption_key: Option<String>,
+        /// Peer multiaddress to connect to.
+        /// This is useful to connect to a specific preexisting peer
+        ///
+        /// If this is supplied then no genesis node will be started.
+        #[arg(long)]
+        bootstrap_peer: Option<String>,
         /// The branch of the Github repository to build from.
         ///
         /// If used, all binaries will be built from this branch. It is typically used for testing
@@ -102,12 +108,7 @@ enum Commands {
         /// If not used, the contacts file will have the same name as the environment.
         #[arg(long)]
         network_contacts_file_name: Option<String>,
-        /// Peer multiaddress to connect to.
-        /// This is useful to connect to a specific preexisting peer
-        ///
-        /// If this is supplied then no genesis node will be started.
-        #[arg(long)]
-        peer: Option<String>,
+
         /// The number of safenode processes to run on each VM.
         #[clap(long, default_value_t = 40)]
         node_count: u16,
@@ -179,6 +180,12 @@ enum Commands {
         vm_count: u16,
     },
     Inventory {
+        /// Peer multiaddress to connect to.
+        /// This is useful to connect to a specific preexisting peer
+        ///
+        /// To inventory an extensions network, a contact must be suopplied here
+        #[arg(long)]
+        bootstrap_peer: Option<String>,
         /// If set to true, the inventory will be regenerated.
         ///
         /// This is useful if the testnet was created on another machine.
@@ -521,7 +528,7 @@ async fn main() -> Result<()> {
             name,
             network_contacts_file_name,
             node_count,
-            peer,
+            bootstrap_peer,
             protocol_version,
             provider,
             public_rpc,
@@ -589,7 +596,7 @@ async fn main() -> Result<()> {
                 name.clone(),
                 node_count,
                 vm_count,
-                peer,
+                bootstrap_peer.clone(),
                 public_rpc,
                 logstash_details,
                 binary_option.clone(),
@@ -600,7 +607,7 @@ async fn main() -> Result<()> {
 
             let inventory_service = DeploymentInventoryService::from(testnet_deploy);
             let inventory = inventory_service
-                .generate_inventory(&name, true, Some(binary_option))
+                .generate_inventory(&name, true, Some(binary_option), bootstrap_peer)
                 .await?;
             inventory.print_report()?;
             inventory.save()?;
@@ -616,6 +623,7 @@ async fn main() -> Result<()> {
             name,
             network_contacts_file_name,
             provider,
+            bootstrap_peer,
         } => {
             let testnet_deploy = TestnetDeployBuilder::default()
                 .environment_name(&name)
@@ -624,7 +632,7 @@ async fn main() -> Result<()> {
 
             let inventory_service = DeploymentInventoryService::from(testnet_deploy);
             let inventory = inventory_service
-                .generate_inventory(&name, force_regeneration, None)
+                .generate_inventory(&name, force_regeneration, None, bootstrap_peer)
                 .await?;
             inventory.print_report()?;
             inventory.save()?;

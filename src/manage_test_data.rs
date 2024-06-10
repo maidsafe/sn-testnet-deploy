@@ -125,11 +125,14 @@ impl TestDataClient {
             }
         }
 
-        let faucet_addr: SocketAddr = inventory.faucet_address.parse()?;
+        let faucet_addr = inventory.faucet_address.clone().ok_or_else(|| {
+            return eyre!("No faucet deployed for this inventory. (It was launched using existing bootstrap peers)")
+        })?;
+
+        let faucet_addr: SocketAddr = faucet_addr.parse()?;
         let random_peer = inventory.get_random_peer();
         self.safe_client
             .wallet_get_faucet(&random_peer, faucet_addr)?;
-
         // Generate 10 random files to be uploaded, increasing in size from 1 to 10k.
         // They will then be re-downloaded by `safe` and compared to make sure they are right.
         let mut uploaded_files = Vec::new();
