@@ -126,7 +126,7 @@ impl TestDataClient {
         }
 
         let faucet_addr = inventory.faucet_address.clone().ok_or_else(|| {
-            return eyre!("No faucet deployed for this inventory. (It was launched using existing bootstrap peers)")
+            eyre!("No faucet deployed for this inventory. (It was launched using existing bootstrap peers)")
         })?;
 
         let faucet_addr: SocketAddr = faucet_addr.parse()?;

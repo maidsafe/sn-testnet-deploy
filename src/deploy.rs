@@ -89,7 +89,9 @@ impl DeployCmd {
 
         let this_is_a_new_network = self.bootstrap_peer.is_none();
         let initial_point_of_contact = if let Some(contact) = &self.bootstrap_peer {
+            println!("Using bootstrap peer: {contact}, waiting 60s for initital inventory spin up");
             sleep(Duration::from_secs(60)).await;
+
             contact.clone()
         } else {
             self.print_ansible_run_banner(n, total, "Provision Genesis Node");
