@@ -63,7 +63,9 @@ impl DeployCmd {
                 BinaryOption::Versioned { .. } => false,
             }
         };
-        self.create_infra(build_custom_binaries)
+
+        let is_fresh_network = self.peer.is_none();
+        self.create_infra(build_custom_binaries, is_fresh_network)
             .await
             .map_err(|err| {
                 println!("Failed to create infra {err:?}");
@@ -158,13 +160,14 @@ impl DeployCmd {
         Ok(())
     }
 
-    async fn create_infra(&self, enable_build_vm: bool) -> Result<()> {
+    async fn create_infra(&self, enable_build_vm: bool, is_fresh_network: bool) -> Result<()> {
         let start = Instant::now();
         println!("Selecting {} workspace...", self.name);
         self.testnet_deploy
             .terraform_runner
             .workspace_select(&self.name)?;
         let args = vec![
+            ("fresh_testnet".to_string(), is_fresh_network.to_string()),
             ("node_count".to_string(), self.vm_count.to_string()),
             ("use_custom_bin".to_string(), enable_build_vm.to_string()),
         ];

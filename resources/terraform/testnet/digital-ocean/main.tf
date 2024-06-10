@@ -11,6 +11,7 @@ terraform {
 }
 
 resource "digitalocean_droplet" "genesis" {
+  count    = var.fresh_testnet ? 1 : 0
   image    = var.node_droplet_image_id
   name     = "${terraform.workspace}-genesis"
   region   = var.region
@@ -70,6 +71,7 @@ resource "digitalocean_droplet" "build" {
 # }
 
 resource "digitalocean_droplet" "auditor" {
+  count    = var.fresh_testnet ? 1 : 0
   image    = var.auditor_droplet_image_id
   name     = "${terraform.workspace}-auditor"
   region   = var.region
