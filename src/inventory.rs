@@ -87,7 +87,9 @@ impl DeploymentInventoryService {
         name: &str,
         force: bool,
         binary_option: Option<BinaryOption>,
+        bootstrap_peer: Option<String>,
     ) -> Result<DeploymentInventory> {
+        let is_fresh_network = bootstrap_peer.is_none();
         println!("=============================");
         println!("     Generating Inventory    ");
         println!("=============================");
@@ -117,11 +119,7 @@ impl DeploymentInventoryService {
             )
             .await?
         }
-
-        let genesis_inventory = self
-            .ansible_runner
-            .get_inventory(AnsibleInventoryType::Genesis, false)
-            .await?;
+        let mut optional_audit_ip = None;
         let build_inventory = self
             .ansible_runner
             .get_inventory(AnsibleInventoryType::Build, false)
@@ -130,22 +128,30 @@ impl DeploymentInventoryService {
             .ansible_runner
             .get_inventory(AnsibleInventoryType::Nodes, false)
             .await?;
-        let auditor_inventory = self
-            .ansible_runner
-            .get_inventory(AnsibleInventoryType::Auditor, true)
-            .await?;
-        let auditor_ip = auditor_inventory[0].1;
+        let mut vm_list = Vec::new();
 
-        // It also seems to be possible for a workspace and inventory files to still exist, but
-        // there to be no inventory items returned. Perhaps someone deleted the VMs manually. We
-        // only need to test the genesis node in this case, since that must always exist.
-        if genesis_inventory.is_empty() {
-            return Err(eyre!("The '{}' environment does not exist", name));
+        if is_fresh_network {
+            let genesis_inventory = self
+                .ansible_runner
+                .get_inventory(AnsibleInventoryType::Genesis, false)
+                .await?;
+            let auditor_inventory = self
+                .ansible_runner
+                .get_inventory(AnsibleInventoryType::Auditor, true)
+                .await?;
+            let auditor_ip = auditor_inventory[0].1;
+            // It also seems to be possible for a workspace and inventory files to still exist, but
+            // there to be no inventory items returned. Perhaps someone deleted the VMs manually. We
+            // only need to test the genesis node in this case, since that must always exist.
+            if genesis_inventory.is_empty() {
+                return Err(eyre!("The '{}' environment does not exist", name));
+            }
+            vm_list.push((genesis_inventory[0].0.clone(), genesis_inventory[0].1));
+            vm_list.push((auditor_inventory[0].0.clone(), auditor_ip));
+
+            optional_audit_ip = Some(auditor_ip);
         }
 
-        let mut vm_list = Vec::new();
-        vm_list.push((genesis_inventory[0].0.clone(), genesis_inventory[0].1));
-        vm_list.push((auditor_inventory[0].0.clone(), auditor_ip));
         if !build_inventory.is_empty() {
             vm_list.push((build_inventory[0].0.clone(), build_inventory[0].1));
         }
@@ -164,16 +170,19 @@ impl DeploymentInventoryService {
                 AnsibleInventoryType::Nodes,
                 Some(format!("{{ \"dest\": {temp_dir_json} }}")),
             )?;
-            self.ansible_runner.run_playbook(
-                AnsiblePlaybook::NodeManagerInventory,
-                AnsibleInventoryType::Genesis,
-                Some(format!("{{ \"dest\": {temp_dir_json} }}")),
-            )?;
-            self.ansible_runner.run_playbook(
-                AnsiblePlaybook::NodeManagerInventory,
-                AnsibleInventoryType::Auditor,
-                Some(format!("{{ \"dest\": {temp_dir_json} }}")),
-            )?;
+
+            if is_fresh_network {
+                self.ansible_runner.run_playbook(
+                    AnsiblePlaybook::NodeManagerInventory,
+                    AnsibleInventoryType::Genesis,
+                    Some(format!("{{ \"dest\": {temp_dir_json} }}")),
+                )?;
+                self.ansible_runner.run_playbook(
+                    AnsiblePlaybook::NodeManagerInventory,
+                    AnsibleInventoryType::Auditor,
+                    Some(format!("{{ \"dest\": {temp_dir_json} }}")),
+                )?;
+            }
 
             let node_registry_paths = WalkDir::new(temp_dir_path)
                 .into_iter()
@@ -241,8 +250,12 @@ impl DeploymentInventoryService {
             })
             .collect::<Vec<String>>();
 
-        let (genesis_multiaddr, genesis_ip) =
-            get_genesis_multiaddr(&self.ansible_runner, &self.ssh_client).await?;
+        let (bootstrap_peer, genesis_ip) = if let Some(peer) = bootstrap_peer {
+            (peer, None)
+        } else {
+            let (addr, ip) = get_genesis_multiaddr(&self.ansible_runner, &self.ssh_client).await?;
+            (addr, Some(ip))
+        };
 
         let binary_option = if let Some(binary_option) = binary_option {
             binary_option
@@ -279,10 +292,10 @@ impl DeploymentInventoryService {
         };
 
         let inventory = DeploymentInventory {
-            auditor_address: format!("{auditor_ip}:4242"),
+            auditor_address: optional_audit_ip.map(|ip| format!("{ip}:4242")),
             binary_option,
-            faucet_address: format!("{genesis_ip}:8000"),
-            genesis_multiaddr,
+            faucet_address: genesis_ip.map(|ip| format!("{ip}:8000")),
+            bootstrap_multiaddr: bootstrap_peer,
             name: name.to_string(),
             peers,
             rpc_endpoints: safenode_rpc_endpoints,
@@ -330,10 +343,10 @@ impl DeploymentInventoryService {
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct DeploymentInventory {
-    pub auditor_address: String,
+    pub auditor_address: Option<String>,
     pub binary_option: BinaryOption,
-    pub faucet_address: String,
-    pub genesis_multiaddr: String,
+    pub faucet_address: Option<String>,
+    pub bootstrap_multiaddr: String,
     pub name: String,
     pub peers: Vec<String>,
     pub rpc_endpoints: BTreeMap<String, SocketAddr>,
@@ -427,7 +440,7 @@ impl DeploymentInventory {
                 println!("{peer}");
             }
         }
-        println!("Genesis: {}", self.genesis_multiaddr);
+        println!("Genesis: {}", self.bootstrap_multiaddr);
         let inventory_file_path =
             get_data_directory()?.join(format!("{}-inventory.json", self.name));
         println!(
@@ -439,18 +452,18 @@ impl DeploymentInventory {
         println!("==============");
         println!("Faucet Details");
         println!("==============");
-        println!("Faucet address: {}", self.faucet_address);
+        println!("Faucet address: {:?}", self.faucet_address);
         println!("Check the faucet:");
         println!(
-            "safe --peer {} wallet get-faucet {}",
-            self.genesis_multiaddr, self.faucet_address
+            "safe --peer {} wallet get-faucet {:?}",
+            self.bootstrap_multiaddr, self.faucet_address
         );
         println!();
 
         println!("===============");
         println!("Auditor Details");
         println!("===============");
-        println!("Auditor address: {}", self.auditor_address);
+        println!("Auditor address: {:?}", self.auditor_address);
         println!();
 
         if !self.uploaded_files.is_empty() {

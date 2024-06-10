@@ -10,7 +10,11 @@ use crate::{
     get_genesis_multiaddr, print_duration, BinaryOption, TestnetDeploy,
 };
 use colored::Colorize;
-use std::{net::SocketAddr, time::Instant};
+use std::{
+    net::SocketAddr,
+    time::{Duration, Instant},
+};
+use tokio::time::sleep;
 
 const DEFAULT_BETA_ENCRYPTION_KEY: &str =
     "49113d2083f57a976076adbe85decb75115820de1e6e74b47e0429338cef124a";
@@ -22,7 +26,7 @@ pub struct DeployCmd {
     logstash_details: Option<(String, Vec<SocketAddr>)>,
     name: String,
     node_count: u16,
-    peer: Option<String>,
+    bootstrap_peer: Option<String>,
     public_rpc: bool,
     testnet_deploy: TestnetDeploy,
     vm_count: u16,
@@ -47,7 +51,7 @@ impl DeployCmd {
             name,
             node_count,
             vm_count,
-            peer,
+            bootstrap_peer: peer,
             public_rpc,
             logstash_details,
             binary_option,
@@ -64,7 +68,7 @@ impl DeployCmd {
             }
         };
 
-        let is_fresh_network = self.peer.is_none();
+        let is_fresh_network = self.bootstrap_peer.is_none();
         self.create_infra(build_custom_binaries, is_fresh_network)
             .await
             .map_err(|err| {
@@ -83,12 +87,12 @@ impl DeployCmd {
             n += 1;
         }
 
-        self.print_ansible_run_banner(n, total, "Provision Genesis Node");
-
-        let this_is_a_new_network = self.peer.is_none();
-        let initial_point_of_contact = if let Some(contact) = &self.peer {
+        let this_is_a_new_network = self.bootstrap_peer.is_none();
+        let initial_point_of_contact = if let Some(contact) = &self.bootstrap_peer {
+            sleep(Duration::from_secs(60)).await;
             contact.clone()
         } else {
+            self.print_ansible_run_banner(n, total, "Provision Genesis Node");
             self.provision_genesis_node().await.map_err(|err| {
                 println!("Failed to provision genesis node {err:?}");
                 err
@@ -296,16 +300,16 @@ impl DeployCmd {
 
     fn build_node_extra_vars_doc(
         &self,
-        genesis_multiaddr: Option<String>,
+        bootstrap_node: Option<String>,
         node_instance_count: Option<u16>,
     ) -> Result<String> {
         let mut extra_vars = ExtraVarsDocBuilder::default();
         extra_vars.add_variable("provider", &self.testnet_deploy.cloud_provider.to_string());
         extra_vars.add_variable("testnet_name", &self.name);
-        if genesis_multiaddr.is_some() {
+        if bootstrap_node.is_some() {
             extra_vars.add_variable(
                 "genesis_multiaddr",
-                &genesis_multiaddr.ok_or_else(|| Error::GenesisMultiAddrNotSupplied)?,
+                &bootstrap_node.ok_or_else(|| Error::GenesisMultiAddrNotSupplied)?,
             );
         }
         if node_instance_count.is_some() {
