@@ -87,9 +87,8 @@ impl DeploymentInventoryService {
         name: &str,
         force: bool,
         binary_option: Option<BinaryOption>,
-        bootstrap_peer: Option<String>,
+        initial_bootstrap_peer: Option<String>,
     ) -> Result<DeploymentInventory> {
-        let is_fresh_network = bootstrap_peer.is_none();
         println!("=============================");
         println!("     Generating Inventory    ");
         println!("=============================");
@@ -130,27 +129,41 @@ impl DeploymentInventoryService {
             .await?;
         let mut vm_list = Vec::new();
 
-        if is_fresh_network {
-            let genesis_inventory = self
-                .ansible_runner
-                .get_inventory(AnsibleInventoryType::Genesis, false)
-                .await?;
-            let auditor_inventory = self
-                .ansible_runner
-                .get_inventory(AnsibleInventoryType::Auditor, true)
-                .await?;
-            let auditor_ip = auditor_inventory[0].1;
-            // It also seems to be possible for a workspace and inventory files to still exist, but
-            // there to be no inventory items returned. Perhaps someone deleted the VMs manually. We
-            // only need to test the genesis node in this case, since that must always exist.
-            if genesis_inventory.is_empty() {
-                return Err(eyre!("The '{}' environment does not exist", name));
-            }
-            vm_list.push((genesis_inventory[0].0.clone(), genesis_inventory[0].1));
-            vm_list.push((auditor_inventory[0].0.clone(), auditor_ip));
+        let is_fresh_network = match self
+            .ansible_runner
+            .get_inventory(AnsibleInventoryType::Genesis, false)
+            .await
+        {
+            Ok(genesis_inventory) => {
+                let auditor_inventory = self
+                    .ansible_runner
+                    .get_inventory(AnsibleInventoryType::Auditor, true)
+                    .await?;
+                let auditor_ip = auditor_inventory[0].1;
+                // It also seems to be possible for a workspace and inventory files to still exist, but
+                // there to be no inventory items returned. Perhaps someone deleted the VMs manually. We
+                // only need to test the genesis node in this case, since that must always exist.
+                if genesis_inventory.is_empty() {
+                    return Err(eyre!("The '{}' environment does not exist", name));
+                }
 
-            optional_audit_ip = Some(auditor_ip);
-        }
+                vm_list.push((genesis_inventory[0].0.clone(), genesis_inventory[0].1));
+                vm_list.push((auditor_inventory[0].0.clone(), auditor_ip));
+
+                optional_audit_ip = Some(auditor_ip);
+                true
+            }
+
+            Err(error) => {
+                eprintln!("Error getting genesis, treaing inventory as an extension to an existing network: {}", error);
+
+                if initial_bootstrap_peer.is_none() {
+                    return Err(eyre!("Initial bootstrap peer is required for an extension to an existing network.
+                        Choose a peer from the existing network contacts file to be the initial bootstrap peer."));
+                }
+                false
+            }
+        };
 
         if !build_inventory.is_empty() {
             vm_list.push((build_inventory[0].0.clone(), build_inventory[0].1));
@@ -250,7 +263,7 @@ impl DeploymentInventoryService {
             })
             .collect::<Vec<String>>();
 
-        let (bootstrap_peer, genesis_ip) = if let Some(peer) = bootstrap_peer {
+        let (bootstrap_peer, genesis_ip) = if let Some(peer) = initial_bootstrap_peer {
             (peer, None)
         } else {
             let (addr, ip) = get_genesis_multiaddr(&self.ansible_runner, &self.ssh_client).await?;
