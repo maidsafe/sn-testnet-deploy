@@ -15,7 +15,7 @@ resource "digitalocean_droplet" "genesis" {
   image    = var.node_droplet_image_id
   name     = "${terraform.workspace}-genesis"
   region   = var.region
-  size     = var.droplet_size
+  size     = var.boostrap_droplet_size # The genesis machine is always a bootstrapper
   ssh_keys = var.droplet_ssh_keys
   tags     = ["environment:${terraform.workspace}", "type:genesis"]
 }
@@ -25,7 +25,7 @@ resource "digitalocean_droplet" "node" {
   image    = var.node_droplet_image_id
   name     = "${terraform.workspace}-node-${count.index + 1}"
   region   = var.region
-  size     = var.droplet_size
+  size     = var.fresh_testnet ? var.boostrap_droplet_size : var.droplet_size
   ssh_keys = var.droplet_ssh_keys
   tags     = ["environment:${terraform.workspace}", "type:node"]
 }
