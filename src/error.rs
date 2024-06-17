@@ -59,6 +59,8 @@ pub enum Error {
     Io(#[from] std::io::Error),
     #[error("Failed to list objects in S3 bucket with prefix '{prefix}': {error}")]
     ListS3ObjectsError { prefix: String, error: String },
+    #[error("Could not configure logging: {0}")]
+    LoggingConfiguration(String),
     #[error("Logs for a '{0}' testnet already exist")]
     LogsForPreviousTestnetExist(String),
     #[error("Logs have not been retrieved for the '{0}' environment.")]

@@ -7,7 +7,7 @@
 use crate::{
     ansible::{AnsibleInventoryType, AnsiblePlaybook, ExtraVarsDocBuilder},
     error::{Error, Result},
-    get_genesis_multiaddr, print_duration, BinaryOption, TestnetDeploy,
+    get_genesis_multiaddr, print_duration, BinaryOption, LogFormat, TestnetDeploy,
 };
 use colored::Colorize;
 use std::{
@@ -23,6 +23,7 @@ pub struct DeployCmd {
     beta_encryption_key: Option<String>,
     binary_option: BinaryOption,
     env_variables: Option<Vec<(String, String)>>,
+    log_format: Option<LogFormat>,
     logstash_details: Option<(String, Vec<SocketAddr>)>,
     name: String,
     node_count: u16,
@@ -41,6 +42,7 @@ impl DeployCmd {
         vm_count: u16,
         peer: Option<String>,
         public_rpc: bool,
+        log_format: Option<LogFormat>,
         logstash_details: Option<(String, Vec<SocketAddr>)>,
         binary_option: BinaryOption,
         env_variables: Option<Vec<(String, String)>>,
@@ -53,6 +55,7 @@ impl DeployCmd {
             vm_count,
             bootstrap_peer: peer,
             public_rpc,
+            log_format,
             logstash_details,
             binary_option,
             env_variables,
@@ -318,6 +321,9 @@ impl DeployCmd {
                 "node_instance_count",
                 &node_instance_count.unwrap_or(20).to_string(),
             );
+        }
+        if let Some(log_format) = self.log_format {
+            extra_vars.add_variable("log_format", log_format.as_str());
         }
         if self.public_rpc {
             extra_vars.add_variable("public_rpc", "true");

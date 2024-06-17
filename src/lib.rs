@@ -105,6 +105,31 @@ impl CloudProvider {
     }
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum LogFormat {
+    Default,
+    Json,
+}
+
+impl LogFormat {
+    pub fn parse_from_str(val: &str) -> Result<Self> {
+        match val {
+            "default" => Ok(LogFormat::Default),
+            "json" => Ok(LogFormat::Json),
+            _ => Err(Error::LoggingConfiguration(
+                "The only valid values for this argument are \"default\" or \"json\"".to_string(),
+            )),
+        }
+    }
+
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            LogFormat::Default => "default",
+            LogFormat::Json => "json",
+        }
+    }
+}
+
 #[derive(Clone)]
 pub struct UpgradeOptions {
     pub ansible_verbose: bool,
