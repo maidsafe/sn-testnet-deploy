@@ -22,7 +22,7 @@ use sn_testnet_deploy::{
     manage_test_data::TestDataClientBuilder,
     network_commands, notify_slack,
     setup::setup_dotenv_file,
-    BinaryOption, CloudProvider, TestnetDeployBuilder, UpgradeOptions,
+    BinaryOption, CloudProvider, LogFormat, TestnetDeployBuilder, UpgradeOptions,
 };
 use std::time::Duration;
 
@@ -97,6 +97,13 @@ enum Commands {
         /// You can only supply version numbers or a custom branch, not both.
         #[arg(long)]
         faucet_version: Option<String>,
+        /// Specify the logging format for the nodes.
+        ///
+        /// Valid values are "default" or "json".
+        ///
+        /// If the argument is not used, the default format will be applied.
+        #[clap(long, value_parser = LogFormat::parse_from_str, verbatim_doc_comment)]
+        log_format: Option<LogFormat>,
         /// The name of the Logstash stack to forward logs to.
         #[clap(long, default_value = "main")]
         logstash_stack_name: String,
@@ -108,7 +115,6 @@ enum Commands {
         /// If not used, the contacts file will have the same name as the environment.
         #[arg(long)]
         network_contacts_file_name: Option<String>,
-
         /// The number of safenode processes to run on each VM.
         #[clap(long, default_value_t = 40)]
         node_count: u16,
@@ -524,6 +530,7 @@ async fn main() -> Result<()> {
             branch,
             env_variables,
             faucet_version,
+            log_format,
             logstash_stack_name,
             name,
             network_contacts_file_name,
@@ -598,6 +605,7 @@ async fn main() -> Result<()> {
                 vm_count,
                 bootstrap_peer.clone(),
                 public_rpc,
+                log_format,
                 logstash_details,
                 binary_option.clone(),
                 env_variables,

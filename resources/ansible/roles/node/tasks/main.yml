@@ -35,6 +35,7 @@
       - add
       - --first
       - --rpc-address={{ node_rpc_ip }}
+      - "{{ ('--log-format=' + log_format) if log_format is defined else omit }}"
       - "{{ ('--env=' + env_variables) if env_variables is defined else omit }}"
       - "{{ ('--version=' + version) if version is defined else ('--url=' + node_archive_url) }}"
   when: is_genesis and not genesis_exists | default(false)
@@ -84,6 +85,7 @@
       - --rpc-address={{ node_rpc_ip }}
       - --rpc-port={{ rpc_start_port }}-{{ rpc_end_port }}
       - --metrics-port={{ metrics_start_port }}-{{ metrics_end_port }}
+      - "{{ ('--log-format=' + log_format) if log_format is defined else omit }}"
       - "{{ ('--env=' + env_variables) if env_variables is defined else omit }}"
       - "{{ ('--version=' + version) if version is defined else ('--url=' + node_archive_url) }}"
   when: not is_genesis and nodes_to_add | default(0) | int > 0
