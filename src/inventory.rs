@@ -139,18 +139,20 @@ impl DeploymentInventoryService {
                     .ansible_runner
                     .get_inventory(AnsibleInventoryType::Auditor, true)
                     .await?;
-                let auditor_ip = auditor_inventory[0].1;
                 // It also seems to be possible for a workspace and inventory files to still exist, but
                 // there to be no inventory items returned. Perhaps someone deleted the VMs manually. We
                 // only need to test the genesis node in this case, since that must always exist.
                 if genesis_inventory.is_empty() {
                     return Err(eyre!("The '{}' environment does not exist", name));
                 }
+                if auditor_inventory.is_empty() {
+                    let auditor_ip = auditor_inventory[0].1;
+                    vm_list.push((auditor_inventory[0].0.clone(), auditor_ip));
+                    optional_audit_ip = Some(auditor_ip);
+                }
 
                 vm_list.push((genesis_inventory[0].0.clone(), genesis_inventory[0].1));
-                vm_list.push((auditor_inventory[0].0.clone(), auditor_ip));
 
-                optional_audit_ip = Some(auditor_ip);
                 true
             }
 
