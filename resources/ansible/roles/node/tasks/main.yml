@@ -65,8 +65,8 @@
 
 - name: calculate end port
   set_fact:
-    rpc_end_port: "{{ rpc_start_port | int + nodes_to_add | int - 1 }}"
-    metrics_end_port: "{{ metrics_start_port | int + nodes_to_add | int - 1 }}"
+    rpc_end_port: "{{ rpc_start_port | int + nodes_to_add | int }}"
+    metrics_end_port: "{{ metrics_start_port | int + nodes_to_add | int }}"
   when: nodes_to_add | default(0) | int > 0
 
 - name: add node services
