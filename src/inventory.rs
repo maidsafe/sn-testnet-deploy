@@ -12,7 +12,7 @@ use crate::{
     s3::S3Repository,
     ssh::SshClient,
     terraform::TerraformRunner,
-    BinaryOption, CloudProvider, TestnetDeploy,
+    BinaryOption, CloudProvider, TestnetDeployer,
 };
 use color_eyre::{eyre::eyre, Result};
 use log::{debug, trace};
@@ -44,8 +44,8 @@ pub struct DeploymentInventoryService {
     pub working_directory_path: PathBuf,
 }
 
-impl From<TestnetDeploy> for DeploymentInventoryService {
-    fn from(item: TestnetDeploy) -> Self {
+impl From<TestnetDeployer> for DeploymentInventoryService {
+    fn from(item: TestnetDeployer) -> Self {
         let provider = match item.cloud_provider {
             CloudProvider::Aws => "aws",
             CloudProvider::DigitalOcean => "digital_ocean",

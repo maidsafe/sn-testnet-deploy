@@ -14,7 +14,7 @@ use rand::Rng;
 use semver::Version;
 use sn_releases::{ReleaseType, SafeReleaseRepoActions};
 use sn_testnet_deploy::{
-    deploy::DeployCmd,
+    deploy::DeployOptions,
     error::Error,
     get_wallet_directory,
     inventory::{get_data_directory, DeploymentInventory, DeploymentInventoryService},
@@ -558,13 +558,13 @@ async fn main() -> Result<()> {
             )
             .await?;
 
-            let testnet_deploy = TestnetDeployBuilder::default()
+            let testnet_deployer = TestnetDeployBuilder::default()
                 .ansible_verbose_mode(ansible_verbose)
                 .environment_name(&name)
                 .provider(provider.clone())
                 .build()?;
 
-            match testnet_deploy.init().await {
+            match testnet_deployer.init().await {
                 Ok(_) => {}
                 Err(e @ Error::LogsForPreviousTestnetExist(_)) => {
                     return Err(eyre!(e)
@@ -598,22 +598,23 @@ async fn main() -> Result<()> {
                     Some((logstash_stack_name, stack_hosts))
                 }
             };
-            let deploy_cmd = DeployCmd::new(
-                testnet_deploy.clone(),
-                name.clone(),
-                node_count,
-                vm_count,
-                bootstrap_peer.clone(),
-                public_rpc,
-                log_format,
-                logstash_details,
-                binary_option.clone(),
-                env_variables,
-                beta_encryption_key,
-            );
-            deploy_cmd.execute().await?;
 
-            let inventory_service = DeploymentInventoryService::from(testnet_deploy);
+            testnet_deployer
+                .deploy(&DeployOptions {
+                    beta_encryption_key,
+                    binary_option: binary_option.clone(),
+                    bootstrap_peer: bootstrap_peer.clone(),
+                    env_variables,
+                    log_format,
+                    logstash_details,
+                    name: name.clone(),
+                    node_count,
+                    public_rpc,
+                    vm_count,
+                })
+                .await?;
+
+            let inventory_service = DeploymentInventoryService::from(testnet_deployer);
             let inventory = inventory_service
                 .generate_inventory(&name, true, Some(binary_option), bootstrap_peer)
                 .await?;
