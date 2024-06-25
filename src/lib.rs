@@ -222,7 +222,7 @@ impl TestnetDeployBuilder {
         self
     }
 
-    pub fn build(&self) -> Result<TestnetDeploy> {
+    pub fn build(&self) -> Result<TestnetDeployer> {
         let provider = self
             .provider
             .as_ref()
@@ -298,7 +298,7 @@ impl TestnetDeployBuilder {
             std::fs::remove_file(safe_path)?;
         }
 
-        let testnet = TestnetDeploy::new(
+        let testnet = TestnetDeployer::new(
             ansible_runner,
             provider.clone(),
             &self.environment_name,
@@ -314,7 +314,7 @@ impl TestnetDeployBuilder {
 }
 
 #[derive(Clone)]
-pub struct TestnetDeploy {
+pub struct TestnetDeployer {
     pub ansible_runner: AnsibleRunner,
     pub cloud_provider: CloudProvider,
     pub environment_name: String,
@@ -326,7 +326,7 @@ pub struct TestnetDeploy {
     pub working_directory_path: PathBuf,
 }
 
-impl TestnetDeploy {
+impl TestnetDeployer {
     #[allow(clippy::too_many_arguments)]
     pub fn new(
         ansible_runner: AnsibleRunner,
@@ -337,7 +337,7 @@ impl TestnetDeploy {
         ssh_client: SshClient,
         terraform_runner: TerraformRunner,
         working_directory_path: PathBuf,
-    ) -> Result<TestnetDeploy> {
+    ) -> Result<TestnetDeployer> {
         if environment_name.is_empty() {
             return Err(Error::EnvironmentNameRequired);
         }
@@ -345,7 +345,7 @@ impl TestnetDeploy {
             .join("ansible")
             .join("inventory")
             .join("dev_inventory_digital_ocean.yml");
-        Ok(TestnetDeploy {
+        Ok(TestnetDeployer {
             ansible_runner,
             cloud_provider,
             environment_name: environment_name.to_string(),

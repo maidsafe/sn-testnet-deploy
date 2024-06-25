@@ -9,7 +9,7 @@ use crate::{
     error::{Error, Result},
     get_progress_bar, run_external_command,
     s3::S3Repository,
-    TestnetDeploy,
+    TestnetDeployer,
 };
 use fs_extra::dir::{copy, remove, CopyOptions};
 use log::debug;
@@ -21,7 +21,7 @@ use std::{
     path::{Path, PathBuf},
 };
 
-impl TestnetDeploy {
+impl TestnetDeployer {
     pub async fn rsync_logs(&self, name: &str, resources_only: bool) -> Result<()> {
         // take root_dir at the top as `get_all_node_inventory` changes the working dir.
         let root_dir = std::env::current_dir()?;
