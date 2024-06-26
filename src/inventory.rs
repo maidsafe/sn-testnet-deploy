@@ -67,27 +67,25 @@ impl From<TestnetDeployer> for DeploymentInventoryService {
 }
 
 impl DeploymentInventoryService {
-    /// Generate the inventory for the deployment.
+    /// Generate or retrieve the inventory for the deployment.
     ///
-    /// It will be cached for the purposes of quick display later and also for use with the test
-    /// data upload.
+    /// If we're creating a new environment and there is no inventory yet, a empty inventory will
+    /// be returned; otherwise the inventory will represent what is deployed currently.
     ///
     /// The `force` flag is used when the `deploy` command runs, to make sure that a new inventory
     /// is generated, because it's possible that an old one with the same environment name has been
     /// cached.
     ///
     /// The binary option will only be present on the first generation of the inventory, when the
-    /// testnet is initially deployed. On any subsequent runs to generate the inventory, we don't
-    /// have access to the initial arguments that the deployment was launched with. This will mean
-    /// that any branch specification is lost. In this case, we will just retrieve the version
-    /// numbers from the genesis node in the node registry. Most of the time it is the version
-    /// numbers that will be of interest.
-    pub async fn generate_inventory(
+    /// testnet is initially deployed. On any subsequent runs, we don't have access to the initial
+    /// launch arguments. This means any branch specification is lost. In this case, we'll just
+    /// retrieve the version numbers from the genesis node in the node registry. Most of the time
+    /// it is the version numbers that will be of interest.
+    pub async fn generate_or_retrieve_inventory(
         &self,
         name: &str,
         force: bool,
         binary_option: Option<BinaryOption>,
-        initial_bootstrap_peer: Option<String>,
     ) -> Result<DeploymentInventory> {
         println!("=============================");
         println!("     Generating Inventory    ");
@@ -107,70 +105,60 @@ impl DeploymentInventoryService {
             }
         }
 
-        if force {
-            generate_environment_inventory(
+        // The following operation is idempotent.
+        generate_environment_inventory(
+            name,
+            &self.inventory_file_path,
+            &self
+                .working_directory_path
+                .join("ansible")
+                .join("inventory"),
+        )
+        .await?;
+
+        let mut vm_list = Vec::new();
+        let genesis_inventory = self
+            .ansible_runner
+            .get_inventory(AnsibleInventoryType::Genesis, false)
+            .await?;
+        if genesis_inventory.is_empty() {
+            println!("Genesis node does not exist: we are treating this as a new deployment");
+            return Ok(DeploymentInventory::empty(
                 name,
-                &self.inventory_file_path,
-                &self
-                    .working_directory_path
-                    .join("ansible")
-                    .join("inventory"),
-            )
-            .await?
+                binary_option
+                    .ok_or_else(|| eyre!("For a new deployment the binary option must be set"))?,
+            ));
         }
-        let mut optional_audit_ip = None;
+        vm_list.push((genesis_inventory[0].0.clone(), genesis_inventory[0].1));
+
+        let auditor_inventory = self
+            .ansible_runner
+            .get_inventory(AnsibleInventoryType::Auditor, true)
+            .await?;
+        let auditor_ip = auditor_inventory[0].1;
+        vm_list.push((auditor_inventory[0].0.clone(), auditor_ip));
+
         let build_inventory = self
             .ansible_runner
             .get_inventory(AnsibleInventoryType::Build, false)
             .await?;
-        let remaining_nodes_inventory = self
-            .ansible_runner
-            .get_inventory(AnsibleInventoryType::Nodes, false)
-            .await?;
-        let mut vm_list = Vec::new();
-
-        let is_fresh_network = match self
-            .ansible_runner
-            .get_inventory(AnsibleInventoryType::Genesis, false)
-            .await
-        {
-            Ok(genesis_inventory) => {
-                let auditor_inventory = self
-                    .ansible_runner
-                    .get_inventory(AnsibleInventoryType::Auditor, true)
-                    .await?;
-                // It also seems to be possible for a workspace and inventory files to still exist, but
-                // there to be no inventory items returned. Perhaps someone deleted the VMs manually. We
-                // only need to test the genesis node in this case, since that must always exist.
-                if genesis_inventory.is_empty() {
-                    return Err(eyre!("The '{}' environment does not exist", name));
-                }
-                if auditor_inventory.is_empty() {
-                    let auditor_ip = auditor_inventory[0].1;
-                    vm_list.push((auditor_inventory[0].0.clone(), auditor_ip));
-                    optional_audit_ip = Some(auditor_ip);
-                }
-
-                vm_list.push((genesis_inventory[0].0.clone(), genesis_inventory[0].1));
-
-                true
-            }
-
-            Err(error) => {
-                eprintln!("Error getting genesis, treaing inventory as an extension to an existing network: {}", error);
-
-                if initial_bootstrap_peer.is_none() {
-                    return Err(eyre!("Initial bootstrap peer is required for an extension to an existing network.
-                        Choose a peer from the existing network contacts file to be the initial bootstrap peer."));
-                }
-                false
-            }
-        };
-
         if !build_inventory.is_empty() {
             vm_list.push((build_inventory[0].0.clone(), build_inventory[0].1));
         }
-        for entry in remaining_nodes_inventory.iter() {
+
+        let nodes_inventory = self
+            .ansible_runner
+            .get_inventory(AnsibleInventoryType::Nodes, false)
+            .await?;
+        for entry in nodes_inventory.iter() {
+            vm_list.push((entry.0.clone(), entry.1));
+        }
+
+        let bootstrap_nodes_inventory = self
+            .ansible_runner
+            .get_inventory(AnsibleInventoryType::BootstrapNodes, false)
+            .await?;
+        for entry in bootstrap_nodes_inventory.iter() {
             vm_list.push((entry.0.clone(), entry.1));
         }
 
@@ -185,19 +173,21 @@ impl DeploymentInventoryService {
                 AnsibleInventoryType::Nodes,
                 Some(format!("{{ \"dest\": {temp_dir_json} }}")),
             )?;
-
-            if is_fresh_network {
-                self.ansible_runner.run_playbook(
-                    AnsiblePlaybook::NodeManagerInventory,
-                    AnsibleInventoryType::Genesis,
-                    Some(format!("{{ \"dest\": {temp_dir_json} }}")),
-                )?;
-                self.ansible_runner.run_playbook(
-                    AnsiblePlaybook::NodeManagerInventory,
-                    AnsibleInventoryType::Auditor,
-                    Some(format!("{{ \"dest\": {temp_dir_json} }}")),
-                )?;
-            }
+            self.ansible_runner.run_playbook(
+                AnsiblePlaybook::NodeManagerInventory,
+                AnsibleInventoryType::BootstrapNodes,
+                Some(format!("{{ \"dest\": {temp_dir_json} }}")),
+            )?;
+            self.ansible_runner.run_playbook(
+                AnsiblePlaybook::NodeManagerInventory,
+                AnsibleInventoryType::Genesis,
+                Some(format!("{{ \"dest\": {temp_dir_json} }}")),
+            )?;
+            self.ansible_runner.run_playbook(
+                AnsiblePlaybook::NodeManagerInventory,
+                AnsibleInventoryType::Auditor,
+                Some(format!("{{ \"dest\": {temp_dir_json} }}")),
+            )?;
 
             let node_registry_paths = WalkDir::new(temp_dir_path)
                 .into_iter()
@@ -265,13 +255,6 @@ impl DeploymentInventoryService {
             })
             .collect::<Vec<String>>();
 
-        let (bootstrap_peer, genesis_ip) = if let Some(peer) = initial_bootstrap_peer {
-            (peer, None)
-        } else {
-            let (addr, ip) = get_genesis_multiaddr(&self.ansible_runner, &self.ssh_client).await?;
-            (addr, Some(ip))
-        };
-
         let binary_option = if let Some(binary_option) = binary_option {
             binary_option
         } else {
@@ -306,11 +289,13 @@ impl DeploymentInventoryService {
             }
         };
 
+        let (genesis_multiaddr, genesis_ip) =
+            get_genesis_multiaddr(&self.ansible_runner, &self.ssh_client).await?;
         let inventory = DeploymentInventory {
-            auditor_address: optional_audit_ip.map(|ip| format!("{ip}:4242")),
+            auditor_address: format!("{auditor_ip}:4242"),
             binary_option,
-            faucet_address: genesis_ip.map(|ip| format!("{ip}:8000")),
-            bootstrap_multiaddr: bootstrap_peer,
+            faucet_address: format!("{genesis_ip}:8000"),
+            genesis_multiaddr,
             name: name.to_string(),
             peers,
             rpc_endpoints: safenode_rpc_endpoints,
@@ -358,10 +343,10 @@ impl DeploymentInventoryService {
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct DeploymentInventory {
-    pub auditor_address: Option<String>,
+    pub auditor_address: String,
     pub binary_option: BinaryOption,
-    pub faucet_address: Option<String>,
-    pub bootstrap_multiaddr: String,
+    pub faucet_address: String,
+    pub genesis_multiaddr: String,
     pub name: String,
     pub peers: Vec<String>,
     pub rpc_endpoints: BTreeMap<String, SocketAddr>,
@@ -372,6 +357,28 @@ pub struct DeploymentInventory {
 }
 
 impl DeploymentInventory {
+    /// Create an inventory for a new deployment which is initially empty, other than the name and
+    /// binary option, which will have been selected.
+    pub fn empty(name: &str, binary_option: BinaryOption) -> DeploymentInventory {
+        Self {
+            binary_option,
+            name: name.to_string(),
+            auditor_address: String::new(),
+            genesis_multiaddr: String::new(),
+            faucet_address: String::new(),
+            peers: Vec::new(),
+            rpc_endpoints: BTreeMap::new(),
+            safenodemand_endpoints: Vec::new(),
+            ssh_user: "root".to_string(),
+            uploaded_files: Vec::new(),
+            vm_list: Vec::new(),
+        }
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.vm_list.is_empty()
+    }
+
     pub fn save(&self) -> Result<()> {
         let path = get_data_directory()?.join(format!("{}-inventory.json", self.name));
         let serialized_data = serde_json::to_string_pretty(self)?;
@@ -455,7 +462,7 @@ impl DeploymentInventory {
                 println!("{peer}");
             }
         }
-        println!("Genesis: {}", self.bootstrap_multiaddr);
+        println!("Genesis: {}", self.genesis_multiaddr);
         let inventory_file_path =
             get_data_directory()?.join(format!("{}-inventory.json", self.name));
         println!(
@@ -471,7 +478,7 @@ impl DeploymentInventory {
         println!("Check the faucet:");
         println!(
             "safe --peer {} wallet get-faucet {:?}",
-            self.bootstrap_multiaddr, self.faucet_address
+            self.genesis_multiaddr, self.faucet_address
         );
         println!();
 

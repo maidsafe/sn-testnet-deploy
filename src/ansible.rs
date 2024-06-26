@@ -145,6 +145,8 @@ pub enum AnsibleInventoryType {
     //
     // Only one machine will be returned in this inventory.
     Auditor,
+    // Use to run a playbook against all bootstrap nodes.
+    BootstrapNodes,
     // Use to run a playbook against the build machine.
     //
     // This is a larger machine that is used for building binaries from source.
@@ -316,6 +318,10 @@ impl AnsibleRunner {
                 ".{}_auditor_inventory_{}.yml",
                 self.environment_name, provider
             )),
+            AnsibleInventoryType::Nodes => PathBuf::from("inventory").join(format!(
+                ".{}_node_inventory_{}.yml",
+                self.environment_name, provider
+            )),
             AnsibleInventoryType::Build => PathBuf::from("inventory").join(format!(
                 ".{}_build_inventory_{}.yml",
                 self.environment_name, provider
@@ -328,8 +334,8 @@ impl AnsibleRunner {
                 ".{}_logstash_inventory_{}.yml",
                 self.environment_name, provider
             )),
-            AnsibleInventoryType::Nodes => PathBuf::from("inventory").join(format!(
-                ".{}_node_inventory_{}.yml",
+            AnsibleInventoryType::BootstrapNodes => PathBuf::from("inventory").join(format!(
+                ".{}_bootstrap_node_inventory_{}.yml",
                 self.environment_name, provider
             )),
         };
@@ -621,7 +627,7 @@ pub async fn generate_environment_inventory(
     output_inventory_dir_path: &Path,
 ) -> Result<()> {
     let mut generated_inventory_paths = vec![];
-    let inventory_files = ["build", "genesis", "node", "auditor"];
+    let inventory_files = ["bootstrap_node", "build", "genesis", "node", "auditor"];
     for inventory_type in inventory_files.iter() {
         let src_path = base_inventory_path;
         let dest_path = output_inventory_dir_path.join(format!(

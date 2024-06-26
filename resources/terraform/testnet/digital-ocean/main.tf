@@ -10,22 +10,31 @@ terraform {
   }
 }
 
-resource "digitalocean_droplet" "genesis" {
-  count    = var.fresh_testnet ? 1 : 0
+resource "digitalocean_droplet" "genesis_bootstrap" {
   image    = var.node_droplet_image_id
-  name     = "${terraform.workspace}-genesis"
+  name     = "${terraform.workspace}-genesis-bootstrap"
   region   = var.region
-  size     = var.boostrap_droplet_size # The genesis machine is always a bootstrapper
+  size     = var.boostrap_droplet_size
   ssh_keys = var.droplet_ssh_keys
   tags     = ["environment:${terraform.workspace}", "type:genesis"]
 }
 
+resource "digitalocean_droplet" "bootstrap_node" {
+  count    = var.bootstrap_node_vm_count
+  image    = var.node_droplet_image_id
+  name     = "${terraform.workspace}-bootstrap-node-${count.index + 1}"
+  region   = var.region
+  size     = var.boostrap_droplet_size
+  ssh_keys = var.droplet_ssh_keys
+  tags     = ["environment:${terraform.workspace}", "type:bootstrap_node"]
+}
+
 resource "digitalocean_droplet" "node" {
-  count    = var.node_count
+  count    = var.node_vm_count
   image    = var.node_droplet_image_id
   name     = "${terraform.workspace}-node-${count.index + 1}"
   region   = var.region
-  size     = var.fresh_testnet ? var.boostrap_droplet_size : var.droplet_size
+  size     = var.node_droplet_size
   ssh_keys = var.droplet_ssh_keys
   tags     = ["environment:${terraform.workspace}", "type:node"]
 }
@@ -40,42 +49,11 @@ resource "digitalocean_droplet" "build" {
   tags     = ["environment:${terraform.workspace}", "type:build"]
 }
 
-# Todo: Have unique name for firewall? As we got this error
-# Error creating firewall: POST https://api.digitalocean.com/v2/firewalls: 409 duplicate name
-# resource "digitalocean_firewall" "auditor_fw" {
-#   name = "auditor-firewall"
-
-#   inbound_rule {
-#     protocol         = "tcp"
-#     port_range       = "80"
-#     source_addresses = ["127.0.0.1"]
-#   }
-#   # Allow SSH connections
-#   inbound_rule {
-#     protocol         = "tcp"
-#     port_range       = "22"
-#     source_addresses = ["0.0.0.0/0"]
-#   }
-#   outbound_rule {
-#     protocol               = "udp"
-#     port_range             = "1-65535"
-#     destination_addresses  = ["0.0.0.0/0"]
-#   }
-#     outbound_rule {
-#     protocol               = "tcp"
-#     port_range             = "1-65535"
-#     destination_addresses  = ["0.0.0.0/0"]
-#   }
-
-#   droplet_ids = [digitalocean_droplet.auditor.id]
-# }
-
 resource "digitalocean_droplet" "auditor" {
-  count    = var.fresh_testnet ? 1 : 0
   image    = var.auditor_droplet_image_id
   name     = "${terraform.workspace}-auditor"
   region   = var.region
-  size     = var.droplet_size
+  size     = var.node_droplet_size
   backups  = true
   ssh_keys = var.droplet_ssh_keys
   tags     = ["environment:${terraform.workspace}", "type:auditor"]

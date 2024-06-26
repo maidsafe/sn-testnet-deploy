@@ -65,12 +65,11 @@ enum Commands {
         /// If not used a default key will be supplied.
         #[arg(long)]
         beta_encryption_key: Option<String>,
-        /// Peer multiaddress to connect to.
-        /// This is useful to connect to a specific preexisting peer
+        /// The number of bootstrap node VMs to create.
         ///
-        /// If this is supplied then no genesis node will be started.
-        #[arg(long)]
-        bootstrap_peer: Option<String>,
+        /// Each VM will run many safenode services.
+        #[clap(long, default_value_t = 10)]
+        bootstrap_node_vm_count: u16,
         /// The branch of the Github repository to build from.
         ///
         /// If used, all binaries will be built from this branch. It is typically used for testing
@@ -80,14 +79,15 @@ enum Commands {
         ///
         /// The --branch and --repo-owner arguments are mutually exclusive with the binary version
         /// arguments. You can only supply version numbers or a custom branch, not both.
-        #[arg(long)]
+        #[arg(long, verbatim_doc_comment)]
         branch: Option<String>,
         /// Provide environment variables for the safenode service.
         ///
-        /// This is useful to set the safenode's log levels. Each variable should be comma separated without any space.
+        /// This is useful to set the safenode's log levels. Each variable should be comma
+        /// separated without any space.
         ///
         /// Example: --env SN_LOG=all,RUST_LOG=libp2p=debug
-        #[clap(name = "env", long, use_value_delimiter = true, value_parser = parse_environment_variables)]
+        #[clap(name = "env", long, use_value_delimiter = true, value_parser = parse_environment_variables, verbatim_doc_comment)]
         env_variables: Option<Vec<(String, String)>>,
         /// Supply a version number to be used for the faucet binary.
         ///
@@ -95,7 +95,7 @@ enum Commands {
         ///
         /// The version arguments are mutually exclusive with the --branch and --repo-owner arguments.
         /// You can only supply version numbers or a custom branch, not both.
-        #[arg(long)]
+        #[arg(long, verbatim_doc_comment)]
         faucet_version: Option<String>,
         /// Specify the logging format for the nodes.
         ///
@@ -115,17 +115,22 @@ enum Commands {
         /// If not used, the contacts file will have the same name as the environment.
         #[arg(long)]
         network_contacts_file_name: Option<String>,
-        /// The number of safenode processes to run on each VM.
+        /// The number of safenode services to run on each VM.
         #[clap(long, default_value_t = 40)]
         node_count: u16,
-        /// Protocol version is used to partition the network and would not allow nodes with different protocol versions
-        /// to join us.
+        /// The number of node VMs to create.
         ///
-        /// If set to 'restricted' then the branch name is used as the protocol version string else the passed in value
-        /// is used as the version string.
+        /// Each VM will run many safenode services.
+        #[clap(long, default_value_t = 10)]
+        node_vm_count: u16,
+        /// Protocol version is used to partition the network and will not allow nodes with
+        /// different protocol versions to join.
         ///
-        /// The protocol version argument is mutually exclusive with the --safenode-version argument.
-        #[arg(long)]
+        /// If set to 'restricted', the branch name is used as the protocol version; otherwise the
+        /// version is set to the value supplied.
+        ///
+        /// This argument is mutually exclusive with the --safenode-version argument.
+        #[arg(long, verbatim_doc_comment)]
         protocol_version: Option<String>,
         /// The cloud provider to deploy to.
         ///
@@ -134,8 +139,9 @@ enum Commands {
         provider: CloudProvider,
         /// If set to true, the RPC of the node will be accessible remotely.
         ///
-        /// By default, the safenode RPC is only accessible via the 'localhost' and is not exposed for security reasons.
-        #[clap(long, default_value_t = false)]
+        /// By default, the safenode RPC is only accessible via the 'localhost' and is not exposed for
+        /// security reasons.
+        #[clap(long, default_value_t = false, verbatim_doc_comment)]
         public_rpc: bool,
         /// The owner/org of the Github repository to build from.
         ///
@@ -146,14 +152,14 @@ enum Commands {
         ///
         /// The --branch and --repo-owner arguments are mutually exclusive with the binary version
         /// arguments. You can only supply version numbers or a custom branch, not both.
-        #[arg(long)]
+        #[arg(long, verbatim_doc_comment)]
         repo_owner: Option<String>,
         /// The features to enable on the safenode binary.
         ///
         /// If not provided, the default feature set specified for the safenode binary are used.
         ///
         /// The features argument is mutually exclusive with the --safenode-version argument.
-        #[clap(long)]
+        #[clap(long, verbatim_doc_comment)]
         safenode_features: Option<Vec<String>>,
         /// Supply a version number for the safenode binary.
         ///
@@ -161,7 +167,7 @@ enum Commands {
         ///
         /// The version arguments are mutually exclusive with the --branch and --repo-owner
         /// arguments. You can only supply version numbers or a custom branch, not both.
-        #[arg(long)]
+        #[arg(long, verbatim_doc_comment)]
         safenode_version: Option<String>,
         /// Supply a version number for the safenode-manager binary.
         ///
@@ -169,7 +175,7 @@ enum Commands {
         ///
         /// The version arguments are mutually exclusive with the --branch and --repo-owner
         /// arguments. You can only supply version numbers or a custom branch, not both.
-        #[arg(long)]
+        #[arg(long, verbatim_doc_comment)]
         safenode_manager_version: Option<String>,
         /// Supply a version number for the sn_auditor binary.
         ///
@@ -177,21 +183,10 @@ enum Commands {
         ///
         /// The version arguments are mutually exclusive with the --branch and --repo-owner
         /// arguments. You can only supply version numbers or a custom branch, not both.
-        #[arg(long)]
+        #[arg(long, verbatim_doc_comment)]
         sn_auditor_version: Option<String>,
-        /// The number of node VMs to create.
-        ///
-        /// Each VM will run many safenode processes.
-        #[clap(long, default_value_t = 10)]
-        vm_count: u16,
     },
     Inventory {
-        /// Peer multiaddress to connect to.
-        /// This is useful to connect to a specific preexisting peer
-        ///
-        /// To inventory an extensions network, a contact must be suopplied here
-        #[arg(long)]
-        bootstrap_peer: Option<String>,
         /// If set to true, the inventory will be regenerated.
         ///
         /// This is useful if the testnet was created on another machine.
@@ -528,6 +523,7 @@ async fn main() -> Result<()> {
             ansible_verbose,
             beta_encryption_key,
             branch,
+            bootstrap_node_vm_count,
             env_variables,
             faucet_version,
             log_format,
@@ -535,7 +531,7 @@ async fn main() -> Result<()> {
             name,
             network_contacts_file_name,
             node_count,
-            bootstrap_peer,
+            node_vm_count,
             protocol_version,
             provider,
             public_rpc,
@@ -544,7 +540,6 @@ async fn main() -> Result<()> {
             safenode_version,
             safenode_manager_version,
             sn_auditor_version,
-            vm_count,
         } => {
             let binary_option = get_binary_option(
                 branch,
@@ -563,6 +558,11 @@ async fn main() -> Result<()> {
                 .environment_name(&name)
                 .provider(provider.clone())
                 .build()?;
+
+            let inventory_service = DeploymentInventoryService::from(testnet_deployer.clone());
+            let inventory = inventory_service
+                .generate_or_retrieve_inventory(&name, true, Some(binary_option.clone()))
+                .await?;
 
             match testnet_deployer.init().await {
                 Ok(_) => {}
@@ -603,20 +603,20 @@ async fn main() -> Result<()> {
                 .deploy(&DeployOptions {
                     beta_encryption_key,
                     binary_option: binary_option.clone(),
-                    bootstrap_peer: bootstrap_peer.clone(),
+                    bootstrap_node_vm_count,
+                    current_inventory: inventory,
                     env_variables,
                     log_format,
                     logstash_details,
                     name: name.clone(),
                     node_count,
+                    node_vm_count,
                     public_rpc,
-                    vm_count,
                 })
                 .await?;
 
-            let inventory_service = DeploymentInventoryService::from(testnet_deployer);
             let inventory = inventory_service
-                .generate_inventory(&name, true, Some(binary_option), bootstrap_peer)
+                .generate_or_retrieve_inventory(&name, true, Some(binary_option.clone()))
                 .await?;
             inventory.print_report()?;
             inventory.save()?;
@@ -632,7 +632,6 @@ async fn main() -> Result<()> {
             name,
             network_contacts_file_name,
             provider,
-            bootstrap_peer,
         } => {
             let testnet_deploy = TestnetDeployBuilder::default()
                 .environment_name(&name)
@@ -641,7 +640,7 @@ async fn main() -> Result<()> {
 
             let inventory_service = DeploymentInventoryService::from(testnet_deploy);
             let inventory = inventory_service
-                .generate_inventory(&name, force_regeneration, None, bootstrap_peer)
+                .generate_or_retrieve_inventory(&name, force_regeneration, None)
                 .await?;
             inventory.print_report()?;
             inventory.save()?;
