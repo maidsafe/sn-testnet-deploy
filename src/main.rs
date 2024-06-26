@@ -620,9 +620,29 @@ async fn main() -> Result<()> {
                 })
                 .await?;
 
-            let inventory = inventory_service
-                .generate_or_retrieve_inventory(&name, true, Some(binary_option.clone()))
-                .await?;
+            let max_retries = 3;
+            let mut retries = 0;
+            let inventory = loop {
+                match inventory_service
+                    .generate_or_retrieve_inventory(&name, true, Some(binary_option.clone()))
+                    .await
+                {
+                    Ok(inv) => break inv,
+                    Err(e) if retries < max_retries => {
+                        retries += 1;
+                        eprintln!("Failed to generate inventory on attempt {retries}: {:?}", e);
+                        eprintln!("Will retry up to {max_retries} times...");
+                    }
+                    Err(_) => {
+                        eprintln!("Failed to generate inventory after {max_retries} attempts");
+                        eprintln!(
+                            "Please try running the `inventory` command or workflow separately"
+                        );
+                        return Ok(());
+                    }
+                }
+            };
+
             inventory.print_report()?;
             inventory.save()?;
 
