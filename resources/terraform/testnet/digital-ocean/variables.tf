@@ -56,7 +56,12 @@ variable "bootstrap_node_vm_count" {
 
 variable "node_vm_count" {
   default     = 25
-  description = "The number of droplets to launch for the nodes"
+  description = "The number of droplets to launch for nodes"
+}
+
+variable "uploader_vm_count" {
+  default     = 5
+  description = "The number of droplets to launch for uploaders"
 }
 
 variable "use_custom_bin" {
