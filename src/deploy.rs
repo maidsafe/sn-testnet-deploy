@@ -28,6 +28,7 @@ pub struct DeployOptions {
     pub node_count: u16,
     pub node_vm_count: u16,
     pub public_rpc: bool,
+    pub uploader_vm_count: u16,
 }
 
 enum NodeType {
@@ -163,6 +164,10 @@ impl TestnetDeployer {
             (
                 "node_vm_count".to_string(),
                 options.node_vm_count.to_string(),
+            ),
+            (
+                "uploader_vm_count".to_string(),
+                options.uploader_vm_count.to_string(),
             ),
             ("use_custom_bin".to_string(), enable_build_vm.to_string()),
         ];

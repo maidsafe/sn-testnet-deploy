@@ -39,6 +39,16 @@ resource "digitalocean_droplet" "node" {
   tags     = ["environment:${terraform.workspace}", "type:node"]
 }
 
+resource "digitalocean_droplet" "uploader" {
+  count    = var.uploader_vm_count
+  image    = var.node_droplet_image_id
+  name     = "${terraform.workspace}-uploader-${count.index + 1}"
+  region   = var.region
+  size     = var.node_droplet_size
+  ssh_keys = var.droplet_ssh_keys
+  tags     = ["environment:${terraform.workspace}", "type:uploader"]
+}
+
 resource "digitalocean_droplet" "build" {
   count    = var.use_custom_bin ? 1 : 0
   image    = var.build_droplet_image_id

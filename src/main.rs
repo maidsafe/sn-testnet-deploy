@@ -185,6 +185,9 @@ enum Commands {
         /// arguments. You can only supply version numbers or a custom branch, not both.
         #[arg(long, verbatim_doc_comment)]
         sn_auditor_version: Option<String>,
+        /// The number of uploader VMs to create.
+        #[clap(long, default_value_t = 5)]
+        uploader_vm_count: u16,
     },
     Inventory {
         /// If set to true, the inventory will be regenerated.
@@ -540,6 +543,7 @@ async fn main() -> Result<()> {
             safenode_version,
             safenode_manager_version,
             sn_auditor_version,
+            uploader_vm_count,
         } => {
             let binary_option = get_binary_option(
                 branch,
@@ -612,6 +616,7 @@ async fn main() -> Result<()> {
                     node_count,
                     node_vm_count,
                     public_rpc,
+                    uploader_vm_count,
                 })
                 .await?;
 
