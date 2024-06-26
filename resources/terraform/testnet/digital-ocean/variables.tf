@@ -18,19 +18,16 @@ variable "droplet_ssh_keys" {
   ]
 }
 
-variable "droplet_size" {
+variable "node_droplet_size" {
   default = "s-2vcpu-4gb"
 }
+
 variable "boostrap_droplet_size" {
   default = "s-8vcpu-16gb-480gb-intel"
 }
 
 variable "build_machine_size" {
   default = "s-8vcpu-16gb"
-}
-
-variable "fresh_testnet" {
-  default = "false"
 }
 
 # This corresponds to the 'safe_network-auditor-1715864456' image/snapshot.
@@ -52,8 +49,12 @@ variable "region" {
   default = "lon1"
 }
 
-# 25*80 = 2k. A good node sample size. Should provide enough bandwidth per droplet to survive on defualt limits.
-variable "node_count" {
+variable "bootstrap_node_vm_count" {
+  default     = 25
+  description = "The number of droplets to launch for bootstrap nodes"
+}
+
+variable "node_vm_count" {
   default     = 25
   description = "The number of droplets to launch for the nodes"
 }

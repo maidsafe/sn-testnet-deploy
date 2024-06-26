@@ -7,14 +7,11 @@
 use crate::{
     ansible::{AnsibleInventoryType, AnsiblePlaybook, ExtraVarsDocBuilder},
     error::{Error, Result},
-    get_genesis_multiaddr, print_duration, BinaryOption, LogFormat, TestnetDeployer,
+    get_genesis_multiaddr, print_duration, BinaryOption, DeploymentInventory, LogFormat,
+    TestnetDeployer,
 };
 use colored::Colorize;
-use std::{
-    net::SocketAddr,
-    time::{Duration, Instant},
-};
-use tokio::time::sleep;
+use std::{net::SocketAddr, time::Instant};
 
 const DEFAULT_BETA_ENCRYPTION_KEY: &str =
     "49113d2083f57a976076adbe85decb75115820de1e6e74b47e0429338cef124a";
@@ -22,14 +19,20 @@ const DEFAULT_BETA_ENCRYPTION_KEY: &str =
 pub struct DeployOptions {
     pub beta_encryption_key: Option<String>,
     pub binary_option: BinaryOption,
-    pub bootstrap_peer: Option<String>,
+    pub bootstrap_node_vm_count: u16,
+    pub current_inventory: DeploymentInventory,
     pub env_variables: Option<Vec<(String, String)>>,
     pub log_format: Option<LogFormat>,
     pub logstash_details: Option<(String, Vec<SocketAddr>)>,
     pub name: String,
     pub node_count: u16,
+    pub node_vm_count: u16,
     pub public_rpc: bool,
-    pub vm_count: u16,
+}
+
+enum NodeType {
+    Bootstrap,
+    Normal,
 }
 
 impl TestnetDeployer {
@@ -41,8 +44,7 @@ impl TestnetDeployer {
             }
         };
 
-        let is_fresh_network = options.bootstrap_peer.is_none();
-        self.create_infra(options, build_custom_binaries, is_fresh_network)
+        self.create_infra(options, build_custom_binaries)
             .await
             .map_err(|err| {
                 println!("Failed to create infra {err:?}");
@@ -50,7 +52,11 @@ impl TestnetDeployer {
             })?;
 
         let mut n = 1;
-        let total = if build_custom_binaries { 6 } else { 5 };
+        let mut total = if build_custom_binaries { 7 } else { 6 };
+        if !options.current_inventory.is_empty() {
+            total -= 3;
+        }
+
         if build_custom_binaries {
             self.print_ansible_run_banner(n, total, "Build Custom Binaries");
             self.build_safe_network_binaries(options)
@@ -62,38 +68,28 @@ impl TestnetDeployer {
             n += 1;
         }
 
-        let initial_point_of_contact = if let Some(contact) = &options.bootstrap_peer {
-            println!("Using bootstrap peer: {contact}, waiting 60s for initital inventory spin up");
-            sleep(Duration::from_secs(60)).await;
-
-            contact.clone()
-        } else {
-            self.print_ansible_run_banner(n, total, "Provision Genesis Node");
-            self.provision_genesis_node(options).await.map_err(|err| {
-                println!("Failed to provision genesis node {err:?}");
+        self.print_ansible_run_banner(n, total, "Provision Genesis Node");
+        self.provision_genesis_node(options).await.map_err(|err| {
+            println!("Failed to provision genesis node {err:?}");
+            err
+        })?;
+        n += 1;
+        let (genesis_multiaddr, _) = get_genesis_multiaddr(&self.ansible_runner, &self.ssh_client)
+            .await
+            .map_err(|err| {
+                println!("Failed to get genesis multiaddr {err:?}");
                 err
             })?;
-            n += 1;
-            let (genesis_multiaddr, _) =
-                get_genesis_multiaddr(&self.ansible_runner, &self.ssh_client)
-                    .await
-                    .map_err(|err| {
-                        println!("Failed to get genesis multiaddr {err:?}");
-                        err
-                    })?;
-            println!("Obtained multiaddr for genesis node: {genesis_multiaddr}");
-
-            genesis_multiaddr
-        };
+        println!("Obtained multiaddr for genesis node: {genesis_multiaddr}");
 
         let mut node_provision_failed = false;
-        self.print_ansible_run_banner(n, total, "Provision Remaining Nodes");
+        self.print_ansible_run_banner(n, total, "Provision Bootstrap Nodes");
         match self
-            .provision_remaining_nodes(options, &initial_point_of_contact)
+            .provision_nodes(options, &genesis_multiaddr, NodeType::Bootstrap)
             .await
         {
             Ok(()) => {
-                println!("Provisioned all remaining nodes");
+                println!("Provisioned bootstrap nodes");
             }
             Err(_) => {
                 node_provision_failed = true;
@@ -101,9 +97,25 @@ impl TestnetDeployer {
         }
         n += 1;
 
-        if is_fresh_network {
+        self.print_ansible_run_banner(n, total, "Provision Normal Nodes");
+        match self
+            .provision_nodes(options, &genesis_multiaddr, NodeType::Normal)
+            .await
+        {
+            Ok(()) => {
+                println!("Provisioned normal nodes");
+            }
+            Err(_) => {
+                node_provision_failed = true;
+            }
+        }
+        n += 1;
+
+        if options.current_inventory.is_empty() {
+            // These steps are only necessary on the initial deploy, at which point the inventory
+            // will be empty.
             self.print_ansible_run_banner(n, total, "Deploy Faucet");
-            self.provision_faucet(options, &initial_point_of_contact)
+            self.provision_faucet(options, &genesis_multiaddr)
                 .await
                 .map_err(|err| {
                     println!("Failed to provision faucet {err:?}");
@@ -111,14 +123,15 @@ impl TestnetDeployer {
                 })?;
             n += 1;
             self.print_ansible_run_banner(n, total, "Provision RPC Client on Genesis Node");
-            self.provision_safenode_rpc_client(options, &initial_point_of_contact)
+            self.provision_safenode_rpc_client(options, &genesis_multiaddr)
                 .await
                 .map_err(|err| {
                     println!("Failed to provision safenode rpc client {err:?}");
                     err
                 })?;
+            n += 1;
             self.print_ansible_run_banner(n, total, "Provision Auditor");
-            self.provision_sn_auditor(options, &initial_point_of_contact)
+            self.provision_sn_auditor(options, &genesis_multiaddr)
                 .await
                 .map_err(|err| {
                     println!("Failed to provision sn_auditor {err:?}");
@@ -138,18 +151,19 @@ impl TestnetDeployer {
         Ok(())
     }
 
-    async fn create_infra(
-        &self,
-        options: &DeployOptions,
-        enable_build_vm: bool,
-        is_fresh_network: bool,
-    ) -> Result<()> {
+    async fn create_infra(&self, options: &DeployOptions, enable_build_vm: bool) -> Result<()> {
         let start = Instant::now();
         println!("Selecting {} workspace...", options.name);
         self.terraform_runner.workspace_select(&options.name)?;
         let args = vec![
-            ("fresh_testnet".to_string(), is_fresh_network.to_string()),
-            ("node_count".to_string(), options.vm_count.to_string()),
+            (
+                "bootstrap_node_vm_count".to_string(),
+                options.bootstrap_node_vm_count.to_string(),
+            ),
+            (
+                "node_vm_count".to_string(),
+                options.node_vm_count.to_string(),
+            ),
             ("use_custom_bin".to_string(), enable_build_vm.to_string()),
         ];
         println!("Running terraform apply...");
@@ -176,15 +190,21 @@ impl TestnetDeployer {
         Ok(())
     }
 
-    pub async fn provision_remaining_nodes(
+    async fn provision_nodes(
         &self,
         options: &DeployOptions,
         initial_contact_peer: &str,
+        node_type: NodeType,
     ) -> Result<()> {
         let start = Instant::now();
+        let inventory_type = match node_type {
+            NodeType::Bootstrap => AnsibleInventoryType::BootstrapNodes,
+            NodeType::Normal => AnsibleInventoryType::Nodes,
+        };
+
         self.ansible_runner.run_playbook(
             AnsiblePlaybook::Nodes,
-            AnsibleInventoryType::Nodes,
+            inventory_type,
             Some(self.build_node_extra_vars_doc(
                 options,
                 Some(initial_contact_peer.to_string()),

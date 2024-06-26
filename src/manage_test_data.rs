@@ -125,11 +125,7 @@ impl TestDataClient {
             }
         }
 
-        let faucet_addr = inventory.faucet_address.clone().ok_or_else(|| {
-            eyre!("No faucet deployed for this inventory. (It was launched using existing bootstrap peers)")
-        })?;
-
-        let faucet_addr: SocketAddr = faucet_addr.parse()?;
+        let faucet_addr: SocketAddr = inventory.faucet_address.parse()?;
         let random_peer = inventory.get_random_peer();
         self.safe_client
             .wallet_get_faucet(&random_peer, faucet_addr)?;

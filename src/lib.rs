@@ -21,10 +21,7 @@ pub mod ssh;
 pub mod terraform;
 
 use crate::{
-    ansible::{
-        generate_environment_inventory, AnsibleInventoryType, AnsiblePlaybook, AnsibleRunner,
-        ExtraVarsDocBuilder,
-    },
+    ansible::{AnsibleInventoryType, AnsiblePlaybook, AnsibleRunner, ExtraVarsDocBuilder},
     error::{Error, Result},
     inventory::DeploymentInventory,
     rpc_client::RpcClient,
@@ -396,16 +393,6 @@ impl TestnetDeployer {
             permissions.set_mode(0o755); // rwxr-xr-x
             std::fs::set_permissions(&rpc_client_path, permissions)?;
         }
-
-        generate_environment_inventory(
-            &self.environment_name,
-            &self.inventory_file_path,
-            &self
-                .working_directory_path
-                .join("ansible")
-                .join("inventory"),
-        )
-        .await?;
 
         Ok(())
     }
