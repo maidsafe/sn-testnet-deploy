@@ -456,10 +456,11 @@ enum NetworkCommands {
         /// The number of nodes to update concurrently.
         #[clap(long, short = 'c', default_value_t = 10)]
         concurrent_updates: usize,
-        /// The log level to set.
+        /// Change the log level of the safenode. This accepts a comma-separated list of log levels for different modules
+        /// or specific keywords like "all" or "v".
         ///
-        /// Example: --log-level SN_LOG=all,RUST_LOG=libp2p=debug
-        #[clap(long)]
+        /// Example: --level libp2p=DEBUG,tokio=INFO,all,sn_client=ERROR
+        #[clap(name = "level", long)]
         log_level: String,
         /// The name of the environment
         #[arg(short = 'n', long)]
