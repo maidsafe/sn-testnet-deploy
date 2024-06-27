@@ -65,6 +65,9 @@ enum Commands {
         /// If not used a default key will be supplied.
         #[arg(long)]
         beta_encryption_key: Option<String>,
+        /// The number of safenode services to run on each bootstrap VM.
+        #[clap(long, default_value_t = 1)]
+        bootstrap_node_count: u16,
         /// The number of bootstrap node VMs to create.
         ///
         /// Each VM will run many safenode services.
@@ -317,7 +320,6 @@ enum Commands {
         /// Supply a version for the binary to be upgraded to.
         ///
         /// There should be no 'v' prefix.
-        /// The name of the environment
         #[arg(short = 'v', long)]
         version: String,
     },
@@ -526,6 +528,7 @@ async fn main() -> Result<()> {
             ansible_verbose,
             beta_encryption_key,
             branch,
+            bootstrap_node_count,
             bootstrap_node_vm_count,
             env_variables,
             faucet_version,
@@ -607,6 +610,7 @@ async fn main() -> Result<()> {
                 .deploy(&DeployOptions {
                     beta_encryption_key,
                     binary_option: binary_option.clone(),
+                    bootstrap_node_count,
                     bootstrap_node_vm_count,
                     current_inventory: inventory,
                     env_variables,
