@@ -38,14 +38,20 @@
   replace:
     path: "{{ network_dashboard_repo_path }}/telegraf/EnvironmentFile/telegraf"
     regexp: 'SAFENODE_TESTNET_NAME=UNDEFINED'
-    replace: 'SAFENODE_TESTNET_NAME={{ testnet_name }}'
+    replace: 'SAFENODE_TESTNET_NAME={{ testnet_name | upper }}'
+
+- name: replace SAFENODE_HOST_ROLE value
+  replace:
+    path: "{{ network_dashboard_repo_path }}/telegraf/EnvironmentFile/telegraf"
+    regexp: 'SAFENODE_HOST_ROLE=UNDEFINED'
+    replace: 'SAFENODE_HOST_ROLE={{ node_type | upper }}'
 
 # The real branch name will be supplied later, when it is available in `safenode`.
 - name: replace SAFENODE_BRANCH_NAME value
   replace:
     path: "{{ network_dashboard_repo_path }}/telegraf/EnvironmentFile/telegraf"
     regexp: "SAFENODE_BRANCH_NAME=UNDEFINED"
-    replace: "SAFENODE_BRANCH_NAME=stable"
+    replace: "SAFENODE_BRANCH_NAME=STABLE"
 
 # The real commit hash will be supplied later, when it is available in `safenode`.
 - name: replace SAFENODE_BRANCH_COMMIT value

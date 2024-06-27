@@ -190,7 +190,7 @@ impl TestnetDeployer {
         self.ansible_runner.run_playbook(
             AnsiblePlaybook::Genesis,
             AnsibleInventoryType::Genesis,
-            Some(self.build_node_extra_vars_doc(options, None, None)?),
+            Some(self.build_node_extra_vars_doc(options, NodeType::Bootstrap, None, 1)?),
         )?;
         print_duration(start.elapsed());
         Ok(())
@@ -216,8 +216,9 @@ impl TestnetDeployer {
             inventory_type,
             Some(self.build_node_extra_vars_doc(
                 options,
+                node_type,
                 Some(initial_contact_peer.to_string()),
-                Some(node_count),
+                node_count,
             )?),
         )?;
         print_duration(start.elapsed());
@@ -242,24 +243,31 @@ impl TestnetDeployer {
     fn build_node_extra_vars_doc(
         &self,
         options: &DeployOptions,
-        bootstrap_node: Option<String>,
-        node_instance_count: Option<u16>,
+        node_type: NodeType,
+        bootstrap_multiaddr: Option<String>,
+        node_instance_count: u16,
     ) -> Result<String> {
         let mut extra_vars = ExtraVarsDocBuilder::default();
         extra_vars.add_variable("provider", &self.cloud_provider.to_string());
         extra_vars.add_variable("testnet_name", &options.name);
-        if bootstrap_node.is_some() {
+
+        match node_type {
+            NodeType::Bootstrap => {
+                extra_vars.add_variable("node_type", "bootstrap_node");
+            }
+            NodeType::Normal => {
+                extra_vars.add_variable("node_type", "generic_node");
+            }
+        }
+
+        if bootstrap_multiaddr.is_some() {
             extra_vars.add_variable(
                 "genesis_multiaddr",
-                &bootstrap_node.ok_or_else(|| Error::GenesisMultiAddrNotSupplied)?,
+                &bootstrap_multiaddr.ok_or_else(|| Error::GenesisMultiAddrNotSupplied)?,
             );
         }
-        if node_instance_count.is_some() {
-            extra_vars.add_variable(
-                "node_instance_count",
-                &node_instance_count.unwrap_or(20).to_string(),
-            );
-        }
+
+        extra_vars.add_variable("node_instance_count", &node_instance_count.to_string());
         if let Some(log_format) = options.log_format {
             extra_vars.add_variable("log_format", log_format.as_str());
         }
