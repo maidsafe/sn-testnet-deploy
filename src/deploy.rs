@@ -19,6 +19,7 @@ const DEFAULT_BETA_ENCRYPTION_KEY: &str =
 pub struct DeployOptions {
     pub beta_encryption_key: Option<String>,
     pub binary_option: BinaryOption,
+    pub bootstrap_node_count: u16,
     pub bootstrap_node_vm_count: u16,
     pub current_inventory: DeploymentInventory,
     pub env_variables: Option<Vec<(String, String)>>,
@@ -202,9 +203,12 @@ impl TestnetDeployer {
         node_type: NodeType,
     ) -> Result<()> {
         let start = Instant::now();
-        let inventory_type = match node_type {
-            NodeType::Bootstrap => AnsibleInventoryType::BootstrapNodes,
-            NodeType::Normal => AnsibleInventoryType::Nodes,
+        let (inventory_type, node_count) = match node_type {
+            NodeType::Bootstrap => (
+                AnsibleInventoryType::BootstrapNodes,
+                options.bootstrap_node_count,
+            ),
+            NodeType::Normal => (AnsibleInventoryType::Nodes, options.node_count),
         };
 
         self.ansible_runner.run_playbook(
@@ -213,7 +217,7 @@ impl TestnetDeployer {
             Some(self.build_node_extra_vars_doc(
                 options,
                 Some(initial_contact_peer.to_string()),
-                Some(options.node_count),
+                Some(node_count),
             )?),
         )?;
         print_duration(start.elapsed());
