@@ -119,7 +119,7 @@ enum Commands {
         #[arg(long)]
         network_contacts_file_name: Option<String>,
         /// The number of safenode services to run on each VM.
-        #[clap(long, default_value_t = 40)]
+        #[clap(long, default_value_t = 25)]
         node_count: u16,
         /// The number of node VMs to create.
         ///
