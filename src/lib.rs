@@ -46,6 +46,8 @@ use std::{
 };
 use tar::Archive;
 
+const ANSIBLE_DEFAULT_FORKS: usize = 50;
+
 /// Specify the binary option for the deployment.
 ///
 /// There are several binaries involved in the deployment:
@@ -164,6 +166,7 @@ impl UpgradeOptions {
 
 #[derive(Default)]
 pub struct TestnetDeployBuilder {
+    ansible_forks: Option<usize>,
     ansible_verbose_mode: bool,
     environment_name: String,
     provider: Option<CloudProvider>,
@@ -181,6 +184,11 @@ impl TestnetDeployBuilder {
 
     pub fn ansible_verbose_mode(&mut self, ansible_verbose_mode: bool) -> &mut Self {
         self.ansible_verbose_mode = ansible_verbose_mode;
+        self
+    }
+
+    pub fn ansible_forks(&mut self, ansible_forks: usize) -> &mut Self {
+        self.ansible_forks = Some(ansible_forks);
         self
     }
 
@@ -276,11 +284,12 @@ impl TestnetDeployBuilder {
             &state_bucket_name,
         )?;
         let ansible_runner = AnsibleRunner::new(
+            self.ansible_forks.unwrap_or(ANSIBLE_DEFAULT_FORKS),
+            self.ansible_verbose_mode,
             &self.environment_name,
             provider.clone(),
             ssh_secret_key_path.clone(),
             vault_password_path,
-            self.ansible_verbose_mode,
             working_directory_path.join("ansible"),
         )?;
         let rpc_client = RpcClient::new(
@@ -418,10 +427,6 @@ impl TestnetDeployer {
     }
 
     pub async fn upgrade(&self, options: UpgradeOptions) -> Result<()> {
-        // Set the `forks` config value for Ansible. This environment variable will override
-        // whatever is in the ansible.cfg file.
-        std::env::set_var("ANSIBLE_FORKS", options.forks.to_string());
-
         let environments = self.terraform_runner.workspace_list()?;
         if !environments.contains(&options.name.to_string()) {
             return Err(Error::EnvironmentDoesNotExist(options.name.to_string()));

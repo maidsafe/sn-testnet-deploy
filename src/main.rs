@@ -100,6 +100,11 @@ enum Commands {
         /// You can only supply version numbers or a custom branch, not both.
         #[arg(long, verbatim_doc_comment)]
         faucet_version: Option<String>,
+        /// Override the maximum number of forks Ansible will use to execute tasks on target hosts.
+        ///
+        /// The default value from ansible.cfg is 50.
+        #[clap(long)]
+        forks: Option<usize>,
         /// Specify the logging format for the nodes.
         ///
         /// Valid values are "default" or "json".
@@ -532,6 +537,7 @@ async fn main() -> Result<()> {
             bootstrap_node_vm_count,
             env_variables,
             faucet_version,
+            forks,
             log_format,
             logstash_stack_name,
             name,
@@ -560,11 +566,15 @@ async fn main() -> Result<()> {
             )
             .await?;
 
-            let testnet_deployer = TestnetDeployBuilder::default()
+            let mut builder = TestnetDeployBuilder::default();
+            builder
                 .ansible_verbose_mode(ansible_verbose)
                 .environment_name(&name)
-                .provider(provider.clone())
-                .build()?;
+                .provider(provider.clone());
+            if let Some(forks) = forks {
+                builder.ansible_forks(forks);
+            }
+            let testnet_deployer = builder.build()?;
 
             let inventory_service = DeploymentInventoryService::from(testnet_deployer.clone());
             let inventory = inventory_service
@@ -876,6 +886,7 @@ async fn main() -> Result<()> {
             safenode_version,
         } => {
             let testnet_deploy = TestnetDeployBuilder::default()
+                .ansible_forks(forks)
                 .ansible_verbose_mode(ansible_verbose)
                 .provider(provider.clone())
                 .build()?;
