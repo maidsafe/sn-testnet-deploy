@@ -11,7 +11,7 @@ use crate::{
     error::{Error, Result},
     ssh::SshClient,
     terraform::TerraformRunner,
-    CloudProvider,
+    CloudProvider, ANSIBLE_DEFAULT_FORKS,
 };
 use log::debug;
 use std::{
@@ -137,11 +137,12 @@ impl LogstashDeployBuilder {
             &state_bucket_name,
         )?;
         let ansible_runner = AnsibleRunner::new(
+            ANSIBLE_DEFAULT_FORKS,
+            false,
             &self.environment_name,
             provider.clone(),
             ssh_secret_key_path.clone(),
             vault_password_path,
-            false,
             working_directory_path.join("ansible"),
         )?;
 

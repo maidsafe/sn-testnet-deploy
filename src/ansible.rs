@@ -165,11 +165,12 @@ pub enum AnsibleInventoryType {
 
 #[derive(Clone)]
 pub struct AnsibleRunner {
+    pub ansible_forks: usize,
+    pub ansible_verbose_mode: bool,
     pub environment_name: String,
     pub provider: CloudProvider,
     pub ssh_sk_path: PathBuf,
     pub vault_password_file_path: PathBuf,
-    pub verbose_mode: bool,
     pub working_directory_path: PathBuf,
 }
 
@@ -190,23 +191,25 @@ struct Output {
 
 impl AnsibleRunner {
     pub fn new(
+        ansible_forks: usize,
+        ansible_verbose_mode: bool,
         environment_name: &str,
         provider: CloudProvider,
         ssh_sk_path: PathBuf,
         vault_password_file_path: PathBuf,
-        verbose_mode: bool,
         working_directory_path: PathBuf,
     ) -> Result<AnsibleRunner> {
         if environment_name.is_empty() {
             return Err(Error::EnvironmentNameRequired);
         }
         Ok(AnsibleRunner {
+            ansible_forks,
+            ansible_verbose_mode,
             environment_name: environment_name.to_string(),
             provider,
             working_directory_path,
             ssh_sk_path,
             vault_password_file_path,
-            verbose_mode,
         })
     }
 
@@ -294,9 +297,11 @@ impl AnsibleRunner {
             args.push("--extra-vars".to_string());
             args.push(extra_vars);
         }
-        if self.verbose_mode {
+        if self.ansible_verbose_mode {
             args.push("-v".to_string());
         }
+        args.push("--forks".to_string());
+        args.push(self.ansible_forks.to_string());
         args.push(playbook.get_playbook_name());
         run_external_command(
             PathBuf::from(AnsibleBinary::AnsiblePlaybook.to_string()),
