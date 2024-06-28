@@ -116,7 +116,7 @@ impl DeploymentInventoryService {
         )
         .await?;
 
-        let mut vm_list = Vec::new();
+        let mut bootstrap_vm_list = Vec::new();
         let genesis_inventory = self
             .ansible_runner
             .get_inventory(AnsibleInventoryType::Genesis, false)
@@ -129,29 +129,31 @@ impl DeploymentInventoryService {
                     .ok_or_else(|| eyre!("For a new deployment the binary option must be set"))?,
             ));
         }
-        vm_list.push((genesis_inventory[0].0.clone(), genesis_inventory[0].1));
+        bootstrap_vm_list.push((genesis_inventory[0].0.clone(), genesis_inventory[0].1));
 
+        let mut misc_vm_list = Vec::new();
         let auditor_inventory = self
             .ansible_runner
             .get_inventory(AnsibleInventoryType::Auditor, true)
             .await?;
         let auditor_ip = auditor_inventory[0].1;
-        vm_list.push((auditor_inventory[0].0.clone(), auditor_ip));
+        misc_vm_list.push((auditor_inventory[0].0.clone(), auditor_ip));
 
         let build_inventory = self
             .ansible_runner
             .get_inventory(AnsibleInventoryType::Build, false)
             .await?;
         if !build_inventory.is_empty() {
-            vm_list.push((build_inventory[0].0.clone(), build_inventory[0].1));
+            misc_vm_list.push((build_inventory[0].0.clone(), build_inventory[0].1));
         }
 
+        let mut node_vm_list = Vec::new();
         let nodes_inventory = self
             .ansible_runner
             .get_inventory(AnsibleInventoryType::Nodes, false)
             .await?;
         for entry in nodes_inventory.iter() {
-            vm_list.push((entry.0.clone(), entry.1));
+            node_vm_list.push((entry.0.clone(), entry.1));
         }
 
         let bootstrap_nodes_inventory = self
@@ -159,7 +161,7 @@ impl DeploymentInventoryService {
             .get_inventory(AnsibleInventoryType::BootstrapNodes, false)
             .await?;
         for entry in bootstrap_nodes_inventory.iter() {
-            vm_list.push((entry.0.clone(), entry.1));
+            bootstrap_vm_list.push((entry.0.clone(), entry.1));
         }
 
         println!("Retrieving node registries from all VMs...");
@@ -294,14 +296,16 @@ impl DeploymentInventoryService {
         let inventory = DeploymentInventory {
             auditor_address: format!("{auditor_ip}:4242"),
             binary_option,
+            bootstrap_node_vms: bootstrap_vm_list,
             faucet_address: format!("{genesis_ip}:8000"),
             genesis_multiaddr,
             name: name.to_string(),
+            misc_vms: misc_vm_list,
+            node_vms: node_vm_list,
             peers,
             rpc_endpoints: safenode_rpc_endpoints,
             safenodemand_endpoints,
             ssh_user: self.cloud_provider.get_ssh_user(),
-            vm_list,
             uploaded_files: Vec::new(),
         };
         Ok(inventory)
@@ -341,19 +345,23 @@ impl DeploymentInventoryService {
     }
 }
 
+pub type VirtualMachine = (String, IpAddr);
+
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct DeploymentInventory {
     pub auditor_address: String,
     pub binary_option: BinaryOption,
+    pub bootstrap_node_vms: Vec<VirtualMachine>,
     pub faucet_address: String,
     pub genesis_multiaddr: String,
+    pub misc_vms: Vec<VirtualMachine>,
     pub name: String,
+    pub node_vms: Vec<VirtualMachine>,
     pub peers: Vec<String>,
     pub rpc_endpoints: BTreeMap<String, SocketAddr>,
     pub safenodemand_endpoints: Vec<SocketAddr>,
     pub ssh_user: String,
     pub uploaded_files: Vec<(String, String)>,
-    pub vm_list: Vec<(String, IpAddr)>,
 }
 
 impl DeploymentInventory {
@@ -364,19 +372,29 @@ impl DeploymentInventory {
             binary_option,
             name: name.to_string(),
             auditor_address: String::new(),
+            bootstrap_node_vms: Vec::new(),
             genesis_multiaddr: String::new(),
             faucet_address: String::new(),
+            misc_vms: Vec::new(),
+            node_vms: Vec::new(),
             peers: Vec::new(),
             rpc_endpoints: BTreeMap::new(),
             safenodemand_endpoints: Vec::new(),
             ssh_user: "root".to_string(),
             uploaded_files: Vec::new(),
-            vm_list: Vec::new(),
         }
     }
 
     pub fn is_empty(&self) -> bool {
-        self.vm_list.is_empty()
+        self.bootstrap_node_vms.is_empty() && self.node_vms.is_empty()
+    }
+
+    pub fn vm_list(&self) -> Vec<VirtualMachine> {
+        let mut list = Vec::new();
+        list.extend(self.bootstrap_node_vms.clone());
+        list.extend(self.misc_vms.clone());
+        list.extend(self.node_vms.clone());
+        list
     }
 
     pub fn save(&self) -> Result<()> {
@@ -442,10 +460,28 @@ impl DeploymentInventory {
             }
         }
 
-        println!("=======");
-        println!("VM List");
-        println!("=======");
-        for vm in self.vm_list.iter() {
+        println!("=============");
+        println!("Bootstrap VMs");
+        println!("=============");
+        for vm in self.bootstrap_node_vms.iter() {
+            println!("{}: {}", vm.0, vm.1);
+        }
+        println!("SSH user: {}", self.ssh_user);
+        println!();
+
+        println!("========");
+        println!("Node VMs");
+        println!("========");
+        for vm in self.node_vms.iter() {
+            println!("{}: {}", vm.0, vm.1);
+        }
+        println!("SSH user: {}", self.ssh_user);
+        println!();
+
+        println!("=========");
+        println!("Other VMs");
+        println!("=========");
+        for vm in self.misc_vms.iter() {
             println!("{}: {}", vm.0, vm.1);
         }
         println!("SSH user: {}", self.ssh_user);
@@ -457,11 +493,15 @@ impl DeploymentInventory {
         println!("============");
         println!("Sample Peers");
         println!("============");
-        for ip in self.vm_list.iter().map(|vm| vm.1.to_string()) {
-            if let Some(peer) = self.peers.iter().find(|p| p.contains(&ip)) {
-                println!("{peer}");
-            }
-        }
+        self.bootstrap_node_vms
+            .iter()
+            .chain(self.node_vms.iter())
+            .map(|vm| vm.1.to_string())
+            .for_each(|ip| {
+                if let Some(peer) = self.peers.iter().find(|p| p.contains(&ip)) {
+                    println!("{peer}");
+                }
+            });
         println!("Genesis: {}", self.genesis_multiaddr);
         let inventory_file_path =
             get_data_directory()?.join(format!("{}-inventory.json", self.name));
