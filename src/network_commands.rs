@@ -42,7 +42,7 @@ pub async fn perform_fixed_interval_network_churn(
 ) -> Result<()> {
     // We should not restart the genesis node as it is used as the bootstrap peer for all other nodes.
     let genesis_ip = inventory
-        .vm_list
+        .vm_list()
         .iter()
         .find_map(|(name, addr)| {
             if name.contains("genesis") {
@@ -61,13 +61,13 @@ pub async fn perform_fixed_interval_network_churn(
 
     let nodes_per_vm = {
         let mut vms_to_ignore = 0;
-        inventory.vm_list.iter().for_each(|(name, _addr)| {
+        inventory.vm_list().iter().for_each(|(name, _addr)| {
             if name.contains("build") || name.contains("genesis") {
                 vms_to_ignore += 1;
             }
         });
         // subtract 1 node for genesis. And ignore build & genesis node.
-        (inventory.peers.len() - 1) / (inventory.vm_list.len() - vms_to_ignore)
+        (inventory.peers.len() - 1) / (inventory.vm_list().len() - vms_to_ignore)
     };
 
     let max_concurrent_churns = std::cmp::min(concurrent_churns, nodes_per_vm);
@@ -121,7 +121,7 @@ pub async fn perform_random_interval_network_churn(
 
     // We should not restart the genesis node as it is used as the bootstrap peer for all other nodes.
     let genesis_ip = inventory
-        .vm_list
+        .vm_list()
         .iter()
         .find_map(|(name, addr)| {
             if name.contains("genesis") {
