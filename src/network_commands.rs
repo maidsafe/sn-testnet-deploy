@@ -66,8 +66,7 @@ pub async fn perform_fixed_interval_network_churn(
                 vms_to_ignore += 1;
             }
         });
-        // subtract 1 node for genesis. And ignore build & genesis node.
-        (inventory.peers.len() - 1) / (inventory.vm_list().len() - vms_to_ignore)
+        inventory.peers().len() / (inventory.vm_list().len() - vms_to_ignore)
     };
 
     let max_concurrent_churns = std::cmp::min(concurrent_churns, nodes_per_vm);
@@ -143,7 +142,7 @@ pub async fn perform_random_interval_network_churn(
 
     // print the time to churn all these nodes
     {
-        let total_num_nodes = inventory.peers.len() - 1;
+        let total_num_nodes = inventory.peers().len() - 1;
         let n_timeframes_to_churn_all_nodes = if total_num_nodes % churn_count > 0 {
             total_num_nodes / churn_count + 1
         } else {
