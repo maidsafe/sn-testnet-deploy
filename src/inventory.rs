@@ -51,7 +51,7 @@ impl From<TestnetDeployer> for DeploymentInventoryService {
             CloudProvider::DigitalOcean => "digital_ocean",
         };
         DeploymentInventoryService {
-            ansible_runner: item.ansible_runner.clone(),
+            ansible_runner: item.ansible_provisioner.ansible_runner.clone(),
             cloud_provider: item.cloud_provider,
             inventory_file_path: item
                 .working_directory_path

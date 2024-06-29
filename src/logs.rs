@@ -5,7 +5,6 @@
 // Please see the LICENSE file for more details.
 
 use crate::{
-    ansible::{AnsibleInventoryType, AnsiblePlaybook},
     error::{Error, Result},
     get_progress_bar, run_external_command,
     s3::S3Repository,
@@ -202,21 +201,9 @@ impl TestnetDeployer {
             remove(dest.clone())?;
         }
         std::fs::create_dir_all(&dest)?;
-
-        self.ansible_runner.run_playbook(
-            AnsiblePlaybook::Logs,
-            AnsibleInventoryType::Genesis,
-            Some(format!(
-                "{{ \"env_name\": \"{name}\", \"resources_only\" : \"{resources_only}\" }}"
-            )),
-        )?;
-        self.ansible_runner.run_playbook(
-            AnsiblePlaybook::Logs,
-            AnsibleInventoryType::Nodes,
-            Some(format!(
-                "{{ \"env_name\": \"{name}\", \"resources_only\" : \"{resources_only}\" }}"
-            )),
-        )?;
+        self.ansible_provisioner
+            .copy_logs(name, resources_only)
+            .await?;
         Ok(())
     }
 
@@ -226,17 +213,7 @@ impl TestnetDeployer {
         if !environments.contains(&name.to_string()) {
             return Err(Error::EnvironmentDoesNotExist(name.to_string()));
         }
-
-        let mut all_node_inventory = self
-            .ansible_runner
-            .get_inventory(AnsibleInventoryType::Genesis, false)
-            .await?;
-        all_node_inventory.extend(
-            self.ansible_runner
-                .get_inventory(AnsibleInventoryType::Nodes, false)
-                .await?,
-        );
-        Ok(all_node_inventory)
+        self.ansible_provisioner.get_all_node_inventory().await
     }
 }
 

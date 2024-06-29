@@ -21,7 +21,10 @@ pub mod ssh;
 pub mod terraform;
 
 use crate::{
-    ansible::{AnsibleInventoryType, AnsiblePlaybook, AnsibleRunner, ExtraVarsDocBuilder},
+    ansible::{
+        extra_vars::ExtraVarsDocBuilder, provisioning::AnsibleProvisioner, AnsibleInventoryType,
+        AnsibleRunner,
+    },
     error::{Error, Result},
     inventory::DeploymentInventory,
     rpc_client::RpcClient,
@@ -292,6 +295,9 @@ impl TestnetDeployBuilder {
             vault_password_path,
             working_directory_path.join("ansible"),
         )?;
+        let ssh_client = SshClient::new(ssh_secret_key_path);
+        let ansible_provisioner =
+            AnsibleProvisioner::new(ansible_runner, provider.clone(), ssh_client.clone());
         let rpc_client = RpcClient::new(
             PathBuf::from("/usr/local/bin/safenode_rpc_client"),
             working_directory_path.clone(),
@@ -305,12 +311,12 @@ impl TestnetDeployBuilder {
         }
 
         let testnet = TestnetDeployer::new(
-            ansible_runner,
+            ansible_provisioner,
             provider.clone(),
             &self.environment_name,
             rpc_client,
             S3Repository {},
-            SshClient::new(ssh_secret_key_path),
+            ssh_client,
             terraform_runner,
             working_directory_path,
         )?;
@@ -321,7 +327,7 @@ impl TestnetDeployBuilder {
 
 #[derive(Clone)]
 pub struct TestnetDeployer {
-    pub ansible_runner: AnsibleRunner,
+    pub ansible_provisioner: AnsibleProvisioner,
     pub cloud_provider: CloudProvider,
     pub environment_name: String,
     pub inventory_file_path: PathBuf,
@@ -335,7 +341,7 @@ pub struct TestnetDeployer {
 impl TestnetDeployer {
     #[allow(clippy::too_many_arguments)]
     pub fn new(
-        ansible_runner: AnsibleRunner,
+        ansible_provisioner: AnsibleProvisioner,
         cloud_provider: CloudProvider,
         environment_name: &str,
         rpc_client: RpcClient,
@@ -352,7 +358,7 @@ impl TestnetDeployer {
             .join("inventory")
             .join("dev_inventory_digital_ocean.yml");
         Ok(TestnetDeployer {
-            ansible_runner,
+            ansible_provisioner,
             cloud_provider,
             environment_name: environment_name.to_string(),
             inventory_file_path,
@@ -411,18 +417,7 @@ impl TestnetDeployer {
         if !environments.contains(&name.to_string()) {
             return Err(Error::EnvironmentDoesNotExist(name.to_string()));
         }
-
-        self.ansible_runner.run_playbook(
-            AnsiblePlaybook::StartNodes,
-            AnsibleInventoryType::Genesis,
-            None,
-        )?;
-        self.ansible_runner.run_playbook(
-            AnsiblePlaybook::StartNodes,
-            AnsibleInventoryType::Nodes,
-            None,
-        )?;
-
+        self.ansible_provisioner.start_nodes().await?;
         Ok(())
     }
 
@@ -431,22 +426,7 @@ impl TestnetDeployer {
         if !environments.contains(&options.name.to_string()) {
             return Err(Error::EnvironmentDoesNotExist(options.name.to_string()));
         }
-
-        self.ansible_runner.run_playbook(
-            AnsiblePlaybook::UpgradeNodes,
-            AnsibleInventoryType::Nodes,
-            Some(options.get_ansible_vars()),
-        )?;
-        self.ansible_runner.run_playbook(
-            AnsiblePlaybook::UpgradeNodes,
-            AnsibleInventoryType::Genesis,
-            Some(options.get_ansible_vars()),
-        )?;
-        self.ansible_runner.run_playbook(
-            AnsiblePlaybook::UpgradeFaucet,
-            AnsibleInventoryType::Genesis,
-            Some(options.get_ansible_vars()),
-        )?;
+        self.ansible_provisioner.upgrade_nodes(&options).await?;
 
         Ok(())
     }
@@ -456,20 +436,9 @@ impl TestnetDeployer {
         if !environments.contains(&name.to_string()) {
             return Err(Error::EnvironmentDoesNotExist(name.to_string()));
         }
-
-        let mut extra_vars = ExtraVarsDocBuilder::default();
-        extra_vars.add_variable("version", &version.to_string());
-        self.ansible_runner.run_playbook(
-            AnsiblePlaybook::UpgradeNodeManager,
-            AnsibleInventoryType::Genesis,
-            Some(extra_vars.build()),
-        )?;
-        self.ansible_runner.run_playbook(
-            AnsiblePlaybook::UpgradeNodeManager,
-            AnsibleInventoryType::Nodes,
-            Some(extra_vars.build()),
-        )?;
-
+        self.ansible_provisioner
+            .upgrade_node_manager(&version)
+            .await?;
         Ok(())
     }
 
