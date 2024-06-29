@@ -929,8 +929,8 @@ async fn main() -> Result<()> {
 
             let mut inventory = DeploymentInventory::read(&inventory_path)?;
             let mut rng = rand::thread_rng();
-            let i = rng.gen_range(0..inventory.peers.len());
-            let random_peer = &inventory.peers[i];
+            let i = rng.gen_range(0..inventory.peers().len());
+            let random_peer = &inventory.peers()[i];
 
             let test_data_client = TestDataClientBuilder::default().build()?;
             let uploaded_files = test_data_client

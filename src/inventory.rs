@@ -87,9 +87,9 @@ impl DeploymentInventoryService {
         force: bool,
         binary_option: Option<BinaryOption>,
     ) -> Result<DeploymentInventory> {
-        println!("=============================");
-        println!("     Generating Inventory    ");
-        println!("=============================");
+        println!("======================================");
+        println!("  Generating or Retrieving Inventory  ");
+        println!("======================================");
         let inventory_path = get_data_directory()?.join(format!("{name}-inventory.json"));
         if inventory_path.exists() && !force {
             let inventory = DeploymentInventory::read(&inventory_path)?;
@@ -165,61 +165,12 @@ impl DeploymentInventoryService {
         }
 
         println!("Retrieving node registries from all VMs...");
-        let node_registries = {
-            debug!("Fetching node manager inventory");
-            let temp_dir_path = tempfile::tempdir()?.into_path();
-            let temp_dir_json = serde_json::to_string(&temp_dir_path)?;
-
-            self.ansible_runner.run_playbook(
-                AnsiblePlaybook::NodeManagerInventory,
-                AnsibleInventoryType::Nodes,
-                Some(format!("{{ \"dest\": {temp_dir_json} }}")),
-            )?;
-            self.ansible_runner.run_playbook(
-                AnsiblePlaybook::NodeManagerInventory,
-                AnsibleInventoryType::BootstrapNodes,
-                Some(format!("{{ \"dest\": {temp_dir_json} }}")),
-            )?;
-            self.ansible_runner.run_playbook(
-                AnsiblePlaybook::NodeManagerInventory,
-                AnsibleInventoryType::Genesis,
-                Some(format!("{{ \"dest\": {temp_dir_json} }}")),
-            )?;
-            self.ansible_runner.run_playbook(
-                AnsiblePlaybook::NodeManagerInventory,
-                AnsibleInventoryType::Auditor,
-                Some(format!("{{ \"dest\": {temp_dir_json} }}")),
-            )?;
-
-            let node_registry_paths = WalkDir::new(temp_dir_path)
-                .into_iter()
-                .flatten()
-                .filter_map(|entry| {
-                    if entry.file_type().is_file()
-                        && entry.path().extension().is_some_and(|ext| ext == "json")
-                    {
-                        // tempdir/<testnet_name>-node/var/safenode-manager/node_registry.json
-                        let mut vm_name = entry.path().to_path_buf();
-                        trace!("Found file with json extension: {vm_name:?}");
-                        vm_name.pop();
-                        vm_name.pop();
-                        vm_name.pop();
-                        // Extract the <testnet_name>-node string
-                        trace!("Extracting the vm name from the path");
-                        let vm_name = vm_name.file_name()?.to_str()?;
-                        trace!("Extracted vm name from path: {vm_name}");
-                        Some(entry.path().to_path_buf())
-                    } else {
-                        None
-                    }
-                })
-                .collect::<Vec<PathBuf>>();
-
-            node_registry_paths
-                .iter()
-                .map(|file_path| NodeRegistry::load(file_path).unwrap())
-                .collect::<Vec<NodeRegistry>>()
-        };
+        let mut node_registries = Vec::new();
+        let bootstrap_node_registries =
+            self.get_node_registries(AnsibleInventoryType::BootstrapNodes)?;
+        let generic_node_registries = self.get_node_registries(AnsibleInventoryType::Nodes)?;
+        node_registries.extend(bootstrap_node_registries.clone());
+        node_registries.extend(generic_node_registries.clone());
 
         let safenode_rpc_endpoints: BTreeMap<String, SocketAddr> = node_registries
             .iter()
@@ -241,7 +192,22 @@ impl DeploymentInventoryService {
             .filter_map(|daemon| daemon.endpoint)
             .collect();
 
-        let peers = node_registries
+        let bootstrap_peers = bootstrap_node_registries
+            .iter()
+            .flat_map(|reg| {
+                reg.nodes.iter().map(|node| {
+                    if let Some(listen_addresses) = &node.listen_addr {
+                        // It seems to be the case that the listening address with the public IP is
+                        // always in the second position. If this ever changes, we could do some
+                        // filtering to find the address that does not start with "127." or "10.".
+                        listen_addresses[1].to_string()
+                    } else {
+                        "-".to_string()
+                    }
+                })
+            })
+            .collect::<Vec<String>>();
+        let node_peers = generic_node_registries
             .iter()
             .flat_map(|reg| {
                 reg.nodes.iter().map(|node| {
@@ -297,12 +263,13 @@ impl DeploymentInventoryService {
             auditor_address: format!("{auditor_ip}:4242"),
             binary_option,
             bootstrap_node_vms: bootstrap_vm_list,
+            bootstrap_peers,
             faucet_address: format!("{genesis_ip}:8000"),
             genesis_multiaddr,
             name: name.to_string(),
             misc_vms: misc_vm_list,
             node_vms: node_vm_list,
-            peers,
+            node_peers,
             rpc_endpoints: safenode_rpc_endpoints,
             safenodemand_endpoints,
             ssh_user: self.cloud_provider.get_ssh_user(),
@@ -323,8 +290,8 @@ impl DeploymentInventoryService {
             temp_dir_path.join(inventory.name.clone())
         };
 
-        let count = if inventory.peers.len() < DEFAULT_CONTACTS_COUNT {
-            inventory.peers.len()
+        let count = if inventory.peers().len() < DEFAULT_CONTACTS_COUNT {
+            inventory.peers().len()
         } else {
             DEFAULT_CONTACTS_COUNT
         };
@@ -343,6 +310,50 @@ impl DeploymentInventoryService {
 
         Ok(())
     }
+
+    fn get_node_registries(
+        &self,
+        inventory_type: AnsibleInventoryType,
+    ) -> Result<Vec<NodeRegistry>> {
+        debug!("Fetching node manager inventory");
+        let temp_dir_path = tempfile::tempdir()?.into_path();
+        let temp_dir_json = serde_json::to_string(&temp_dir_path)?;
+
+        self.ansible_runner.run_playbook(
+            AnsiblePlaybook::NodeManagerInventory,
+            inventory_type,
+            Some(format!("{{ \"dest\": {temp_dir_json} }}")),
+        )?;
+
+        let node_registry_paths = WalkDir::new(temp_dir_path)
+            .into_iter()
+            .flatten()
+            .filter_map(|entry| {
+                if entry.file_type().is_file()
+                    && entry.path().extension().is_some_and(|ext| ext == "json")
+                {
+                    // tempdir/<testnet_name>-node/var/safenode-manager/node_registry.json
+                    let mut vm_name = entry.path().to_path_buf();
+                    trace!("Found file with json extension: {vm_name:?}");
+                    vm_name.pop();
+                    vm_name.pop();
+                    vm_name.pop();
+                    // Extract the <testnet_name>-node string
+                    trace!("Extracting the vm name from the path");
+                    let vm_name = vm_name.file_name()?.to_str()?;
+                    trace!("Extracted vm name from path: {vm_name}");
+                    Some(entry.path().to_path_buf())
+                } else {
+                    None
+                }
+            })
+            .collect::<Vec<PathBuf>>();
+
+        Ok(node_registry_paths
+            .iter()
+            .map(|file_path| NodeRegistry::load(file_path).unwrap())
+            .collect::<Vec<NodeRegistry>>())
+    }
 }
 
 pub type VirtualMachine = (String, IpAddr);
@@ -352,12 +363,13 @@ pub struct DeploymentInventory {
     pub auditor_address: String,
     pub binary_option: BinaryOption,
     pub bootstrap_node_vms: Vec<VirtualMachine>,
+    pub bootstrap_peers: Vec<String>,
     pub faucet_address: String,
     pub genesis_multiaddr: String,
     pub misc_vms: Vec<VirtualMachine>,
     pub name: String,
     pub node_vms: Vec<VirtualMachine>,
-    pub peers: Vec<String>,
+    pub node_peers: Vec<String>,
     pub rpc_endpoints: BTreeMap<String, SocketAddr>,
     pub safenodemand_endpoints: Vec<SocketAddr>,
     pub ssh_user: String,
@@ -373,11 +385,12 @@ impl DeploymentInventory {
             name: name.to_string(),
             auditor_address: String::new(),
             bootstrap_node_vms: Vec::new(),
+            bootstrap_peers: Vec::new(),
             genesis_multiaddr: String::new(),
             faucet_address: String::new(),
             misc_vms: Vec::new(),
             node_vms: Vec::new(),
-            peers: Vec::new(),
+            node_peers: Vec::new(),
             rpc_endpoints: BTreeMap::new(),
             safenodemand_endpoints: Vec::new(),
             ssh_user: "root".to_string(),
@@ -394,6 +407,13 @@ impl DeploymentInventory {
         list.extend(self.bootstrap_node_vms.clone());
         list.extend(self.misc_vms.clone());
         list.extend(self.node_vms.clone());
+        list
+    }
+
+    pub fn peers(&self) -> Vec<String> {
+        let mut list = Vec::new();
+        list.extend(self.bootstrap_peers.clone());
+        list.extend(self.node_peers.clone());
         list
     }
 
@@ -417,8 +437,8 @@ impl DeploymentInventory {
 
     pub fn get_random_peer(&self) -> String {
         let mut rng = rand::thread_rng();
-        let i = rng.gen_range(0..self.peers.len());
-        let random_peer = &self.peers[i];
+        let i = rng.gen_range(0..self.peers().len());
+        let random_peer = &self.peers()[i];
         random_peer.to_string()
     }
 
@@ -498,7 +518,7 @@ impl DeploymentInventory {
             .chain(self.node_vms.iter())
             .map(|vm| vm.1.to_string())
             .for_each(|ip| {
-                if let Some(peer) = self.peers.iter().find(|p| p.contains(&ip)) {
+                if let Some(peer) = self.peers().iter().find(|p| p.contains(&ip)) {
                     println!("{peer}");
                 }
             });
