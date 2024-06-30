@@ -19,9 +19,13 @@ pub mod safe;
 pub mod setup;
 pub mod ssh;
 pub mod terraform;
+pub mod upscale;
 
 use crate::{
-    ansible::{AnsibleInventoryType, AnsiblePlaybook, AnsibleRunner, ExtraVarsDocBuilder},
+    ansible::{
+        extra_vars::ExtraVarsDocBuilder, provisioning::AnsibleProvisioner, AnsibleInventoryType,
+        AnsibleRunner,
+    },
     error::{Error, Result},
     inventory::DeploymentInventory,
     rpc_client::RpcClient,
@@ -38,15 +42,36 @@ use serde_json::json;
 use std::{
     fs::File,
     io::{BufRead, BufReader, BufWriter},
-    net::IpAddr,
+    net::{IpAddr, SocketAddr},
     os::unix::fs::PermissionsExt,
     path::{Path, PathBuf},
     process::{Command, Stdio},
-    time::Duration,
+    time::{Duration, Instant},
 };
 use tar::Archive;
 
 const ANSIBLE_DEFAULT_FORKS: usize = 50;
+
+pub enum NodeType {
+    Bootstrap,
+    Normal,
+}
+
+pub struct DeployOptions {
+    pub beta_encryption_key: Option<String>,
+    pub binary_option: BinaryOption,
+    pub bootstrap_node_count: u16,
+    pub bootstrap_node_vm_count: u16,
+    pub current_inventory: DeploymentInventory,
+    pub env_variables: Option<Vec<(String, String)>>,
+    pub log_format: Option<LogFormat>,
+    pub logstash_details: Option<(String, Vec<SocketAddr>)>,
+    pub name: String,
+    pub node_count: u16,
+    pub node_vm_count: u16,
+    pub public_rpc: bool,
+    pub uploader_vm_count: u16,
+}
 
 /// Specify the binary option for the deployment.
 ///
@@ -292,6 +317,9 @@ impl TestnetDeployBuilder {
             vault_password_path,
             working_directory_path.join("ansible"),
         )?;
+        let ssh_client = SshClient::new(ssh_secret_key_path);
+        let ansible_provisioner =
+            AnsibleProvisioner::new(ansible_runner, provider.clone(), ssh_client.clone());
         let rpc_client = RpcClient::new(
             PathBuf::from("/usr/local/bin/safenode_rpc_client"),
             working_directory_path.clone(),
@@ -305,12 +333,12 @@ impl TestnetDeployBuilder {
         }
 
         let testnet = TestnetDeployer::new(
-            ansible_runner,
+            ansible_provisioner,
             provider.clone(),
             &self.environment_name,
             rpc_client,
             S3Repository {},
-            SshClient::new(ssh_secret_key_path),
+            ssh_client,
             terraform_runner,
             working_directory_path,
         )?;
@@ -321,7 +349,7 @@ impl TestnetDeployBuilder {
 
 #[derive(Clone)]
 pub struct TestnetDeployer {
-    pub ansible_runner: AnsibleRunner,
+    pub ansible_provisioner: AnsibleProvisioner,
     pub cloud_provider: CloudProvider,
     pub environment_name: String,
     pub inventory_file_path: PathBuf,
@@ -335,7 +363,7 @@ pub struct TestnetDeployer {
 impl TestnetDeployer {
     #[allow(clippy::too_many_arguments)]
     pub fn new(
-        ansible_runner: AnsibleRunner,
+        ansible_provisioner: AnsibleProvisioner,
         cloud_provider: CloudProvider,
         environment_name: &str,
         rpc_client: RpcClient,
@@ -352,7 +380,7 @@ impl TestnetDeployer {
             .join("inventory")
             .join("dev_inventory_digital_ocean.yml");
         Ok(TestnetDeployer {
-            ansible_runner,
+            ansible_provisioner,
             cloud_provider,
             environment_name: environment_name.to_string(),
             inventory_file_path,
@@ -411,18 +439,7 @@ impl TestnetDeployer {
         if !environments.contains(&name.to_string()) {
             return Err(Error::EnvironmentDoesNotExist(name.to_string()));
         }
-
-        self.ansible_runner.run_playbook(
-            AnsiblePlaybook::StartNodes,
-            AnsibleInventoryType::Genesis,
-            None,
-        )?;
-        self.ansible_runner.run_playbook(
-            AnsiblePlaybook::StartNodes,
-            AnsibleInventoryType::Nodes,
-            None,
-        )?;
-
+        self.ansible_provisioner.start_nodes().await?;
         Ok(())
     }
 
@@ -431,22 +448,7 @@ impl TestnetDeployer {
         if !environments.contains(&options.name.to_string()) {
             return Err(Error::EnvironmentDoesNotExist(options.name.to_string()));
         }
-
-        self.ansible_runner.run_playbook(
-            AnsiblePlaybook::UpgradeNodes,
-            AnsibleInventoryType::Nodes,
-            Some(options.get_ansible_vars()),
-        )?;
-        self.ansible_runner.run_playbook(
-            AnsiblePlaybook::UpgradeNodes,
-            AnsibleInventoryType::Genesis,
-            Some(options.get_ansible_vars()),
-        )?;
-        self.ansible_runner.run_playbook(
-            AnsiblePlaybook::UpgradeFaucet,
-            AnsibleInventoryType::Genesis,
-            Some(options.get_ansible_vars()),
-        )?;
+        self.ansible_provisioner.upgrade_nodes(&options).await?;
 
         Ok(())
     }
@@ -456,20 +458,9 @@ impl TestnetDeployer {
         if !environments.contains(&name.to_string()) {
             return Err(Error::EnvironmentDoesNotExist(name.to_string()));
         }
-
-        let mut extra_vars = ExtraVarsDocBuilder::default();
-        extra_vars.add_variable("version", &version.to_string());
-        self.ansible_runner.run_playbook(
-            AnsiblePlaybook::UpgradeNodeManager,
-            AnsibleInventoryType::Genesis,
-            Some(extra_vars.build()),
-        )?;
-        self.ansible_runner.run_playbook(
-            AnsiblePlaybook::UpgradeNodeManager,
-            AnsibleInventoryType::Nodes,
-            Some(extra_vars.build()),
-        )?;
-
+        self.ansible_provisioner
+            .upgrade_node_manager(&version)
+            .await?;
         Ok(())
     }
 
@@ -484,6 +475,35 @@ impl TestnetDeployer {
                 "node".to_string(),
             ],
         )
+    }
+
+    async fn create_or_update_infra(
+        &self,
+        name: &str,
+        bootstrap_node_vm_count: u16,
+        node_vm_count: u16,
+        uploader_vm_count: u16,
+        enable_build_vm: bool,
+    ) -> Result<()> {
+        let start = Instant::now();
+        println!("Selecting {} workspace...", name);
+        self.terraform_runner.workspace_select(name)?;
+        let args = vec![
+            (
+                "bootstrap_node_vm_count".to_string(),
+                bootstrap_node_vm_count.to_string(),
+            ),
+            ("node_vm_count".to_string(), node_vm_count.to_string()),
+            (
+                "uploader_vm_count".to_string(),
+                uploader_vm_count.to_string(),
+            ),
+            ("use_custom_bin".to_string(), enable_build_vm.to_string()),
+        ];
+        println!("Running terraform apply...");
+        self.terraform_runner.apply(args)?;
+        print_duration(start.elapsed());
+        Ok(())
     }
 }
 
@@ -671,21 +691,23 @@ pub async fn notify_slack(inventory: DeploymentInventory) -> Result<()> {
     let mut message = String::new();
     message.push_str("*Testnet Details*\n");
     message.push_str(&format!("Name: {}\n", inventory.name));
-    message.push_str(&format!("Node count: {}\n", inventory.peers.len()));
+    message.push_str(&format!("Node count: {}\n", inventory.peers().len()));
     message.push_str(&format!("Faucet address: {:?}\n", inventory.faucet_address));
     match inventory.binary_option {
         BinaryOption::BuildFromSource {
-            repo_owner, branch, ..
+            ref repo_owner,
+            ref branch,
+            ..
         } => {
             message.push_str("*Branch Details*\n");
             message.push_str(&format!("Repo owner: {}\n", repo_owner));
             message.push_str(&format!("Branch: {}\n", branch));
         }
         BinaryOption::Versioned {
-            faucet_version,
-            safenode_version,
-            safenode_manager_version,
-            sn_auditor_version,
+            ref faucet_version,
+            ref safenode_version,
+            ref safenode_manager_version,
+            ref sn_auditor_version,
         } => {
             message.push_str("*Version Details*\n");
             message.push_str(&format!("faucet version: {}\n", faucet_version));
@@ -700,7 +722,7 @@ pub async fn notify_slack(inventory: DeploymentInventory) -> Result<()> {
 
     message.push_str("*Sample Peers*\n");
     message.push_str("```\n");
-    for peer in inventory.peers.iter().take(20) {
+    for peer in inventory.peers().iter().take(20) {
         message.push_str(&format!("{peer}\n"));
     }
     message.push_str("```\n");
