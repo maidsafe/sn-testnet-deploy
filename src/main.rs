@@ -22,6 +22,7 @@ use sn_testnet_deploy::{
     manage_test_data::TestDataClientBuilder,
     network_commands, notify_slack,
     setup::setup_dotenv_file,
+    upscale::UpscaleOptions,
     BinaryOption, CloudProvider, LogFormat, TestnetDeployBuilder, UpgradeOptions,
 };
 use std::time::Duration;
@@ -343,6 +344,58 @@ enum Commands {
         /// There should be no 'v' prefix.
         #[arg(long)]
         safe_version: Option<String>,
+    },
+    /// Upscale VMs and node services for an existing network.
+    Upscale {
+        /// Set to run Ansible with more verbose output.
+        #[arg(long)]
+        ansible_verbose: bool,
+        /// The desired number of safenode services to be running on each bootstrap VM after the
+        /// scale.
+        ///
+        /// If there are currently 10 services running on each VM, and you want there to be 25, the
+        /// value used should be 25, rather than 15 as a delta to reach 25.
+        ///
+        /// Note: bootstrap VMs normally only use a single node service, so you probably want this
+        /// value to be 1.
+        #[clap(long, verbatim_doc_comment)]
+        desired_bootstrap_node_count: Option<u16>,
+        /// The desired number of bootstrap VMs to be running after the scale.
+        ///
+        /// If there are currently 10 VMs running, and you want there to be 20, use 20 as the value
+        /// not 10 as a delta.
+        #[clap(long, verbatim_doc_comment)]
+        desired_bootstrap_node_vm_count: Option<u16>,
+        /// If set to true, for new VMs the RPC of the node will be accessible remotely.
+        ///
+        /// By default, the safenode RPC is only accessible via the 'localhost' and is not exposed for
+        /// security reasons.
+        #[clap(long, default_value_t = false, verbatim_doc_comment)]
+        public_rpc: bool,
+        /// The name of the existing network to upscale.
+        #[arg(short = 'n', long, verbatim_doc_comment)]
+        name: String,
+        /// The desired number of safenode services to be running on each node VM after the scale.
+        ///
+        /// If there are currently 10 services running on each VM, and you want there to be 25, the
+        /// value used should be 25, rather than 15 as a delta to reach 25.
+        #[clap(long, verbatim_doc_comment)]
+        desired_node_count: Option<u16>,
+        /// The desired number of node VMs to be running after the scale.
+        ///
+        /// If there are currently 10 VMs running, and you want there to be 25, the value used
+        /// should be 25, rather than 15 as a delta to reach 25.
+        #[clap(long, verbatim_doc_comment)]
+        desired_node_vm_count: Option<u16>,
+        /// The desired number of uploader VMs to be running after the scale.
+        ///
+        /// If there are currently 10 VMs running, and you want there to be 25, the value used
+        /// should be 25, rather than 15 as a delta to reach 25.
+        #[clap(long, verbatim_doc_comment)]
+        desired_uploader_vm_count: Option<u16>,
+        /// The cloud provider for the network.
+        #[clap(long, value_parser = parse_provider, verbatim_doc_comment, default_value_t = CloudProvider::DigitalOcean)]
+        provider: CloudProvider,
     },
 }
 
@@ -942,6 +995,72 @@ async fn main() -> Result<()> {
                 println!("{path}: {address}");
             }
             inventory.add_uploaded_files(uploaded_files.clone());
+            inventory.save()?;
+
+            Ok(())
+        }
+        Commands::Upscale {
+            ansible_verbose,
+            desired_bootstrap_node_count,
+            desired_bootstrap_node_vm_count,
+            name,
+            desired_node_count,
+            desired_node_vm_count,
+            desired_uploader_vm_count,
+            provider,
+            public_rpc,
+        } => {
+            println!("Upscaling deployment...");
+            let testnet_deployer = TestnetDeployBuilder::default()
+                .ansible_verbose_mode(ansible_verbose)
+                .environment_name(&name)
+                .provider(provider.clone())
+                .build()?;
+            testnet_deployer.init().await?;
+
+            let inventory_service = DeploymentInventoryService::from(testnet_deployer.clone());
+            let inventory = inventory_service
+                .generate_or_retrieve_inventory(&name, true, None)
+                .await?;
+
+            testnet_deployer
+                .upscale(&UpscaleOptions {
+                    ansible_verbose,
+                    current_inventory: inventory,
+                    desired_bootstrap_node_count,
+                    desired_bootstrap_node_vm_count,
+                    desired_node_count,
+                    desired_node_vm_count,
+                    desired_uploader_vm_count,
+                    public_rpc,
+                })
+                .await?;
+
+            println!("Generating new inventory after upscale...");
+            let max_retries = 3;
+            let mut retries = 0;
+            let inventory = loop {
+                match inventory_service
+                    .generate_or_retrieve_inventory(&name, true, None)
+                    .await
+                {
+                    Ok(inv) => break inv,
+                    Err(e) if retries < max_retries => {
+                        retries += 1;
+                        eprintln!("Failed to generate inventory on attempt {retries}: {:?}", e);
+                        eprintln!("Will retry up to {max_retries} times...");
+                    }
+                    Err(_) => {
+                        eprintln!("Failed to generate inventory after {max_retries} attempts");
+                        eprintln!(
+                            "Please try running the `inventory` command or workflow separately"
+                        );
+                        return Ok(());
+                    }
+                }
+            };
+
+            inventory.print_report()?;
             inventory.save()?;
 
             Ok(())

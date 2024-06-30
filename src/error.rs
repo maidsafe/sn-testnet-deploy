@@ -55,6 +55,31 @@ pub enum Error {
     JoinError(#[from] JoinError),
     #[error(transparent)]
     InquireError(#[from] inquire::InquireError),
+    #[error(
+        "The desired bootstrap VM count is smaller than the current count. \
+         This is invalid for an upscale operation."
+    )]
+    InvalidUpscaleDesiredBootstrapVmCount,
+    #[error(
+        "The desired bootstrap node count is smaller than the current count. \
+         This is invalid for an upscale operation."
+    )]
+    InvalidUpscaleDesiredBootstrapNodeCount,
+    #[error(
+        "The desired node VM count is smaller than the current count. \
+         This is invalid for an upscale operation."
+    )]
+    InvalidUpscaleDesiredNodeVmCount,
+    #[error(
+        "The desired node count is smaller than the current count. \
+         This is invalid for an upscale operation."
+    )]
+    InvalidUpscaleDesiredNodeCount,
+    #[error(
+        "The desired uploader VM count is smaller than the current count. \
+         This is invalid for an upscale operation."
+    )]
+    InvalidUpscaleDesiredUploaderVmCount,
     #[error(transparent)]
     Io(#[from] std::io::Error),
     #[error("Failed to list objects in S3 bucket with prefix '{prefix}': {error}")]
@@ -97,6 +122,8 @@ pub enum Error {
         "The '{0}' binary was not found. It is required for the deploy process. Make sure it is installed."
     )]
     ToolBinaryNotFound(String),
+    #[error("The {0} type is not yet supported for an upscaling provision")]
+    UpscaleInventoryTypeNotSupported(String),
     #[error(transparent)]
     VarError(#[from] std::env::VarError),
 }

@@ -7,11 +7,10 @@
 use crate::{
     ansible::provisioning::{NodeType, ProvisionOptions},
     error::Result,
-    get_genesis_multiaddr, print_duration, BinaryOption, DeploymentInventory, LogFormat,
-    TestnetDeployer,
+    get_genesis_multiaddr, BinaryOption, DeploymentInventory, LogFormat, TestnetDeployer,
 };
 use colored::Colorize;
-use std::{net::SocketAddr, time::Instant};
+use std::net::SocketAddr;
 
 #[derive(Clone)]
 pub struct DeployOptions {
@@ -39,12 +38,18 @@ impl TestnetDeployer {
             }
         };
 
-        self.create_infra(options, build_custom_binaries)
-            .await
-            .map_err(|err| {
-                println!("Failed to create infra {err:?}");
-                err
-            })?;
+        self.create_or_update_infra(
+            &options.name,
+            options.bootstrap_node_vm_count,
+            options.node_vm_count,
+            options.uploader_vm_count,
+            build_custom_binaries,
+        )
+        .await
+        .map_err(|err| {
+            println!("Failed to create infra {err:?}");
+            err
+        })?;
 
         let mut n = 1;
         let mut total = if build_custom_binaries { 7 } else { 6 };
@@ -164,31 +169,6 @@ impl TestnetDeployer {
             println!("See the output from Ansible to determine which VMs had failures.");
         }
 
-        Ok(())
-    }
-
-    async fn create_infra(&self, options: &DeployOptions, enable_build_vm: bool) -> Result<()> {
-        let start = Instant::now();
-        println!("Selecting {} workspace...", options.name);
-        self.terraform_runner.workspace_select(&options.name)?;
-        let args = vec![
-            (
-                "bootstrap_node_vm_count".to_string(),
-                options.bootstrap_node_vm_count.to_string(),
-            ),
-            (
-                "node_vm_count".to_string(),
-                options.node_vm_count.to_string(),
-            ),
-            (
-                "uploader_vm_count".to_string(),
-                options.uploader_vm_count.to_string(),
-            ),
-            ("use_custom_bin".to_string(), enable_build_vm.to_string()),
-        ];
-        println!("Running terraform apply...");
-        self.terraform_runner.apply(args)?;
-        print_duration(start.elapsed());
         Ok(())
     }
 }
