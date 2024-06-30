@@ -1,3 +1,9 @@
+// Copyright (c) 2023, MaidSafe.
+// All rights reserved.
+//
+// This SAFE Network Software is licensed under the BSD-3-Clause license.
+// Please see the LICENSE file for more details.
+
 use super::{
     extra_vars::ExtraVarsDocBuilder, AnsibleInventoryType, AnsiblePlaybook, AnsibleRunner,
 };
@@ -100,7 +106,21 @@ impl AnsibleProvisioner {
         )?;
         self.ansible_runner.run_playbook(
             AnsiblePlaybook::Logs,
+            AnsibleInventoryType::BootstrapNodes,
+            Some(format!(
+                "{{ \"env_name\": \"{name}\", \"resources_only\" : \"{resources_only}\" }}"
+            )),
+        )?;
+        self.ansible_runner.run_playbook(
+            AnsiblePlaybook::Logs,
             AnsibleInventoryType::Nodes,
+            Some(format!(
+                "{{ \"env_name\": \"{name}\", \"resources_only\" : \"{resources_only}\" }}"
+            )),
+        )?;
+        self.ansible_runner.run_playbook(
+            AnsiblePlaybook::Logs,
+            AnsibleInventoryType::Auditor,
             Some(format!(
                 "{{ \"env_name\": \"{name}\", \"resources_only\" : \"{resources_only}\" }}"
             )),
@@ -113,6 +133,11 @@ impl AnsibleProvisioner {
             .ansible_runner
             .get_inventory(AnsibleInventoryType::Genesis, false)
             .await?;
+        all_node_inventory.extend(
+            self.ansible_runner
+                .get_inventory(AnsibleInventoryType::BootstrapNodes, false)
+                .await?,
+        );
         all_node_inventory.extend(
             self.ansible_runner
                 .get_inventory(AnsibleInventoryType::Nodes, false)
@@ -220,6 +245,11 @@ impl AnsibleProvisioner {
         self.ansible_runner.run_playbook(
             AnsiblePlaybook::StartNodes,
             AnsibleInventoryType::Genesis,
+            None,
+        )?;
+        self.ansible_runner.run_playbook(
+            AnsiblePlaybook::StartNodes,
+            AnsibleInventoryType::BootstrapNodes,
             None,
         )?;
         self.ansible_runner.run_playbook(

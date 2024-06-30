@@ -19,6 +19,7 @@ pub mod safe;
 pub mod setup;
 pub mod ssh;
 pub mod terraform;
+pub mod upscale;
 
 use crate::{
     ansible::{
@@ -41,15 +42,36 @@ use serde_json::json;
 use std::{
     fs::File,
     io::{BufRead, BufReader, BufWriter},
-    net::IpAddr,
+    net::{IpAddr, SocketAddr},
     os::unix::fs::PermissionsExt,
     path::{Path, PathBuf},
     process::{Command, Stdio},
-    time::Duration,
+    time::{Duration, Instant},
 };
 use tar::Archive;
 
 const ANSIBLE_DEFAULT_FORKS: usize = 50;
+
+pub enum NodeType {
+    Bootstrap,
+    Normal,
+}
+
+pub struct DeployOptions {
+    pub beta_encryption_key: Option<String>,
+    pub binary_option: BinaryOption,
+    pub bootstrap_node_count: u16,
+    pub bootstrap_node_vm_count: u16,
+    pub current_inventory: DeploymentInventory,
+    pub env_variables: Option<Vec<(String, String)>>,
+    pub log_format: Option<LogFormat>,
+    pub logstash_details: Option<(String, Vec<SocketAddr>)>,
+    pub name: String,
+    pub node_count: u16,
+    pub node_vm_count: u16,
+    pub public_rpc: bool,
+    pub uploader_vm_count: u16,
+}
 
 /// Specify the binary option for the deployment.
 ///
@@ -454,6 +476,35 @@ impl TestnetDeployer {
             ],
         )
     }
+
+    async fn create_or_update_infra(
+        &self,
+        name: &str,
+        bootstrap_node_vm_count: u16,
+        node_vm_count: u16,
+        uploader_vm_count: u16,
+        enable_build_vm: bool,
+    ) -> Result<()> {
+        let start = Instant::now();
+        println!("Selecting {} workspace...", name);
+        self.terraform_runner.workspace_select(name)?;
+        let args = vec![
+            (
+                "bootstrap_node_vm_count".to_string(),
+                bootstrap_node_vm_count.to_string(),
+            ),
+            ("node_vm_count".to_string(), node_vm_count.to_string()),
+            (
+                "uploader_vm_count".to_string(),
+                uploader_vm_count.to_string(),
+            ),
+            ("use_custom_bin".to_string(), enable_build_vm.to_string()),
+        ];
+        println!("Running terraform apply...");
+        self.terraform_runner.apply(args)?;
+        print_duration(start.elapsed());
+        Ok(())
+    }
 }
 
 ///
@@ -640,21 +691,23 @@ pub async fn notify_slack(inventory: DeploymentInventory) -> Result<()> {
     let mut message = String::new();
     message.push_str("*Testnet Details*\n");
     message.push_str(&format!("Name: {}\n", inventory.name));
-    message.push_str(&format!("Node count: {}\n", inventory.peers.len()));
+    message.push_str(&format!("Node count: {}\n", inventory.peers().len()));
     message.push_str(&format!("Faucet address: {:?}\n", inventory.faucet_address));
     match inventory.binary_option {
         BinaryOption::BuildFromSource {
-            repo_owner, branch, ..
+            ref repo_owner,
+            ref branch,
+            ..
         } => {
             message.push_str("*Branch Details*\n");
             message.push_str(&format!("Repo owner: {}\n", repo_owner));
             message.push_str(&format!("Branch: {}\n", branch));
         }
         BinaryOption::Versioned {
-            faucet_version,
-            safenode_version,
-            safenode_manager_version,
-            sn_auditor_version,
+            ref faucet_version,
+            ref safenode_version,
+            ref safenode_manager_version,
+            ref sn_auditor_version,
         } => {
             message.push_str("*Version Details*\n");
             message.push_str(&format!("faucet version: {}\n", faucet_version));
@@ -669,7 +722,7 @@ pub async fn notify_slack(inventory: DeploymentInventory) -> Result<()> {
 
     message.push_str("*Sample Peers*\n");
     message.push_str("```\n");
-    for peer in inventory.peers.iter().take(20) {
+    for peer in inventory.peers().iter().take(20) {
         message.push_str(&format!("{peer}\n"));
     }
     message.push_str("```\n");

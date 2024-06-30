@@ -161,6 +161,23 @@ pub enum AnsibleInventoryType {
     Logstash,
     // Use to run a playbook against all nodes except the genesis node.
     Nodes,
+    // Use to run a playbook against all the uploader machines.
+    Uploaders,
+}
+
+impl std::fmt::Display for AnsibleInventoryType {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let s = match self {
+            AnsibleInventoryType::Auditor => "Auditor",
+            AnsibleInventoryType::BootstrapNodes => "BootstrapNodes",
+            AnsibleInventoryType::Build => "Build",
+            AnsibleInventoryType::Genesis => "Genesis",
+            AnsibleInventoryType::Logstash => "Logstash",
+            AnsibleInventoryType::Nodes => "Nodes",
+            AnsibleInventoryType::Uploaders => "Uploaders",
+        };
+        write!(f, "{}", s)
+    }
 }
 
 #[derive(Clone)]
@@ -343,6 +360,10 @@ impl AnsibleRunner {
                 ".{}_bootstrap_node_inventory_{}.yml",
                 self.environment_name, provider
             )),
+            AnsibleInventoryType::Uploaders => PathBuf::from("inventory").join(format!(
+                ".{}_uploader_inventory_{}.yml",
+                self.environment_name, provider
+            )),
         };
         let path = self.working_directory_path.join(path);
         match path.exists() {
@@ -366,7 +387,14 @@ pub async fn generate_environment_inventory(
     output_inventory_dir_path: &Path,
 ) -> Result<()> {
     let mut generated_inventory_paths = vec![];
-    let inventory_files = ["bootstrap_node", "build", "genesis", "node", "auditor"];
+    let inventory_files = [
+        "bootstrap_node",
+        "build",
+        "genesis",
+        "node",
+        "auditor",
+        "uploader",
+    ];
     for inventory_type in inventory_files.iter() {
         let src_path = base_inventory_path;
         let dest_path = output_inventory_dir_path.join(format!(
