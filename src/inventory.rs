@@ -116,7 +116,7 @@ impl DeploymentInventoryService {
         )
         .await?;
 
-        let mut bootstrap_vm_list = Vec::new();
+        let mut misc_vm_list = Vec::new();
         let genesis_inventory = self
             .ansible_runner
             .get_inventory(AnsibleInventoryType::Genesis, false)
@@ -129,9 +129,8 @@ impl DeploymentInventoryService {
                     .ok_or_else(|| eyre!("For a new deployment the binary option must be set"))?,
             ));
         }
-        bootstrap_vm_list.push((genesis_inventory[0].0.clone(), genesis_inventory[0].1));
+        misc_vm_list.push((genesis_inventory[0].0.clone(), genesis_inventory[0].1));
 
-        let mut misc_vm_list = Vec::new();
         let auditor_inventory = self
             .ansible_runner
             .get_inventory(AnsibleInventoryType::Auditor, true)
@@ -156,6 +155,7 @@ impl DeploymentInventoryService {
             node_vm_list.push((entry.0.clone(), entry.1));
         }
 
+        let mut bootstrap_vm_list = Vec::new();
         let bootstrap_nodes_inventory = self
             .ansible_runner
             .get_inventory(AnsibleInventoryType::BootstrapNodes, false)
@@ -164,13 +164,25 @@ impl DeploymentInventoryService {
             bootstrap_vm_list.push((entry.0.clone(), entry.1));
         }
 
+        let mut uploader_vm_list = Vec::new();
+        let uploader_inventory = self
+            .ansible_runner
+            .get_inventory(AnsibleInventoryType::Uploaders, false)
+            .await?;
+        for entry in uploader_inventory.iter() {
+            uploader_vm_list.push((entry.0.clone(), entry.1));
+        }
+
         println!("Retrieving node registries from all VMs...");
         let mut node_registries = Vec::new();
         let bootstrap_node_registries =
             self.get_node_registries(AnsibleInventoryType::BootstrapNodes)?;
+
         let generic_node_registries = self.get_node_registries(AnsibleInventoryType::Nodes)?;
         node_registries.extend(bootstrap_node_registries.clone());
         node_registries.extend(generic_node_registries.clone());
+        node_registries.extend(self.get_node_registries(AnsibleInventoryType::Genesis)?);
+        node_registries.extend(self.get_node_registries(AnsibleInventoryType::Auditor)?);
 
         let safenode_rpc_endpoints: BTreeMap<String, SocketAddr> = node_registries
             .iter()
@@ -274,6 +286,7 @@ impl DeploymentInventoryService {
             safenodemand_endpoints,
             ssh_user: self.cloud_provider.get_ssh_user(),
             uploaded_files: Vec::new(),
+            uploader_vms: uploader_vm_list,
         };
         Ok(inventory)
     }
@@ -374,6 +387,7 @@ pub struct DeploymentInventory {
     pub safenodemand_endpoints: Vec<SocketAddr>,
     pub ssh_user: String,
     pub uploaded_files: Vec<(String, String)>,
+    pub uploader_vms: Vec<VirtualMachine>,
 }
 
 impl DeploymentInventory {
@@ -395,6 +409,7 @@ impl DeploymentInventory {
             safenodemand_endpoints: Vec::new(),
             ssh_user: "root".to_string(),
             uploaded_files: Vec::new(),
+            uploader_vms: Vec::new(),
         }
     }
 
@@ -442,6 +457,14 @@ impl DeploymentInventory {
         random_peer.to_string()
     }
 
+    pub fn bootstrap_node_count(&self) -> usize {
+        self.bootstrap_peers.len() / self.bootstrap_node_vms.len()
+    }
+
+    pub fn node_count(&self) -> usize {
+        self.node_peers.len() / self.node_vms.len()
+    }
+
     pub fn print_report(&self) -> Result<()> {
         println!("**************************************");
         println!("*                                    *");
@@ -475,7 +498,6 @@ impl DeploymentInventory {
                 println!("safenode version: {safenode_version}");
                 println!("safenode-manager version: {safenode_manager_version}");
                 println!("sn_auditor version: {sn_auditor_version}");
-
                 println!();
             }
         }
@@ -486,6 +508,7 @@ impl DeploymentInventory {
         for vm in self.bootstrap_node_vms.iter() {
             println!("{}: {}", vm.0, vm.1);
         }
+        println!("Nodes per VM: {}", self.bootstrap_node_count());
         println!("SSH user: {}", self.ssh_user);
         println!();
 
@@ -493,6 +516,16 @@ impl DeploymentInventory {
         println!("Node VMs");
         println!("========");
         for vm in self.node_vms.iter() {
+            println!("{}: {}", vm.0, vm.1);
+        }
+        println!("Nodes per VM: {}", self.node_count());
+        println!("SSH user: {}", self.ssh_user);
+        println!();
+
+        println!("============");
+        println!("Uploader VMs");
+        println!("============");
+        for vm in self.uploader_vms.iter() {
             println!("{}: {}", vm.0, vm.1);
         }
         println!("SSH user: {}", self.ssh_user);
