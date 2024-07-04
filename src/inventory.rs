@@ -29,7 +29,7 @@ use std::{
 };
 use walkdir::WalkDir;
 
-const DEFAULT_CONTACTS_COUNT: usize = 50;
+const DEFAULT_CONTACTS_COUNT: usize = 25;
 const STOPPED_PEER_ID: &str = "-";
 const TESTNET_BUCKET_NAME: &str = "sn-testnet";
 
