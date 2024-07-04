@@ -10,7 +10,10 @@ use crate::{
     safe::{SafeBinaryRepository, SafeClient},
     BinaryOption, DeploymentInventory,
 };
-use color_eyre::{eyre::eyre, Help, Result};
+use color_eyre::{
+    eyre::{eyre, OptionExt},
+    Help, Result,
+};
 use rand::Rng;
 use sha2::{Digest, Sha256};
 use std::{
@@ -126,7 +129,9 @@ impl TestDataClient {
         }
 
         let faucet_addr: SocketAddr = inventory.faucet_address.parse()?;
-        let random_peer = inventory.get_random_peer();
+        let random_peer = inventory
+            .get_random_peer()
+            .ok_or_eyre("No peers available")?;
         self.safe_client
             .wallet_get_faucet(&random_peer, faucet_addr)?;
         // Generate 10 random files to be uploaded, increasing in size from 1 to 10k.

@@ -6,11 +6,10 @@
 
 use clap::{Parser, Subcommand};
 use color_eyre::{
-    eyre::{bail, eyre},
+    eyre::{bail, eyre, OptionExt},
     Help, Result,
 };
 use dotenv::dotenv;
-use rand::Rng;
 use semver::Version;
 use sn_releases::{ReleaseType, SafeReleaseRepoActions};
 use sn_testnet_deploy::{
@@ -981,9 +980,7 @@ async fn main() -> Result<()> {
             }
 
             let mut inventory = DeploymentInventory::read(&inventory_path)?;
-            let mut rng = rand::thread_rng();
-            let i = rng.gen_range(0..inventory.peers().len());
-            let random_peer = &inventory.peers()[i];
+            let random_peer = &inventory.get_random_peer().ok_or_eyre("No peers found")?;
 
             let test_data_client = TestDataClientBuilder::default().build()?;
             let uploaded_files = test_data_client

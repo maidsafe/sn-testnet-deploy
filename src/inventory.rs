@@ -16,18 +16,17 @@ use crate::{
 };
 use color_eyre::{eyre::eyre, Result};
 use log::{debug, trace};
-use rand::Rng;
+use rand::seq::IteratorRandom;
 use serde::{Deserialize, Serialize};
 use sn_service_management::NodeRegistry;
 use std::{
-    collections::BTreeMap,
+    collections::{BTreeMap, BTreeSet},
     convert::From,
     fs::File,
     io::Write,
     net::{IpAddr, SocketAddr},
     path::PathBuf,
 };
-use tokio::io::AsyncWriteExt;
 use walkdir::WalkDir;
 
 const DEFAULT_CONTACTS_COUNT: usize = 50;
@@ -303,18 +302,16 @@ impl DeploymentInventoryService {
             temp_dir_path.join(inventory.name.clone())
         };
 
-        let count = if inventory.peers().len() < DEFAULT_CONTACTS_COUNT {
-            inventory.peers().len()
-        } else {
-            DEFAULT_CONTACTS_COUNT
-        };
+        let mut file = std::fs::File::create(&temp_file_path)?;
+        let mut rng = rand::thread_rng();
 
-        let mut file = tokio::fs::File::create(&temp_file_path).await?;
-        for _ in 0..count {
-            let peer = inventory.get_random_peer();
-            if peer != STOPPED_PEER_ID {
-                file.write_all(format!("{}\n", peer).as_bytes()).await?;
-            }
+        for peer in inventory
+            .peers()
+            .into_iter()
+            .filter(|peer| peer != STOPPED_PEER_ID)
+            .choose_multiple(&mut rng, DEFAULT_CONTACTS_COUNT)
+        {
+            writeln!(file, "{peer}",)?;
         }
 
         self.s3_repository
@@ -425,8 +422,8 @@ impl DeploymentInventory {
         list
     }
 
-    pub fn peers(&self) -> Vec<String> {
-        let mut list = Vec::new();
+    pub fn peers(&self) -> BTreeSet<String> {
+        let mut list = BTreeSet::new();
         list.extend(self.bootstrap_peers.clone());
         list.extend(self.node_peers.clone());
         list
@@ -450,11 +447,9 @@ impl DeploymentInventory {
         self.uploaded_files.extend_from_slice(&uploaded_files);
     }
 
-    pub fn get_random_peer(&self) -> String {
+    pub fn get_random_peer(&self) -> Option<String> {
         let mut rng = rand::thread_rng();
-        let i = rng.gen_range(0..self.peers().len());
-        let random_peer = &self.peers()[i];
-        random_peer.to_string()
+        self.peers().into_iter().choose(&mut rng)
     }
 
     pub fn bootstrap_node_count(&self) -> usize {
