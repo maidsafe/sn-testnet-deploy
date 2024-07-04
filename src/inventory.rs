@@ -305,13 +305,27 @@ impl DeploymentInventoryService {
         let mut file = std::fs::File::create(&temp_file_path)?;
         let mut rng = rand::thread_rng();
 
+        let bootstrap_peers_len = inventory.bootstrap_peers.len();
         for peer in inventory
-            .peers()
-            .into_iter()
-            .filter(|peer| peer != STOPPED_PEER_ID)
+            .bootstrap_peers
+            .iter()
+            .filter(|&peer| peer != STOPPED_PEER_ID)
+            .cloned()
             .choose_multiple(&mut rng, DEFAULT_CONTACTS_COUNT)
         {
             writeln!(file, "{peer}",)?;
+        }
+
+        if DEFAULT_CONTACTS_COUNT > bootstrap_peers_len {
+            for peer in inventory
+                .node_peers
+                .iter()
+                .filter(|&peer| peer != STOPPED_PEER_ID)
+                .cloned()
+                .choose_multiple(&mut rng, DEFAULT_CONTACTS_COUNT - bootstrap_peers_len)
+            {
+                writeln!(file, "{peer}",)?;
+            }
         }
 
         self.s3_repository
