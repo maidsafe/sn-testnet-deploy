@@ -139,6 +139,9 @@ impl TestnetDeployer {
         let rg_cmd = format!("rg {rg_args} /var/log/safenode/");
         println!("Running ripgrep with command: {rg_cmd}");
 
+        // Get current date and time
+        let now = chrono::Utc::now();
+        let timestamp = now.format("%Y%m%dT%H%M%S").to_string();
         let progress_bar = get_progress_bar(all_node_inventory.len() as u64)?;
         let _failed_inventory = all_node_inventory
             .par_iter()
@@ -147,13 +150,15 @@ impl TestnetDeployer {
                     .ssh_client
                     .run_command(ip_address, "safe", &rg_cmd, true)
                 {
-                    Ok(output) => match Self::store_rg_output(&output, &log_abs_dest, vm_name) {
-                        Ok(_) => None,
-                        Err(err) => {
-                            println!("Failed store output for {ip_address:?} with: {err:?}");
-                            Some((vm_name, ip_address))
+                    Ok(output) => {
+                        match Self::store_rg_output(&timestamp, &output, &log_abs_dest, vm_name) {
+                            Ok(_) => None,
+                            Err(err) => {
+                                println!("Failed store output for {ip_address:?} with: {err:?}");
+                                Some((vm_name, ip_address))
+                            }
                         }
-                    },
+                    }
                     Err(err) => {
                         println!("Failed to run rg query for {ip_address:?} with: {err:?}");
                         Some((vm_name, ip_address))
@@ -170,12 +175,13 @@ impl TestnetDeployer {
         Ok(())
     }
 
-    fn store_rg_output(output: &[String], log_abs_dest: &Path, vm_name: &str) -> Result<()> {
+    fn store_rg_output(
+        timestamp: &str,
+        output: &[String],
+        log_abs_dest: &Path,
+        vm_name: &str,
+    ) -> Result<()> {
         std::fs::create_dir_all(log_abs_dest.join(vm_name))?;
-
-        // Get current date and time
-        let now = chrono::Utc::now();
-        let timestamp = now.format("%Y%m%dT%H%M%S").to_string();
 
         let mut file = File::create(
             log_abs_dest
