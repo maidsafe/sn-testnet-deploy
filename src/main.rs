@@ -442,7 +442,7 @@ enum LogCommands {
         /// The ripgrep arguments that are directly passed to ripgrep. The text to search for should be put inside
         /// single quotes. The dir to search for is set automatically, so do not provide one.
         ///
-        /// Example command: `cargo run --release -- logs rg --name <name> --args "'ValidSpendRecordPutFromNetwork' -c"`
+        /// Example command: `cargo run --release -- logs rg --name <name> --args "'ValidSpendRecordPutFromNetwork' -z -a"`
         #[arg(short = 'a', long, allow_hyphen_values(true))]
         args: String,
         /// The name of the environment
