@@ -97,8 +97,7 @@ impl SshClient {
             args,
             suppress_output,
             false,
-        )
-        .map_err(|_| Error::SshCommandFailed(command.to_string()))?;
+        )?;
         Ok(output)
     }
 
