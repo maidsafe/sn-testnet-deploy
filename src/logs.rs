@@ -151,12 +151,44 @@ impl TestnetDeployer {
                     .run_command(ip_address, "safe", &rg_cmd, true)
                 {
                     Ok(output) => {
-                        match Self::store_rg_output(&timestamp, &output, &log_abs_dest, vm_name) {
+                        match Self::store_rg_output(
+                            &timestamp,
+                            &rg_cmd,
+                            &output,
+                            &log_abs_dest,
+                            vm_name,
+                        ) {
                             Ok(_) => None,
                             Err(err) => {
                                 println!("Failed store output for {ip_address:?} with: {err:?}");
                                 Some((vm_name, ip_address))
                             }
+                        }
+                    }
+                    Err(Error::ExternalCommandRunFailed {
+                        binary,
+                        exit_status,
+                    }) => {
+                        if let Some(1) = exit_status.code() {
+                            debug!("No matches found for {ip_address:?}");
+                            match Self::store_rg_output(
+                                &timestamp,
+                                &rg_cmd,
+                                &["No matches found".to_string()],
+                                &log_abs_dest,
+                                vm_name,
+                            ) {
+                                Ok(_) => None,
+                                Err(err) => {
+                                    println!(
+                                        "Failed store output for {ip_address:?} with: {err:?}"
+                                    );
+                                    Some((vm_name, ip_address))
+                                }
+                            }
+                        } else {
+                            println!("Failed to run rg query for {ip_address:?} with: {binary}");
+                            Some((vm_name, ip_address))
                         }
                     }
                     Err(err) => {
@@ -177,6 +209,7 @@ impl TestnetDeployer {
 
     fn store_rg_output(
         timestamp: &str,
+        cmd: &str,
         output: &[String],
         log_abs_dest: &Path,
         vm_name: &str,
@@ -188,6 +221,8 @@ impl TestnetDeployer {
                 .join(vm_name)
                 .join(format!("rg-{timestamp}.log")),
         )?;
+
+        writeln!(file, "Command: {cmd}")?;
 
         for line in output {
             writeln!(file, "{}", line)?;

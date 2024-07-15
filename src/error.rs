@@ -37,8 +37,11 @@ pub enum Error {
     EnvironmentDoesNotExist(String),
     #[error("The environment name is required")]
     EnvironmentNameRequired,
-    #[error("Command that executed with {0} failed. See output for details.")]
-    ExternalCommandRunFailed(String),
+    #[error("Command that executed with {binary} failed. See output for details.")]
+    ExternalCommandRunFailed {
+        binary: String,
+        exit_status: std::process::ExitStatus,
+    },
     #[error("The provided inventory file is empty or does not exists {0}")]
     EmptyInventory(PathBuf),
     #[error("To provision the remaining nodes the multiaddr of the genesis node must be supplied")]

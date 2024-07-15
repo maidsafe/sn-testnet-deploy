@@ -619,7 +619,10 @@ pub fn run_external_command(
     if !output.success() {
         // Using `unwrap` here avoids introducing another error variant, which seems excessive.
         let binary_path = binary_path.to_str().unwrap();
-        return Err(Error::ExternalCommandRunFailed(binary_path.to_string()));
+        return Err(Error::ExternalCommandRunFailed {
+            binary: binary_path.to_string(),
+            exit_status: output,
+        });
     }
 
     Ok(output_lines)
