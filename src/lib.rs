@@ -99,6 +99,7 @@ pub enum BinaryOption {
     /// Pre-built, versioned binaries will be fetched from S3.
     Versioned {
         faucet_version: Version,
+        safe_version: Version,
         safenode_version: Version,
         safenode_manager_version: Version,
         sn_auditor_version: Version,
@@ -705,12 +706,14 @@ pub async fn notify_slack(inventory: DeploymentInventory) -> Result<()> {
         }
         BinaryOption::Versioned {
             ref faucet_version,
+            ref safe_version,
             ref safenode_version,
             ref safenode_manager_version,
             ref sn_auditor_version,
         } => {
             message.push_str("*Version Details*\n");
             message.push_str(&format!("faucet version: {}\n", faucet_version));
+            message.push_str(&format!("safe version: {}\n", safe_version));
             message.push_str(&format!("safenode version: {}\n", safenode_version));
             message.push_str(&format!(
                 "safenode-manager version: {}\n",

@@ -9,6 +9,7 @@ use std::collections::HashMap;
 const NODE_S3_BUCKET_URL: &str = "https://sn-node.s3.eu-west-2.amazonaws.com";
 const NODE_MANAGER_S3_BUCKET_URL: &str = "https://sn-node-manager.s3.eu-west-2.amazonaws.com";
 const RPC_CLIENT_BUCKET_URL: &str = "https://sn-node-rpc-client.s3.eu-west-2.amazonaws.com";
+const SAFE_S3_BUCKET_URL: &str = "https://sn-cli.s3.eu-west-2.amazonaws.com";
 
 #[derive(Default)]
 pub struct ExtraVarsDocBuilder {
@@ -239,6 +240,33 @@ impl ExtraVarsDocBuilder {
             } => self
                 .variables
                 .push(("version".to_string(), sn_auditor_version.to_string())),
+        }
+    }
+
+    pub fn add_safe_url_or_version(&mut self, deployment_name: &str, binary_option: &BinaryOption) {
+        match binary_option {
+            BinaryOption::BuildFromSource {
+                repo_owner, branch, ..
+            } => {
+                self.add_branch_url_variable(
+                    "safe_archive_url",
+                    &format!(
+                        "{}/{}/{}/safe-{}-x86_64-unknown-linux-musl.tar.gz",
+                        NODE_S3_BUCKET_URL, repo_owner, branch, deployment_name
+                    ),
+                    branch,
+                    repo_owner,
+                );
+            }
+            BinaryOption::Versioned { safe_version, .. } => {
+                self.variables.push((
+                    "safe_archive_url".to_string(),
+                    format!(
+                        "{}/safe-{}-x86_64-unknown-linux-musl.tar.gz",
+                        SAFE_S3_BUCKET_URL, safe_version
+                    ),
+                ));
+            }
         }
     }
 

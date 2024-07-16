@@ -1,0 +1,42 @@
+---
+- name: check if safe binary exists
+  ansible.builtin.stat:
+    path: "{{ binary_dir}}/safe"
+  register: safe_binary
+
+- name: download the safe binary
+  ansible.builtin.get_url:
+    url: "{{ safe_archive_url }}"
+    dest: /tmp/{{ safe_archive_filename }}
+  when: not safe_binary.stat.exists
+
+- name: extract the safe binary to /usr/local/bin
+  become: True
+  ansible.builtin.unarchive:
+    src: "/tmp/{{ safe_archive_filename }}"
+    dest: "{{ binary_dir }}"
+    remote_src: True
+  when: not safe_binary.stat.exists
+
+- name: copy upload-random-data.sh to remote
+  ansible.builtin.copy:
+    src: ../scripts/upload-random-data.sh
+    dest: /home/safe/upload-random-data.sh
+    owner: safe
+    group: safe
+    mode: '0744'
+  when: not safe_binary.stat.exists
+
+- name: obtain funds from the faucet
+  shell: "safe --peer {{ genesis_multiaddr }} wallet get-faucet {{ faucet_address }}"
+  args:
+    chdir: /home/safe/
+    executable: /bin/bash
+  when: not safe_binary.stat.exists
+
+- name: start the uploader script
+  shell: "nohup /home/safe/upload-random-data.sh {{ genesis_multiaddr }} > nohup.out 2>&1 &"
+  args:
+    chdir: /home/safe/
+    executable: /bin/bash
+  when: not safe_binary.stat.exists
