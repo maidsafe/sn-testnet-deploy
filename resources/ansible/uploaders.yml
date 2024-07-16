@@ -1,0 +1,9 @@
+---
+- name: deploy safenode to remaining nodes
+  hosts: all
+  become: False
+  ignore_unreachable: yes
+  roles:
+    - role: safe_user
+      become: True
+    - uploaders

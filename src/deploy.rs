@@ -52,7 +52,7 @@ impl TestnetDeployer {
         })?;
 
         let mut n = 1;
-        let mut total = if build_custom_binaries { 7 } else { 6 };
+        let mut total = if build_custom_binaries { 8 } else { 7 };
         if !options.current_inventory.is_empty() {
             total -= 3;
         }
@@ -81,7 +81,7 @@ impl TestnetDeployer {
                 err
             })?;
         n += 1;
-        let (genesis_multiaddr, _) =
+        let (genesis_multiaddr, genesis_ip) =
             get_genesis_multiaddr(&self.ansible_provisioner.ansible_runner, &self.ssh_client)
                 .await
                 .map_err(|err| {
@@ -156,6 +156,16 @@ impl TestnetDeployer {
                 .await
                 .map_err(|err| {
                     println!("Failed to provision sn_auditor {err:?}");
+                    err
+                })?;
+            n += 1;
+            self.ansible_provisioner
+                .print_ansible_run_banner(n, total, "Provision Uploaders");
+            self.ansible_provisioner
+                .provision_uploaders(&provision_options, &genesis_multiaddr, &genesis_ip)
+                .await
+                .map_err(|err| {
+                    println!("Failed to provision uploaders {err:?}");
                     err
                 })?;
         }

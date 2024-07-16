@@ -116,6 +116,10 @@ pub enum AnsiblePlaybook {
     ///
     /// Use in combination with `AnsibleInventoryType::Genesis` or `AnsibleInventoryType::Nodes`.
     UpgradeNodes,
+    /// The uploader playbook will setup the uploader scripts on the uploader VMs.
+    ///
+    /// Use in combination with `AnsibleInventoryType::Uploaders`.
+    Uploaders,
 }
 
 impl AnsiblePlaybook {
@@ -134,6 +138,7 @@ impl AnsiblePlaybook {
             AnsiblePlaybook::UpgradeFaucet => "upgrade_faucet.yml".to_string(),
             AnsiblePlaybook::UpgradeNodeManager => "upgrade_node_manager.yml".to_string(),
             AnsiblePlaybook::UpgradeNodes => "upgrade_nodes.yml".to_string(),
+            AnsiblePlaybook::Uploaders => "uploaders.yml".to_string(),
         }
     }
 }

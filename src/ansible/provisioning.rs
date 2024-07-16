@@ -241,6 +241,23 @@ impl AnsibleProvisioner {
         Ok(())
     }
 
+    pub async fn provision_uploaders(
+        &self,
+        options: &ProvisionOptions,
+        genesis_multiaddr: &str,
+        genesis_ip: &IpAddr,
+    ) -> Result<()> {
+        let start = Instant::now();
+        println!("Running ansible against uploader machine to start the uploader script.");
+        self.ansible_runner.run_playbook(
+            AnsiblePlaybook::Uploaders,
+            AnsibleInventoryType::Uploaders,
+            Some(self.build_uploaders_extra_vars_doc(options, genesis_multiaddr, genesis_ip)?),
+        )?;
+        print_duration(start.elapsed());
+        Ok(())
+    }
+
     pub async fn start_nodes(&self) -> Result<()> {
         self.ansible_runner.run_playbook(
             AnsiblePlaybook::StartNodes,
@@ -403,6 +420,22 @@ impl AnsibleProvisioner {
         );
         extra_vars.add_node_manager_url(&options.name, &options.binary_option);
         extra_vars.add_sn_auditor_url_or_version(&options.name, &options.binary_option);
+        Ok(extra_vars.build())
+    }
+
+    fn build_uploaders_extra_vars_doc(
+        &self,
+        options: &ProvisionOptions,
+        genesis_multiaddr: &str,
+        genesis_ip: &IpAddr,
+    ) -> Result<String> {
+        let faucet_address = format!("{genesis_ip}:8000");
+        let mut extra_vars: ExtraVarsDocBuilder = ExtraVarsDocBuilder::default();
+        extra_vars.add_variable("provider", &self.cloud_provider.to_string());
+        extra_vars.add_variable("testnet_name", &options.name);
+        extra_vars.add_variable("genesis_multiaddr", genesis_multiaddr);
+        extra_vars.add_variable("faucet_address", &faucet_address);
+        extra_vars.add_safe_url_or_version(&options.name, &options.binary_option);
         Ok(extra_vars.build())
     }
 

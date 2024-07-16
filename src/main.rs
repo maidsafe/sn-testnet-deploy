@@ -162,6 +162,14 @@ enum Commands {
         /// arguments. You can only supply version numbers or a custom branch, not both.
         #[arg(long, verbatim_doc_comment)]
         repo_owner: Option<String>,
+        /// Supply a version number for the safe binary.
+        ///
+        /// There should be no 'v' prefix.
+        ///
+        /// The version arguments are mutually exclusive with the --branch and --repo-owner
+        /// arguments. You can only supply version numbers or a custom branch, not both.
+        #[arg(long, verbatim_doc_comment)]
+        safe_version: Option<String>,
         /// The features to enable on the safenode binary.
         ///
         /// If not provided, the default feature set specified for the safenode binary are used.
@@ -601,6 +609,7 @@ async fn main() -> Result<()> {
             provider,
             public_rpc,
             repo_owner,
+            safe_version,
             safenode_features,
             safenode_version,
             safenode_manager_version,
@@ -612,6 +621,7 @@ async fn main() -> Result<()> {
                 protocol_version,
                 repo_owner,
                 faucet_version,
+                safe_version,
                 safenode_version,
                 safenode_manager_version,
                 sn_auditor_version,
@@ -1082,6 +1092,7 @@ async fn get_binary_option(
     protocol_version: Option<String>,
     repo_owner: Option<String>,
     faucet_version: Option<String>,
+    safe_version: Option<String>,
     safenode_version: Option<String>,
     safenode_manager_version: Option<String>,
     sn_auditor_version: Option<String>,
@@ -1127,6 +1138,7 @@ async fn get_binary_option(
         print_with_banner("Binaries will be supplied from pre-built versions");
 
         let faucet_version = get_version_from_option(faucet_version, &ReleaseType::Faucet).await?;
+        let safe_version = get_version_from_option(safe_version, &ReleaseType::Safe).await?;
         let safenode_version =
             get_version_from_option(safenode_version, &ReleaseType::Safenode).await?;
         let safenode_manager_version =
@@ -1136,6 +1148,7 @@ async fn get_binary_option(
             get_version_from_option(sn_auditor_version, &ReleaseType::SnAuditor).await?;
         BinaryOption::Versioned {
             faucet_version,
+            safe_version,
             safenode_version,
             safenode_manager_version,
             sn_auditor_version,

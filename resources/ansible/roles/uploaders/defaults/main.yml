@@ -1,0 +1,3 @@
+binary_dir: /usr/local/bin
+safe_archive_filename: safe-latest-x86_64-unknown-linux-musl.tar.gz
+safe_archive_url: https://sn-cli.s3.eu-west-2.amazonaws.com/{{ safe_archive_filename }}
