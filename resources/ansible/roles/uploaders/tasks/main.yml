@@ -25,6 +25,8 @@
     owner: safe
     group: safe
     mode: '0744'
+  become: yes
+  become_user: safe
   when: not safe_binary.stat.exists
 
 - name: obtain funds from the faucet
@@ -32,6 +34,10 @@
   args:
     chdir: /home/safe/
     executable: /bin/bash
+  become: yes
+  become_user: safe
+  # run one at a time to not be rate limited by the faucet
+  throttle: 1
   when: not safe_binary.stat.exists
 
 - name: start the uploader script
@@ -39,4 +45,6 @@
   args:
     chdir: /home/safe/
     executable: /bin/bash
+  become: yes
+  become_user: safe
   when: not safe_binary.stat.exists
