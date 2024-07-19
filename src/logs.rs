@@ -21,10 +21,24 @@ use std::{
 };
 
 impl TestnetDeployer {
-    pub async fn rsync_logs(&self, name: &str, resources_only: bool) -> Result<()> {
+    pub async fn rsync_logs(
+        &self,
+        name: &str,
+        resources_only: bool,
+        vm_filter: Option<String>,
+    ) -> Result<()> {
         // take root_dir at the top as `get_all_node_inventory` changes the working dir.
         let root_dir = std::env::current_dir()?;
         let all_node_inventory = self.get_all_node_inventory(name).await?;
+        let all_node_inventory = if let Some(filter) = vm_filter {
+            all_node_inventory
+                .into_iter()
+                .filter(|(vm_name, _)| vm_name.contains(&filter))
+                .collect()
+        } else {
+            all_node_inventory
+        };
+
         let log_abs_dest = create_initial_log_dir_setup(&root_dir, name, &all_node_inventory)?;
 
         // Rsync args

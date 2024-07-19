@@ -480,6 +480,9 @@ enum LogCommands {
         /// Should we copy the resource-usage.logs only
         #[arg(short = 'r', long)]
         resources_only: bool,
+        /// Optionally only sync the logs for the VMs that contain the following string.
+        #[arg(long)]
+        vm_filter: Option<String>,
     },
 }
 
@@ -758,13 +761,16 @@ async fn main() -> Result<()> {
                 name,
                 provider,
                 resources_only,
+                vm_filter,
             } => {
                 let testnet_deploy = TestnetDeployBuilder::default()
                     .environment_name(&name)
                     .provider(provider)
                     .build()?;
                 testnet_deploy.init().await?;
-                testnet_deploy.rsync_logs(&name, resources_only).await?;
+                testnet_deploy
+                    .rsync_logs(&name, resources_only, vm_filter)
+                    .await?;
                 Ok(())
             }
             LogCommands::Rg {
