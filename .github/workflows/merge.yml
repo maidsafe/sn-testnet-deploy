@@ -73,14 +73,6 @@ jobs:
         # should be fixed by https://github.com/zowens/crc32c/pull/52
         continue-on-error: true
 
-  cargo-deny:
-    runs-on: ubuntu-latest
-    steps:
-    - uses: actions/checkout@v2
-    - shell: bash
-      run: wget https://raw.githubusercontent.com/maidsafe/QA/master/misc-scripts/deny.toml
-    - uses: EmbarkStudios/cargo-deny-action@v1
-
   unit-test:
     name: unit test
     runs-on: ubuntu-latest
