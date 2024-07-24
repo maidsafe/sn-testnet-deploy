@@ -163,6 +163,7 @@ pub struct UpgradeOptions {
     pub force_faucet: bool,
     pub force_safenode: bool,
     pub forks: usize,
+    pub interval: Duration,
     pub name: String,
     pub provider: CloudProvider,
     pub safenode_version: Option<String>,
@@ -171,6 +172,7 @@ pub struct UpgradeOptions {
 impl UpgradeOptions {
     pub fn get_ansible_vars(&self) -> String {
         let mut extra_vars = ExtraVarsDocBuilder::default();
+        extra_vars.add_variable("interval", &self.interval.as_millis().to_string());
         if let Some(env_variables) = &self.env_variables {
             extra_vars.add_env_variable_list("env_variables", env_variables.clone());
         }

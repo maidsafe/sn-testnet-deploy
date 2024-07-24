@@ -10,6 +10,7 @@
         command_args:
           - safenode-manager
           - upgrade
+          - --interval={{ interval }}
           - "{{ '--force' if force_safenode is defined else omit }}"
           - "{{ ('--env=' + env_variables) if env_variables is defined else omit }}"
           - "{{ ('--version=' + safenode_version) if safenode_version is defined else omit }}"
