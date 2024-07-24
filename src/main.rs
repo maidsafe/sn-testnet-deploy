@@ -299,6 +299,9 @@ enum Commands {
         /// Maximum number of forks Ansible will use to execute tasks on target hosts.
         #[clap(long, default_value_t = 2)]
         forks: usize,
+        /// The interval between each node upgrade.
+        #[clap(long, value_parser = |t: &str| -> Result<Duration> { Ok(t.parse().map(Duration::from_millis)?)}, default_value = "200")]
+        interval: Duration,
         /// The name of the environment
         #[arg(short = 'n', long)]
         name: String,
@@ -950,6 +953,7 @@ async fn main() -> Result<()> {
             force_faucet,
             force_safenode,
             forks,
+            interval,
             name,
             provider,
             safenode_version,
@@ -957,6 +961,7 @@ async fn main() -> Result<()> {
             let testnet_deploy = TestnetDeployBuilder::default()
                 .ansible_forks(forks)
                 .ansible_verbose_mode(ansible_verbose)
+                .environment_name(&name)
                 .provider(provider.clone())
                 .build()?;
             testnet_deploy
@@ -967,6 +972,7 @@ async fn main() -> Result<()> {
                     force_faucet,
                     force_safenode,
                     forks,
+                    interval,
                     name,
                     provider,
                     safenode_version,
