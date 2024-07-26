@@ -447,12 +447,7 @@ impl TestnetDeployer {
     }
 
     pub async fn upgrade(&self, options: UpgradeOptions) -> Result<()> {
-        let environments = self.terraform_runner.workspace_list()?;
-        if !environments.contains(&options.name.to_string()) {
-            return Err(Error::EnvironmentDoesNotExist(options.name.to_string()));
-        }
         self.ansible_provisioner.upgrade_nodes(&options).await?;
-
         Ok(())
     }
 

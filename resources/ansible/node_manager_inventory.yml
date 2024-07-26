@@ -9,3 +9,4 @@
         src: "/var/safenode-manager/node_registry.json"
         dest: "{{dest}}"
         flat: no
+        validate_checksum: no

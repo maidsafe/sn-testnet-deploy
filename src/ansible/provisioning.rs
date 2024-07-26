@@ -278,21 +278,46 @@ impl AnsibleProvisioner {
     }
 
     pub async fn upgrade_nodes(&self, options: &UpgradeOptions) -> Result<()> {
-        self.ansible_runner.run_playbook(
+        match self.ansible_runner.run_playbook(
+            AnsiblePlaybook::UpgradeNodes,
+            AnsibleInventoryType::BootstrapNodes,
+            Some(options.get_ansible_vars()),
+        ) {
+            Ok(()) => println!("All bootstrap nodes were successfully upgraded"),
+            Err(_) => {
+                println!("WARNING: some bootstrap nodes may not have been upgraded or restarted");
+            }
+        }
+        match self.ansible_runner.run_playbook(
             AnsiblePlaybook::UpgradeNodes,
             AnsibleInventoryType::Nodes,
             Some(options.get_ansible_vars()),
-        )?;
-        self.ansible_runner.run_playbook(
+        ) {
+            Ok(()) => println!("All generic nodes were successfully upgraded"),
+            Err(_) => {
+                println!("WARNING: some nodes may not have been upgraded or restarted");
+            }
+        }
+        match self.ansible_runner.run_playbook(
             AnsiblePlaybook::UpgradeNodes,
             AnsibleInventoryType::Genesis,
             Some(options.get_ansible_vars()),
-        )?;
-        self.ansible_runner.run_playbook(
+        ) {
+            Ok(()) => println!("The genesis nodes was successfully upgraded"),
+            Err(_) => {
+                println!("WARNING: the genesis node may not have been upgraded or restarted");
+            }
+        }
+        match self.ansible_runner.run_playbook(
             AnsiblePlaybook::UpgradeFaucet,
             AnsibleInventoryType::Genesis,
             Some(options.get_ansible_vars()),
-        )?;
+        ) {
+            Ok(()) => println!("The faucet was successfully upgraded"),
+            Err(_) => {
+                println!("WARNING: the faucet may not have been upgraded or restarted");
+            }
+        }
         Ok(())
     }
 

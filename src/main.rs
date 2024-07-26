@@ -958,6 +958,24 @@ async fn main() -> Result<()> {
             provider,
             safenode_version,
         } => {
+            // The upgrade intentionally uses a small value for `forks`, but this is far too slow
+            // for retrieving the inventory from a large deployment. Therefore, we will use 50
+            // forks for the initial run to retrieve the inventory, then recreate the deployer
+            // using the smaller fork value.
+            let testnet_deploy = TestnetDeployBuilder::default()
+                .ansible_forks(50)
+                .ansible_verbose_mode(ansible_verbose)
+                .environment_name(&name)
+                .provider(provider.clone())
+                .build()?;
+            let inventory_service = DeploymentInventoryService::from(testnet_deploy.clone());
+            let inventory = inventory_service
+                .generate_or_retrieve_inventory(&name, true, None)
+                .await?;
+            if inventory.is_empty() {
+                return Err(eyre!("The {name} environment does not exist"));
+            }
+
             let testnet_deploy = TestnetDeployBuilder::default()
                 .ansible_forks(forks)
                 .ansible_verbose_mode(ansible_verbose)
