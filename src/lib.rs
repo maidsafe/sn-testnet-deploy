@@ -39,6 +39,7 @@ use log::debug;
 use semver::Version;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
+use sn_service_management::{NodeRegistry, ServiceStatus};
 use std::{
     fs::File,
     io::{BufRead, BufReader, BufWriter},
@@ -446,6 +447,33 @@ impl TestnetDeployer {
         Ok(())
     }
 
+    pub async fn status(&self) -> Result<()> {
+        let bootstrap_node_registries = self
+            .ansible_provisioner
+            .get_node_registries(&AnsibleInventoryType::BootstrapNodes)?;
+        let generic_node_registries = self
+            .ansible_provisioner
+            .get_node_registries(&AnsibleInventoryType::Nodes)?;
+        let genesis_node_registry = self
+            .ansible_provisioner
+            .get_node_registries(&AnsibleInventoryType::Genesis)?[0]
+            .clone();
+
+        Self::print_banner("Bootstrap Nodes");
+        for (vm_name, registry) in bootstrap_node_registries.iter() {
+            Self::print_node_registry(vm_name, registry);
+        }
+
+        Self::print_banner("Generic Nodes");
+        for (vm_name, registry) in generic_node_registries.iter() {
+            Self::print_node_registry(vm_name, registry);
+        }
+
+        Self::print_banner("Genesis Node");
+        Self::print_node_registry(&genesis_node_registry.0, &genesis_node_registry.1);
+        Ok(())
+    }
+
     pub async fn upgrade(&self, options: UpgradeOptions) -> Result<()> {
         self.ansible_provisioner.upgrade_nodes(&options).await?;
         Ok(())
@@ -502,6 +530,39 @@ impl TestnetDeployer {
         self.terraform_runner.apply(args)?;
         print_duration(start.elapsed());
         Ok(())
+    }
+
+    fn format_status(status: &ServiceStatus) -> String {
+        match status {
+            ServiceStatus::Running => "RUNNING".to_string(),
+            ServiceStatus::Stopped => "STOPPED".to_string(),
+            ServiceStatus::Added => "ADDED".to_string(),
+            ServiceStatus::Removed => "REMOVED".to_string(),
+        }
+    }
+
+    fn print_node_registry(vm_name: &str, registry: &NodeRegistry) {
+        println!("{vm_name}:");
+        for node in registry.nodes.iter() {
+            println!(
+                "  {}: {} {}",
+                node.service_name,
+                node.version,
+                Self::format_status(&node.status)
+            );
+        }
+    }
+
+    fn print_banner(text: &str) {
+        let padding = 2;
+        let text_width = text.len() + padding * 2;
+        let border_chars = 2;
+        let total_width = text_width + border_chars;
+        let top_bottom = "═".repeat(total_width);
+
+        println!("╔{}╗", top_bottom);
+        println!("║ {:^width$} ║", text, width = text_width);
+        println!("╚{}╝", top_bottom);
     }
 }
 
