@@ -6,7 +6,8 @@
 
 use crate::{
     ansible::{
-        generate_environment_inventory, AnsibleInventoryType, AnsiblePlaybook, AnsibleRunner,
+        generate_environment_inventory, provisioning::AnsibleProvisioner, AnsibleInventoryType,
+        AnsibleRunner,
     },
     get_genesis_multiaddr,
     s3::S3Repository,
@@ -15,10 +16,8 @@ use crate::{
     BinaryOption, CloudProvider, TestnetDeployer,
 };
 use color_eyre::{eyre::eyre, Result};
-use log::{debug, trace};
 use rand::seq::IteratorRandom;
 use serde::{Deserialize, Serialize};
-use sn_service_management::NodeRegistry;
 use std::{
     collections::{BTreeMap, BTreeSet},
     convert::From,
@@ -27,7 +26,6 @@ use std::{
     net::{IpAddr, SocketAddr},
     path::PathBuf,
 };
-use walkdir::WalkDir;
 
 const DEFAULT_CONTACTS_COUNT: usize = 25;
 const STOPPED_PEER_ID: &str = "-";
@@ -35,6 +33,10 @@ const TESTNET_BUCKET_NAME: &str = "sn-testnet";
 
 pub struct DeploymentInventoryService {
     pub ansible_runner: AnsibleRunner,
+    // It may seem strange to have both the runner and the provisioner, because the provisioner is
+    // a wrapper around the runner, but it's for the purpose of sharing some code. More things
+    // could go into the provisioner later, which may eliminate the need to have the runner.
+    pub ansible_provisioner: AnsibleProvisioner,
     pub cloud_provider: CloudProvider,
     pub inventory_file_path: PathBuf,
     pub s3_repository: S3Repository,
@@ -51,6 +53,7 @@ impl From<TestnetDeployer> for DeploymentInventoryService {
         };
         DeploymentInventoryService {
             ansible_runner: item.ansible_provisioner.ansible_runner.clone(),
+            ansible_provisioner: item.ansible_provisioner.clone(),
             cloud_provider: item.cloud_provider,
             inventory_file_path: item
                 .working_directory_path
@@ -174,17 +177,26 @@ impl DeploymentInventoryService {
 
         println!("Retrieving node registries from all VMs...");
         let mut node_registries = Vec::new();
-        let bootstrap_node_registries =
-            self.get_node_registries(AnsibleInventoryType::BootstrapNodes)?;
-        let generic_node_registries = self.get_node_registries(AnsibleInventoryType::Nodes)?;
+        let bootstrap_node_registries = self
+            .ansible_provisioner
+            .get_node_registries(&AnsibleInventoryType::BootstrapNodes)?;
+        let generic_node_registries = self
+            .ansible_provisioner
+            .get_node_registries(&AnsibleInventoryType::Nodes)?;
         node_registries.extend(bootstrap_node_registries.clone());
         node_registries.extend(generic_node_registries.clone());
-        node_registries.extend(self.get_node_registries(AnsibleInventoryType::Genesis)?);
-        node_registries.extend(self.get_node_registries(AnsibleInventoryType::Auditor)?);
+        node_registries.extend(
+            self.ansible_provisioner
+                .get_node_registries(&AnsibleInventoryType::Genesis)?,
+        );
+        node_registries.extend(
+            self.ansible_provisioner
+                .get_node_registries(&AnsibleInventoryType::Auditor)?,
+        );
 
         let safenode_rpc_endpoints: BTreeMap<String, SocketAddr> = node_registries
             .iter()
-            .flat_map(|inv| {
+            .flat_map(|(_, inv)| {
                 inv.nodes.iter().map(|node| {
                     let id = if let Some(peer_id) = node.peer_id {
                         peer_id.to_string().clone()
@@ -198,13 +210,13 @@ impl DeploymentInventoryService {
 
         let safenodemand_endpoints: Vec<SocketAddr> = node_registries
             .iter()
-            .filter_map(|reg| reg.daemon.clone())
+            .filter_map(|(_, reg)| reg.daemon.clone())
             .filter_map(|daemon| daemon.endpoint)
             .collect();
 
         let bootstrap_peers = bootstrap_node_registries
             .iter()
-            .flat_map(|reg| {
+            .flat_map(|(_, reg)| {
                 reg.nodes.iter().map(|node| {
                     if let Some(listen_addresses) = &node.listen_addr {
                         // It seems to be the case that the listening address with the public IP is
@@ -219,7 +231,7 @@ impl DeploymentInventoryService {
             .collect::<Vec<String>>();
         let node_peers = generic_node_registries
             .iter()
-            .flat_map(|reg| {
+            .flat_map(|(_, reg)| {
                 reg.nodes.iter().map(|node| {
                     if let Some(listen_addresses) = &node.listen_addr {
                         // It seems to be the case that the listening address with the public IP is
@@ -236,9 +248,9 @@ impl DeploymentInventoryService {
         let binary_option = if let Some(binary_option) = binary_option {
             binary_option
         } else {
-            let genesis_node_registry = node_registries
+            let (_, genesis_node_registry) = node_registries
                 .iter()
-                .find(|reg| reg.faucet.is_some())
+                .find(|(_, reg)| reg.faucet.is_some())
                 .ok_or_else(|| eyre!("Unable to retrieve genesis node registry"))?;
             let faucet_version = &genesis_node_registry.faucet.as_ref().unwrap().version;
             let safenode_version = genesis_node_registry
@@ -253,9 +265,9 @@ impl DeploymentInventoryService {
                 .ok_or_else(|| eyre!("Unable to obtain the daemon"))?
                 .version
                 .clone();
-            let auditor_node_registry = node_registries
+            let (_, auditor_node_registry) = node_registries
                 .iter()
-                .find(|reg| reg.auditor.is_some())
+                .find(|(_, reg)| reg.auditor.is_some())
                 .ok_or_else(|| eyre!("Unable to retrieve auditor node registry"))?;
             let sn_auditor_version = &auditor_node_registry.auditor.as_ref().unwrap().version;
 
@@ -333,50 +345,6 @@ impl DeploymentInventoryService {
             .await?;
 
         Ok(())
-    }
-
-    fn get_node_registries(
-        &self,
-        inventory_type: AnsibleInventoryType,
-    ) -> Result<Vec<NodeRegistry>> {
-        debug!("Fetching node manager inventory");
-        let temp_dir_path = tempfile::tempdir()?.into_path();
-        let temp_dir_json = serde_json::to_string(&temp_dir_path)?;
-
-        self.ansible_runner.run_playbook(
-            AnsiblePlaybook::NodeManagerInventory,
-            inventory_type,
-            Some(format!("{{ \"dest\": {temp_dir_json} }}")),
-        )?;
-
-        let node_registry_paths = WalkDir::new(temp_dir_path)
-            .into_iter()
-            .flatten()
-            .filter_map(|entry| {
-                if entry.file_type().is_file()
-                    && entry.path().extension().is_some_and(|ext| ext == "json")
-                {
-                    // tempdir/<testnet_name>-node/var/safenode-manager/node_registry.json
-                    let mut vm_name = entry.path().to_path_buf();
-                    trace!("Found file with json extension: {vm_name:?}");
-                    vm_name.pop();
-                    vm_name.pop();
-                    vm_name.pop();
-                    // Extract the <testnet_name>-node string
-                    trace!("Extracting the vm name from the path");
-                    let vm_name = vm_name.file_name()?.to_str()?;
-                    trace!("Extracted vm name from path: {vm_name}");
-                    Some(entry.path().to_path_buf())
-                } else {
-                    None
-                }
-            })
-            .collect::<Vec<PathBuf>>();
-
-        Ok(node_registry_paths
-            .iter()
-            .map(|file_path| NodeRegistry::load(file_path).unwrap())
-            .collect::<Vec<NodeRegistry>>())
     }
 }
 

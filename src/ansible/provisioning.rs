@@ -12,11 +12,15 @@ use crate::{
     error::{Error, Result},
     print_duration, BinaryOption, CloudProvider, LogFormat, SshClient, UpgradeOptions,
 };
+use log::{debug, trace};
 use semver::Version;
+use sn_service_management::NodeRegistry;
 use std::{
     net::{IpAddr, SocketAddr},
+    path::PathBuf,
     time::Instant,
 };
+use walkdir::WalkDir;
 
 const DEFAULT_BETA_ENCRYPTION_KEY: &str =
     "49113d2083f57a976076adbe85decb75115820de1e6e74b47e0429338cef124a";
@@ -144,6 +148,50 @@ impl AnsibleProvisioner {
                 .await?,
         );
         Ok(all_node_inventory)
+    }
+
+    pub fn get_node_registries(
+        &self,
+        inventory_type: &AnsibleInventoryType,
+    ) -> Result<Vec<(String, NodeRegistry)>> {
+        debug!("Fetching node manager inventory");
+        let temp_dir_path = tempfile::tempdir()?.into_path();
+        let temp_dir_json = serde_json::to_string(&temp_dir_path)?;
+
+        self.ansible_runner.run_playbook(
+            AnsiblePlaybook::NodeManagerInventory,
+            inventory_type.clone(),
+            Some(format!("{{ \"dest\": {temp_dir_json} }}")),
+        )?;
+
+        let node_registry_paths = WalkDir::new(temp_dir_path)
+            .into_iter()
+            .flatten()
+            .filter_map(|entry| {
+                if entry.file_type().is_file()
+                    && entry.path().extension().is_some_and(|ext| ext == "json")
+                {
+                    // tempdir/<testnet_name>-node/var/safenode-manager/node_registry.json
+                    let mut vm_name = entry.path().to_path_buf();
+                    trace!("Found file with json extension: {vm_name:?}");
+                    vm_name.pop();
+                    vm_name.pop();
+                    vm_name.pop();
+                    // Extract the <testnet_name>-node string
+                    trace!("Extracting the vm name from the path");
+                    let vm_name = vm_name.file_name()?.to_str()?;
+                    trace!("Extracted vm name from path: {vm_name}");
+                    Some((vm_name.to_string(), entry.path().to_path_buf()))
+                } else {
+                    None
+                }
+            })
+            .collect::<Vec<(String, PathBuf)>>();
+
+        Ok(node_registry_paths
+            .iter()
+            .map(|(vm_name, file_path)| (vm_name.clone(), NodeRegistry::load(file_path).unwrap()))
+            .collect::<Vec<(String, NodeRegistry)>>())
     }
 
     pub async fn provision_genesis_node(&self, options: &ProvisionOptions) -> Result<()> {
