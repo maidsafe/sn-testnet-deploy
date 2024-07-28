@@ -1074,13 +1074,20 @@ async fn main() -> Result<()> {
             provider,
             version,
         } => {
-            println!("Upgrading the node manager binaries...");
             let testnet_deploy = TestnetDeployBuilder::default()
-                .ansible_verbose_mode(false)
+                .ansible_forks(50)
+                .environment_name(&name)
                 .provider(provider.clone())
                 .build()?;
+            let inventory_service = DeploymentInventoryService::from(testnet_deploy.clone());
+            let inventory = inventory_service
+                .generate_or_retrieve_inventory(&name, true, None)
+                .await?;
+            if inventory.is_empty() {
+                return Err(eyre!("The {name} environment does not exist"));
+            }
             testnet_deploy
-                .upgrade_node_manager(&name, version.parse()?)
+                .upgrade_node_manager(version.parse()?)
                 .await?;
             Ok(())
         }

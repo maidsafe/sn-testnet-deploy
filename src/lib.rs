@@ -475,11 +475,7 @@ impl TestnetDeployer {
         Ok(())
     }
 
-    pub async fn upgrade_node_manager(&self, name: &str, version: Version) -> Result<()> {
-        let environments = self.terraform_runner.workspace_list()?;
-        if !environments.contains(&name.to_string()) {
-            return Err(Error::EnvironmentDoesNotExist(name.to_string()));
-        }
+    pub async fn upgrade_node_manager(&self, version: Version) -> Result<()> {
         self.ansible_provisioner
             .upgrade_node_manager(&version)
             .await?;
