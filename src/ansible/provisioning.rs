@@ -379,6 +379,11 @@ impl AnsibleProvisioner {
         )?;
         self.ansible_runner.run_playbook(
             AnsiblePlaybook::UpgradeNodeManager,
+            AnsibleInventoryType::BootstrapNodes,
+            Some(extra_vars.build()),
+        )?;
+        self.ansible_runner.run_playbook(
+            AnsiblePlaybook::UpgradeNodeManager,
             AnsibleInventoryType::Nodes,
             Some(extra_vars.build()),
         )?;
