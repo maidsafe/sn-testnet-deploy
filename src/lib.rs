@@ -438,11 +438,7 @@ impl TestnetDeployer {
         Ok(())
     }
 
-    pub async fn start(&self, name: &str) -> Result<()> {
-        let environments = self.terraform_runner.workspace_list()?;
-        if !environments.contains(&name.to_string()) {
-            return Err(Error::EnvironmentDoesNotExist(name.to_string()));
-        }
+    pub async fn start(&self) -> Result<()> {
         self.ansible_provisioner.start_nodes().await?;
         Ok(())
     }

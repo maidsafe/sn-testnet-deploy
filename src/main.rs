@@ -256,6 +256,9 @@ enum Commands {
     ///
     /// This can be useful if all nodes did not upgrade successfully.
     Start {
+        /// Maximum number of forks Ansible will use to execute tasks on target hosts.
+        #[clap(long, default_value_t = 50)]
+        forks: usize,
         /// The name of the environment.
         #[arg(short = 'n', long)]
         name: String,
@@ -953,9 +956,30 @@ async fn main() -> Result<()> {
             inventory.save()?;
             Ok(())
         }
-        Commands::Start { name, provider } => {
-            let testnet_deploy = TestnetDeployBuilder::default().provider(provider).build()?;
-            testnet_deploy.start(&name).await?;
+        Commands::Start {
+            forks,
+            name,
+            provider,
+        } => {
+            let testnet_deploy = TestnetDeployBuilder::default()
+                .ansible_forks(forks)
+                .environment_name(&name)
+                .provider(provider.clone())
+                .build()?;
+
+            // This is required in the case where the command runs in a remote environment, where
+            // there won't be an existing inventory, which is required to retrieve the node
+            // registry files used to determine the status.
+            let inventory_service = DeploymentInventoryService::from(testnet_deploy.clone());
+            let inventory = inventory_service
+                .generate_or_retrieve_inventory(&name, true, None)
+                .await?;
+            if inventory.is_empty() {
+                return Err(eyre!("The {name} environment does not exist"));
+            }
+
+            testnet_deploy.start().await?;
+
             Ok(())
         }
         Commands::Status {
