@@ -443,7 +443,14 @@ impl TestnetDeployer {
         Ok(())
     }
 
+    /// Get the status of all nodes in a network.
+    ///
+    /// First, a playbook runs `safenode-manager status` against all the machines, to get the
+    /// current state of all the nodes. Then all the node registry files are retrieved and
+    /// deserialized to a `NodeRegistry`, allowing us to output the status of each node on each VM.
     pub async fn status(&self) -> Result<()> {
+        self.ansible_provisioner.status().await?;
+
         let bootstrap_node_registries = self
             .ansible_provisioner
             .get_node_registries(&AnsibleInventoryType::BootstrapNodes)?;
