@@ -1,0 +1,9 @@
+---
+- name: run safenode-manager status
+  hosts: all
+  become: False
+  max_fail_percentage: 10
+  ignore_unreachable: yes
+  tasks:
+    - name: run safenode-manager status
+      ansible.builtin.command: safenode-manager status
