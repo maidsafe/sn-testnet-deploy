@@ -331,7 +331,7 @@ impl AnsibleRunner {
             args.push(extra_vars);
         }
         if self.ansible_verbose_mode {
-            args.push("-v".to_string());
+            args.push("-vvvvv".to_string());
         }
         args.push("--forks".to_string());
         args.push(self.ansible_forks.to_string());
