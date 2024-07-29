@@ -1,0 +1,10 @@
+---
+- name: ensure the telegraf service is stopped
+  hosts: all
+  become: True
+  tasks:
+    - name: stop telegraf service
+      systemd:
+        name: telegraf
+        enabled: yes
+        state: stopped
