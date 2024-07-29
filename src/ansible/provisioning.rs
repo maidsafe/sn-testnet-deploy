@@ -325,6 +325,25 @@ impl AnsibleProvisioner {
         Ok(())
     }
 
+    pub async fn stop_telegraf(&self) -> Result<()> {
+        self.ansible_runner.run_playbook(
+            AnsiblePlaybook::StopTelegraf,
+            AnsibleInventoryType::Genesis,
+            None,
+        )?;
+        self.ansible_runner.run_playbook(
+            AnsiblePlaybook::StopTelegraf,
+            AnsibleInventoryType::BootstrapNodes,
+            None,
+        )?;
+        self.ansible_runner.run_playbook(
+            AnsiblePlaybook::StopTelegraf,
+            AnsibleInventoryType::Nodes,
+            None,
+        )?;
+        Ok(())
+    }
+
     pub async fn upgrade_nodes(&self, options: &UpgradeOptions) -> Result<()> {
         match self.ansible_runner.run_playbook(
             AnsiblePlaybook::UpgradeNodes,

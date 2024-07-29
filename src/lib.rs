@@ -470,6 +470,11 @@ impl TestnetDeployer {
         Ok(())
     }
 
+    pub async fn stop_telegraf(&self) -> Result<()> {
+        self.ansible_provisioner.stop_telegraf().await?;
+        Ok(())
+    }
+
     pub async fn upgrade(&self, options: UpgradeOptions) -> Result<()> {
         self.ansible_provisioner.upgrade_nodes(&options).await?;
         Ok(())
