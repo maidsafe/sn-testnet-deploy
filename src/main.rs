@@ -1066,7 +1066,6 @@ async fn main() -> Result<()> {
             // using the smaller fork value.
             let testnet_deploy = TestnetDeployBuilder::default()
                 .ansible_forks(50)
-                .ansible_verbose_mode(ansible_verbose)
                 .environment_name(&name)
                 .provider(provider.clone())
                 .build()?;
@@ -1102,7 +1101,6 @@ async fn main() -> Result<()> {
             // Recreate the deployer with an increased number of forks for retrieving the status.
             let testnet_deploy = TestnetDeployBuilder::default()
                 .ansible_forks(50)
-                .ansible_verbose_mode(ansible_verbose)
                 .environment_name(&name)
                 .provider(provider.clone())
                 .build()?;
