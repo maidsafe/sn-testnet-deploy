@@ -8,6 +8,7 @@ use super::{
     extra_vars::ExtraVarsDocBuilder, AnsibleInventoryType, AnsiblePlaybook, AnsibleRunner,
 };
 use crate::{
+    ansible::generate_custom_environment_inventory,
     deploy::DeployOptions,
     error::{Error, Result},
     print_duration, BinaryOption, CloudProvider, LogFormat, SshClient, UpgradeOptions,
@@ -364,6 +365,26 @@ impl AnsibleProvisioner {
     }
 
     pub async fn upgrade_nodes(&self, options: &UpgradeOptions) -> Result<()> {
+        if let Some(custom_inventory) = &options.custom_inventory {
+            println!("Running the upgrade with a custom inventory");
+            generate_custom_environment_inventory(
+                custom_inventory,
+                &options.name,
+                &self.ansible_runner.working_directory_path.join("inventory"),
+            )?;
+            match self.ansible_runner.run_playbook(
+                AnsiblePlaybook::UpgradeNodes,
+                AnsibleInventoryType::Custom,
+                Some(options.get_ansible_vars()),
+            ) {
+                Ok(()) => println!("All nodes were successfully upgraded"),
+                Err(_) => {
+                    println!("WARNING: some nodes may not have been upgraded or restarted");
+                }
+            }
+            return Ok(());
+        }
+
         match self.ansible_runner.run_playbook(
             AnsiblePlaybook::UpgradeNodes,
             AnsibleInventoryType::BootstrapNodes,

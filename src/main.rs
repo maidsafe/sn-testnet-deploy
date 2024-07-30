@@ -298,6 +298,14 @@ enum Commands {
         /// Set to run Ansible with more verbose output.
         #[arg(long)]
         ansible_verbose: bool,
+        /// Provide a list of VM names to use as a custom inventory.
+        ///
+        /// This will run the upgrade against this particular subset of VMs.
+        ///
+        /// It can be useful to save time and run the upgrade against particular machines that were
+        /// unreachable during the main run.
+        #[clap(name = "custom-inventory", long, use_value_delimiter = true)]
+        custom_inventory: Option<Vec<String>>,
         /// Provide environment variables for the safenode service.
         ///
         /// These will override the values provided initially.
@@ -1050,6 +1058,7 @@ async fn main() -> Result<()> {
         }
         Commands::Upgrade {
             ansible_verbose,
+            custom_inventory,
             env_variables,
             faucet_version,
             force_faucet,
@@ -1077,6 +1086,24 @@ async fn main() -> Result<()> {
                 return Err(eyre!("The {name} environment does not exist"));
             }
 
+            let custom_inventory = if let Some(custom_inventory) = custom_inventory {
+                let mut custom_vms = Vec::new();
+                for vm in custom_inventory.iter() {
+                    let vm_list = inventory.vm_list();
+                    let (name, ip) = vm_list
+                        .iter()
+                        .find(|(vm_name, _)| vm_name == vm)
+                        .ok_or_eyre(format!(
+                            "{} is not in the inventory for this environment",
+                            vm
+                        ))?;
+                    custom_vms.push((name.clone(), *ip));
+                }
+                Some(custom_vms)
+            } else {
+                None
+            };
+
             let testnet_deploy = TestnetDeployBuilder::default()
                 .ansible_forks(forks)
                 .ansible_verbose_mode(ansible_verbose)
@@ -1086,6 +1113,7 @@ async fn main() -> Result<()> {
             testnet_deploy
                 .upgrade(UpgradeOptions {
                     ansible_verbose,
+                    custom_inventory,
                     env_variables,
                     faucet_version,
                     force_faucet,

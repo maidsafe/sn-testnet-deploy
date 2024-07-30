@@ -9,12 +9,15 @@ pub mod provisioning;
 
 use crate::{
     error::{Error, Result},
+    inventory::VirtualMachine,
     is_binary_on_path, run_external_command, CloudProvider,
 };
 use log::{debug, warn};
 use serde::Deserialize;
 use std::{
     collections::HashMap,
+    fs::File,
+    io::{BufWriter, Write},
     net::IpAddr,
     path::{Path, PathBuf},
     time::Duration,
@@ -169,6 +172,8 @@ pub enum AnsibleInventoryType {
     //
     // Only one machine will be returned in this inventory.
     Build,
+    // Provide a static list of VMs to connect to.
+    Custom,
     // Use to run a playbook against the genesis node.
     //
     // Only one machine will be returned in this inventory.
@@ -187,6 +192,7 @@ impl std::fmt::Display for AnsibleInventoryType {
             AnsibleInventoryType::Auditor => "Auditor",
             AnsibleInventoryType::BootstrapNodes => "BootstrapNodes",
             AnsibleInventoryType::Build => "Build",
+            AnsibleInventoryType::Custom => "Custom",
             AnsibleInventoryType::Genesis => "Genesis",
             AnsibleInventoryType::Logstash => "Logstash",
             AnsibleInventoryType::Nodes => "Nodes",
@@ -356,12 +362,16 @@ impl AnsibleRunner {
                 ".{}_auditor_inventory_{}.yml",
                 self.environment_name, provider
             )),
-            AnsibleInventoryType::Nodes => PathBuf::from("inventory").join(format!(
-                ".{}_node_inventory_{}.yml",
+            AnsibleInventoryType::BootstrapNodes => PathBuf::from("inventory").join(format!(
+                ".{}_bootstrap_node_inventory_{}.yml",
                 self.environment_name, provider
             )),
             AnsibleInventoryType::Build => PathBuf::from("inventory").join(format!(
                 ".{}_build_inventory_{}.yml",
+                self.environment_name, provider
+            )),
+            AnsibleInventoryType::Custom => PathBuf::from("inventory").join(format!(
+                ".{}_custom_inventory_{}.yml",
                 self.environment_name, provider
             )),
             AnsibleInventoryType::Genesis => PathBuf::from("inventory").join(format!(
@@ -372,8 +382,8 @@ impl AnsibleRunner {
                 ".{}_logstash_inventory_{}.yml",
                 self.environment_name, provider
             )),
-            AnsibleInventoryType::BootstrapNodes => PathBuf::from("inventory").join(format!(
-                ".{}_bootstrap_node_inventory_{}.yml",
+            AnsibleInventoryType::Nodes => PathBuf::from("inventory").join(format!(
+                ".{}_node_inventory_{}.yml",
                 self.environment_name, provider
             )),
             AnsibleInventoryType::Uploaders => PathBuf::from("inventory").join(format!(
@@ -430,6 +440,28 @@ pub async fn generate_environment_inventory(
         debug!("Created inventory file at {dest_path:#?}");
         generated_inventory_paths.push(dest_path);
     }
+
+    Ok(())
+}
+
+pub fn generate_custom_environment_inventory(
+    vm_list: &[VirtualMachine],
+    environment_name: &str,
+    output_inventory_dir_path: &Path,
+) -> Result<()> {
+    let dest_path = output_inventory_dir_path.join(format!(
+        ".{}_custom_inventory_digital_ocean.yml",
+        environment_name
+    ));
+    let file = File::create(&dest_path)?;
+    let mut writer = BufWriter::new(file);
+
+    writeln!(writer, "[custom]")?;
+    for (_, ip) in vm_list.iter() {
+        writeln!(writer, "{}", ip)?;
+    }
+
+    debug!("Created custom inventory file at {dest_path:#?}");
 
     Ok(())
 }
