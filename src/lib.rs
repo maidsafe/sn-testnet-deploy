@@ -27,7 +27,7 @@ use crate::{
         AnsibleRunner,
     },
     error::{Error, Result},
-    inventory::DeploymentInventory,
+    inventory::{DeploymentInventory, VirtualMachine},
     rpc_client::RpcClient,
     s3::S3Repository,
     ssh::SshClient,
@@ -159,6 +159,7 @@ impl LogFormat {
 #[derive(Clone)]
 pub struct UpgradeOptions {
     pub ansible_verbose: bool,
+    pub custom_inventory: Option<Vec<VirtualMachine>>,
     pub env_variables: Option<Vec<(String, String)>>,
     pub faucet_version: Option<String>,
     pub force_faucet: bool,
