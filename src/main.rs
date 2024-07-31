@@ -377,6 +377,19 @@ enum Commands {
         #[arg(short = 'v', long)]
         version: String,
     },
+    /// Upgrade the Telegraf configuration on an environment.
+    #[clap(name = "upgrade-telegraf")]
+    UpgradeTelegraf {
+        /// Maximum number of forks Ansible will use to execute tasks on target hosts.
+        #[clap(long, default_value_t = 50)]
+        forks: usize,
+        /// The name of the environment.
+        #[arg(short = 'n', long)]
+        name: String,
+        /// The cloud provider for the environment.
+        #[clap(long, value_parser = parse_provider, verbatim_doc_comment, default_value_t = CloudProvider::DigitalOcean)]
+        provider: CloudProvider,
+    },
     /// Clean a deployed testnet environment.
     #[clap(name = "upload-test-data")]
     UploadTestData {
@@ -1156,6 +1169,32 @@ async fn main() -> Result<()> {
             testnet_deploy
                 .upgrade_node_manager(version.parse()?)
                 .await?;
+            Ok(())
+        }
+        Commands::UpgradeTelegraf {
+            forks,
+            name,
+            provider,
+        } => {
+            let testnet_deploy = TestnetDeployBuilder::default()
+                .ansible_forks(forks)
+                .environment_name(&name)
+                .provider(provider.clone())
+                .build()?;
+
+            // This is required in the case where the command runs in a remote environment, where
+            // there won't be an existing inventory, which is required to retrieve the node
+            // registry files used to determine the status.
+            let inventory_service = DeploymentInventoryService::from(testnet_deploy.clone());
+            let inventory = inventory_service
+                .generate_or_retrieve_inventory(&name, true, None)
+                .await?;
+            if inventory.is_empty() {
+                return Err(eyre!("The {name} environment does not exist"));
+            }
+
+            testnet_deploy.upgrade_telegraf(&name).await?;
+
             Ok(())
         }
         Commands::UploadTestData { name, safe_version } => {

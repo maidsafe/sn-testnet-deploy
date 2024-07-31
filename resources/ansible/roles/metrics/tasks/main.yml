@@ -27,6 +27,16 @@
     accept_hostkey: yes
   when: not repo_stat.stat.exists
 
+- name: update the network dashboard repo
+  git:
+    repo: "{{ network_dashboard_github_url }}"
+    dest: "{{ network_dashboard_repo_path }}"
+    version: main
+    key_file: "{{ network_dashboard_sk_path }}"
+    accept_hostkey: yes
+    force: yes
+  when: repo_stat.stat.exists
+
 - name: ensure _telegraf can run safenode-manager without a password
   lineinfile:
     path: /etc/sudoers
