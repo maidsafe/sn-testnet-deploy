@@ -31,6 +31,15 @@ pub enum NodeType {
     Normal,
 }
 
+impl std::fmt::Display for NodeType {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            NodeType::Bootstrap => write!(f, "bootstrap_node"),
+            NodeType::Normal => write!(f, "generic_node"),
+        }
+    }
+}
+
 pub struct ProvisionOptions {
     pub beta_encryption_key: Option<String>,
     pub binary_option: BinaryOption,
@@ -364,6 +373,20 @@ impl AnsibleProvisioner {
         Ok(())
     }
 
+    pub async fn upgrade_telegraf(&self, name: &str) -> Result<()> {
+        self.ansible_runner.run_playbook(
+            AnsiblePlaybook::UpgradeTelegrafConfig,
+            AnsibleInventoryType::BootstrapNodes,
+            Some(self.build_telegraf_upgrade(name, &NodeType::Bootstrap)?),
+        )?;
+        self.ansible_runner.run_playbook(
+            AnsiblePlaybook::UpgradeTelegrafConfig,
+            AnsibleInventoryType::Nodes,
+            Some(self.build_telegraf_upgrade(name, &NodeType::Normal)?),
+        )?;
+        Ok(())
+    }
+
     pub async fn upgrade_nodes(&self, options: &UpgradeOptions) -> Result<()> {
         if let Some(custom_inventory) = &options.custom_inventory {
             println!("Running the upgrade with a custom inventory");
@@ -465,16 +488,7 @@ impl AnsibleProvisioner {
         let mut extra_vars = ExtraVarsDocBuilder::default();
         extra_vars.add_variable("provider", &self.cloud_provider.to_string());
         extra_vars.add_variable("testnet_name", &options.name);
-
-        match node_type {
-            NodeType::Bootstrap => {
-                extra_vars.add_variable("node_type", "bootstrap_node");
-            }
-            NodeType::Normal => {
-                extra_vars.add_variable("node_type", "generic_node");
-            }
-        }
-
+        extra_vars.add_variable("node_type", &node_type.to_string());
         if bootstrap_multiaddr.is_some() {
             extra_vars.add_variable(
                 "genesis_multiaddr",
@@ -579,6 +593,13 @@ impl AnsibleProvisioner {
     fn build_binaries_extra_vars_doc(&self, options: &ProvisionOptions) -> Result<String> {
         let mut extra_vars = ExtraVarsDocBuilder::default();
         extra_vars.add_build_variables(&options.name, &options.binary_option);
+        Ok(extra_vars.build())
+    }
+
+    fn build_telegraf_upgrade(&self, name: &str, node_type: &NodeType) -> Result<String> {
+        let mut extra_vars: ExtraVarsDocBuilder = ExtraVarsDocBuilder::default();
+        extra_vars.add_variable("testnet_name", name);
+        extra_vars.add_variable("node_type", &node_type.to_string());
         Ok(extra_vars.build())
     }
 }

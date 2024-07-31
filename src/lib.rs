@@ -495,6 +495,11 @@ impl TestnetDeployer {
         Ok(())
     }
 
+    pub async fn upgrade_telegraf(&self, name: &str) -> Result<()> {
+        self.ansible_provisioner.upgrade_telegraf(name).await?;
+        Ok(())
+    }
+
     pub async fn clean(&self) -> Result<()> {
         do_clean(
             &self.environment_name,
