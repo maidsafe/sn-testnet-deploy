@@ -251,17 +251,35 @@ impl AnsibleProvisioner {
         Ok(())
     }
 
-    pub async fn provision_faucet(
+    /// Provision the faucet service on the genesis node and start it.
+    pub async fn provision_and_start_faucet(
         &self,
         options: &ProvisionOptions,
         genesis_multiaddr: &str,
     ) -> Result<()> {
         let start = Instant::now();
-        println!("Running ansible against genesis node to deploy faucet...");
+        println!("Running ansible against genesis node to deploy and start faucet...");
         self.ansible_runner.run_playbook(
             AnsiblePlaybook::Faucet,
             AnsibleInventoryType::Genesis,
-            Some(self.build_faucet_extra_vars_doc(options, genesis_multiaddr)?),
+            Some(self.build_faucet_extra_vars_doc(options, genesis_multiaddr, false)?),
+        )?;
+        print_duration(start.elapsed());
+        Ok(())
+    }
+
+    /// Stop the faucet service on the genesis node. If the faucet is not provisioned, this will also provision it.
+    pub async fn provision_and_stop_faucet(
+        &self,
+        options: &ProvisionOptions,
+        genesis_multiaddr: &str,
+    ) -> Result<()> {
+        let start = Instant::now();
+        println!("Running ansible against genesis node stop the faucet...");
+        self.ansible_runner.run_playbook(
+            AnsiblePlaybook::Faucet,
+            AnsibleInventoryType::Genesis,
+            Some(self.build_faucet_extra_vars_doc(options, genesis_multiaddr, true)?),
         )?;
         print_duration(start.elapsed());
         Ok(())
@@ -526,15 +544,23 @@ impl AnsibleProvisioner {
         Ok(extra_vars.build())
     }
 
+    /// If the `stop` flag is set to true, the playbook will stop the faucet service.
+    /// Otherwise, it will start the faucet service.
     fn build_faucet_extra_vars_doc(
         &self,
         options: &ProvisionOptions,
         genesis_multiaddr: &str,
+        stop: bool,
     ) -> Result<String> {
         let mut extra_vars = ExtraVarsDocBuilder::default();
         extra_vars.add_variable("provider", &self.cloud_provider.to_string());
         extra_vars.add_variable("testnet_name", &options.name);
         extra_vars.add_variable("genesis_multiaddr", genesis_multiaddr);
+        if stop {
+            extra_vars.add_variable("action", "stop");
+        } else {
+            extra_vars.add_variable("action", "start");
+        }
         extra_vars.add_node_manager_url(&options.name, &options.binary_option);
         extra_vars.add_faucet_url_or_version(&options.name, &options.binary_option);
         Ok(extra_vars.build())
