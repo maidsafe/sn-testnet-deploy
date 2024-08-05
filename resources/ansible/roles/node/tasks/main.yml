@@ -41,7 +41,7 @@
   when: is_genesis and not genesis_exists | default(false)
 
 #
-# Setup remaining nodes on non-genesis run
+# Calculate the number of nodes to add
 #
 - name: check current number of node services
   become: True
@@ -57,18 +57,31 @@
   set_fact:
     nodes_to_add: "{{ node_instance_count | int - (current_node_count | default(0)) | int }}"
 
+# 
+# Calculate the port range
+#
+- name: check if we need a port range
+  set_fact:
+    use_port_range: "{{ nodes_to_add | default(0) | int > 1 }}"
+    rpc_port: "{{ initial_rpc_start_port | int + (current_node_count | default(0)) | int }}"
+    metrics_port: "{{ initial_metrics_start_port | int + (current_node_count | default(0)) | int }}"
+  when: nodes_to_add | default(0) | int > 0
+
 - name: calculate start port
   set_fact:
     rpc_start_port: "{{ initial_rpc_start_port | int + (current_node_count | default(0)) | int }}"
     metrics_start_port: "{{ initial_metrics_start_port | int + (current_node_count | default(0)) | int }}"
-  when: nodes_to_add | default(0) | int > 0
+  when: use_port_range
 
 - name: calculate end port
   set_fact:
     rpc_end_port: "{{ rpc_start_port | int + nodes_to_add | int - 1 | int }}"
     metrics_end_port: "{{ metrics_start_port | int + nodes_to_add | int - 1 | int }}"
-  when: nodes_to_add | default(0) | int > 0
+  when: use_port_range
 
+#
+# Add the nodes
+#
 - name: add node services
   become: True
   ansible.builtin.command:
@@ -83,8 +96,10 @@
       - "--owner=maidsafe"
       - "--peer={{ genesis_multiaddr }}"
       - --rpc-address={{ node_rpc_ip }}
-      - --rpc-port={{ rpc_start_port }}-{{ rpc_end_port }}
-      - --metrics-port={{ metrics_start_port }}-{{ metrics_end_port }}
+      - "{{ ('--rpc-port=' + rpc_port) if not use_port_range else omit }}"
+      - "{{ ('--rpc-port=' + rpc_start_port + '-' + rpc_end_port) if use_port_range else omit }}"
+      - "{{ ('--metrics-port=' + metrics_port) if not use_port_range else omit }}"
+      - "{{ ('--metrics-port=' + metrics_start_port + '-' + metrics_end_port) if use_port_range else omit }}"
       - "{{ ('--log-format=' + log_format) if log_format is defined else omit }}"
       - "{{ ('--env=' + env_variables) if env_variables is defined else omit }}"
       - "{{ ('--version=' + version) if version is defined else ('--url=' + node_archive_url) }}"
