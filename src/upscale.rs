@@ -84,7 +84,7 @@ impl TestnetDeployer {
         })?;
 
         let mut n = 1;
-        let total = 2;
+        let total = 3;
 
         let provision_options = ProvisionOptions {
             beta_encryption_key: None,
@@ -98,7 +98,7 @@ impl TestnetDeployer {
             public_rpc: options.public_rpc,
         };
         let mut node_provision_failed = false;
-        let (genesis_multiaddr, _) =
+        let (genesis_multiaddr, genesis_ip) =
             get_genesis_multiaddr(&self.ansible_provisioner.ansible_runner, &self.ssh_client)
                 .await
                 .map_err(|err| {
@@ -147,6 +147,21 @@ impl TestnetDeployer {
                 node_provision_failed = true;
             }
         }
+
+        self.wait_for_ssh_availability_on_new_machines(
+            AnsibleInventoryType::Uploaders,
+            &options.current_inventory,
+        )
+        .await?;
+        self.ansible_provisioner
+            .print_ansible_run_banner(n, total, "Provision Uploaders");
+        self.ansible_provisioner
+            .provision_uploaders(&provision_options, &genesis_multiaddr, &genesis_ip)
+            .await
+            .map_err(|err| {
+                println!("Failed to provision uploaders {err:?}");
+                err
+            })?;
 
         if node_provision_failed {
             println!();
