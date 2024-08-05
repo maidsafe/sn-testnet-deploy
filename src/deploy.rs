@@ -52,9 +52,9 @@ impl TestnetDeployer {
         })?;
 
         let mut n = 1;
-        let mut total = if build_custom_binaries { 8 } else { 7 };
+        let mut total = if build_custom_binaries { 9 } else { 8 };
         if !options.current_inventory.is_empty() {
-            total -= 3;
+            total -= 4;
         }
 
         let provision_options = ProvisionOptions::from(options.clone());
@@ -127,9 +127,9 @@ impl TestnetDeployer {
             // These steps are only necessary on the initial deploy, at which point the inventory
             // will be empty.
             self.ansible_provisioner
-                .print_ansible_run_banner(n, total, "Deploy Faucet");
+                .print_ansible_run_banner(n, total, "Deploy and Start Faucet");
             self.ansible_provisioner
-                .provision_faucet(&provision_options, &genesis_multiaddr)
+                .provision_and_start_faucet(&provision_options, &genesis_multiaddr)
                 .await
                 .map_err(|err| {
                     println!("Failed to provision faucet {err:?}");
@@ -166,6 +166,17 @@ impl TestnetDeployer {
                 .await
                 .map_err(|err| {
                     println!("Failed to provision uploaders {err:?}");
+                    err
+                })?;
+
+            n += 1;
+            self.ansible_provisioner
+                .print_ansible_run_banner(n, total, "Stop Faucet");
+            self.ansible_provisioner
+                .provision_and_stop_faucet(&provision_options, &genesis_multiaddr)
+                .await
+                .map_err(|err| {
+                    println!("Failed to stop faucet {err:?}");
                     err
                 })?;
         }

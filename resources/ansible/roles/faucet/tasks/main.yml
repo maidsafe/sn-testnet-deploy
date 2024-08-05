@@ -27,3 +27,9 @@
 - name: start the faucet
   become: True
   command: safenode-manager -v faucet start
+  when: action == 'start'
+
+- name: stop the faucet
+  become: True
+  command: safenode-manager -v faucet stop
+  when: action == 'stop'

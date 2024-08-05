@@ -84,7 +84,7 @@ impl TestnetDeployer {
         })?;
 
         let mut n = 1;
-        let total = 3;
+        let total = 5;
 
         let provision_options = ProvisionOptions {
             beta_encryption_key: None,
@@ -147,6 +147,19 @@ impl TestnetDeployer {
                 node_provision_failed = true;
             }
         }
+        n += 1;
+
+        // make sure faucet is running
+        self.ansible_provisioner
+            .print_ansible_run_banner(n, total, "Start Faucet");
+        self.ansible_provisioner
+            .provision_and_start_faucet(&provision_options, &genesis_multiaddr)
+            .await
+            .map_err(|err| {
+                println!("Failed to stop faucet {err:?}");
+                err
+            })?;
+        n += 1;
 
         self.wait_for_ssh_availability_on_new_machines(
             AnsibleInventoryType::Uploaders,
@@ -160,6 +173,17 @@ impl TestnetDeployer {
             .await
             .map_err(|err| {
                 println!("Failed to provision uploaders {err:?}");
+                err
+            })?;
+        n += 1;
+
+        self.ansible_provisioner
+            .print_ansible_run_banner(n, total, "Stop Faucet");
+        self.ansible_provisioner
+            .provision_and_stop_faucet(&provision_options, &genesis_multiaddr)
+            .await
+            .map_err(|err| {
+                println!("Failed to stop faucet {err:?}");
                 err
             })?;
 
