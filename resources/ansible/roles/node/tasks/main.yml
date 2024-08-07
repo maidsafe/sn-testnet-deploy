@@ -105,6 +105,7 @@
       - "{{ ('--version=' + version) if version is defined else ('--url=' + node_archive_url) }}"
   when: not is_genesis and nodes_to_add | default(0) | int > 0
 
+# set "interval" to override dynamic startup delay
 - name: start the node services
   become: True
-  command: safenode-manager -v start
+  command: safenode-manager -v start --interval 200
