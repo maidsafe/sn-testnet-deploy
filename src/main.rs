@@ -22,19 +22,9 @@ use sn_testnet_deploy::{
     network_commands, notify_slack,
     setup::setup_dotenv_file,
     upscale::UpscaleOptions,
-    BinaryOption, CloudProvider, LogFormat, TestnetDeployBuilder, UpgradeOptions,
+    BinaryOption, CloudProvider, EnvironmentType, LogFormat, TestnetDeployBuilder, UpgradeOptions,
 };
 use std::time::Duration;
-
-pub fn parse_provider(val: &str) -> Result<CloudProvider> {
-    match val {
-        "aws" => Ok(CloudProvider::Aws),
-        "digital-ocean" => Ok(CloudProvider::DigitalOcean),
-        _ => Err(eyre!(
-            "The only supported providers are 'aws' or 'digital-ocean'"
-        )),
-    }
-}
 
 #[derive(Parser, Debug)]
 #[clap(name = "sn-testnet-deploy", version = env!("CARGO_PKG_VERSION"))]
@@ -66,13 +56,19 @@ enum Commands {
         #[arg(long)]
         beta_encryption_key: Option<String>,
         /// The number of safenode services to run on each bootstrap VM.
-        #[clap(long, default_value_t = 1)]
-        bootstrap_node_count: u16,
+        ///
+        /// If the argument is not used, the value will be determined by the 'environment-type'
+        /// argument.
+        #[clap(long)]
+        bootstrap_node_count: Option<u16>,
         /// The number of bootstrap node VMs to create.
         ///
         /// Each VM will run many safenode services.
-        #[clap(long, default_value_t = 10)]
-        bootstrap_node_vm_count: u16,
+        ///
+        /// If the argument is not used, the value will be determined by the 'environment-type'
+        /// argument.
+        #[clap(long)]
+        bootstrap_node_vm_count: Option<u16>,
         /// The branch of the Github repository to build from.
         ///
         /// If used, all binaries will be built from this branch. It is typically used for testing
@@ -84,6 +80,16 @@ enum Commands {
         /// arguments. You can only supply version numbers or a custom branch, not both.
         #[arg(long, verbatim_doc_comment)]
         branch: Option<String>,
+        /// The type of deployment.
+        ///
+        /// Possible values are 'development', 'production' or 'staging'. The value used will
+        /// determine the sizes of VMs, the number of VMs, and the number of nodes deployed on
+        /// them. The specification will increase in size from development, to staging, to
+        /// production.
+        ///
+        /// The default is 'development'.
+        #[clap(long, default_value_t = EnvironmentType::Development, value_parser = parse_deployment_type, verbatim_doc_comment)]
+        environment_type: EnvironmentType,
         /// Provide environment variables for the safenode service.
         ///
         /// This is useful to set the safenode's log levels. Each variable should be comma
@@ -124,13 +130,19 @@ enum Commands {
         #[arg(long)]
         network_contacts_file_name: Option<String>,
         /// The number of safenode services to run on each VM.
-        #[clap(long, default_value_t = 25)]
-        node_count: u16,
+        ///
+        /// If the argument is not used, the value will be determined by the 'environment-type'
+        /// argument.
+        #[clap(long)]
+        node_count: Option<u16>,
         /// The number of node VMs to create.
         ///
         /// Each VM will run many safenode services.
-        #[clap(long, default_value_t = 10)]
-        node_vm_count: u16,
+        ///
+        /// If the argument is not used, the value will be determined by the 'environment-type'
+        /// argument.
+        #[clap(long)]
+        node_vm_count: Option<u16>,
         /// Protocol version is used to partition the network and will not allow nodes with
         /// different protocol versions to join.
         ///
@@ -202,8 +214,11 @@ enum Commands {
         #[arg(long, verbatim_doc_comment)]
         sn_auditor_version: Option<String>,
         /// The number of uploader VMs to create.
-        #[clap(long, default_value_t = 5)]
-        uploader_vm_count: u16,
+        ///
+        /// If the argument is not used, the value will be determined by the 'environment-type'
+        /// argument.
+        #[clap(long)]
+        uploader_vm_count: Option<u16>,
     },
     Inventory {
         /// If set to true, the inventory will be regenerated.
@@ -653,6 +668,7 @@ async fn main() -> Result<()> {
             branch,
             bootstrap_node_count,
             bootstrap_node_vm_count,
+            environment_type,
             env_variables,
             faucet_version,
             forks,
@@ -689,6 +705,7 @@ async fn main() -> Result<()> {
             let mut builder = TestnetDeployBuilder::default();
             builder
                 .ansible_verbose_mode(ansible_verbose)
+                .deployment_type(environment_type.clone())
                 .environment_name(&name)
                 .provider(provider.clone());
             if let Some(forks) = forks {
@@ -740,14 +757,16 @@ async fn main() -> Result<()> {
                 .deploy(&DeployOptions {
                     beta_encryption_key,
                     binary_option: binary_option.clone(),
-                    bootstrap_node_count,
+                    bootstrap_node_count: bootstrap_node_count
+                        .unwrap_or(environment_type.get_default_bootstrap_node_count()),
                     bootstrap_node_vm_count,
                     current_inventory: inventory,
+                    environment_type: environment_type.clone(),
                     env_variables,
                     log_format,
                     logstash_details,
                     name: name.clone(),
-                    node_count,
+                    node_count: node_count.unwrap_or(environment_type.get_default_node_count()),
                     node_vm_count,
                     public_rpc,
                     uploader_vm_count,
@@ -1397,6 +1416,27 @@ async fn get_binary_option(
 fn print_with_banner(s: &str) {
     let banner = "=".repeat(s.len());
     println!("{}\n{}\n{}", banner, s, banner);
+}
+
+pub fn parse_provider(val: &str) -> Result<CloudProvider> {
+    match val {
+        "aws" => Ok(CloudProvider::Aws),
+        "digital-ocean" => Ok(CloudProvider::DigitalOcean),
+        _ => Err(eyre!(
+            "The only supported providers are 'aws' or 'digital-ocean'"
+        )),
+    }
+}
+
+pub fn parse_deployment_type(val: &str) -> Result<EnvironmentType> {
+    match val {
+        "development" => Ok(EnvironmentType::Development),
+        "production" => Ok(EnvironmentType::Production),
+        "staging" => Ok(EnvironmentType::Staging),
+        _ => Err(eyre!(
+            "Supported deployment types are 'development', 'production' or 'staging'."
+        )),
+    }
 }
 
 // Since delimiter is on, we get element of the csv and not the entire csv.

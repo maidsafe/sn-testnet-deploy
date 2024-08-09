@@ -78,6 +78,14 @@ impl S3Repository {
         Ok(())
     }
 
+    pub async fn delete_object(&self, bucket_name: &str, object_key: &str) -> Result<()> {
+        let conf = aws_config::from_env().region("eu-west-2").load().await;
+        let client = Client::new(&conf);
+        self.do_delete_object(&client, bucket_name, object_key)
+            .await?;
+        Ok(())
+    }
+
     pub async fn delete_folder(&self, bucket_name: &str, folder_path: &str) -> Result<()> {
         let conf = aws_config::from_env().region("eu-west-2").load().await;
         let client = Client::new(&conf);
@@ -186,7 +194,8 @@ impl S3Repository {
         if let Some(objects) = output.contents {
             for object in objects {
                 let object_key = object.key.unwrap();
-                self.delete_object(client, bucket_name, &object_key).await?;
+                self.do_delete_object(client, bucket_name, &object_key)
+                    .await?;
             }
         }
 
@@ -231,7 +240,7 @@ impl S3Repository {
         Ok(())
     }
 
-    async fn delete_object(
+    async fn do_delete_object(
         &self,
         client: &Client,
         bucket_name: &str,

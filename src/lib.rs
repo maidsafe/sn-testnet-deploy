@@ -47,6 +47,7 @@ use std::{
     os::unix::fs::PermissionsExt,
     path::{Path, PathBuf},
     process::{Command, Stdio},
+    str::FromStr,
     time::{Duration, Instant},
 };
 use tar::Archive;
@@ -56,6 +57,63 @@ const ANSIBLE_DEFAULT_FORKS: usize = 50;
 pub enum NodeType {
     Bootstrap,
     Normal,
+}
+
+#[derive(Clone, Debug, Default, Serialize, Deserialize)]
+pub enum EnvironmentType {
+    #[default]
+    Development,
+    Production,
+    Staging,
+}
+
+impl EnvironmentType {
+    pub fn get_tfvars_filename(&self) -> String {
+        match self {
+            EnvironmentType::Development => "dev.tfvars".to_string(),
+            EnvironmentType::Production => "production.tfvars".to_string(),
+            EnvironmentType::Staging => "staging.tfvars".to_string(),
+        }
+    }
+
+    pub fn get_default_bootstrap_node_count(&self) -> u16 {
+        match self {
+            EnvironmentType::Development => 1,
+            EnvironmentType::Production => 1,
+            EnvironmentType::Staging => 1,
+        }
+    }
+
+    pub fn get_default_node_count(&self) -> u16 {
+        match self {
+            EnvironmentType::Development => 25,
+            EnvironmentType::Production => 25,
+            EnvironmentType::Staging => 25,
+        }
+    }
+}
+
+impl std::fmt::Display for EnvironmentType {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            EnvironmentType::Development => write!(f, "development"),
+            EnvironmentType::Production => write!(f, "production"),
+            EnvironmentType::Staging => write!(f, "staging"),
+        }
+    }
+}
+
+impl FromStr for EnvironmentType {
+    type Err = Error;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s.to_lowercase().as_str() {
+            "development" => Ok(EnvironmentType::Development),
+            "production" => Ok(EnvironmentType::Production),
+            "staging" => Ok(EnvironmentType::Staging),
+            _ => Err(Error::EnvironmentNameFromStringError(s.to_string())),
+        }
+    }
 }
 
 pub struct DeployOptions {
@@ -198,6 +256,7 @@ impl UpgradeOptions {
 pub struct TestnetDeployBuilder {
     ansible_forks: Option<usize>,
     ansible_verbose_mode: bool,
+    deployment_type: EnvironmentType,
     environment_name: String,
     provider: Option<CloudProvider>,
     ssh_secret_key_path: Option<PathBuf>,
@@ -219,6 +278,11 @@ impl TestnetDeployBuilder {
 
     pub fn ansible_forks(&mut self, ansible_forks: usize) -> &mut Self {
         self.ansible_forks = Some(ansible_forks);
+        self
+    }
+
+    pub fn deployment_type(&mut self, deployment_type: EnvironmentType) -> &mut Self {
+        self.deployment_type = deployment_type;
         self
     }
 
@@ -340,6 +404,7 @@ impl TestnetDeployBuilder {
         let testnet = TestnetDeployer::new(
             ansible_provisioner,
             provider.clone(),
+            self.deployment_type.clone(),
             &self.environment_name,
             rpc_client,
             S3Repository {},
@@ -356,6 +421,7 @@ impl TestnetDeployBuilder {
 pub struct TestnetDeployer {
     pub ansible_provisioner: AnsibleProvisioner,
     pub cloud_provider: CloudProvider,
+    pub deployment_type: EnvironmentType,
     pub environment_name: String,
     pub inventory_file_path: PathBuf,
     pub rpc_client: RpcClient,
@@ -370,6 +436,7 @@ impl TestnetDeployer {
     pub fn new(
         ansible_provisioner: AnsibleProvisioner,
         cloud_provider: CloudProvider,
+        deployment_type: EnvironmentType,
         environment_name: &str,
         rpc_client: RpcClient,
         s3_repository: S3Repository,
@@ -387,6 +454,7 @@ impl TestnetDeployer {
         Ok(TestnetDeployer {
             ansible_provisioner,
             cloud_provider,
+            deployment_type,
             environment_name: environment_name.to_string(),
             inventory_file_path,
             rpc_client,
@@ -501,8 +569,11 @@ impl TestnetDeployer {
     }
 
     pub async fn clean(&self) -> Result<()> {
+        let environment_type =
+            get_environment_type(&self.environment_name, &self.s3_repository).await?;
         do_clean(
             &self.environment_name,
+            Some(environment_type),
             self.working_directory_path.clone(),
             &self.terraform_runner,
             vec![
@@ -510,34 +581,47 @@ impl TestnetDeployer {
                 "genesis".to_string(),
                 "node".to_string(),
             ],
-        )
+        )?;
+        self.s3_repository
+            .delete_object("sn-environment-type", &self.environment_name)
+            .await?;
+        Ok(())
     }
 
     async fn create_or_update_infra(
         &self,
         name: &str,
-        bootstrap_node_vm_count: u16,
-        node_vm_count: u16,
-        uploader_vm_count: u16,
+        bootstrap_node_vm_count: Option<u16>,
+        node_vm_count: Option<u16>,
+        uploader_vm_count: Option<u16>,
         enable_build_vm: bool,
+        tfvars_filename: &str,
     ) -> Result<()> {
         let start = Instant::now();
         println!("Selecting {} workspace...", name);
         self.terraform_runner.workspace_select(name)?;
-        let args = vec![
-            (
+
+        let mut args = Vec::new();
+        if let Some(bootstrap_node_vm_count) = bootstrap_node_vm_count {
+            args.push((
                 "bootstrap_node_vm_count".to_string(),
                 bootstrap_node_vm_count.to_string(),
-            ),
-            ("node_vm_count".to_string(), node_vm_count.to_string()),
-            (
+            ));
+        }
+        if let Some(node_vm_count) = node_vm_count {
+            args.push(("node_vm_count".to_string(), node_vm_count.to_string()));
+        }
+        if let Some(uploader_vm_count) = uploader_vm_count {
+            args.push((
                 "uploader_vm_count".to_string(),
                 uploader_vm_count.to_string(),
-            ),
-            ("use_custom_bin".to_string(), enable_build_vm.to_string()),
-        ];
+            ));
+        }
+        args.push(("use_custom_bin".to_string(), enable_build_vm.to_string()));
+
         println!("Running terraform apply...");
-        self.terraform_runner.apply(args)?;
+        self.terraform_runner
+            .apply(args, Some(tfvars_filename.to_string()))?;
         print_duration(start.elapsed());
         Ok(())
     }
@@ -712,6 +796,7 @@ pub fn is_binary_on_path(binary_name: &str) -> bool {
 
 pub fn do_clean(
     name: &str,
+    environment_type: Option<EnvironmentType>,
     working_directory_path: PathBuf,
     terraform_runner: &TerraformRunner,
     inventory_types: Vec<String>,
@@ -723,7 +808,9 @@ pub fn do_clean(
     }
     terraform_runner.workspace_select(name)?;
     println!("Selected {name} workspace");
-    terraform_runner.destroy()?;
+
+    terraform_runner.destroy(environment_type.map(|et| et.get_tfvars_filename()))?;
+
     // The 'dev' workspace is one we always expect to exist, for admin purposes.
     // You can't delete a workspace while it is selected, so we select 'dev' before we delete
     // the current workspace.
@@ -836,4 +923,16 @@ pub fn get_progress_bar(length: u64) -> Result<ProgressBar> {
     );
     progress_bar.enable_steady_tick(Duration::from_millis(100));
     Ok(progress_bar)
+}
+
+pub async fn get_environment_type(
+    environment_name: &str,
+    s3_repository: &S3Repository,
+) -> Result<EnvironmentType> {
+    let temp_file = tempfile::NamedTempFile::new()?;
+    s3_repository
+        .download_object("sn-environment-type", environment_name, temp_file.path())
+        .await?;
+    let environment_type = std::fs::read_to_string(temp_file.path())?;
+    environment_type.parse()
 }

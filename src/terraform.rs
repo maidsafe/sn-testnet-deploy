@@ -41,11 +41,18 @@ impl TerraformRunner {
         Ok(runner)
     }
 
-    pub fn apply(&self, vars: Vec<(String, String)>) -> Result<()> {
+    pub fn apply(
+        &self,
+        vars: Vec<(String, String)>,
+        tfvars_filename: Option<String>,
+    ) -> Result<()> {
         let mut args = vec!["apply".to_string(), "-auto-approve".to_string()];
         for var in vars.iter() {
             args.push("-var".to_string());
             args.push(format!("{}={}", var.0, var.1));
+        }
+        if let Some(tfvars_filename) = tfvars_filename {
+            args.push(format!("-var-file={}", tfvars_filename));
         }
         run_external_command(
             self.binary_path.clone(),
@@ -57,11 +64,15 @@ impl TerraformRunner {
         Ok(())
     }
 
-    pub fn destroy(&self) -> Result<()> {
+    pub fn destroy(&self, tfvars_filename: Option<String>) -> Result<()> {
+        let mut args = vec!["destroy".to_string(), "-auto-approve".to_string()];
+        if let Some(tfvars_filename) = tfvars_filename {
+            args.push(format!("-var-file={}", tfvars_filename));
+        }
         run_external_command(
             self.binary_path.clone(),
             self.working_directory_path.clone(),
-            vec!["destroy".to_string(), "-auto-approve".to_string()],
+            args,
             false,
             false,
         )?;

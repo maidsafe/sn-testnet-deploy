@@ -37,6 +37,8 @@ pub enum Error {
     EnvironmentDoesNotExist(String),
     #[error("The environment name is required")]
     EnvironmentNameRequired,
+    #[error("Could not convert '{0}' to an EnvironmentType variant")]
+    EnvironmentNameFromStringError(String),
     #[error("Command that executed with {binary} failed. See output for details.")]
     ExternalCommandRunFailed {
         binary: String,
@@ -95,6 +97,12 @@ pub enum Error {
     LogsNotRetrievedError(String),
     #[error("The API response did not contain the expected '{0}' value")]
     MalformedDigitalOceanApiRespose(String),
+    #[error("Could not convert from DeployOptions to ProvisionOptions: bootstrap node count must have a value")]
+    MissingBootstrapNodeCount,
+    #[error(
+        "Could not convert from DeployOptions to ProvisionOptions: node count must have a value"
+    )]
+    MissingNodeCount,
     #[error(transparent)]
     ReqwestError(#[from] reqwest::Error),
     #[error(transparent)]
