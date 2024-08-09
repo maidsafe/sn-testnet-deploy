@@ -9,11 +9,11 @@ use crate::{
         generate_environment_inventory, provisioning::AnsibleProvisioner, AnsibleInventoryType,
         AnsibleRunner,
     },
-    get_genesis_multiaddr,
+    get_environment_type, get_genesis_multiaddr,
     s3::S3Repository,
     ssh::SshClient,
     terraform::TerraformRunner,
-    BinaryOption, CloudProvider, TestnetDeployer,
+    BinaryOption, CloudProvider, EnvironmentType, TestnetDeployer,
 };
 use color_eyre::{eyre::eyre, Result};
 use rand::seq::IteratorRandom;
@@ -282,11 +282,13 @@ impl DeploymentInventoryService {
 
         let (genesis_multiaddr, genesis_ip) =
             get_genesis_multiaddr(&self.ansible_runner, &self.ssh_client).await?;
+        let environment_type = get_environment_type(name, &self.s3_repository).await?;
         let inventory = DeploymentInventory {
             auditor_address: format!("{auditor_ip}:4242"),
             binary_option,
             bootstrap_node_vms: bootstrap_vm_list,
             bootstrap_peers,
+            environment_type,
             faucet_address: format!("{genesis_ip}:8000"),
             genesis_multiaddr,
             name: name.to_string(),
@@ -356,6 +358,7 @@ pub struct DeploymentInventory {
     pub binary_option: BinaryOption,
     pub bootstrap_node_vms: Vec<VirtualMachine>,
     pub bootstrap_peers: Vec<String>,
+    pub environment_type: EnvironmentType,
     pub faucet_address: String,
     pub genesis_multiaddr: String,
     pub misc_vms: Vec<VirtualMachine>,
@@ -379,6 +382,7 @@ impl DeploymentInventory {
             auditor_address: String::new(),
             bootstrap_node_vms: Vec::new(),
             bootstrap_peers: Vec::new(),
+            environment_type: EnvironmentType::Development,
             genesis_multiaddr: String::new(),
             faucet_address: String::new(),
             misc_vms: Vec::new(),

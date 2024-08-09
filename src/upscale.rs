@@ -72,10 +72,14 @@ impl TestnetDeployer {
 
         self.create_or_update_infra(
             &options.current_inventory.name,
-            desired_bootstrap_node_vm_count,
-            desired_node_vm_count,
-            desired_uploader_vm_count,
+            Some(desired_bootstrap_node_vm_count),
+            Some(desired_node_vm_count),
+            Some(desired_uploader_vm_count),
             false,
+            &options
+                .current_inventory
+                .environment_type
+                .get_tfvars_filename(),
         )
         .await
         .map_err(|err| {

@@ -18,30 +18,39 @@ variable "droplet_ssh_keys" {
 }
 
 variable "node_droplet_size" {
-  default = "s-2vcpu-4gb"
+  description = "The size of the droplet for generic nodes VMs"
 }
 
-variable "boostrap_droplet_size" {
-  default = "s-8vcpu-16gb-480gb-intel"
+variable "bootstrap_droplet_size" {
+  description = "The size of the droplet for bootstrap nodes VMs"
+}
+
+variable "uploader_droplet_size" {
+  description = "The size of the droplet for uploader VMs"
 }
 
 variable "build_machine_size" {
   default = "s-8vcpu-16gb"
 }
 
-# This corresponds to the 'safe_network-auditor-1715864456' image/snapshot.
 variable "auditor_droplet_image_id" {
   default = "156295663"
 }
 
-# This corresponds to the 'safe_network-build-1715854128' image/snapshot.
 variable "build_droplet_image_id" {
   default = "156286538"
 }
 
-# This corresponds to the 'safe_network-node-1717198184' image/snapshot.
+variable "bootstrap_droplet_image_id" {
+  description = "The ID of the bootstrap node droplet image. Varies per environment type."
+}
+
 variable "node_droplet_image_id" {
-  default = "157362431"
+  description = "The ID of the node droplet image. Varies per environment type."
+}
+
+variable "uploader_droplet_image_id" {
+  description = "The ID of the uploader droplet image. Varies per environment type."
 }
 
 variable "region" {
@@ -49,17 +58,17 @@ variable "region" {
 }
 
 variable "bootstrap_node_vm_count" {
-  default     = 25
+  default     = 2
   description = "The number of droplets to launch for bootstrap nodes"
 }
 
 variable "node_vm_count" {
-  default     = 25
+  default     = 10
   description = "The number of droplets to launch for nodes"
 }
 
 variable "uploader_vm_count" {
-  default     = 5
+  default     = 2
   description = "The number of droplets to launch for uploaders"
 }
 

@@ -7,26 +7,28 @@
 use crate::{
     ansible::provisioning::{NodeType, ProvisionOptions},
     error::Result,
-    get_genesis_multiaddr, BinaryOption, DeploymentInventory, LogFormat, TestnetDeployer,
+    get_genesis_multiaddr, BinaryOption, DeploymentInventory, EnvironmentType, LogFormat,
+    TestnetDeployer,
 };
 use colored::Colorize;
-use std::net::SocketAddr;
+use std::{fs::File, io::Write, net::SocketAddr};
 
 #[derive(Clone)]
 pub struct DeployOptions {
     pub beta_encryption_key: Option<String>,
     pub binary_option: BinaryOption,
     pub bootstrap_node_count: u16,
-    pub bootstrap_node_vm_count: u16,
+    pub bootstrap_node_vm_count: Option<u16>,
     pub current_inventory: DeploymentInventory,
+    pub environment_type: EnvironmentType,
     pub env_variables: Option<Vec<(String, String)>>,
     pub log_format: Option<LogFormat>,
     pub logstash_details: Option<(String, Vec<SocketAddr>)>,
     pub name: String,
     pub node_count: u16,
-    pub node_vm_count: u16,
+    pub node_vm_count: Option<u16>,
     pub public_rpc: bool,
-    pub uploader_vm_count: u16,
+    pub uploader_vm_count: Option<u16>,
 }
 
 impl TestnetDeployer {
@@ -38,12 +40,16 @@ impl TestnetDeployer {
             }
         };
 
+        self.write_environment_type(&options.name, &options.environment_type)
+            .await?;
+
         self.create_or_update_infra(
             &options.name,
             options.bootstrap_node_vm_count,
             options.node_vm_count,
             options.uploader_vm_count,
             build_custom_binaries,
+            &options.environment_type.get_tfvars_filename(),
         )
         .await
         .map_err(|err| {
@@ -190,6 +196,21 @@ impl TestnetDeployer {
             println!("See the output from Ansible to determine which VMs had failures.");
         }
 
+        Ok(())
+    }
+
+    async fn write_environment_type(
+        &self,
+        environment_name: &str,
+        environment_type: &EnvironmentType,
+    ) -> Result<()> {
+        let temp_dir = tempfile::tempdir()?;
+        let path = temp_dir.path().to_path_buf().join(environment_name);
+        let mut file = File::create(&path)?;
+        file.write_all(environment_type.to_string().as_bytes())?;
+        self.s3_repository
+            .upload_file("sn-environment-type", &path, true)
+            .await?;
         Ok(())
     }
 }

@@ -1,0 +1,9 @@
+bootstrap_droplet_size = "s-8vcpu-16gb-480gb-intel"
+bootstrap_node_vm_count = 50
+bootstrap_droplet_image_id = 157362431
+node_droplet_size = "s-2vcpu-4gb"
+node_vm_count = 79
+node_droplet_image_id = 157362431
+uploader_droplet_size = "s-2vcpu-4gb"
+uploader_vm_count = 5
+uploader_droplet_image_id = 157362431

@@ -224,7 +224,7 @@ impl LogstashDeploy {
         self.terraform_runner.workspace_select(name)?;
         println!("Running terraform apply...");
         self.terraform_runner
-            .apply(vec![("node_count".to_string(), vm_count.to_string())])?;
+            .apply(vec![("node_count".to_string(), vm_count.to_string())], None)?;
         Ok(())
     }
 
@@ -257,6 +257,7 @@ impl LogstashDeploy {
     pub async fn clean(&self, name: &str) -> Result<()> {
         do_clean(
             name,
+            None,
             self.working_directory_path.clone(),
             &self.terraform_runner,
             vec!["logstash".to_string()],

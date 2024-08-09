@@ -1,0 +1,9 @@
+bootstrap_droplet_size = "s-1vcpu-2gb"
+bootstrap_node_vm_count = 2
+bootstrap_droplet_image_id = 162461040
+node_droplet_size = "s-2vcpu-4gb"
+node_vm_count = 39
+node_droplet_image_id = 162460774
+uploader_droplet_size = "s-2vcpu-4gb"
+uploader_vm_count = 2
+uploader_droplet_image_id = 162461150

@@ -11,20 +11,20 @@ terraform {
 }
 
 resource "digitalocean_droplet" "genesis_bootstrap" {
-  image    = var.node_droplet_image_id
+  image    = var.bootstrap_droplet_image_id
   name     = "${terraform.workspace}-genesis-bootstrap"
   region   = var.region
-  size     = var.boostrap_droplet_size
+  size     = var.bootstrap_droplet_size
   ssh_keys = var.droplet_ssh_keys
   tags     = ["environment:${terraform.workspace}", "type:genesis"]
 }
 
 resource "digitalocean_droplet" "bootstrap_node" {
   count    = var.bootstrap_node_vm_count
-  image    = var.node_droplet_image_id
+  image    = var.bootstrap_droplet_image_id
   name     = "${terraform.workspace}-bootstrap-node-${count.index + 1}"
   region   = var.region
-  size     = var.boostrap_droplet_size
+  size     = var.bootstrap_droplet_size
   ssh_keys = var.droplet_ssh_keys
   tags     = ["environment:${terraform.workspace}", "type:bootstrap_node"]
 }
@@ -41,10 +41,10 @@ resource "digitalocean_droplet" "node" {
 
 resource "digitalocean_droplet" "uploader" {
   count    = var.uploader_vm_count
-  image    = var.node_droplet_image_id
+  image    = var.uploader_droplet_image_id
   name     = "${terraform.workspace}-uploader-${count.index + 1}"
   region   = var.region
-  size     = var.node_droplet_size
+  size     = var.uploader_droplet_size
   ssh_keys = var.droplet_ssh_keys
   tags     = ["environment:${terraform.workspace}", "type:uploader"]
 }
