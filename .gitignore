@@ -11,3 +11,6 @@ resources/safe
 *.key
 *.csr
 .DS_Store
+
+/artifacts/
+/deploy/
