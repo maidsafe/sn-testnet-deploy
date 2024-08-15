@@ -4184,7 +4184,7 @@ dependencies = [
 
 [[package]]
 name = "sn-testnet-deploy"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "async-recursion",
  "aws-config",
