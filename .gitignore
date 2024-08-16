@@ -11,6 +11,7 @@ resources/safe
 *.key
 *.csr
 .DS_Store
+**/__pycache__/
 
 /artifacts/
 /deploy/
