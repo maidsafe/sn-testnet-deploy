@@ -546,13 +546,20 @@ impl TestnetDeployer {
         Ok(())
     }
 
-    pub async fn start_telegraf(&self) -> Result<()> {
-        self.ansible_provisioner.start_telegraf().await?;
+    pub async fn start_telegraf(
+        &self,
+        custom_inventory: Option<Vec<VirtualMachine>>,
+    ) -> Result<()> {
+        self.ansible_provisioner
+            .start_telegraf(&self.environment_name, custom_inventory)
+            .await?;
         Ok(())
     }
 
-    pub async fn stop_telegraf(&self) -> Result<()> {
-        self.ansible_provisioner.stop_telegraf().await?;
+    pub async fn stop_telegraf(&self, custom_inventory: Option<Vec<VirtualMachine>>) -> Result<()> {
+        self.ansible_provisioner
+            .stop_telegraf(&self.environment_name, custom_inventory)
+            .await?;
         Ok(())
     }
 

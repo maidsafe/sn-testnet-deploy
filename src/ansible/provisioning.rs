@@ -11,6 +11,7 @@ use crate::{
     ansible::generate_custom_environment_inventory,
     deploy::DeployOptions,
     error::{Error, Result},
+    inventory::VirtualMachine,
     print_duration, BinaryOption, CloudProvider, LogFormat, SshClient, UpgradeOptions,
 };
 use log::{debug, trace};
@@ -372,7 +373,26 @@ impl AnsibleProvisioner {
         Ok(())
     }
 
-    pub async fn start_telegraf(&self) -> Result<()> {
+    pub async fn start_telegraf(
+        &self,
+        environment_name: &str,
+        custom_inventory: Option<Vec<VirtualMachine>>,
+    ) -> Result<()> {
+        if let Some(custom_inventory) = custom_inventory {
+            println!("Running the start telegraf playbook with a custom inventory");
+            generate_custom_environment_inventory(
+                &custom_inventory,
+                environment_name,
+                &self.ansible_runner.working_directory_path.join("inventory"),
+            )?;
+            self.ansible_runner.run_playbook(
+                AnsiblePlaybook::StartTelegraf,
+                AnsibleInventoryType::Custom,
+                None,
+            )?;
+            return Ok(());
+        }
+
         self.ansible_runner.run_playbook(
             AnsiblePlaybook::StartTelegraf,
             AnsibleInventoryType::Genesis,
@@ -391,7 +411,26 @@ impl AnsibleProvisioner {
         Ok(())
     }
 
-    pub async fn stop_telegraf(&self) -> Result<()> {
+    pub async fn stop_telegraf(
+        &self,
+        environment_name: &str,
+        custom_inventory: Option<Vec<VirtualMachine>>,
+    ) -> Result<()> {
+        if let Some(custom_inventory) = custom_inventory {
+            println!("Running the stop telegraf playbook with a custom inventory");
+            generate_custom_environment_inventory(
+                &custom_inventory,
+                environment_name,
+                &self.ansible_runner.working_directory_path.join("inventory"),
+            )?;
+            self.ansible_runner.run_playbook(
+                AnsiblePlaybook::StopTelegraf,
+                AnsibleInventoryType::Custom,
+                None,
+            )?;
+            return Ok(());
+        }
+
         self.ansible_runner.run_playbook(
             AnsiblePlaybook::StopTelegraf,
             AnsibleInventoryType::Genesis,

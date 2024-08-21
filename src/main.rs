@@ -16,7 +16,9 @@ use sn_testnet_deploy::{
     deploy::DeployOptions,
     error::Error,
     get_wallet_directory,
-    inventory::{get_data_directory, DeploymentInventory, DeploymentInventoryService},
+    inventory::{
+        get_data_directory, DeploymentInventory, DeploymentInventoryService, VirtualMachine,
+    },
     logstash::LogstashDeployBuilder,
     manage_test_data::TestDataClientBuilder,
     network_commands, notify_slack,
@@ -300,6 +302,11 @@ enum Commands {
     /// This may be necessary for performing upgrades.
     #[clap(name = "start-telegraf")]
     StartTelegraf {
+        /// Provide a list of VM names to use as a custom inventory.
+        ///
+        /// This will stop Telegraf on a particular subset of VMs.
+        #[clap(name = "custom-inventory", long, use_value_delimiter = true)]
+        custom_inventory: Option<Vec<String>>,
         /// Maximum number of forks Ansible will use to execute tasks on target hosts.
         #[clap(long, default_value_t = 50)]
         forks: usize,
@@ -315,6 +322,11 @@ enum Commands {
     /// This may be necessary for performing upgrades.
     #[clap(name = "stop-telegraf")]
     StopTelegraf {
+        /// Provide a list of VM names to use as a custom inventory.
+        ///
+        /// This will stop Telegraf on a particular subset of VMs.
+        #[clap(name = "custom-inventory", long, use_value_delimiter = true)]
+        custom_inventory: Option<Vec<String>>,
         /// Maximum number of forks Ansible will use to execute tasks on target hosts.
         #[clap(long, default_value_t = 50)]
         forks: usize,
@@ -1055,6 +1067,7 @@ async fn main() -> Result<()> {
             Ok(())
         }
         Commands::StartTelegraf {
+            custom_inventory,
             forks,
             name,
             provider,
@@ -1076,7 +1089,14 @@ async fn main() -> Result<()> {
                 return Err(eyre!("The {name} environment does not exist"));
             }
 
-            testnet_deploy.start_telegraf().await?;
+            let custom_inventory = if let Some(custom_inventory) = custom_inventory {
+                let custom_vms = get_custom_inventory(&inventory, &custom_inventory)?;
+                Some(custom_vms)
+            } else {
+                None
+            };
+
+            testnet_deploy.start_telegraf(custom_inventory).await?;
 
             Ok(())
         }
@@ -1106,6 +1126,7 @@ async fn main() -> Result<()> {
             Ok(())
         }
         Commands::StopTelegraf {
+            custom_inventory,
             forks,
             name,
             provider,
@@ -1127,7 +1148,14 @@ async fn main() -> Result<()> {
                 return Err(eyre!("The {name} environment does not exist"));
             }
 
-            testnet_deploy.stop_telegraf().await?;
+            let custom_inventory = if let Some(custom_inventory) = custom_inventory {
+                let custom_vms = get_custom_inventory(&inventory, &custom_inventory)?;
+                Some(custom_vms)
+            } else {
+                None
+            };
+
+            testnet_deploy.stop_telegraf(custom_inventory).await?;
 
             Ok(())
         }
@@ -1162,18 +1190,7 @@ async fn main() -> Result<()> {
             }
 
             let custom_inventory = if let Some(custom_inventory) = custom_inventory {
-                let mut custom_vms = Vec::new();
-                for vm in custom_inventory.iter() {
-                    let vm_list = inventory.vm_list();
-                    let (name, ip) = vm_list
-                        .iter()
-                        .find(|(vm_name, _)| vm_name == vm)
-                        .ok_or_eyre(format!(
-                            "{} is not in the inventory for this environment",
-                            vm
-                        ))?;
-                    custom_vms.push((name.clone(), *ip));
-                }
+                let custom_vms = get_custom_inventory(&inventory, &custom_inventory)?;
                 Some(custom_vms)
             } else {
                 None
@@ -1511,4 +1528,23 @@ async fn get_version_from_option(
         version
     };
     Ok(version.parse()?)
+}
+
+fn get_custom_inventory(
+    inventory: &DeploymentInventory,
+    vm_list: &[String],
+) -> Result<Vec<VirtualMachine>> {
+    let mut custom_vms = Vec::new();
+    for vm in vm_list.iter() {
+        let vm_list = inventory.vm_list();
+        let (name, ip) = vm_list
+            .iter()
+            .find(|(vm_name, _)| vm_name == vm)
+            .ok_or_eyre(format!(
+                "{} is not in the inventory for this environment",
+                vm
+            ))?;
+        custom_vms.push((name.clone(), *ip));
+    }
+    Ok(custom_vms)
 }
