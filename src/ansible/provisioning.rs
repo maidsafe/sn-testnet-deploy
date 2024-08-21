@@ -372,6 +372,25 @@ impl AnsibleProvisioner {
         Ok(())
     }
 
+    pub async fn start_telegraf(&self) -> Result<()> {
+        self.ansible_runner.run_playbook(
+            AnsiblePlaybook::StartTelegraf,
+            AnsibleInventoryType::Genesis,
+            None,
+        )?;
+        self.ansible_runner.run_playbook(
+            AnsiblePlaybook::StartTelegraf,
+            AnsibleInventoryType::BootstrapNodes,
+            None,
+        )?;
+        self.ansible_runner.run_playbook(
+            AnsiblePlaybook::StartTelegraf,
+            AnsibleInventoryType::Nodes,
+            None,
+        )?;
+        Ok(())
+    }
+
     pub async fn stop_telegraf(&self) -> Result<()> {
         self.ansible_runner.run_playbook(
             AnsiblePlaybook::StopTelegraf,
