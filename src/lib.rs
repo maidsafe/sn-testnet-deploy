@@ -568,9 +568,13 @@ impl TestnetDeployer {
         Ok(())
     }
 
-    pub async fn upgrade_node_manager(&self, version: Version) -> Result<()> {
+    pub async fn upgrade_node_manager(
+        &self,
+        version: Version,
+        custom_inventory: Option<Vec<VirtualMachine>>,
+    ) -> Result<()> {
         self.ansible_provisioner
-            .upgrade_node_manager(&version)
+            .upgrade_node_manager(&self.environment_name, &version, custom_inventory)
             .await?;
         Ok(())
     }

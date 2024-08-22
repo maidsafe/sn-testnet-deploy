@@ -527,9 +527,30 @@ impl AnsibleProvisioner {
         Ok(())
     }
 
-    pub async fn upgrade_node_manager(&self, version: &Version) -> Result<()> {
+    pub async fn upgrade_node_manager(
+        &self,
+        environment_name: &str,
+        version: &Version,
+        custom_inventory: Option<Vec<VirtualMachine>>,
+    ) -> Result<()> {
         let mut extra_vars = ExtraVarsDocBuilder::default();
         extra_vars.add_variable("version", &version.to_string());
+
+        if let Some(custom_inventory) = custom_inventory {
+            println!("Running the upgrade node manager playbook with a custom inventory");
+            generate_custom_environment_inventory(
+                &custom_inventory,
+                environment_name,
+                &self.ansible_runner.working_directory_path.join("inventory"),
+            )?;
+            self.ansible_runner.run_playbook(
+                AnsiblePlaybook::UpgradeNodeManager,
+                AnsibleInventoryType::Custom,
+                Some(extra_vars.build()),
+            )?;
+            return Ok(());
+        }
+
         self.ansible_runner.run_playbook(
             AnsiblePlaybook::UpgradeNodeManager,
             AnsibleInventoryType::Genesis,

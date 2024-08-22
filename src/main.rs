@@ -406,6 +406,11 @@ enum Commands {
     /// Simple mechanism that simply copies over the existing binary.
     #[clap(name = "upgrade-node-manager")]
     UpgradeNodeManager {
+        /// Provide a list of VM names to use as a custom inventory.
+        ///
+        /// This will upgrade the node manager on a particular subset of VMs.
+        #[clap(name = "custom-inventory", long, use_value_delimiter = true)]
+        custom_inventory: Option<Vec<String>>,
         /// The name of the environment
         #[arg(short = 'n', long)]
         name: String,
@@ -1229,6 +1234,7 @@ async fn main() -> Result<()> {
             Ok(())
         }
         Commands::UpgradeNodeManager {
+            custom_inventory,
             name,
             provider,
             version,
@@ -1245,8 +1251,16 @@ async fn main() -> Result<()> {
             if inventory.is_empty() {
                 return Err(eyre!("The {name} environment does not exist"));
             }
+
+            let custom_inventory = if let Some(custom_inventory) = custom_inventory {
+                let custom_vms = get_custom_inventory(&inventory, &custom_inventory)?;
+                Some(custom_vms)
+            } else {
+                None
+            };
+
             testnet_deploy
-                .upgrade_node_manager(version.parse()?)
+                .upgrade_node_manager(version.parse()?, custom_inventory)
                 .await?;
             Ok(())
         }
