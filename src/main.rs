@@ -2161,16 +2161,15 @@ fn get_custom_inventory(
     vm_list: &[String],
 ) -> Result<Vec<VirtualMachine>> {
     let mut custom_vms = Vec::new();
-    for vm in vm_list.iter() {
+    for vm_name in vm_list.iter() {
         let vm_list = inventory.vm_list();
-        let (name, ip) = vm_list
+        let vm = vm_list
             .iter()
-            .find(|(vm_name, _)| vm_name == vm)
+            .find(|vm| vm_name == &vm.name)
             .ok_or_eyre(format!(
-                "{} is not in the inventory for this environment",
-                vm
+                "{vm_name} is not in the inventory for this environment",
             ))?;
-        custom_vms.push((name.clone(), *ip));
+        custom_vms.push(vm.clone());
     }
     Ok(custom_vms)
 }

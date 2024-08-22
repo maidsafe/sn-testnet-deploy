@@ -44,9 +44,9 @@ pub async fn perform_fixed_interval_network_churn(
     let genesis_ip = inventory
         .vm_list()
         .iter()
-        .find_map(|(name, addr)| {
-            if name.contains("genesis") {
-                Some(*addr)
+        .find_map(|vm| {
+            if vm.name.contains("genesis") {
+                Some(vm.public_ip_addr)
             } else {
                 None
             }
@@ -61,8 +61,8 @@ pub async fn perform_fixed_interval_network_churn(
 
     let nodes_per_vm = {
         let mut vms_to_ignore = 0;
-        inventory.vm_list().iter().for_each(|(name, _addr)| {
-            if name.contains("build") || name.contains("genesis") {
+        inventory.vm_list().iter().for_each(|vm| {
+            if vm.name.contains("build") || vm.name.contains("genesis") {
                 vms_to_ignore += 1;
             }
         });
@@ -122,9 +122,9 @@ pub async fn perform_random_interval_network_churn(
     let genesis_ip = inventory
         .vm_list()
         .iter()
-        .find_map(|(name, addr)| {
-            if name.contains("genesis") {
-                Some(*addr)
+        .find_map(|vm| {
+            if vm.name.contains("genesis") {
+                Some(vm.public_ip_addr)
             } else {
                 None
             }

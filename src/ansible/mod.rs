@@ -5,6 +5,7 @@
 // Please see the LICENSE file for more details.
 
 pub mod extra_vars;
+pub mod inventory;
 pub mod provisioning;
 
 use crate::{
@@ -12,15 +13,11 @@ use crate::{
     inventory::VirtualMachine,
     is_binary_on_path, run_external_command, CloudProvider,
 };
-use log::{debug, warn};
-use serde::Deserialize;
+use log::debug;
 use std::{
-    collections::HashMap,
     fs::File,
     io::{BufWriter, Write},
-    net::IpAddr,
     path::{Path, PathBuf},
-    time::Duration,
 };
 
 /// Ansible has multiple 'binaries', e.g., `ansible-playbook`, `ansible-inventory` etc. that are
@@ -247,21 +244,6 @@ pub struct AnsibleRunner {
     pub working_directory_path: PathBuf,
 }
 
-// The following three structs are utilities that are used to parse the output of the
-// `ansible-inventory` command.
-#[derive(Debug, Deserialize)]
-struct HostVars {
-    ansible_host: IpAddr,
-}
-#[derive(Debug, Deserialize)]
-struct Meta {
-    hostvars: HashMap<String, HostVars>,
-}
-#[derive(Debug, Deserialize)]
-struct Output {
-    _meta: Meta,
-}
-
 impl AnsibleRunner {
     pub fn new(
         ansible_forks: usize,
@@ -284,64 +266,6 @@ impl AnsibleRunner {
             ssh_sk_path,
             vault_password_file_path,
         })
-    }
-
-    /// Runs Ansible's inventory command and returns a list of machine name and IP address pairs.
-    pub async fn get_inventory(
-        &self,
-        inventory_type: AnsibleInventoryType,
-        re_attempt: bool,
-    ) -> Result<Vec<(String, IpAddr)>> {
-        let retry_count = if re_attempt { 3 } else { 0 };
-        let mut count = 0;
-        let mut inventory = Vec::new();
-
-        while count <= retry_count {
-            debug!("Running inventory list. retry attempts {count}/{retry_count}");
-            let output = run_external_command(
-                AnsibleBinary::AnsibleInventory.get_binary_path()?,
-                self.working_directory_path.clone(),
-                vec![
-                    "--inventory".to_string(),
-                    self.get_inventory_path(&inventory_type)?
-                        .to_string_lossy()
-                        .to_string(),
-                    "--list".to_string(),
-                ],
-                true,
-                false,
-            )?;
-
-            debug!("Inventory list output:");
-            debug!("{output:#?}");
-            let mut output_string = output
-                .into_iter()
-                .skip_while(|line| !line.starts_with('{'))
-                .collect::<Vec<String>>()
-                .join("\n");
-            if let Some(end_index) = output_string.rfind('}') {
-                output_string.truncate(end_index + 1);
-            }
-            let parsed: Output = serde_json::from_str(&output_string)?;
-            inventory = parsed
-                ._meta
-                .hostvars
-                .into_iter()
-                .map(|(name, vars)| (name, vars.ansible_host))
-                .collect();
-
-            count += 1;
-            if !inventory.is_empty() {
-                break;
-            }
-            debug!("Inventory list is empty, re-running after a few seconds.");
-            tokio::time::sleep(Duration::from_secs(3)).await;
-        }
-        if inventory.is_empty() {
-            warn!("Inventory list is empty after {retry_count} retries");
-        }
-
-        Ok(inventory)
     }
 
     pub fn run_playbook(
@@ -491,8 +415,8 @@ pub fn generate_custom_environment_inventory(
     let mut writer = BufWriter::new(file);
 
     writeln!(writer, "[custom]")?;
-    for (_, ip) in vm_list.iter() {
-        writeln!(writer, "{}", ip)?;
+    for vm in vm_list.iter() {
+        writeln!(writer, "{}", vm.public_ip_addr)?;
     }
 
     debug!("Created custom inventory file at {dest_path:#?}");
