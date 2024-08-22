@@ -113,7 +113,7 @@ impl AnsibleProvisioner {
             .ansible_runner
             .get_inventory(AnsibleInventoryType::Build, true)
             .await?;
-        let build_ip = build_inventory[0].1;
+        let build_ip = build_inventory[0].public_ip_addr;
         self.ssh_client
             .wait_for_ssh_availability(&build_ip, &self.cloud_provider.get_ssh_user())?;
 
@@ -160,7 +160,7 @@ impl AnsibleProvisioner {
         Ok(())
     }
 
-    pub async fn get_all_node_inventory(&self) -> Result<Vec<(String, IpAddr)>> {
+    pub async fn get_all_node_inventory(&self) -> Result<Vec<VirtualMachine>> {
         let mut all_node_inventory = self
             .ansible_runner
             .get_inventory(AnsibleInventoryType::Genesis, false)
@@ -239,7 +239,7 @@ impl AnsibleProvisioner {
             .ansible_runner
             .get_inventory(AnsibleInventoryType::Genesis, true)
             .await?;
-        let genesis_ip = genesis_inventory[0].1;
+        let genesis_ip = genesis_inventory[0].public_ip_addr;
         self.ssh_client
             .wait_for_ssh_availability(&genesis_ip, &self.cloud_provider.get_ssh_user())?;
         self.ansible_runner.run_playbook(
@@ -276,12 +276,15 @@ impl AnsibleProvisioner {
             .await?;
 
         println!("Waiting for SSH availability on {} nodes...", node_type);
-        for (vm_name, ip) in inventory.iter() {
-            println!("Checking SSH availability for {}: {}", vm_name, ip);
+        for vm in inventory.iter() {
+            println!(
+                "Checking SSH availability for {}: {}",
+                vm.name, vm.public_ip_addr
+            );
             self.ssh_client
-                .wait_for_ssh_availability(ip, &self.cloud_provider.get_ssh_user())
+                .wait_for_ssh_availability(&vm.public_ip_addr, &self.cloud_provider.get_ssh_user())
                 .map_err(|e| {
-                    println!("Failed to establish SSH connection to {}: {}", vm_name, e);
+                    println!("Failed to establish SSH connection to {}: {}", vm.name, e);
                     e
                 })?;
         }

@@ -143,24 +143,19 @@ impl DeploymentInventoryService {
             .await?;
 
         if !genesis_inventory.is_empty() {
-            misc_vm_list.push((genesis_inventory[0].0.clone(), genesis_inventory[0].1));
+            misc_vm_list.push(genesis_inventory[0].clone());
         }
 
-        let mut auditor_vm_list = Vec::new();
         let auditor_inventory = self
             .ansible_runner
             .get_inventory(AnsibleInventoryType::Auditor, true)
             .await?;
-        for entry in auditor_inventory.iter() {
-            auditor_vm_list.push((entry.0.clone(), entry.1));
-        }
-
         let build_inventory = self
             .ansible_runner
             .get_inventory(AnsibleInventoryType::Build, false)
             .await?;
         if !build_inventory.is_empty() {
-            misc_vm_list.push((build_inventory[0].0.clone(), build_inventory[0].1));
+            misc_vm_list.push(build_inventory[0].clone());
         }
 
         let mut node_vm_list = Vec::new();
@@ -168,8 +163,8 @@ impl DeploymentInventoryService {
             .ansible_runner
             .get_inventory(AnsibleInventoryType::Nodes, false)
             .await?;
-        for entry in nodes_inventory.iter() {
-            node_vm_list.push((entry.0.clone(), entry.1));
+        for vm in nodes_inventory.iter() {
+            node_vm_list.push(vm.clone());
         }
 
         let mut bootstrap_vm_list = Vec::new();
@@ -177,8 +172,8 @@ impl DeploymentInventoryService {
             .ansible_runner
             .get_inventory(AnsibleInventoryType::BootstrapNodes, false)
             .await?;
-        for entry in bootstrap_nodes_inventory.iter() {
-            bootstrap_vm_list.push((entry.0.clone(), entry.1));
+        for vm in bootstrap_nodes_inventory.iter() {
+            bootstrap_vm_list.push(vm.clone());
         }
 
         let mut uploader_vm_list = Vec::new();
@@ -186,8 +181,8 @@ impl DeploymentInventoryService {
             .ansible_runner
             .get_inventory(AnsibleInventoryType::Uploaders, false)
             .await?;
-        for entry in uploader_inventory.iter() {
-            uploader_vm_list.push((entry.0.clone(), entry.1));
+        for vm in uploader_inventory.iter() {
+            uploader_vm_list.push(vm.clone());
         }
 
         println!("Retrieving node registries from all VMs...");
@@ -347,7 +342,7 @@ impl DeploymentInventoryService {
                 (None, None)
             };
         let inventory = DeploymentInventory {
-            auditor_vms: auditor_vm_list,
+            auditor_vms: auditor_inventory,
             binary_option,
             bootstrap_node_vms: bootstrap_vm_list,
             bootstrap_peers,
@@ -414,7 +409,13 @@ impl DeploymentInventoryService {
     }
 }
 
-pub type VirtualMachine = (String, IpAddr);
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq, Hash)]
+pub struct VirtualMachine {
+    pub id: u64,
+    pub name: String,
+    pub public_ip_addr: IpAddr,
+    pub private_ip_addr: IpAddr,
+}
 
 #[derive(Clone)]
 pub struct DeploymentNodeRegistries {
@@ -633,7 +634,7 @@ impl DeploymentInventory {
             println!("Bootstrap VMs");
             println!("=============");
             for vm in self.bootstrap_node_vms.iter() {
-                println!("{}: {}", vm.0, vm.1);
+                println!("{}: {}", vm.name, vm.public_ip_addr);
             }
             println!("Nodes per VM: {}", self.bootstrap_node_count());
             println!("SSH user: {}", self.ssh_user);
@@ -644,7 +645,7 @@ impl DeploymentInventory {
         println!("Node VMs");
         println!("========");
         for vm in self.node_vms.iter() {
-            println!("{}: {}", vm.0, vm.1);
+            println!("{}: {}", vm.name, vm.public_ip_addr);
         }
         println!("Nodes per VM: {}", self.node_count());
         println!("SSH user: {}", self.ssh_user);
@@ -655,7 +656,7 @@ impl DeploymentInventory {
             println!("Uploader VMs");
             println!("============");
             for vm in self.uploader_vms.iter() {
-                println!("{}: {}", vm.0, vm.1);
+                println!("{}: {}", vm.name, vm.public_ip_addr);
             }
             println!("SSH user: {}", self.ssh_user);
             println!();
@@ -666,7 +667,7 @@ impl DeploymentInventory {
             println!("Other VMs");
             println!("=========");
             for vm in self.misc_vms.iter() {
-                println!("{}: {}", vm.0, vm.1);
+                println!("{}: {}", vm.name, vm.public_ip_addr);
             }
             println!("SSH user: {}", self.ssh_user);
             println!();
@@ -684,7 +685,7 @@ impl DeploymentInventory {
             self.bootstrap_node_vms
                 .iter()
                 .chain(self.node_vms.iter())
-                .map(|vm| vm.1.to_string())
+                .map(|vm| vm.public_ip_addr.to_string())
                 .for_each(|ip| {
                     if let Some(peer) = self.peers().iter().find(|p| p.contains(&ip)) {
                         println!("{peer}");
@@ -727,7 +728,7 @@ impl DeploymentInventory {
             println!("Auditor Details");
             println!("===============");
             for vm in self.auditor_vms.iter() {
-                println!("{}:4242", vm.1);
+                println!("{}:4242", vm.public_ip_addr);
             }
             println!();
         }
@@ -744,8 +745,8 @@ impl DeploymentInventory {
     pub fn get_genesis_ip(&self) -> Option<IpAddr> {
         self.misc_vms
             .iter()
-            .find(|(name, _)| name.contains("genesis"))
-            .map(|(_, ip)| *ip)
+            .find(|vm| vm.name.contains("genesis"))
+            .map(|vm| vm.public_ip_addr)
     }
 }
 

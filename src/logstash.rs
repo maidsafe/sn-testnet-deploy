@@ -234,7 +234,7 @@ impl LogstashDeploy {
             .ansible_runner
             .get_inventory(AnsibleInventoryType::Logstash, false)
             .await?;
-        let logstash_ip = logstash_inventory[0].1;
+        let logstash_ip = logstash_inventory[0].public_ip_addr;
         self.ssh_client
             .wait_for_ssh_availability(&logstash_ip, &self.cloud_provider.get_ssh_user())?;
         self.ansible_runner.run_playbook(

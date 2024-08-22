@@ -96,6 +96,8 @@ pub enum Error {
     InvalidUpscaleOptionsForBootstrapDeployment,
     #[error(transparent)]
     Io(#[from] std::io::Error),
+    #[error("Could not obtain IpDetails")]
+    IpDetailsNotObtained,
     #[error("Failed to list objects in S3 bucket with prefix '{prefix}': {error}")]
     ListS3ObjectsError { prefix: String, error: String },
     #[error("Could not configure logging: {0}")]
