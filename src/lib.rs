@@ -715,7 +715,7 @@ pub async fn get_genesis_multiaddr(
     let genesis_inventory = ansible_runner
         .get_inventory(AnsibleInventoryType::Genesis, true)
         .await?;
-    let genesis_ip = genesis_inventory[0].1;
+    let genesis_ip = genesis_inventory[0].public_ip_addr;
 
     let multiaddr =
         ssh_client
@@ -741,7 +741,7 @@ pub async fn get_multiaddr(
     let node_inventory = ansible_runner
         .get_inventory(AnsibleInventoryType::Nodes, true)
         .await?;
-    let node_ip = node_inventory[0].1;
+    let node_ip = node_inventory[0].public_ip_addr;
 
     let multiaddr =
         ssh_client

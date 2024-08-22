@@ -321,8 +321,10 @@ impl TestnetDeployer {
             .filter(|item| !old_set.contains(item))
             .collect();
         for vm in new_vms.iter() {
-            self.ssh_client
-                .wait_for_ssh_availability(&vm.1, &self.cloud_provider.get_ssh_user())?;
+            self.ssh_client.wait_for_ssh_availability(
+                &vm.public_ip_addr,
+                &self.cloud_provider.get_ssh_user(),
+            )?;
         }
         Ok(())
     }

@@ -6,7 +6,9 @@
 
 use crate::{
     error::{Error, Result},
-    get_progress_bar, run_external_command,
+    get_progress_bar,
+    inventory::VirtualMachine,
+    run_external_command,
     s3::S3Repository,
     TestnetDeployer,
 };
@@ -33,7 +35,7 @@ impl TestnetDeployer {
         let all_node_inventory = if let Some(filter) = vm_filter {
             all_node_inventory
                 .into_iter()
-                .filter(|(vm_name, _)| vm_name.contains(&filter))
+                .filter(|vm| vm.name.contains(&filter))
                 .collect()
         } else {
             all_node_inventory
@@ -83,34 +85,37 @@ impl TestnetDeployer {
         println!("Starting to rsync the log files");
         let progress_bar = get_progress_bar(all_node_inventory.len() as u64)?;
 
-        let failed_inventory = all_node_inventory
-            .par_iter()
-            .filter_map(|(vm_name, ip_address)| {
-                if let Err(err) = Self::run_rsync(vm_name, ip_address, &log_abs_dest, &rsync_args) {
-                    println!("Failed to rsync. Retrying it after ssh-keygen {vm_name:?} : {ip_address} with err: {err:?}");
-                    return Some((vm_name, ip_address));
-                }
-                progress_bar.inc(1);
-                None
-            });
+        let failed_inventory = all_node_inventory.par_iter().filter_map(|vm| {
+            if let Err(err) =
+                Self::run_rsync(&vm.name, &vm.public_ip_addr, &log_abs_dest, &rsync_args)
+            {
+                println!(
+                    "Failed to rsync. Retrying it after ssh-keygen {:?} : {} with err: {err:?}",
+                    vm.name, vm.public_ip_addr
+                );
+                return Some(vm.clone());
+            }
+            progress_bar.inc(1);
+            None
+        });
 
         // try ssh-keygen for the failed inventory and try to rsync again
         failed_inventory
             .into_par_iter()
-            .for_each(|(vm_name, ip_address)| {
-                debug!("Trying to ssh-keygen for {vm_name:?} : {ip_address}");
+            .for_each(|vm| {
+                debug!("Trying to ssh-keygen for {:?} : {}", vm.name, vm.public_ip_addr);
                 if let Err(err) = run_external_command(
                     PathBuf::from("ssh-keygen"),
                     PathBuf::from("."),
-                    vec!["-R".to_string(), format!("{ip_address}")],
+                    vec!["-R".to_string(), format!("{}", vm.public_ip_addr)],
                     false,
                     false,
                 ) {
-                    println!("Failed to ssh-keygen {vm_name:?} : {ip_address} with err: {err:?}");
+                    println!("Failed to ssh-keygen {:?} : {} with err: {err:?}", vm.name, vm.public_ip_addr);
                 } else if let Err(err) =
-                    Self::run_rsync(vm_name, ip_address, &log_abs_dest, &rsync_args)
+                    Self::run_rsync(&vm.name, &vm.public_ip_addr, &log_abs_dest, &rsync_args)
                 {
-                    println!("Failed to rsync even after ssh-keygen. Could not obtain logs for {vm_name:?} : {ip_address} with err: {err:?}");
+                    println!("Failed to rsync even after ssh-keygen. Could not obtain logs for {:?} : {} with err: {err:?}", vm.name, vm.public_ip_addr);
                 }
                 progress_bar.inc(1);
             });
@@ -159,57 +164,68 @@ impl TestnetDeployer {
         let progress_bar = get_progress_bar(all_node_inventory.len() as u64)?;
         let _failed_inventory = all_node_inventory
             .par_iter()
-            .filter_map(|(vm_name, ip_address)| {
-                let op = match self
-                    .ssh_client
-                    .run_command(ip_address, "safe", &rg_cmd, true)
-                {
-                    Ok(output) => {
-                        match Self::store_rg_output(
-                            &timestamp,
-                            &rg_cmd,
-                            &output,
-                            &log_abs_dest,
-                            vm_name,
-                        ) {
-                            Ok(_) => None,
-                            Err(err) => {
-                                println!("Failed store output for {ip_address:?} with: {err:?}");
-                                Some((vm_name, ip_address))
-                            }
-                        }
-                    }
-                    Err(Error::ExternalCommandRunFailed {
-                        binary,
-                        exit_status,
-                    }) => {
-                        if let Some(1) = exit_status.code() {
-                            debug!("No matches found for {ip_address:?}");
+            .filter_map(|vm| {
+                let op =
+                    match self
+                        .ssh_client
+                        .run_command(&vm.public_ip_addr, "safe", &rg_cmd, true)
+                    {
+                        Ok(output) => {
                             match Self::store_rg_output(
                                 &timestamp,
                                 &rg_cmd,
-                                &["No matches found".to_string()],
+                                &output,
                                 &log_abs_dest,
-                                vm_name,
+                                &vm.name,
                             ) {
                                 Ok(_) => None,
                                 Err(err) => {
                                     println!(
-                                        "Failed store output for {ip_address:?} with: {err:?}"
+                                        "Failed store output for {:?} with: {err:?}",
+                                        vm.public_ip_addr
                                     );
-                                    Some((vm_name, ip_address))
+                                    Some(vm)
                                 }
                             }
-                        } else {
-                            println!("Failed to run rg query for {ip_address:?} with: {binary}");
-                            Some((vm_name, ip_address))
                         }
-                    }
-                    Err(err) => {
-                        println!("Failed to run rg query for {ip_address:?} with: {err:?}");
-                        Some((vm_name, ip_address))
-                    }
-                };
+                        Err(Error::ExternalCommandRunFailed {
+                            binary,
+                            exit_status,
+                        }) => {
+                            if let Some(1) = exit_status.code() {
+                                debug!("No matches found for {:?}", vm.public_ip_addr);
+                                match Self::store_rg_output(
+                                    &timestamp,
+                                    &rg_cmd,
+                                    &["No matches found".to_string()],
+                                    &log_abs_dest,
+                                    &vm.name,
+                                ) {
+                                    Ok(_) => None,
+                                    Err(err) => {
+                                        println!(
+                                            "Failed store output for {:?} with: {err:?}",
+                                            vm.public_ip_addr
+                                        );
+                                        Some(vm)
+                                    }
+                                }
+                            } else {
+                                println!(
+                                    "Failed to run rg query for {:?} with: {binary}",
+                                    vm.public_ip_addr
+                                );
+                                Some(vm)
+                            }
+                        }
+                        Err(err) => {
+                            println!(
+                                "Failed to run rg query for {:?} with: {err:?}",
+                                vm.public_ip_addr
+                            );
+                            Some(vm)
+                        }
+                    };
                 progress_bar.inc(1);
                 op
             })
@@ -263,7 +279,7 @@ impl TestnetDeployer {
     }
 
     // Return the list of all the node machines.
-    async fn get_all_node_inventory(&self, name: &str) -> Result<Vec<(String, IpAddr)>> {
+    async fn get_all_node_inventory(&self, name: &str) -> Result<Vec<VirtualMachine>> {
         let environments = self.terraform_runner.workspace_list()?;
         if !environments.contains(&name.to_string()) {
             return Err(Error::EnvironmentDoesNotExist(name.to_string()));
@@ -386,7 +402,7 @@ fn visit_dirs(
 fn create_initial_log_dir_setup(
     root_dir: &Path,
     name: &str,
-    all_node_inventory: &[(String, IpAddr)],
+    all_node_inventory: &[VirtualMachine],
 ) -> Result<PathBuf> {
     let log_dest = root_dir.join("logs").join(name);
     if !log_dest.exists() {
@@ -395,8 +411,8 @@ fn create_initial_log_dir_setup(
     // Get the absolute path here. We might be changing the current_dir and we don't want to run into problems.
     let log_abs_dest = std::fs::canonicalize(log_dest)?;
     // Create a log dir per VM
-    all_node_inventory.par_iter().for_each(|(vm_name, _)| {
-        let vm_path = log_abs_dest.join(vm_name);
+    all_node_inventory.par_iter().for_each(|vm| {
+        let vm_path = log_abs_dest.join(&vm.name);
         let _ = std::fs::create_dir_all(vm_path);
     });
     Ok(log_abs_dest)
