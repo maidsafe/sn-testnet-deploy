@@ -950,5 +950,35 @@ pub async fn get_environment_type(
         .download_object("sn-environment-type", environment_name, temp_file.path())
         .await?;
     let environment_type = std::fs::read_to_string(temp_file.path())?;
-    environment_type.parse()
+    // It appears to be possible for the string to have newlines in it, even if the file on S3
+    // doesn't have a newline character.
+    let environment_type_trimmed = environment_type.trim();
+
+    match environment_type_trimmed.parse() {
+        Ok(e) => {
+            debug!("Parsed the environment type from the S3 file");
+            Ok(e)
+        }
+        Err(_) => {
+            // For an unknown reason, the environment type string sometimes comes back empty, even
+            // if the file on S3 is populated with a value. We can try falling back to using the
+            // name of the environment.
+            debug!("Could not parse the environment type from the S3 file");
+            debug!("Falling back to using the environment name ({environment_name})");
+            if environment_name.starts_with("DEV") {
+                debug!("Using Development as the environment type");
+                Ok(EnvironmentType::Development)
+            } else if environment_name.starts_with("STG") {
+                debug!("Using Staging as the environment type");
+                Ok(EnvironmentType::Staging)
+            } else if environment_name.starts_with("PROD") {
+                debug!("Using Production as the environment type");
+                Ok(EnvironmentType::Production)
+            } else {
+                Err(Error::EnvironmentNameFromStringError(
+                    environment_name.to_string(),
+                ))
+            }
+        }
+    }
 }
