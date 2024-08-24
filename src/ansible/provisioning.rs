@@ -11,7 +11,7 @@ use crate::{
     ansible::generate_custom_environment_inventory,
     deploy::DeployOptions,
     error::{Error, Result},
-    inventory::VirtualMachine,
+    inventory::{DeploymentNodeRegistries, VirtualMachine},
     print_duration, BinaryOption, CloudProvider, LogFormat, SshClient, UpgradeOptions,
 };
 use log::{debug, trace};
@@ -164,7 +164,7 @@ impl AnsibleProvisioner {
     pub fn get_node_registries(
         &self,
         inventory_type: &AnsibleInventoryType,
-    ) -> Result<Vec<(String, NodeRegistry)>> {
+    ) -> Result<DeploymentNodeRegistries> {
         debug!("Fetching node manager inventory");
         let temp_dir_path = tempfile::tempdir()?.into_path();
         let temp_dir_json = serde_json::to_string(&temp_dir_path)?;
@@ -199,10 +199,21 @@ impl AnsibleProvisioner {
             })
             .collect::<Vec<(String, PathBuf)>>();
 
-        Ok(node_registry_paths
-            .iter()
-            .map(|(vm_name, file_path)| (vm_name.clone(), NodeRegistry::load(file_path).unwrap()))
-            .collect::<Vec<(String, NodeRegistry)>>())
+        let mut node_registries = Vec::new();
+        let mut failed_vms = Vec::new();
+        for (vm_name, file_path) in node_registry_paths {
+            match NodeRegistry::load(&file_path) {
+                Ok(node_registry) => node_registries.push((vm_name.clone(), node_registry)),
+                Err(_) => failed_vms.push(vm_name.clone()),
+            }
+        }
+
+        let deployment_registries = DeploymentNodeRegistries {
+            inventory_type: inventory_type.clone(),
+            retrieved_registries: node_registries,
+            failed_vms,
+        };
+        Ok(deployment_registries)
     }
 
     pub async fn provision_genesis_node(&self, options: &ProvisionOptions) -> Result<()> {
