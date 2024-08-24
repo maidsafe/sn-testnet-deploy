@@ -18,6 +18,7 @@ use crate::{
 use color_eyre::{eyre::eyre, Result};
 use rand::seq::IteratorRandom;
 use serde::{Deserialize, Serialize};
+use sn_service_management::{NodeRegistry, ServiceStatus};
 use std::{
     collections::{BTreeMap, BTreeSet},
     convert::From,
@@ -177,22 +178,33 @@ impl DeploymentInventoryService {
 
         println!("Retrieving node registries from all VMs...");
         let mut node_registries = Vec::new();
+        let mut failed_node_registry_vms = Vec::new();
+
         let bootstrap_node_registries = self
             .ansible_provisioner
             .get_node_registries(&AnsibleInventoryType::BootstrapNodes)?;
+
         let generic_node_registries = self
             .ansible_provisioner
             .get_node_registries(&AnsibleInventoryType::Nodes)?;
-        node_registries.extend(bootstrap_node_registries.clone());
-        node_registries.extend(generic_node_registries.clone());
-        node_registries.extend(
-            self.ansible_provisioner
-                .get_node_registries(&AnsibleInventoryType::Genesis)?,
-        );
-        node_registries.extend(
-            self.ansible_provisioner
-                .get_node_registries(&AnsibleInventoryType::Auditor)?,
-        );
+
+        let genesis_node_registry = self
+            .ansible_provisioner
+            .get_node_registries(&AnsibleInventoryType::Genesis)?;
+
+        let auditor_node_registry = self
+            .ansible_provisioner
+            .get_node_registries(&AnsibleInventoryType::Auditor)?;
+
+        node_registries.extend(bootstrap_node_registries.retrieved_registries.clone());
+        node_registries.extend(generic_node_registries.retrieved_registries.clone());
+        node_registries.extend(genesis_node_registry.retrieved_registries);
+        node_registries.extend(auditor_node_registry.retrieved_registries);
+
+        failed_node_registry_vms.extend(bootstrap_node_registries.failed_vms);
+        failed_node_registry_vms.extend(generic_node_registries.failed_vms);
+        failed_node_registry_vms.extend(genesis_node_registry.failed_vms);
+        failed_node_registry_vms.extend(auditor_node_registry.failed_vms);
 
         let safenode_rpc_endpoints: BTreeMap<String, SocketAddr> = node_registries
             .iter()
@@ -215,6 +227,7 @@ impl DeploymentInventoryService {
             .collect();
 
         let bootstrap_peers = bootstrap_node_registries
+            .retrieved_registries
             .iter()
             .flat_map(|(_, reg)| {
                 reg.nodes.iter().map(|node| {
@@ -230,6 +243,7 @@ impl DeploymentInventoryService {
             })
             .collect::<Vec<String>>();
         let node_peers = generic_node_registries
+            .retrieved_registries
             .iter()
             .flat_map(|(_, reg)| {
                 reg.nodes.iter().map(|node| {
@@ -289,6 +303,7 @@ impl DeploymentInventoryService {
             bootstrap_node_vms: bootstrap_vm_list,
             bootstrap_peers,
             environment_type,
+            failed_node_registry_vms,
             faucet_address: format!("{genesis_ip}:8000"),
             genesis_multiaddr,
             name: name.to_string(),
@@ -352,6 +367,60 @@ impl DeploymentInventoryService {
 
 pub type VirtualMachine = (String, IpAddr);
 
+#[derive(Clone)]
+pub struct DeploymentNodeRegistries {
+    pub inventory_type: AnsibleInventoryType,
+    pub retrieved_registries: Vec<(String, NodeRegistry)>,
+    pub failed_vms: Vec<String>,
+}
+
+impl DeploymentNodeRegistries {
+    pub fn print(&self) {
+        Self::print_banner(&self.inventory_type.to_string());
+        for (vm_name, registry) in self.retrieved_registries.iter() {
+            println!("{vm_name}:");
+            for node in registry.nodes.iter() {
+                println!(
+                    "  {}: {} {}",
+                    node.service_name,
+                    node.version,
+                    Self::format_status(&node.status)
+                );
+            }
+        }
+        if !self.failed_vms.is_empty() {
+            println!(
+                "Failed to retrieve node registries for {}:",
+                self.inventory_type
+            );
+            for vm_name in self.failed_vms.iter() {
+                println!("- {}", vm_name);
+            }
+        }
+    }
+
+    fn format_status(status: &ServiceStatus) -> String {
+        match status {
+            ServiceStatus::Running => "RUNNING".to_string(),
+            ServiceStatus::Stopped => "STOPPED".to_string(),
+            ServiceStatus::Added => "ADDED".to_string(),
+            ServiceStatus::Removed => "REMOVED".to_string(),
+        }
+    }
+
+    fn print_banner(text: &str) {
+        let padding = 2;
+        let text_width = text.len() + padding * 2;
+        let border_chars = 2;
+        let total_width = text_width + border_chars;
+        let top_bottom = "═".repeat(total_width);
+
+        println!("╔{}╗", top_bottom);
+        println!("║ {:^width$} ║", text, width = text_width);
+        println!("╚{}╝", top_bottom);
+    }
+}
+
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct DeploymentInventory {
     pub auditor_address: String,
@@ -359,6 +428,7 @@ pub struct DeploymentInventory {
     pub bootstrap_node_vms: Vec<VirtualMachine>,
     pub bootstrap_peers: Vec<String>,
     pub environment_type: EnvironmentType,
+    pub failed_node_registry_vms: Vec<String>,
     pub faucet_address: String,
     pub genesis_multiaddr: String,
     pub misc_vms: Vec<VirtualMachine>,
@@ -384,6 +454,7 @@ impl DeploymentInventory {
             bootstrap_peers: Vec::new(),
             environment_type: EnvironmentType::Development,
             genesis_multiaddr: String::new(),
+            failed_node_registry_vms: Vec::new(),
             faucet_address: String::new(),
             misc_vms: Vec::new(),
             node_vms: Vec::new(),
