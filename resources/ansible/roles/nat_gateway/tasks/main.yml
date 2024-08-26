@@ -1,0 +1,38 @@
+---
+
+- name: check if ipv4 is forwarded
+  command: sysctl net.ipv4.ip_forward
+  register: ipv4_forwarded
+  ignore_errors: yes
+
+- name: set ipv4_forwarded to true if ipv4 is forwarded
+  set_fact:
+    ipv4_forwarded: true
+  when: ipv4_forwarded.stdout.find('net.ipv4.ip_forward = 1') != -1
+
+- name: enable IPv4 forwarding
+  sysctl:
+    name: net.ipv4.ip_forward
+    value: 1
+    state: present
+    reload: yes
+  when: ipv4_forwarded is not defined
+
+- name: persist IPv4 forwarding on reboots
+  command: sed -i 's/#net.ipv4.ip_forward/net.ipv4.ip_forward/g' /etc/sysctl.conf
+  when: ipv4_forwarded is not defined
+
+- name: check if safenode_private_ip_eth1 is added to the NAT gateway
+  command: iptables -t nat -L POSTROUTING -v
+  register: nat_gateway_rules
+  ignore_errors: yes
+
+- name: set nat_configued if private ip of safenode is added to the NAT gateway
+  set_fact:
+    nat_configured: true
+  when: nat_gateway_rules.stdout.find(safenode_private_ip_eth1) != -1
+
+- name: Add eth1 of safenode VM to the NAT gateway with random parameter
+  command: >
+    iptables -t nat -A POSTROUTING -s {{ safenode_private_ip_eth1 }} -o eth0 -j MASQUERADE --random
+  when: nat_configured is not defined

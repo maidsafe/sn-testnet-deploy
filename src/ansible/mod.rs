@@ -84,6 +84,11 @@ pub enum AnsiblePlaybook {
     ///
     /// Use in combination with `AnsibleInventoryType::Logstash`.
     Logstash,
+    /// The NAT gateway playbook will setup the NAT gateway to enable NAT routing with randomization.
+    /// It allows us to simulate a private node that is behind a NAT.
+    ///
+    /// Use in combination with `AnsibleInventoryType::NatGateway`.
+    NatGateway,
     /// The node manager inventory playbook will retrieve the node manager's inventory from any
     /// machines it is run against.
     ///
@@ -162,6 +167,7 @@ impl AnsiblePlaybook {
             AnsiblePlaybook::FundUploaders => "fund_uploaders.yml".to_string(),
             AnsiblePlaybook::Logs => "logs.yml".to_string(),
             AnsiblePlaybook::Logstash => "logstash.yml".to_string(),
+            AnsiblePlaybook::NatGateway => "nat_gateway.yml".to_string(),
             AnsiblePlaybook::NodeManagerInventory => "node_manager_inventory.yml".to_string(),
             AnsiblePlaybook::Nodes => "nodes.yml".to_string(),
             AnsiblePlaybook::RpcClient => "safenode_rpc_client.yml".to_string(),
@@ -189,31 +195,33 @@ impl AnsiblePlaybook {
 }
 
 /// Represents the inventory types that apply to our own domain.
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub enum AnsibleInventoryType {
-    // Use to run a playbook against the auditor.
-    //
-    // Only one machine will be returned in this inventory.
+    /// Use to run a playbook against the auditor.
+    ///
+    /// Only one machine will be returned in this inventory.
     Auditor,
-    // Use to run a playbook against all bootstrap nodes.
+    /// Use to run a playbook against all bootstrap nodes.
     BootstrapNodes,
-    // Use to run a playbook against the build machine.
-    //
-    // This is a larger machine that is used for building binaries from source.
-    //
-    // Only one machine will be returned in this inventory.
+    /// Use to run a playbook against the build machine.
+    ///
+    /// This is a larger machine that is used for building binaries from source.
+    ///
+    /// Only one machine will be returned in this inventory.
     Build,
-    // Provide a static list of VMs to connect to.
+    /// Provide a static list of VMs to connect to.
     Custom,
-    // Use to run a playbook against the genesis node.
-    //
-    // Only one machine will be returned in this inventory.
+    /// Use to run a playbook against the genesis node.
+    ///
+    /// Only one machine will be returned in this inventory.
     Genesis,
-    // Use to run a playbook against the Logstash servers.
+    /// Use to run a playbook against the Logstash servers.
     Logstash,
-    // Use to run a playbook against all nodes except the genesis node.
+    /// Use to run a playbook against the NAT gateway.
+    NatGateway,
+    /// Use to run a playbook against all nodes except the genesis node.
     Nodes,
-    // Use to run a playbook against all the uploader machines.
+    /// Use to run a playbook against all the uploader machines.
     Uploaders,
 }
 
@@ -226,6 +234,7 @@ impl std::fmt::Display for AnsibleInventoryType {
             AnsibleInventoryType::Custom => "Custom",
             AnsibleInventoryType::Genesis => "Genesis",
             AnsibleInventoryType::Logstash => "Logstash",
+            AnsibleInventoryType::NatGateway => "NatGateway",
             AnsibleInventoryType::Nodes => "Nodes",
             AnsibleInventoryType::Uploaders => "Uploaders",
         };
@@ -340,6 +349,10 @@ impl AnsibleRunner {
                 ".{}_logstash_inventory_{}.yml",
                 self.environment_name, provider
             )),
+            AnsibleInventoryType::NatGateway => PathBuf::from("inventory").join(format!(
+                ".{}_nat_gateway_inventory_{}.yml",
+                self.environment_name, provider
+            )),
             AnsibleInventoryType::Nodes => PathBuf::from("inventory").join(format!(
                 ".{}_node_inventory_{}.yml",
                 self.environment_name, provider
@@ -372,11 +385,12 @@ pub async fn generate_environment_inventory(
 ) -> Result<()> {
     let mut generated_inventory_paths = vec![];
     let inventory_files = [
+        "auditor",
         "bootstrap_node",
         "build",
         "genesis",
+        "nat_gateway",
         "node",
-        "auditor",
         "uploader",
     ];
     for inventory_type in inventory_files.iter() {
