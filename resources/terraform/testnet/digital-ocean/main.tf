@@ -10,14 +10,15 @@ terraform {
   }
 }
 
-resource "digitalocean_droplet" "genesis_bootstrap" {
-  count    = var.genesis_vm_count
-  image    = var.bootstrap_droplet_image_id
-  name     = "${terraform.workspace}-genesis-bootstrap"
+resource "digitalocean_droplet" "auditor" {
+  count    = var.auditor_vm_count
+  image    = var.auditor_droplet_image_id
+  name     = "${terraform.workspace}-auditor-${count.index + 1}"
   region   = var.region
-  size     = var.bootstrap_droplet_size
+  size     = var.node_droplet_size
+  backups  = true
   ssh_keys = var.droplet_ssh_keys
-  tags     = ["environment:${terraform.workspace}", "type:genesis"]
+  tags     = ["environment:${terraform.workspace}", "type:auditor"]
 }
 
 resource "digitalocean_droplet" "bootstrap_node" {
@@ -28,6 +29,36 @@ resource "digitalocean_droplet" "bootstrap_node" {
   size     = var.bootstrap_droplet_size
   ssh_keys = var.droplet_ssh_keys
   tags     = ["environment:${terraform.workspace}", "type:bootstrap_node"]
+}
+
+resource "digitalocean_droplet" "build" {
+  count    = var.use_custom_bin ? 1 : 0
+  image    = var.build_droplet_image_id
+  name     = "${terraform.workspace}-build"
+  region   = var.region
+  size     = var.build_machine_size
+  ssh_keys = var.droplet_ssh_keys
+  tags     = ["environment:${terraform.workspace}", "type:build"]
+}
+
+resource "digitalocean_droplet" "genesis_bootstrap" {
+  count    = var.genesis_vm_count
+  image    = var.bootstrap_droplet_image_id
+  name     = "${terraform.workspace}-genesis-bootstrap"
+  region   = var.region
+  size     = var.bootstrap_droplet_size
+  ssh_keys = var.droplet_ssh_keys
+  tags     = ["environment:${terraform.workspace}", "type:genesis"]
+}
+
+resource "digitalocean_droplet" "nat_gateway" {
+  count    = var.setup_nat_gateway ? 1 : 0
+  image    = var.bootstrap_droplet_image_id // TODO: do we need new image?
+  name     = "${terraform.workspace}-nat-gateway"
+  region   = var.region
+  size     = var.nat_gateway_droplet_size
+  ssh_keys = var.droplet_ssh_keys
+  tags     = ["environment:${terraform.workspace}", "type:nat_gateway"]
 }
 
 resource "digitalocean_droplet" "node" {
@@ -48,25 +79,4 @@ resource "digitalocean_droplet" "uploader" {
   size     = var.uploader_droplet_size
   ssh_keys = var.droplet_ssh_keys
   tags     = ["environment:${terraform.workspace}", "type:uploader"]
-}
-
-resource "digitalocean_droplet" "build" {
-  count    = var.use_custom_bin ? 1 : 0
-  image    = var.build_droplet_image_id
-  name     = "${terraform.workspace}-build"
-  region   = var.region
-  size     = var.build_machine_size
-  ssh_keys = var.droplet_ssh_keys
-  tags     = ["environment:${terraform.workspace}", "type:build"]
-}
-
-resource "digitalocean_droplet" "auditor" {
-  count    = var.auditor_vm_count
-  image    = var.auditor_droplet_image_id
-  name     = "${terraform.workspace}-auditor-${count.index + 1}"
-  region   = var.region
-  size     = var.node_droplet_size
-  backups  = true
-  ssh_keys = var.droplet_ssh_keys
-  tags     = ["environment:${terraform.workspace}", "type:auditor"]
 }

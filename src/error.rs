@@ -4,7 +4,7 @@
 // This SAFE Network Software is licensed under the BSD-3-Clause license.
 // Please see the LICENSE file for more details.
 
-use std::path::PathBuf;
+use crate::ansible::AnsibleInventoryType;
 use thiserror::Error;
 use tokio::task::JoinError;
 
@@ -46,8 +46,8 @@ pub enum Error {
         binary: String,
         exit_status: std::process::ExitStatus,
     },
-    #[error("The provided inventory file is empty or does not exists {0}")]
-    EmptyInventory(PathBuf),
+    #[error("The provided ansible inventory is empty or does not exists {0}")]
+    EmptyInventory(AnsibleInventoryType),
     #[error("To provision the remaining nodes the multiaddr of the genesis node must be supplied")]
     GenesisMultiAddrNotSupplied,
     #[error("Could not obtain Genesis multiaddr")]
@@ -114,6 +114,8 @@ pub enum Error {
         "Could not convert from DeployOptions to ProvisionOptions: node count must have a value"
     )]
     MissingNodeCount,
+    #[error("Could not obtain the private IP address")]
+    PrivateIpNotObtained,
     #[error("This deployment does not have an auditor. It may be a bootstrap deployment.")]
     NoAuditorError,
     #[error("Could not obtain a multiaddr from the node inventory")]

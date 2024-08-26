@@ -158,6 +158,11 @@ impl DeploymentInventoryService {
             misc_vm_list.push(build_inventory[0].clone());
         }
 
+        let nat_gateway_vm = self
+            .ansible_runner
+            .get_inventory(AnsibleInventoryType::NatGateway, false)
+            .await?;
+
         let mut node_vm_list = Vec::new();
         let nodes_inventory = self
             .ansible_runner
@@ -352,6 +357,7 @@ impl DeploymentInventoryService {
             genesis_multiaddr,
             name: name.to_string(),
             misc_vms: misc_vm_list,
+            nat_gateway_vm: nat_gateway_vm.first().cloned(),
             node_vms: node_vm_list,
             node_peers,
             rpc_endpoints: safenode_rpc_endpoints,
@@ -483,6 +489,7 @@ pub struct DeploymentInventory {
     pub genesis_multiaddr: Option<String>,
     pub misc_vms: Vec<VirtualMachine>,
     pub name: String,
+    pub nat_gateway_vm: Option<VirtualMachine>,
     pub node_vms: Vec<VirtualMachine>,
     pub node_peers: Vec<String>,
     pub rpc_endpoints: BTreeMap<String, SocketAddr>,
@@ -498,7 +505,6 @@ impl DeploymentInventory {
     pub fn empty(name: &str, binary_option: BinaryOption) -> DeploymentInventory {
         Self {
             binary_option,
-            name: name.to_string(),
             auditor_vms: Vec::new(),
             bootstrap_node_vms: Vec::new(),
             bootstrap_peers: Vec::new(),
@@ -507,6 +513,8 @@ impl DeploymentInventory {
             failed_node_registry_vms: Vec::new(),
             faucet_address: None,
             misc_vms: Vec::new(),
+            name: name.to_string(),
+            nat_gateway_vm: None,
             node_vms: Vec::new(),
             node_peers: Vec::new(),
             rpc_endpoints: BTreeMap::new(),
@@ -671,6 +679,10 @@ impl DeploymentInventory {
             }
             println!("SSH user: {}", self.ssh_user);
             println!();
+        }
+
+        if let Some(nat_gateway_vm) = &self.nat_gateway_vm {
+            println!("{}: {}", nat_gateway_vm.name, nat_gateway_vm.public_ip_addr);
         }
 
         // If there are no bootstrap nodes, it's a bootstrap deploy, and in that case, we're not

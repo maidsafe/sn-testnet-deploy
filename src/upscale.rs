@@ -146,6 +146,7 @@ impl TestnetDeployer {
             Some(desired_node_vm_count),
             Some(desired_uploader_vm_count),
             false,
+            options.current_inventory.nat_gateway_vm.is_some(),
             &options
                 .current_inventory
                 .environment_details

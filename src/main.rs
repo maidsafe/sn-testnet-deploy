@@ -24,6 +24,7 @@ use sn_testnet_deploy::{
     logstash::LogstashDeployBuilder,
     manage_test_data::TestDataClientBuilder,
     network_commands, notify_slack,
+    private_nodes::PrivateNodeOptions,
     setup::setup_dotenv_file,
     upscale::UpscaleOptions,
     BinaryOption, CloudProvider, EnvironmentType, LogFormat, TestnetDeployBuilder, UpgradeOptions,
@@ -457,6 +458,18 @@ enum Commands {
         #[clap(long, default_value_t = 50)]
         forks: usize,
         /// The name of the environment.
+        #[arg(short = 'n', long)]
+        name: String,
+        /// The cloud provider for the environment.
+        #[clap(long, value_parser = parse_provider, verbatim_doc_comment, default_value_t = CloudProvider::DigitalOcean)]
+        provider: CloudProvider,
+    },
+    /// Make the last VM in the environment as private. This will also setup the
+    SetupPrivateNodes {
+        /// Set to run Ansible with more verbose output.
+        #[arg(long)]
+        ansible_verbose: bool,
+        /// The name of the environment
         #[arg(short = 'n', long)]
         name: String,
         /// The cloud provider for the environment.
@@ -1549,6 +1562,61 @@ async fn main() -> Result<()> {
             }
 
             testnet_deploy.start().await?;
+
+            Ok(())
+        }
+        Commands::SetupPrivateNodes {
+            ansible_verbose,
+            name,
+            provider,
+        } => {
+            println!("Set up private nodes...");
+            let testnet_deployer = TestnetDeployBuilder::default()
+                .ansible_verbose_mode(ansible_verbose)
+                .environment_name(&name)
+                .provider(provider.clone())
+                .build()?;
+            testnet_deployer.init().await?;
+
+            let inventory_service = DeploymentInventoryService::from(testnet_deployer.clone());
+            let inventory = inventory_service
+                // TODO: force = true
+                .generate_or_retrieve_inventory(&name, false, None)
+                .await?;
+
+            testnet_deployer
+                .setup_private_nodes(&PrivateNodeOptions {
+                    ansible_verbose,
+                    current_inventory: inventory,
+                })
+                .await?;
+
+            println!("Generating new inventory after setting up private nodes...");
+            let max_retries = 3;
+            let mut retries = 0;
+            let inventory = loop {
+                match inventory_service
+                    .generate_or_retrieve_inventory(&name, true, None)
+                    .await
+                {
+                    Ok(inv) => break inv,
+                    Err(e) if retries < max_retries => {
+                        retries += 1;
+                        eprintln!("Failed to generate inventory on attempt {retries}: {:?}", e);
+                        eprintln!("Will retry up to {max_retries} times...");
+                    }
+                    Err(_) => {
+                        eprintln!("Failed to generate inventory after {max_retries} attempts");
+                        eprintln!(
+                            "Please try running the `inventory` command or workflow separately"
+                        );
+                        return Ok(());
+                    }
+                }
+            };
+
+            inventory.print_report()?;
+            inventory.save()?;
 
             Ok(())
         }

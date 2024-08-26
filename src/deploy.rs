@@ -58,6 +58,7 @@ impl TestnetDeployer {
             options.node_vm_count,
             options.uploader_vm_count,
             build_custom_binaries,
+            false,
             &options.environment_type.get_tfvars_filename(),
         )
         .await
