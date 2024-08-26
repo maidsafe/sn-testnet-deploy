@@ -18,6 +18,11 @@ variable "droplet_ssh_keys" {
   ]
 }
 
+variable "nat_gateway_droplet_size" {
+  description = "The size of the droplet for NAT gateway VM"
+  default = "s-1vcpu-2gb"
+}
+
 variable "node_droplet_size" {
   description = "The size of the droplet for generic nodes VMs"
 }
@@ -76,6 +81,12 @@ variable "bootstrap_node_vm_count" {
 variable "node_vm_count" {
   default     = 10
   description = "The number of droplets to launch for nodes"
+}
+
+variable "setup_nat_gateway" {
+  type        = bool
+  default     = false
+  description = "A boolean to enable NAT gateway VM. This is required to enable home-network nodes."
 }
 
 variable "uploader_vm_count" {

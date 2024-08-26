@@ -251,6 +251,17 @@ impl AnsibleProvisioner {
         Ok(())
     }
 
+    pub async fn provision_nat_gateway(&self, name: &str, private_ip: IpAddr) -> Result<()> {
+        let start = Instant::now();
+        self.ansible_runner.run_playbook(
+            AnsiblePlaybook::NatGateway,
+            AnsibleInventoryType::NatGateway,
+            Some(format!("{{ \"testnet_name\": \"{name}\", \"safenode_private_ip_eth1\": \"{private_ip}\" }}")),
+        )?;
+        print_duration(start.elapsed());
+        Ok(())
+    }
+
     pub async fn provision_nodes(
         &self,
         options: &ProvisionOptions,
