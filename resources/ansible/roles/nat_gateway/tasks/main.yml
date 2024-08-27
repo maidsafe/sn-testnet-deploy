@@ -3,7 +3,7 @@
 - name: check if ipv4 is forwarded
   command: sysctl net.ipv4.ip_forward
   register: ipv4_forwarded
-  ignore_errors: yes
+  ignore_errors: true
 
 - name: set ipv4_forwarded to true if ipv4 is forwarded
   set_fact:
@@ -15,7 +15,7 @@
     name: net.ipv4.ip_forward
     value: 1
     state: present
-    reload: yes
+    reload: true
   when: ipv4_forwarded is not defined
 
 - name: persist IPv4 forwarding on reboots
@@ -25,7 +25,7 @@
 - name: check if safenode_private_ip_eth1 is added to the NAT gateway
   command: iptables -t nat -L POSTROUTING -v
   register: nat_gateway_rules
-  ignore_errors: yes
+  ignore_errors: true
 
 - name: set nat_configued if private ip of safenode is added to the NAT gateway
   set_fact:
