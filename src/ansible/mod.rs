@@ -99,6 +99,10 @@ pub enum AnsiblePlaybook {
     ///
     /// Use in combination with `AnsibleInventoryType::Genesis` or `AnsibleInventoryType::Nodes`.
     Nodes,
+    /// The private nodes playbook will setup the private nodes on the last node in the inventory.
+    ///
+    /// Use in combination with `AnsibleInventoryType::Nodes`.
+    PrivateNodes,
     /// The rpc client playbook will setup the `safenode_rpc_client` binary on the genesis node.
     ///
     /// Use in combination with `AnsibleInventoryType::Genesis`.
@@ -168,6 +172,7 @@ impl AnsiblePlaybook {
             AnsiblePlaybook::NatGateway => "nat_gateway.yml".to_string(),
             AnsiblePlaybook::NodeManagerInventory => "node_manager_inventory.yml".to_string(),
             AnsiblePlaybook::Nodes => "nodes.yml".to_string(),
+            AnsiblePlaybook::PrivateNodes => "private_nodes.yml".to_string(),
             AnsiblePlaybook::RpcClient => "safenode_rpc_client.yml".to_string(),
             AnsiblePlaybook::StartFaucet => "start_faucet.yml".to_string(),
             AnsiblePlaybook::StartNodes => "start_nodes.yml".to_string(),
@@ -218,6 +223,8 @@ pub enum AnsibleInventoryType {
     NatGateway,
     /// Use to run a playbook against all nodes except the genesis node.
     Nodes,
+    /// Use to run a playbook against the private nodes.
+    PrivateNodes,
     /// Use to run a playbook against all the uploader machines.
     Uploaders,
 }
@@ -233,6 +240,7 @@ impl std::fmt::Display for AnsibleInventoryType {
             AnsibleInventoryType::Logstash => "Logstash",
             AnsibleInventoryType::NatGateway => "NatGateway",
             AnsibleInventoryType::Nodes => "Nodes",
+            AnsibleInventoryType::PrivateNodes => "PrivateNodes",
             AnsibleInventoryType::Uploaders => "Uploaders",
         };
         write!(f, "{}", s)
@@ -335,7 +343,7 @@ impl AnsibleRunner {
                 self.environment_name, provider
             )),
             AnsibleInventoryType::Custom => PathBuf::from("inventory").join(format!(
-                ".{}_custom_inventory_{}.yml",
+                ".{}_custom_inventory_{}.ini",
                 self.environment_name, provider
             )),
             AnsibleInventoryType::Genesis => PathBuf::from("inventory").join(format!(
@@ -352,6 +360,10 @@ impl AnsibleRunner {
             )),
             AnsibleInventoryType::Nodes => PathBuf::from("inventory").join(format!(
                 ".{}_node_inventory_{}.yml",
+                self.environment_name, provider
+            )),
+            AnsibleInventoryType::PrivateNodes => PathBuf::from("inventory").join(format!(
+                ".{}_private_node_inventory_{}.ini",
                 self.environment_name, provider
             )),
             AnsibleInventoryType::Uploaders => PathBuf::from("inventory").join(format!(
@@ -419,7 +431,7 @@ pub fn generate_custom_environment_inventory(
     output_inventory_dir_path: &Path,
 ) -> Result<()> {
     let dest_path = output_inventory_dir_path.join(format!(
-        ".{}_custom_inventory_digital_ocean.yml",
+        ".{}_custom_inventory_digital_ocean.ini",
         environment_name
     ));
     let file = File::create(&dest_path)?;
@@ -431,6 +443,37 @@ pub fn generate_custom_environment_inventory(
     }
 
     debug!("Created custom inventory file at {dest_path:#?}");
+
+    Ok(())
+}
+
+pub fn generate_private_node_environment_inventory(
+    environment_name: &str,
+    vm_to_connect: &VirtualMachine,
+    jump_box: &VirtualMachine,
+    ssh_sk_path: &Path,
+    output_inventory_dir_path: &Path,
+) -> Result<()> {
+    let dest_path = output_inventory_dir_path.join(format!(
+        ".{}_private_node_inventory_digital_ocean.ini",
+        environment_name
+    ));
+    let file = File::create(&dest_path)?;
+    let mut writer = BufWriter::new(file);
+
+    writeln!(writer, "[private]")?;
+    writeln!(writer, "{}", vm_to_connect.private_ip_addr)?;
+
+    writeln!(writer)?;
+
+    writeln!(writer, "[private:vars]")?;
+    writeln!(
+        writer,
+        "ansible_ssh_common_args='-o ProxyCommand=\"ssh -p 22 -W %h:%p -q root@{} -i {ssh_sk_path:?}\"'",
+        jump_box.public_ip_addr
+    )?;
+
+    debug!("Created private node inventory file with ssh proxy at {dest_path:?}");
 
     Ok(())
 }

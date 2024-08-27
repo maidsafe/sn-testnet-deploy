@@ -5,6 +5,7 @@
 // Please see the LICENSE file for more details.
 
 use crate::{
+    ansible::AnsibleInventoryType,
     error::{Error, Result},
     DeploymentInventory, DeploymentType, TestnetDeployer,
 };
@@ -48,9 +49,9 @@ impl TestnetDeployer {
         })?;
 
         let mut n = 1;
-        let total = 2;
+        let total = 4;
 
-        let last_vm_private_ip = options
+        let private_vm_inventory = options
             .current_inventory
             .node_vms
             .iter()
@@ -61,15 +62,19 @@ impl TestnetDeployer {
                     options.current_inventory.node_vms.len()
                 ))
             })
-            .ok_or_else(|| Error::PrivateIpNotObtained)
-            .inspect_err(|err| println!("Failed to obtain node private IP: {err:?}"))?
-            .private_ip_addr;
+            .ok_or_else(|| Error::EmptyInventory(AnsibleInventoryType::Nodes))
+            .inspect_err(|err| {
+                println!("Failed to obtain the inventory of the last vm: {err:?}")
+            })?;
 
         n += 1;
         self.ansible_provisioner
             .print_ansible_run_banner(n, total, "Provision NAT Gateway");
         self.ansible_provisioner
-            .provision_nat_gateway(&options.current_inventory.name, last_vm_private_ip)
+            .provision_nat_gateway(
+                &options.current_inventory.name,
+                private_vm_inventory.private_ip_addr,
+            )
             .await
             .map_err(|err| {
                 println!("Failed to provision NAT gateway {err:?}");
@@ -77,18 +82,38 @@ impl TestnetDeployer {
             })?;
 
         n += 1;
+        self.ansible_provisioner
+            .print_ansible_run_banner(n, total, "Get NAT Gateway inventory");
+        let nat_gateway_inventory = self
+            .ansible_provisioner
+            .ansible_runner
+            .get_inventory(AnsibleInventoryType::NatGateway, true)
+            .await
+            .map_err(|err| {
+                println!("Failed to get NAT Gateway inventory {err:?}");
+                err
+            })?
+            .first()
+            .ok_or_else(|| Error::EmptyInventory(AnsibleInventoryType::NatGateway))?
+            .clone();
+
+        n += 1;
         self.ansible_provisioner.print_ansible_run_banner(
             n,
             total,
             "Provision Private Nodes on the last VM",
         );
-        // self.ansible_provisioner
-        //     .provision_private_nodes(&options.current_inventory.name)
-        //     .await
-        //     .map_err(|err| {
-        //         println!("Failed to provision private nodes {err:?}");
-        //         err
-        //     })?;
+        self.ansible_provisioner
+            .provision_private_nodes(
+                &options.current_inventory.name,
+                private_vm_inventory,
+                &nat_gateway_inventory,
+            )
+            .await
+            .map_err(|err| {
+                println!("Failed to provision private nodes {err:?}");
+                err
+            })?;
 
         Ok(())
     }

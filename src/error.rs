@@ -114,8 +114,6 @@ pub enum Error {
         "Could not convert from DeployOptions to ProvisionOptions: node count must have a value"
     )]
     MissingNodeCount,
-    #[error("Could not obtain the private IP address")]
-    PrivateIpNotObtained,
     #[error("This deployment does not have an auditor. It may be a bootstrap deployment.")]
     NoAuditorError,
     #[error("Could not obtain a multiaddr from the node inventory")]
