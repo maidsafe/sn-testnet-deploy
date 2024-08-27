@@ -8,7 +8,7 @@ use super::{
     extra_vars::ExtraVarsDocBuilder, AnsibleInventoryType, AnsiblePlaybook, AnsibleRunner,
 };
 use crate::{
-    ansible::generate_custom_environment_inventory,
+    ansible::{generate_custom_environment_inventory, generate_private_node_environment_inventory},
     bootstrap::BootstrapOptions,
     deploy::DeployOptions,
     error::{Error, Result},
@@ -251,12 +251,16 @@ impl AnsibleProvisioner {
         Ok(())
     }
 
-    pub async fn provision_nat_gateway(&self, name: &str, private_ip: IpAddr) -> Result<()> {
+    pub async fn provision_nat_gateway(
+        &self,
+        name: &str,
+        safenode_private_ip: IpAddr,
+    ) -> Result<()> {
         let start = Instant::now();
         self.ansible_runner.run_playbook(
             AnsiblePlaybook::NatGateway,
             AnsibleInventoryType::NatGateway,
-            Some(format!("{{ \"testnet_name\": \"{name}\", \"safenode_private_ip_eth1\": \"{private_ip}\" }}")),
+            Some(format!("{{ \"testnet_name\": \"{name}\", \"safenode_private_ip_eth1\": \"{safenode_private_ip}\" }}")),
         )?;
         print_duration(start.elapsed());
         Ok(())
@@ -311,6 +315,34 @@ impl AnsibleProvisioner {
                 Some(initial_contact_peer.to_string()),
                 node_count,
             )?),
+        )?;
+        print_duration(start.elapsed());
+        Ok(())
+    }
+
+    /// Provision private nodes on the provided VMs.
+    pub async fn provision_private_nodes(
+        &self,
+        name: &str,
+        private_vm_inventory: &VirtualMachine,
+        nat_gateway_inventory: &VirtualMachine,
+    ) -> Result<()> {
+        let start = Instant::now();
+        println!("Provisioning private noes with a custom inventory");
+        generate_private_node_environment_inventory(
+            name,
+            private_vm_inventory,
+            nat_gateway_inventory,
+            &self.ansible_runner.ssh_sk_path,
+            &self.ansible_runner.working_directory_path.join("inventory"),
+        )?;
+        self.ansible_runner.run_playbook(
+            AnsiblePlaybook::PrivateNodes,
+            AnsibleInventoryType::PrivateNodes,
+            Some(format!(
+                "{{ \"testnet_name\": \"{name}\", \"nat_gateway_private_ip_eth1\": \"{}\" }}",
+                nat_gateway_inventory.private_ip_addr
+            )),
         )?;
         print_duration(start.elapsed());
         Ok(())
