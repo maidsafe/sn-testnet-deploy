@@ -1,7 +1,86 @@
 ---
-- name: status
-  become: True
-  command: safenode-manager status
-  register: ping1
+- name: check if --home-network flag is set in safenode services
+  command: "grep -- '--home-network' /etc/systemd/system/safenode*.service"
+  register: home_network_flag
+  ignore_errors: true
 
-- debug: var=ping1
+- name: set fact if --home-network flag is set in safenode services
+  set_fact:
+    home_network_flag_set: true
+  when: home_network_flag.stdout.find('--home-network') != -1
+
+- name: stop safenode services
+  become: true
+  command: safenode-manager stop
+  when: home_network_flag_set is not defined
+
+- name: check if telegraf role is set to NAT_RANDOMIZED_NODE
+  command: "grep NAT_RANDOMIZED_NODE /etc/default/telegraf"
+  register: telegraf_host_role
+  ignore_errors: true
+
+- name: set fact if telegraf role is set to NAT_RANDOMIZED_NODE
+  set_fact:
+    nat_randomized_role: true
+  when: telegraf_host_role.stdout.find('NAT_RANDOMIZED_NODE') != -1
+
+- name: stop telegraf
+  become: True
+  command: systemctl stop telegraf
+  when: nat_randomized_role is not defined
+
+- name: obtain DO gateway ip
+  command: "curl -s http://169.254.169.254/metadata/v1/interfaces/public/0/ipv4/gateway"
+  register: do_gateway_ip
+
+- name: check if DO gateway is configured
+  command: "ip route show"
+  register: do_gateway_route
+
+- name: set fact if DO gateway is configured
+  set_fact:
+    do_gateway_configured: true
+  when: do_gateway_route.stdout.find('169.254.168.254') != -1 and do_gateway_route.stdout.find(do_gateway_ip.stdout) != -1
+
+- name: add route to DO gateway via eth0
+  command: "ip route add 169.254.168.254 via {{ do_gateway_ip.stdout }} dev eth0"
+  when: do_gateway_configured is not defined
+
+- name: check if nat gateway is configured
+  command: "ip route show"
+  register: nat_gateway_route
+
+- name: set fact if nat gateway is configured
+  set_fact:
+    nat_gateway_configured: true
+  when: nat_gateway_route.stdout.find(nat_gateway_private_ip_eth1) != -1
+
+- name: change default route to private ip of DO droplet used as a safenode gateway
+  command: "ip route change default via {{ nat_gateway_private_ip_eth1 }}"
+  when: nat_gateway_configured is not defined
+
+- name: verify route is going through nat_gateway private ip
+  command: "ip route get 8.8.8.8"
+  register: route_output
+
+- debug: var=route_output.stdout
+
+- name: setup safenode services to use --home-network flag
+  shell: "sed -i 's/--rpc/--home-network --rpc/g' /etc/systemd/system/safenode*.service"
+  when: home_network_flag_set is not defined
+
+- name: refresh systemd daemon
+  command: "systemctl daemon-reload"
+  when: home_network_flag_set is not defined
+
+- name: restart safenode services
+  command: "safenode-manager start"
+  when: home_network_flag_set is not defined
+
+- name: change telegraf's environment variable for SAFENODE_HOST_ROLE from GENERIC_NODE to NAT_RANDOMIZED_NODE
+  shell: "sed -i 's/GENERIC_NODE/NAT_RANDOMIZED_NODE/g' /etc/default/telegraf"
+  when: nat_randomized_role is not defined
+
+- name: start telegraf
+  command: "systemctl start telegraf"
+  when: nat_randomized_role is not defined
