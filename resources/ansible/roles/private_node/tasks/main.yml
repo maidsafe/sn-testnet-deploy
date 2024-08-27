@@ -1,0 +1,7 @@
+---
+- name: status
+  become: True
+  command: safenode-manager status
+  register: ping1
+
+- debug: var=ping1
