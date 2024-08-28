@@ -61,6 +61,11 @@ pub enum Error {
     #[error(transparent)]
     InquireError(#[from] inquire::InquireError),
     #[error(
+        "The desired auditor VM count is smaller than the current count. \
+         This is invalid for an upscale operation."
+    )]
+    InvalidUpscaleDesiredAuditorVmCount,
+    #[error(
         "The desired bootstrap VM count is smaller than the current count. \
          This is invalid for an upscale operation."
     )]

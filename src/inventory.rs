@@ -134,12 +134,14 @@ impl DeploymentInventoryService {
         }
         misc_vm_list.push((genesis_inventory[0].0.clone(), genesis_inventory[0].1));
 
+        let mut auditor_vm_list = Vec::new();
         let auditor_inventory = self
             .ansible_runner
             .get_inventory(AnsibleInventoryType::Auditor, true)
             .await?;
-        let auditor_ip = auditor_inventory[0].1;
-        misc_vm_list.push((auditor_inventory[0].0.clone(), auditor_ip));
+        for entry in auditor_inventory.iter() {
+            auditor_vm_list.push((entry.0.clone(), entry.1));
+        }
 
         let build_inventory = self
             .ansible_runner
@@ -298,7 +300,7 @@ impl DeploymentInventoryService {
             get_genesis_multiaddr(&self.ansible_runner, &self.ssh_client).await?;
         let environment_type = get_environment_type(name, &self.s3_repository).await?;
         let inventory = DeploymentInventory {
-            auditor_address: format!("{auditor_ip}:4242"),
+            auditor_vms: auditor_vm_list,
             binary_option,
             bootstrap_node_vms: bootstrap_vm_list,
             bootstrap_peers,
@@ -423,7 +425,7 @@ impl DeploymentNodeRegistries {
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct DeploymentInventory {
-    pub auditor_address: String,
+    pub auditor_vms: Vec<VirtualMachine>,
     pub binary_option: BinaryOption,
     pub bootstrap_node_vms: Vec<VirtualMachine>,
     pub bootstrap_peers: Vec<String>,
@@ -449,7 +451,7 @@ impl DeploymentInventory {
         Self {
             binary_option,
             name: name.to_string(),
-            auditor_address: String::new(),
+            auditor_vms: Vec::new(),
             bootstrap_node_vms: Vec::new(),
             bootstrap_peers: Vec::new(),
             environment_type: EnvironmentType::Development,
@@ -632,7 +634,9 @@ impl DeploymentInventory {
         println!("===============");
         println!("Auditor Details");
         println!("===============");
-        println!("Auditor address: {:?}", self.auditor_address);
+        for vm in self.auditor_vms.iter() {
+            println!("{}:4242", vm.1);
+        }
         println!();
 
         if !self.uploaded_files.is_empty() {

@@ -45,6 +45,7 @@ impl TestnetDeployer {
 
         self.create_or_update_infra(
             &options.name,
+            None,
             options.bootstrap_node_vm_count,
             options.node_vm_count,
             options.uploader_vm_count,

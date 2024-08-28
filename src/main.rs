@@ -471,6 +471,12 @@ enum Commands {
         /// Set to run Ansible with more verbose output.
         #[arg(long)]
         ansible_verbose: bool,
+        /// The desired number of auditor VMs to be running after the scale.
+        ///
+        /// If there are currently 10 VMs running, and you want there to be 20, use 20 as the
+        /// value, not 10 as a delta.
+        #[clap(long, verbatim_doc_comment)]
+        desired_auditor_vm_count: Option<u16>,
         /// The desired number of safenode services to be running on each bootstrap VM after the
         /// scale.
         ///
@@ -483,10 +489,21 @@ enum Commands {
         desired_bootstrap_node_count: Option<u16>,
         /// The desired number of bootstrap VMs to be running after the scale.
         ///
-        /// If there are currently 10 VMs running, and you want there to be 20, use 20 as the value
-        /// not 10 as a delta.
+        /// If there are currently 10 VMs running, and you want there to be 20, use 20 as the
+        /// value, not 10 as a delta.
         #[clap(long, verbatim_doc_comment)]
         desired_bootstrap_node_vm_count: Option<u16>,
+        /// Set to only use Terraform to upscale the VMs and not run Ansible.
+        #[clap(long, default_value_t = false)]
+        infra_only: bool,
+        /// Set to only run the Terraform plan rather than applying the changes.
+        ///
+        /// Can be useful to preview the upscale to make sure everything is ok and that no other
+        /// changes slipped in.
+        ///
+        /// The plan will run and then the command will exit without doing anything else.
+        #[clap(long, default_value_t = false)]
+        plan: bool,
         /// If set to true, for new VMs the RPC of the node will be accessible remotely.
         ///
         /// By default, the safenode RPC is only accessible via the 'localhost' and is not exposed for
@@ -1042,7 +1059,9 @@ async fn main() -> Result<()> {
             }
 
             testnet_deploy.init().await?;
-            testnet_deploy.plan(inventory.environment_type).await?;
+            testnet_deploy
+                .plan(None, inventory.environment_type)
+                .await?;
             Ok(())
         }
         Commands::Setup {} => {
@@ -1344,12 +1363,15 @@ async fn main() -> Result<()> {
         }
         Commands::Upscale {
             ansible_verbose,
+            desired_auditor_vm_count,
             desired_bootstrap_node_count,
             desired_bootstrap_node_vm_count,
-            name,
             desired_node_count,
             desired_node_vm_count,
             desired_uploader_vm_count,
+            infra_only,
+            name,
+            plan,
             provider,
             public_rpc,
         } => {
@@ -1370,14 +1392,21 @@ async fn main() -> Result<()> {
                 .upscale(&UpscaleOptions {
                     ansible_verbose,
                     current_inventory: inventory,
+                    desired_auditor_vm_count,
                     desired_bootstrap_node_count,
                     desired_bootstrap_node_vm_count,
                     desired_node_count,
                     desired_node_vm_count,
                     desired_uploader_vm_count,
+                    infra_only,
+                    plan,
                     public_rpc,
                 })
                 .await?;
+
+            if plan {
+                return Ok(());
+            }
 
             println!("Generating new inventory after upscale...");
             let max_retries = 3;

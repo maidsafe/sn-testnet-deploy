@@ -18,16 +18,27 @@ use std::collections::HashSet;
 pub struct UpscaleOptions {
     pub ansible_verbose: bool,
     pub current_inventory: DeploymentInventory,
+    pub desired_auditor_vm_count: Option<u16>,
     pub desired_bootstrap_node_count: Option<u16>,
     pub desired_bootstrap_node_vm_count: Option<u16>,
     pub desired_node_count: Option<u16>,
     pub desired_node_vm_count: Option<u16>,
     pub desired_uploader_vm_count: Option<u16>,
+    pub infra_only: bool,
+    pub plan: bool,
     pub public_rpc: bool,
 }
 
 impl TestnetDeployer {
     pub async fn upscale(&self, options: &UpscaleOptions) -> Result<()> {
+        let desired_auditor_vm_count = options
+            .desired_auditor_vm_count
+            .unwrap_or(options.current_inventory.auditor_vms.len() as u16);
+        if desired_auditor_vm_count < options.current_inventory.auditor_vms.len() as u16 {
+            return Err(Error::InvalidUpscaleDesiredAuditorVmCount);
+        }
+        debug!("Using {desired_auditor_vm_count} for desired auditor node VM count");
+
         let desired_bootstrap_node_vm_count = options
             .desired_bootstrap_node_vm_count
             .unwrap_or(options.current_inventory.bootstrap_node_vms.len() as u16);
@@ -70,8 +81,36 @@ impl TestnetDeployer {
         }
         debug!("Using {desired_node_count} for desired node count");
 
+        if options.plan {
+            let vars = vec![
+                (
+                    "auditor_vm_count".to_string(),
+                    desired_auditor_vm_count.to_string(),
+                ),
+                (
+                    "bootstrap_node_vm_count".to_string(),
+                    desired_bootstrap_node_vm_count.to_string(),
+                ),
+                (
+                    "node_vm_count".to_string(),
+                    desired_node_vm_count.to_string(),
+                ),
+                (
+                    "uploader_vm_count".to_string(),
+                    desired_uploader_vm_count.to_string(),
+                ),
+            ];
+            self.plan(
+                Some(vars),
+                options.current_inventory.environment_type.clone(),
+            )
+            .await?;
+            return Ok(());
+        }
+
         self.create_or_update_infra(
             &options.current_inventory.name,
+            Some(desired_auditor_vm_count),
             Some(desired_bootstrap_node_vm_count),
             Some(desired_node_vm_count),
             Some(desired_uploader_vm_count),
@@ -86,6 +125,10 @@ impl TestnetDeployer {
             println!("Failed to create infra {err:?}");
             err
         })?;
+
+        if options.infra_only {
+            return Ok(());
+        }
 
         let mut n = 1;
         let total = 5;
