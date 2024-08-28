@@ -57,6 +57,11 @@ variable "region" {
   default = "lon1"
 }
 
+variable "auditor_vm_count" {
+  default     = 1
+  description = "The number of auditor droplets"
+}
+
 variable "bootstrap_node_vm_count" {
   default     = 2
   description = "The number of droplets to launch for bootstrap nodes"

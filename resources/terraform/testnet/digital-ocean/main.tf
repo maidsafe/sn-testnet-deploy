@@ -60,8 +60,9 @@ resource "digitalocean_droplet" "build" {
 }
 
 resource "digitalocean_droplet" "auditor" {
+  count    = var.auditor_vm_count
   image    = var.auditor_droplet_image_id
-  name     = "${terraform.workspace}-auditor"
+  name     = "${terraform.workspace}-auditor-${count.index + 1}"
   region   = var.region
   size     = var.node_droplet_size
   backups  = true
