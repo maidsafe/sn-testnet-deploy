@@ -506,6 +506,15 @@ impl TestnetDeployer {
         Ok(())
     }
 
+    pub async fn plan(&self, environment_type: EnvironmentType) -> Result<()> {
+        println!("Selecting {} workspace...", self.environment_name);
+        self.terraform_runner
+            .workspace_select(&self.environment_name)?;
+        self.terraform_runner
+            .plan(Some(environment_type.get_tfvars_filename()))?;
+        Ok(())
+    }
+
     pub async fn start(&self) -> Result<()> {
         self.ansible_provisioner.start_nodes().await?;
         Ok(())

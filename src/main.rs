@@ -252,6 +252,17 @@ enum Commands {
         #[arg(short = 'n', long)]
         name: String,
     },
+    /// Run 'terraform plan' for a given environment.
+    ///
+    /// Useful for reviewing infrastructure changes before deploying them.
+    Plan {
+        /// The name of the environment
+        #[arg(short = 'n', long)]
+        name: String,
+        /// Valid values are "aws" or "digital-ocean".
+        #[clap(long, default_value_t = CloudProvider::DigitalOcean, value_parser = parse_provider, verbatim_doc_comment)]
+        provider: CloudProvider,
+    },
     Setup {},
     /// Run a smoke test against a given network.
     #[clap(name = "smoke-test")]
@@ -1015,6 +1026,23 @@ async fn main() -> Result<()> {
 
             let inventory = DeploymentInventory::read(&inventory_path)?;
             notify_slack(inventory).await?;
+            Ok(())
+        }
+        Commands::Plan { name, provider } => {
+            let testnet_deploy = TestnetDeployBuilder::default()
+                .environment_name(&name)
+                .provider(provider)
+                .build()?;
+            let inventory_service = DeploymentInventoryService::from(testnet_deploy.clone());
+            let inventory = inventory_service
+                .generate_or_retrieve_inventory(&name, true, None)
+                .await?;
+            if inventory.is_empty() {
+                return Err(eyre!("The {name} environment does not exist"));
+            }
+
+            testnet_deploy.init().await?;
+            testnet_deploy.plan(inventory.environment_type).await?;
             Ok(())
         }
         Commands::Setup {} => {
