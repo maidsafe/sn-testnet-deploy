@@ -506,12 +506,16 @@ impl TestnetDeployer {
         Ok(())
     }
 
-    pub async fn plan(&self, environment_type: EnvironmentType) -> Result<()> {
+    pub async fn plan(
+        &self,
+        vars: Option<Vec<(String, String)>>,
+        environment_type: EnvironmentType,
+    ) -> Result<()> {
         println!("Selecting {} workspace...", self.environment_name);
         self.terraform_runner
             .workspace_select(&self.environment_name)?;
         self.terraform_runner
-            .plan(Some(environment_type.get_tfvars_filename()))?;
+            .plan(vars, Some(environment_type.get_tfvars_filename()))?;
         Ok(())
     }
 
@@ -604,9 +608,11 @@ impl TestnetDeployer {
         Ok(())
     }
 
+    #[allow(clippy::too_many_arguments)]
     async fn create_or_update_infra(
         &self,
         name: &str,
+        auditor_vm_count: Option<u16>,
         bootstrap_node_vm_count: Option<u16>,
         node_vm_count: Option<u16>,
         uploader_vm_count: Option<u16>,
@@ -618,6 +624,10 @@ impl TestnetDeployer {
         self.terraform_runner.workspace_select(name)?;
 
         let mut args = Vec::new();
+        if let Some(auditor_vm_count) = auditor_vm_count {
+            args.push(("auditor_vm_count".to_string(), auditor_vm_count.to_string()));
+        }
+
         if let Some(bootstrap_node_vm_count) = bootstrap_node_vm_count {
             args.push((
                 "bootstrap_node_vm_count".to_string(),
