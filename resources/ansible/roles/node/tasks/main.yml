@@ -67,11 +67,16 @@
     metrics_port: "{{ initial_metrics_start_port | int + (current_node_count | default(0)) | int }}"
   when: nodes_to_add | default(0) | int > 0
 
+- name: set default value for use_port_range
+  set_fact:
+    use_port_range: false
+  when: use_port_range is not defined
+
 - name: calculate start port
   set_fact:
     rpc_start_port: "{{ initial_rpc_start_port | int + (current_node_count | default(0)) | int }}"
     metrics_start_port: "{{ initial_metrics_start_port | int + (current_node_count | default(0)) | int }}"
-  when: use_port_range
+  when: use_port_range | bool
 
 - name: calculate end port
   set_fact:
