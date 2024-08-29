@@ -11,8 +11,7 @@ keyed_groups:
     prefix: ''
     separator: ''
 compose:
-  ansible_host: do_networks.v4 | selectattr('type','eq','public')
-    | map(attribute='ip_address') | first
+  ansible_host: do_networks.v4 | selectattr('type','eq','public') | map(attribute='ip_address') | first
 filters:
   - '"environment:env_value" in do_tags'
   - '"type:type_value" in do_tags'
