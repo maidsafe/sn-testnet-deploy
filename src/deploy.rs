@@ -68,7 +68,7 @@ impl TestnetDeployer {
         })?;
 
         let mut n = 1;
-        let mut total = if build_custom_binaries { 9 } else { 8 };
+        let mut total = if build_custom_binaries { 10 } else { 9 };
         if !options.current_inventory.is_empty() {
             total -= 4;
         }
@@ -132,6 +132,22 @@ impl TestnetDeployer {
         {
             Ok(()) => {
                 println!("Provisioned normal nodes");
+            }
+            Err(_) => {
+                node_provision_failed = true;
+            }
+        }
+        n += 1;
+
+        self.ansible_provisioner
+            .print_ansible_run_banner(n, total, "Provision Private Nodes");
+        match self
+            .ansible_provisioner
+            .provision_nodes(&provision_options, &genesis_multiaddr, NodeType::Private)
+            .await
+        {
+            Ok(()) => {
+                println!("Provisioned private nodes");
             }
             Err(_) => {
                 node_provision_failed = true;
