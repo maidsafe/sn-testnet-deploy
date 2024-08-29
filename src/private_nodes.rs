@@ -9,11 +9,13 @@ use crate::{
     error::{Error, Result},
     DeploymentInventory, DeploymentType, TestnetDeployer,
 };
+use std::path::PathBuf;
 
 #[derive(Clone)]
 pub struct PrivateNodeOptions {
     pub ansible_verbose: bool,
     pub current_inventory: DeploymentInventory,
+    pub base_inventory_path: PathBuf,
 }
 
 impl TestnetDeployer {
@@ -53,16 +55,9 @@ impl TestnetDeployer {
 
         let private_vm_inventory = options
             .current_inventory
-            .node_vms
-            .iter()
-            .find(|vm| {
-                vm.name.contains(&format!(
-                    "{}-node-{}",
-                    options.current_inventory.name,
-                    options.current_inventory.node_vms.len()
-                ))
-            })
-            .ok_or_else(|| Error::EmptyInventory(AnsibleInventoryType::Nodes))
+            .private_node_vms
+            .first()
+            .ok_or_else(|| Error::EmptyInventory(AnsibleInventoryType::PrivateNodes))
             .inspect_err(|err| {
                 println!("Failed to obtain the inventory of the last vm: {err:?}")
             })?;
@@ -82,8 +77,11 @@ impl TestnetDeployer {
             })?;
 
         n += 1;
-        self.ansible_provisioner
-            .print_ansible_run_banner(n, total, "Get NAT Gateway inventory");
+        self.ansible_provisioner.print_ansible_run_banner(
+            n,
+            total,
+            "Get NAT Gateway private IP address",
+        );
         let nat_gateway_inventory = self
             .ansible_provisioner
             .ansible_runner
@@ -104,10 +102,11 @@ impl TestnetDeployer {
             "Provision Private Nodes on the last VM",
         );
         self.ansible_provisioner
-            .provision_private_nodes(
+            .provision_home_nodes(
                 &options.current_inventory.name,
-                private_vm_inventory,
                 &nat_gateway_inventory,
+                &options.base_inventory_path,
+                &self.ssh_client.private_key_path,
             )
             .await
             .map_err(|err| {

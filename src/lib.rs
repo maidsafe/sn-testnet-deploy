@@ -577,6 +577,9 @@ impl TestnetDeployer {
         let generic_node_registries = self
             .ansible_provisioner
             .get_node_registries(&AnsibleInventoryType::Nodes)?;
+        let private_node_registries = self
+            .ansible_provisioner
+            .get_node_registries(&AnsibleInventoryType::PrivateNodes)?;
         let genesis_node_registry = self
             .ansible_provisioner
             .get_node_registries(&AnsibleInventoryType::Genesis)?
@@ -584,6 +587,7 @@ impl TestnetDeployer {
 
         bootstrap_node_registries.print();
         generic_node_registries.print();
+        private_node_registries.print();
         genesis_node_registry.print();
 
         Ok(())

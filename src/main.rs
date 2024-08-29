@@ -1588,6 +1588,7 @@ async fn main() -> Result<()> {
                 .setup_private_nodes(&PrivateNodeOptions {
                     ansible_verbose,
                     current_inventory: inventory,
+                    base_inventory_path: inventory_service.inventory_file_path.clone(),
                 })
                 .await?;
 
