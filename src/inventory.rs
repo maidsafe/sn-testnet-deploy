@@ -6,8 +6,8 @@
 
 use crate::{
     ansible::{
-        generate_environment_inventory, provisioning::AnsibleProvisioner, AnsibleInventoryType,
-        AnsibleRunner,
+        generate_environment_inventory, generate_private_node_environment_inventory,
+        provisioning::AnsibleProvisioner, AnsibleInventoryType, AnsibleRunner,
     },
     get_environment_details, get_genesis_multiaddr,
     s3::S3Repository,
@@ -112,15 +112,12 @@ impl DeploymentInventoryService {
         // to be generated for the Ansible run to work correctly.
         //
         // It is an idempotent operation; the files won't be generated if they already exist.
-        generate_environment_inventory(
-            name,
-            &self.inventory_file_path,
-            &self
-                .working_directory_path
-                .join("ansible")
-                .join("inventory"),
-        )
-        .await?;
+        let output_inventory_dir_path = self
+            .working_directory_path
+            .join("ansible")
+            .join("inventory");
+        generate_environment_inventory(name, &self.inventory_file_path, &output_inventory_dir_path)
+            .await?;
 
         let environment_details = match get_environment_details(name, &self.s3_repository).await {
             Ok(details) => details,
@@ -163,14 +160,27 @@ impl DeploymentInventoryService {
             .get_inventory(AnsibleInventoryType::NatGateway, false)
             .await?;
 
+        // Modify the private node inventory to go through NAT gateway if it exists
+        if let Some(_nat_gateway_vm) = nat_gateway_vm.first() {
+            generate_private_node_environment_inventory(
+                name,
+                &self.inventory_file_path,
+                &output_inventory_dir_path,
+            )?;
+        }
+
         let mut node_vm_list = Vec::new();
         let nodes_inventory = self
             .ansible_runner
             .get_inventory(AnsibleInventoryType::Nodes, false)
             .await?;
-        for vm in nodes_inventory.iter() {
-            node_vm_list.push(vm.clone());
+        for vm in nodes_inventory.into_iter() {
+            node_vm_list.push(vm);
         }
+        let private_node_vms = self
+            .ansible_runner
+            .get_inventory(AnsibleInventoryType::PrivateNodes, false)
+            .await?;
 
         let mut bootstrap_vm_list = Vec::new();
         let bootstrap_nodes_inventory = self
@@ -202,6 +212,10 @@ impl DeploymentInventoryService {
             .ansible_provisioner
             .get_node_registries(&AnsibleInventoryType::Nodes)?;
 
+        let private_node_registries = self
+            .ansible_provisioner
+            .get_node_registries(&AnsibleInventoryType::PrivateNodes)?;
+
         let genesis_node_registry = self
             .ansible_provisioner
             .get_node_registries(&AnsibleInventoryType::Genesis)?;
@@ -212,11 +226,13 @@ impl DeploymentInventoryService {
 
         node_registries.extend(bootstrap_node_registries.retrieved_registries.clone());
         node_registries.extend(generic_node_registries.retrieved_registries.clone());
+        node_registries.extend(private_node_registries.retrieved_registries.clone());
         node_registries.extend(genesis_node_registry.retrieved_registries);
         node_registries.extend(auditor_node_registry.retrieved_registries);
 
         failed_node_registry_vms.extend(bootstrap_node_registries.failed_vms);
         failed_node_registry_vms.extend(generic_node_registries.failed_vms);
+        failed_node_registry_vms.extend(private_node_registries.failed_vms);
         failed_node_registry_vms.extend(genesis_node_registry.failed_vms);
         failed_node_registry_vms.extend(auditor_node_registry.failed_vms);
 
@@ -360,6 +376,7 @@ impl DeploymentInventoryService {
             nat_gateway_vm: nat_gateway_vm.first().cloned(),
             node_vms: node_vm_list,
             node_peers,
+            private_node_vms,
             rpc_endpoints: safenode_rpc_endpoints,
             safenodemand_endpoints,
             ssh_user: self.cloud_provider.get_ssh_user(),
@@ -492,6 +509,7 @@ pub struct DeploymentInventory {
     pub nat_gateway_vm: Option<VirtualMachine>,
     pub node_vms: Vec<VirtualMachine>,
     pub node_peers: Vec<String>,
+    pub private_node_vms: Vec<VirtualMachine>,
     pub rpc_endpoints: BTreeMap<String, SocketAddr>,
     pub safenodemand_endpoints: Vec<SocketAddr>,
     pub ssh_user: String,
@@ -517,6 +535,7 @@ impl DeploymentInventory {
             nat_gateway_vm: None,
             node_vms: Vec::new(),
             node_peers: Vec::new(),
+            private_node_vms: Vec::new(),
             rpc_endpoints: BTreeMap::new(),
             safenodemand_endpoints: Vec::new(),
             ssh_user: "root".to_string(),
@@ -658,6 +677,30 @@ impl DeploymentInventory {
         println!("Nodes per VM: {}", self.node_count());
         println!("SSH user: {}", self.ssh_user);
         println!();
+
+        println!("=================");
+        println!("Private Node VMs");
+        println!("=================");
+        for vm in self.private_node_vms.iter() {
+            println!("{}: {}", vm.name, vm.public_ip_addr);
+            if let Some(nat_gateway_vm) = &self.nat_gateway_vm {
+                let ssh = format!(
+                    "ssh -o ProxyCommand=\"ssh -W %h:%p root@{}\" root@{}",
+                    nat_gateway_vm.public_ip_addr, vm.private_ip_addr
+                );
+                println!("SSH using NAT gateway: {ssh}");
+            } else {
+                println!("SSH using public IP");
+            }
+            if self.nat_gateway_vm.is_some() {
+                println!(
+                    "Hint: provide the SSH private key with -i <path-to-private-key> if needed"
+                );
+            }
+        }
+        println!("Nodes per VM: {}", self.node_count());
+
+        println!("SSH user: {}", self.ssh_user);
 
         if !self.uploader_vms.is_empty() {
             println!("============");

@@ -20,7 +20,7 @@ use semver::Version;
 use sn_service_management::NodeRegistry;
 use std::{
     net::{IpAddr, SocketAddr},
-    path::PathBuf,
+    path::{Path, PathBuf},
     time::Instant,
 };
 use walkdir::WalkDir;
@@ -28,16 +28,19 @@ use walkdir::WalkDir;
 const DEFAULT_BETA_ENCRYPTION_KEY: &str =
     "49113d2083f57a976076adbe85decb75115820de1e6e74b47e0429338cef124a";
 
+#[derive(Debug)]
 pub enum NodeType {
     Bootstrap,
     Normal,
+    Private,
 }
 
-impl std::fmt::Display for NodeType {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+impl NodeType {
+    fn telegraph_role(&self) -> &'static str {
         match self {
-            NodeType::Bootstrap => write!(f, "bootstrap_node"),
-            NodeType::Normal => write!(f, "generic_node"),
+            NodeType::Bootstrap => "BOOTSTRAP_NODE",
+            NodeType::Normal => "GENERIC_NODE",
+            NodeType::Private => "NAT_RANDOMIZED_NODE",
         }
     }
 }
@@ -152,6 +155,13 @@ impl AnsibleProvisioner {
         )?;
         self.ansible_runner.run_playbook(
             AnsiblePlaybook::Logs,
+            AnsibleInventoryType::PrivateNodes,
+            Some(format!(
+                "{{ \"env_name\": \"{name}\", \"resources_only\" : \"{resources_only}\" }}"
+            )),
+        )?;
+        self.ansible_runner.run_playbook(
+            AnsiblePlaybook::Logs,
             AnsibleInventoryType::Auditor,
             Some(format!(
                 "{{ \"env_name\": \"{name}\", \"resources_only\" : \"{resources_only}\" }}"
@@ -173,6 +183,11 @@ impl AnsibleProvisioner {
         all_node_inventory.extend(
             self.ansible_runner
                 .get_inventory(AnsibleInventoryType::Nodes, false)
+                .await?,
+        );
+        all_node_inventory.extend(
+            self.ansible_runner
+                .get_inventory(AnsibleInventoryType::PrivateNodes, false)
                 .await?,
         );
         Ok(all_node_inventory)
@@ -257,6 +272,13 @@ impl AnsibleProvisioner {
         safenode_private_ip: IpAddr,
     ) -> Result<()> {
         let start = Instant::now();
+        let nat_gateway_inventory = self
+            .ansible_runner
+            .get_inventory(AnsibleInventoryType::NatGateway, true)
+            .await?;
+        let nat_gateway_ip = nat_gateway_inventory[0].public_ip_addr;
+        self.ssh_client
+            .wait_for_ssh_availability(&nat_gateway_ip, &self.cloud_provider.get_ssh_user())?;
         self.ansible_runner.run_playbook(
             AnsiblePlaybook::NatGateway,
             AnsibleInventoryType::NatGateway,
@@ -279,6 +301,7 @@ impl AnsibleProvisioner {
                 options.bootstrap_node_count,
             ),
             NodeType::Normal => (AnsibleInventoryType::Nodes, options.node_count),
+            NodeType::Private => (AnsibleInventoryType::PrivateNodes, options.node_count),
         };
 
         // For a new deployment, it's quite probable that SSH is available, because this part occurs
@@ -290,7 +313,7 @@ impl AnsibleProvisioner {
             .get_inventory(inventory_type.clone(), true)
             .await?;
 
-        println!("Waiting for SSH availability on {} nodes...", node_type);
+        println!("Waiting for SSH availability on {node_type:?} nodes...");
         for vm in inventory.iter() {
             println!(
                 "Checking SSH availability for {}: {}",
@@ -321,19 +344,18 @@ impl AnsibleProvisioner {
     }
 
     /// Provision private nodes on the provided VMs.
-    pub async fn provision_private_nodes(
+    pub async fn provision_home_nodes(
         &self,
         name: &str,
-        private_vm_inventory: &VirtualMachine,
         nat_gateway_inventory: &VirtualMachine,
+        base_inventory_path: &Path,
+        _ssh_sk_path: &Path,
     ) -> Result<()> {
         let start = Instant::now();
         println!("Provisioning private noes with a custom inventory");
         generate_private_node_environment_inventory(
             name,
-            private_vm_inventory,
-            nat_gateway_inventory,
-            &self.ansible_runner.ssh_sk_path,
+            base_inventory_path,
             &self.ansible_runner.working_directory_path.join("inventory"),
         )?;
         self.ansible_runner.run_playbook(
@@ -447,6 +469,11 @@ impl AnsibleProvisioner {
             AnsibleInventoryType::Nodes,
             None,
         )?;
+        self.ansible_runner.run_playbook(
+            AnsiblePlaybook::StartNodes,
+            AnsibleInventoryType::PrivateNodes,
+            None,
+        )?;
         Ok(())
     }
 
@@ -464,6 +491,11 @@ impl AnsibleProvisioner {
         self.ansible_runner.run_playbook(
             AnsiblePlaybook::Status,
             AnsibleInventoryType::Nodes,
+            None,
+        )?;
+        self.ansible_runner.run_playbook(
+            AnsiblePlaybook::Status,
+            AnsibleInventoryType::PrivateNodes,
             None,
         )?;
         Ok(())
@@ -504,6 +536,11 @@ impl AnsibleProvisioner {
             AnsibleInventoryType::Nodes,
             None,
         )?;
+        self.ansible_runner.run_playbook(
+            AnsiblePlaybook::StartTelegraf,
+            AnsibleInventoryType::PrivateNodes,
+            None,
+        )?;
         Ok(())
     }
 
@@ -542,6 +579,11 @@ impl AnsibleProvisioner {
             AnsibleInventoryType::Nodes,
             None,
         )?;
+        self.ansible_runner.run_playbook(
+            AnsiblePlaybook::StopTelegraf,
+            AnsibleInventoryType::PrivateNodes,
+            None,
+        )?;
         Ok(())
     }
 
@@ -555,6 +597,12 @@ impl AnsibleProvisioner {
             AnsiblePlaybook::UpgradeNodeTelegrafConfig,
             AnsibleInventoryType::Nodes,
             Some(self.build_node_telegraf_upgrade(name, &NodeType::Normal)?),
+        )?;
+
+        self.ansible_runner.run_playbook(
+            AnsiblePlaybook::UpgradeNodeTelegrafConfig,
+            AnsibleInventoryType::PrivateNodes,
+            Some(self.build_node_telegraf_upgrade(name, &NodeType::Private)?),
         )?;
         Ok(())
     }
@@ -605,6 +653,16 @@ impl AnsibleProvisioner {
             Some(options.get_ansible_vars()),
         ) {
             Ok(()) => println!("All generic nodes were successfully upgraded"),
+            Err(_) => {
+                println!("WARNING: some nodes may not have been upgraded or restarted");
+            }
+        }
+        match self.ansible_runner.run_playbook(
+            AnsiblePlaybook::UpgradeNodes,
+            AnsibleInventoryType::PrivateNodes,
+            Some(options.get_ansible_vars()),
+        ) {
+            Ok(()) => println!("All private nodes were successfully upgraded"),
             Err(_) => {
                 println!("WARNING: some nodes may not have been upgraded or restarted");
             }
@@ -671,6 +729,11 @@ impl AnsibleProvisioner {
             AnsibleInventoryType::Nodes,
             Some(extra_vars.build()),
         )?;
+        self.ansible_runner.run_playbook(
+            AnsiblePlaybook::UpgradeNodeManager,
+            AnsibleInventoryType::PrivateNodes,
+            Some(extra_vars.build()),
+        )?;
         Ok(())
     }
 
@@ -690,7 +753,7 @@ impl AnsibleProvisioner {
         let mut extra_vars = ExtraVarsDocBuilder::default();
         extra_vars.add_variable("provider", &self.cloud_provider.to_string());
         extra_vars.add_variable("testnet_name", &options.name);
-        extra_vars.add_variable("node_type", &node_type.to_string());
+        extra_vars.add_variable("node_type", node_type.telegraph_role());
         if bootstrap_multiaddr.is_some() {
             extra_vars.add_variable(
                 "genesis_multiaddr",
@@ -809,7 +872,7 @@ impl AnsibleProvisioner {
     fn build_node_telegraf_upgrade(&self, name: &str, node_type: &NodeType) -> Result<String> {
         let mut extra_vars: ExtraVarsDocBuilder = ExtraVarsDocBuilder::default();
         extra_vars.add_variable("testnet_name", name);
-        extra_vars.add_variable("node_type", &node_type.to_string());
+        extra_vars.add_variable("node_type", node_type.telegraph_role());
         Ok(extra_vars.build())
     }
 
