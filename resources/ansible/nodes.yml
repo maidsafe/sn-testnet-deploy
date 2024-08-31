@@ -34,7 +34,7 @@
       }
     - node-manager
     - node
-    - role: metrics
+    - role: node-metrics
       become: True
 
   tasks:

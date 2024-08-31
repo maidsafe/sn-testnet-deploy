@@ -22,7 +22,7 @@
   git:
     repo: "{{ network_dashboard_github_url }}"
     dest: "{{ network_dashboard_repo_path }}"
-    version: main
+    version: "{{ network_dashboard_branch }}"
     key_file: "{{ network_dashboard_sk_path }}"
     accept_hostkey: yes
   when: not repo_stat.stat.exists
@@ -31,7 +31,7 @@
   git:
     repo: "{{ network_dashboard_github_url }}"
     dest: "{{ network_dashboard_repo_path }}"
-    version: main
+    version: "{{ network_dashboard_branch }}"
     key_file: "{{ network_dashboard_sk_path }}"
     accept_hostkey: yes
     force: yes
@@ -44,47 +44,47 @@
     line: "_telegraf ALL=NOPASSWD: /usr/local/bin/safenode-manager"
     validate: "visudo -cf %s"
 
+- name: copy telegraf environment file
+  copy:
+    src: "{{ network_dashboard_repo_path }}/telegraf/EnvironmentFile/safenodes/telegraf"
+    dest: /etc/default/telegraf
+    remote_src: yes
+
 - name: replace SAFENODE_TESTNET_NAME value
   replace:
-    path: "{{ network_dashboard_repo_path }}/telegraf/EnvironmentFile/telegraf"
+    path: "/etc/default/telegraf"
     regexp: 'SAFENODE_TESTNET_NAME=UNDEFINED'
     replace: 'SAFENODE_TESTNET_NAME={{ testnet_name | upper }}'
 
 - name: replace SAFENODE_HOST_ROLE value
   replace:
-    path: "{{ network_dashboard_repo_path }}/telegraf/EnvironmentFile/telegraf"
+    path: "/etc/default/telegraf"
     regexp: 'SAFENODE_HOST_ROLE=UNDEFINED'
     replace: 'SAFENODE_HOST_ROLE={{ node_type | upper }}'
 
 # The real branch name will be supplied later, when it is available in `safenode`.
 - name: replace SAFENODE_BRANCH_NAME value
   replace:
-    path: "{{ network_dashboard_repo_path }}/telegraf/EnvironmentFile/telegraf"
+    path: "/etc/default/telegraf"
     regexp: "SAFENODE_BRANCH_NAME=UNDEFINED"
     replace: "SAFENODE_BRANCH_NAME=STABLE"
 
 # The real commit hash will be supplied later, when it is available in `safenode`.
 - name: replace SAFENODE_BRANCH_COMMIT value
   replace:
-    path: "{{ network_dashboard_repo_path }}/telegraf/EnvironmentFile/telegraf"
+    path: "/etc/default/telegraf"
     regexp: "SAFENODE_BRANCH_COMMIT=UNDEFINED"
     replace: "SAFENODE_BRANCH_COMMIT=UNDEFINED"
 
-- name: copy telegraf environment file
-  copy:
-    src: "{{ network_dashboard_repo_path }}/telegraf/EnvironmentFile/telegraf"
-    dest: /etc/default/telegraf
-    remote_src: yes
-
 - name: copy telegraf config file
   copy:
-    src: "{{ network_dashboard_repo_path }}/telegraf/ConfigurationFile/telegraf.conf"
+    src: "{{ network_dashboard_repo_path }}/telegraf/ConfigurationFile/safenodes/telegraf.conf"
     dest: /etc/telegraf/telegraf.conf
     remote_src: yes
 
 - name: copy telegraf multi node config file
   copy:
-    src: "{{ network_dashboard_repo_path }}/telegraf/ConfigurationFile/telegraf_safe_multi_node.conf"
+    src: "{{ network_dashboard_repo_path }}/telegraf/ConfigurationFile/safenodes/telegraf_safe_multi_node.conf"
     dest: /etc/telegraf/telegraf.d/telegraf_safe_multi_node.conf
     remote_src: yes
 
