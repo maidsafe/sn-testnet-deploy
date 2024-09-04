@@ -40,11 +40,20 @@
   throttle: 1
   when: not safe_binary.stat.exists
 
-- name: start the uploader script
-  shell: "nohup /home/safe/upload-random-data.sh {{ genesis_multiaddr }} > nohup.out 2>&1 &"
-  args:
-    chdir: /home/safe/
-    executable: /bin/bash
+- name: create systemd service file
+  ansible.builtin.template:
+    src: safe_uploader.service.j2
+    dest: /etc/systemd/system/safe_uploader.service
+    owner: root
+    group: root
+    mode: '0644'
   become: yes
-  become_user: safe
+  when: not safe_binary.stat.exists
+
+- name: start and enable safe_uploader service
+  ansible.builtin.systemd:
+    name: safe_uploader
+    state: started
+    enabled: yes
+  become: yes
   when: not safe_binary.stat.exists
