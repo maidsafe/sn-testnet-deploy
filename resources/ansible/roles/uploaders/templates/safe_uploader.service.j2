@@ -1,0 +1,13 @@
+[Unit]
+Description=Upload Random Data Service
+After=network.target
+
+[Service]
+ExecStart=/home/safe/upload-random-data.sh {{ genesis_multiaddr }}
+User=safe
+Group=safe
+Restart=always
+WorkingDirectory=/home/safe
+
+[Install]
+WantedBy=multi-user.target
