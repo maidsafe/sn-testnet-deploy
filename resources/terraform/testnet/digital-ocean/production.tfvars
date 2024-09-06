@@ -1,5 +1,5 @@
-auditor_vm_count = 1
-bootstrap_droplet_size = "s-4vcpu-8gb"
+auditor_vm_count = 3
+bootstrap_droplet_size = "s-8vcpu-16gb-480gb-intel"
 bootstrap_node_vm_count = 50
 bootstrap_droplet_image_id = 157362431
 node_droplet_size = "s-2vcpu-4gb"
