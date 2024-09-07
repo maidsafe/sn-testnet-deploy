@@ -13,6 +13,7 @@ use dotenv::dotenv;
 use semver::Version;
 use sn_releases::{ReleaseType, SafeReleaseRepoActions};
 use sn_testnet_deploy::{
+    ansible::{AnsibleInventoryType, AnsiblePlaybook},
     deploy::DeployOptions,
     error::Error,
     get_wallet_directory,
@@ -450,6 +451,9 @@ enum Commands {
         #[clap(long, value_parser = parse_provider, verbatim_doc_comment, default_value_t = CloudProvider::DigitalOcean)]
         provider: CloudProvider,
     },
+    /// Manage uploaders for an environment
+    #[clap(name = "uploaders", subcommand)]
+    Uploaders(UploadersCommands),
     /// Clean a deployed testnet environment.
     #[clap(name = "upload-test-data")]
     UploadTestData {
@@ -705,6 +709,28 @@ enum ChurnCommands {
         /// Nodes are restarted at a rate of churn_count/time_frame with random delays between each restart.
         #[clap(long, value_parser = |t: &str| -> Result<Duration> { Ok(t.parse().map(Duration::from_secs)?)}, default_value = "600")]
         time_frame: Duration,
+    },
+}
+
+#[derive(Subcommand, Debug)]
+enum UploadersCommands {
+    /// Start all uploaders for an environment
+    Start {
+        /// The name of the environment
+        #[arg(long)]
+        name: String,
+        /// The cloud provider that was used.
+        #[clap(long, default_value_t = CloudProvider::DigitalOcean, value_parser = parse_provider, verbatim_doc_comment)]
+        provider: CloudProvider,
+    },
+    /// Stop all uploaders for an environment.
+    Stop {
+        /// The name of the environment
+        #[arg(long)]
+        name: String,
+        /// The cloud provider that was used.
+        #[clap(long, default_value_t = CloudProvider::DigitalOcean, value_parser = parse_provider, verbatim_doc_comment)]
+        provider: CloudProvider,
     },
 }
 
@@ -1337,6 +1363,44 @@ async fn main() -> Result<()> {
 
             Ok(())
         }
+        Commands::Uploaders(uploaders_cmd) => match uploaders_cmd {
+            UploadersCommands::Start { name, provider } => {
+                let testnet_deployer = TestnetDeployBuilder::default()
+                    .environment_name(&name)
+                    .provider(provider.clone())
+                    .build()?;
+                let inventory_service = DeploymentInventoryService::from(testnet_deployer.clone());
+                inventory_service
+                    .generate_or_retrieve_inventory(&name, true, None)
+                    .await?;
+
+                let ansible_runner = testnet_deployer.ansible_provisioner.ansible_runner;
+                ansible_runner.run_playbook(
+                    AnsiblePlaybook::StartUploaders,
+                    AnsibleInventoryType::Uploaders,
+                    None,
+                )?;
+                Ok(())
+            }
+            UploadersCommands::Stop { name, provider } => {
+                let testnet_deployer = TestnetDeployBuilder::default()
+                    .environment_name(&name)
+                    .provider(provider.clone())
+                    .build()?;
+                let inventory_service = DeploymentInventoryService::from(testnet_deployer.clone());
+                inventory_service
+                    .generate_or_retrieve_inventory(&name, true, None)
+                    .await?;
+
+                let ansible_runner = testnet_deployer.ansible_provisioner.ansible_runner;
+                ansible_runner.run_playbook(
+                    AnsiblePlaybook::StopUploaders,
+                    AnsibleInventoryType::Uploaders,
+                    None,
+                )?;
+                Ok(())
+            }
+        },
         Commands::UploadTestData { name, safe_version } => {
             let inventory_path = get_data_directory()?.join(format!("{name}-inventory.json"));
             if !inventory_path.exists() {

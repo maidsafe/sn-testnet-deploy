@@ -1,0 +1,10 @@
+---
+- name: ensure the safe uploader service is started
+  hosts: all
+  become: True
+  tasks:
+    - name: start safe uploader service
+      systemd:
+        name: safe_uploader
+        enabled: yes
+        state: started

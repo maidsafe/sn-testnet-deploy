@@ -116,11 +116,15 @@ pub enum AnsiblePlaybook {
     /// It can be necessary for running upgrades, since we will want to re-enable Telegraf after the
     /// upgrade.
     StartTelegraf,
+    /// This playbook will start the uploaders on each machine.
+    StartUploaders,
     /// This playbook will stop the Telegraf service running on each machine.
     ///
     /// It can be necessary for running upgrades, since Telegraf will run `safenode-manager
     /// status`, which writes to the registry file and can interfere with an upgrade.
     StopTelegraf,
+    /// This playbook will stop the uploaders on each machine.
+    StopUploaders,
     /// The upgrade faucet playbook will upgrade the faucet to the latest version.
     ///
     /// Use in combination with `AnsibleInventoryType::Genesis`.
@@ -155,8 +159,10 @@ impl AnsiblePlaybook {
             AnsiblePlaybook::RpcClient => "safenode_rpc_client.yml".to_string(),
             AnsiblePlaybook::StartNodes => "start_nodes.yml".to_string(),
             AnsiblePlaybook::StartTelegraf => "start_telegraf.yml".to_string(),
+            AnsiblePlaybook::StartUploaders => "start_uploaders.yml".to_string(),
             AnsiblePlaybook::Status => "node_status.yml".to_string(),
             AnsiblePlaybook::StopTelegraf => "stop_telegraf.yml".to_string(),
+            AnsiblePlaybook::StopUploaders => "stop_uploaders.yml".to_string(),
             AnsiblePlaybook::UpgradeFaucet => "upgrade_faucet.yml".to_string(),
             AnsiblePlaybook::UpgradeNodeManager => "upgrade_node_manager.yml".to_string(),
             AnsiblePlaybook::UpgradeNodes => "upgrade_nodes.yml".to_string(),

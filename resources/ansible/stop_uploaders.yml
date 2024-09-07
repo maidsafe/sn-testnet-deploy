@@ -1,0 +1,10 @@
+---
+- name: ensure the safe uploader service is stopped
+  hosts: all
+  become: True
+  tasks:
+    - name: stop safe uploader service
+      systemd:
+        name: safe_uploader
+        enabled: yes
+        state: stopped
