@@ -1,0 +1,6 @@
+---
+- name: stop the faucet using the node manager
+  hosts: all
+  tasks:
+    - name: stop faucet
+      ansible.builtin.command: safenode-manager faucet stop

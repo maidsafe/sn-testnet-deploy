@@ -111,6 +111,8 @@ pub enum AnsiblePlaybook {
     ///
     /// Useful to determine the state of all the nodes in a deployment.
     Status,
+    /// This playbook will start the faucet for the environment.
+    StartFaucet,
     /// This playbook will start the Telegraf service on each machine.
     ///
     /// It can be necessary for running upgrades, since we will want to re-enable Telegraf after the
@@ -118,6 +120,8 @@ pub enum AnsiblePlaybook {
     StartTelegraf,
     /// This playbook will start the uploaders on each machine.
     StartUploaders,
+    /// This playbook will stop the faucet for the environment.
+    StopFaucet,
     /// This playbook will stop the Telegraf service running on each machine.
     ///
     /// It can be necessary for running upgrades, since Telegraf will run `safenode-manager
@@ -157,10 +161,12 @@ impl AnsiblePlaybook {
             AnsiblePlaybook::NodeManagerInventory => "node_manager_inventory.yml".to_string(),
             AnsiblePlaybook::Nodes => "nodes.yml".to_string(),
             AnsiblePlaybook::RpcClient => "safenode_rpc_client.yml".to_string(),
+            AnsiblePlaybook::StartFaucet => "start_faucet.yml".to_string(),
             AnsiblePlaybook::StartNodes => "start_nodes.yml".to_string(),
             AnsiblePlaybook::StartTelegraf => "start_telegraf.yml".to_string(),
             AnsiblePlaybook::StartUploaders => "start_uploaders.yml".to_string(),
             AnsiblePlaybook::Status => "node_status.yml".to_string(),
+            AnsiblePlaybook::StopFaucet => "stop_faucet.yml".to_string(),
             AnsiblePlaybook::StopTelegraf => "stop_telegraf.yml".to_string(),
             AnsiblePlaybook::StopUploaders => "stop_uploaders.yml".to_string(),
             AnsiblePlaybook::UpgradeFaucet => "upgrade_faucet.yml".to_string(),

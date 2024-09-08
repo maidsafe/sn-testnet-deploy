@@ -1,0 +1,6 @@
+---
+- name: start the faucet using the node manager
+  hosts: all
+  tasks:
+    - name: start faucet
+      ansible.builtin.command: safenode-manager faucet start

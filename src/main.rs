@@ -223,6 +223,9 @@ enum Commands {
         #[clap(long)]
         uploader_vm_count: Option<u16>,
     },
+    /// Manage the faucet for an environment
+    #[clap(name = "faucet", subcommand)]
+    Faucet(FaucetCommands),
     Inventory {
         /// If set to true, the inventory will be regenerated.
         ///
@@ -734,6 +737,28 @@ enum UploadersCommands {
     },
 }
 
+#[derive(Subcommand, Debug)]
+enum FaucetCommands {
+    /// Start the faucet for the environment
+    Start {
+        /// The name of the environment
+        #[arg(long)]
+        name: String,
+        /// The cloud provider that was used.
+        #[clap(long, default_value_t = CloudProvider::DigitalOcean, value_parser = parse_provider, verbatim_doc_comment)]
+        provider: CloudProvider,
+    },
+    /// Stop the faucet for the environment
+    Stop {
+        /// The name of the environment
+        #[arg(long)]
+        name: String,
+        /// The cloud provider that was used.
+        #[clap(long, default_value_t = CloudProvider::DigitalOcean, value_parser = parse_provider, verbatim_doc_comment)]
+        provider: CloudProvider,
+    },
+}
+
 #[tokio::main]
 async fn main() -> Result<()> {
     color_eyre::install()?;
@@ -893,6 +918,44 @@ async fn main() -> Result<()> {
 
             Ok(())
         }
+        Commands::Faucet(uploaders_cmd) => match uploaders_cmd {
+            FaucetCommands::Start { name, provider } => {
+                let testnet_deployer = TestnetDeployBuilder::default()
+                    .environment_name(&name)
+                    .provider(provider.clone())
+                    .build()?;
+                let inventory_service = DeploymentInventoryService::from(testnet_deployer.clone());
+                inventory_service
+                    .generate_or_retrieve_inventory(&name, true, None)
+                    .await?;
+
+                let ansible_runner = testnet_deployer.ansible_provisioner.ansible_runner;
+                ansible_runner.run_playbook(
+                    AnsiblePlaybook::StartFaucet,
+                    AnsibleInventoryType::Genesis,
+                    None,
+                )?;
+                Ok(())
+            }
+            FaucetCommands::Stop { name, provider } => {
+                let testnet_deployer = TestnetDeployBuilder::default()
+                    .environment_name(&name)
+                    .provider(provider.clone())
+                    .build()?;
+                let inventory_service = DeploymentInventoryService::from(testnet_deployer.clone());
+                inventory_service
+                    .generate_or_retrieve_inventory(&name, true, None)
+                    .await?;
+
+                let ansible_runner = testnet_deployer.ansible_provisioner.ansible_runner;
+                ansible_runner.run_playbook(
+                    AnsiblePlaybook::StopFaucet,
+                    AnsibleInventoryType::Genesis,
+                    None,
+                )?;
+                Ok(())
+            }
+        },
         Commands::Inventory {
             force_regeneration,
             name,
