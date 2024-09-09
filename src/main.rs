@@ -13,7 +13,7 @@ use dotenv::dotenv;
 use semver::Version;
 use sn_releases::{ReleaseType, SafeReleaseRepoActions};
 use sn_testnet_deploy::{
-    ansible::{AnsibleInventoryType, AnsiblePlaybook},
+    ansible::{extra_vars::ExtraVarsDocBuilder, AnsibleInventoryType, AnsiblePlaybook},
     deploy::DeployOptions,
     error::Error,
     get_wallet_directory,
@@ -27,6 +27,7 @@ use sn_testnet_deploy::{
     upscale::UpscaleOptions,
     BinaryOption, CloudProvider, EnvironmentType, LogFormat, TestnetDeployBuilder, UpgradeOptions,
 };
+use std::net::IpAddr;
 use std::time::Duration;
 
 #[derive(Parser, Debug)]
@@ -739,6 +740,22 @@ enum UploadersCommands {
 
 #[derive(Subcommand, Debug)]
 enum FaucetCommands {
+    /// Fund the uploaders from the faucet
+    ///
+    /// This command requires the faucet to be running, so run the 'faucet start' command first.
+    FundUploaders {
+        /// The name of the environment
+        #[arg(long)]
+        name: String,
+        /// The cloud provider that was used
+        #[clap(long, default_value_t = CloudProvider::DigitalOcean, value_parser = parse_provider, verbatim_doc_comment)]
+        provider: CloudProvider,
+        /// Set to a non-zero value to fund each uploader wallet multiple times.
+        ///
+        /// The faucet will distribute one token on each playbook run.
+        #[clap(long, default_value_t = 0)]
+        repeat: u8,
+    },
     /// Start the faucet for the environment
     Start {
         /// The name of the environment
@@ -919,6 +936,37 @@ async fn main() -> Result<()> {
             Ok(())
         }
         Commands::Faucet(uploaders_cmd) => match uploaders_cmd {
+            FaucetCommands::FundUploaders {
+                name,
+                provider,
+                repeat,
+            } => {
+                let testnet_deployer = TestnetDeployBuilder::default()
+                    .ansible_forks(1)
+                    .environment_name(&name)
+                    .provider(provider.clone())
+                    .build()?;
+                let inventory_service = DeploymentInventoryService::from(testnet_deployer.clone());
+                let inventory = inventory_service
+                    .generate_or_retrieve_inventory(&name, true, None)
+                    .await?;
+
+                let ansible_runner = testnet_deployer.ansible_provisioner.ansible_runner;
+
+                let playbook_runs = repeat + 1;
+                for _ in 0..playbook_runs {
+                    ansible_runner.run_playbook(
+                        AnsiblePlaybook::FundUploaders,
+                        AnsibleInventoryType::Uploaders,
+                        Some(build_fund_faucet_extra_vars_doc(
+                            &inventory.get_genesis_ip()?,
+                            &inventory.genesis_multiaddr,
+                        )?),
+                    )?;
+                }
+
+                Ok(())
+            }
             FaucetCommands::Start { name, provider } => {
                 let testnet_deployer = TestnetDeployBuilder::default()
                     .environment_name(&name)
@@ -1745,4 +1793,14 @@ fn get_custom_inventory(
         custom_vms.push((name.clone(), *ip));
     }
     Ok(custom_vms)
+}
+
+fn build_fund_faucet_extra_vars_doc(
+    genesis_ip: &IpAddr,
+    genesis_multiaddr: &str,
+) -> Result<String> {
+    let mut extra_vars = ExtraVarsDocBuilder::default();
+    extra_vars.add_variable("genesis_addr", &genesis_ip.to_string());
+    extra_vars.add_variable("genesis_multiaddr", genesis_multiaddr);
+    Ok(extra_vars.build())
 }

@@ -15,7 +15,10 @@ use crate::{
     terraform::TerraformRunner,
     BinaryOption, CloudProvider, EnvironmentType, TestnetDeployer,
 };
-use color_eyre::{eyre::eyre, Result};
+use color_eyre::{
+    eyre::{eyre, OptionExt},
+    Result,
+};
 use rand::seq::IteratorRandom;
 use serde::{Deserialize, Serialize};
 use sn_service_management::{NodeRegistry, ServiceStatus};
@@ -646,6 +649,14 @@ impl DeploymentInventory {
             }
         }
         Ok(())
+    }
+
+    pub fn get_genesis_ip(&self) -> Result<IpAddr> {
+        self.misc_vms
+            .iter()
+            .find(|(name, _)| name.contains("genesis"))
+            .map(|(_, ip)| *ip)
+            .ok_or_eyre("Genesis node not found in inventory. This is a critical error.")
     }
 }
 
