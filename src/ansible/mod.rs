@@ -72,6 +72,8 @@ pub enum AnsiblePlaybook {
     ///
     /// Use in combination with `AnsibleInventoryType::Genesis`.
     Faucet,
+    /// This playbook will fund the uploaders using the faucet.
+    FundUploaders,
     /// The genesis playbook will use the node manager to setup the genesis node, which the other
     /// nodes will bootstrap against.
     ///
@@ -156,6 +158,7 @@ impl AnsiblePlaybook {
             AnsiblePlaybook::Build => "build.yml".to_string(),
             AnsiblePlaybook::Genesis => "genesis_node.yml".to_string(),
             AnsiblePlaybook::Faucet => "faucet.yml".to_string(),
+            AnsiblePlaybook::FundUploaders => "fund_uploaders.yml".to_string(),
             AnsiblePlaybook::Logs => "logs.yml".to_string(),
             AnsiblePlaybook::Logstash => "logstash.yml".to_string(),
             AnsiblePlaybook::NodeManagerInventory => "node_manager_inventory.yml".to_string(),

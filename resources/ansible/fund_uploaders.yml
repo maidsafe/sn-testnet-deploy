@@ -1,0 +1,20 @@
+---
+- name: fund uploaders
+  hosts: all
+  become: yes
+  become_user: safe
+  vars:
+    genesis_multiaddr: "{{ genesis_multiaddr }}"
+    genesis_addr: "{{ genesis_addr }}"
+
+  tasks:
+    - name: get funds
+      command:
+        cmd: "safe --peer {{ genesis_multiaddr }} wallet get-faucet {{ genesis_addr }}:8000"
+      register: faucet_result
+      changed_when: faucet_result.rc == 0
+      failed_when: faucet_result.rc != 0
+
+    - name: display result
+      debug:
+        var: faucet_result.stdout_lines
