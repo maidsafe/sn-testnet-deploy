@@ -460,14 +460,14 @@ impl AnsibleProvisioner {
         Ok(())
     }
 
-    pub async fn upgrade_telegraf(&self, name: &str) -> Result<()> {
+    pub async fn upgrade_node_telegraf(&self, name: &str) -> Result<()> {
         self.ansible_runner.run_playbook(
-            AnsiblePlaybook::UpgradeTelegrafConfig,
+            AnsiblePlaybook::UpgradeNodeTelegrafConfig,
             AnsibleInventoryType::BootstrapNodes,
             Some(self.build_telegraf_upgrade(name, &NodeType::Bootstrap)?),
         )?;
         self.ansible_runner.run_playbook(
-            AnsiblePlaybook::UpgradeTelegrafConfig,
+            AnsiblePlaybook::UpgradeNodeTelegrafConfig,
             AnsibleInventoryType::Nodes,
             Some(self.build_telegraf_upgrade(name, &NodeType::Normal)?),
         )?;

@@ -1,5 +1,5 @@
 ---
-- name: upgrade the telegraf configuration
+- name: upgrade the node telegraf configuration
   hosts: all
   roles:
     - role: node-metrics

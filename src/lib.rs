@@ -583,8 +583,8 @@ impl TestnetDeployer {
         Ok(())
     }
 
-    pub async fn upgrade_telegraf(&self, name: &str) -> Result<()> {
-        self.ansible_provisioner.upgrade_telegraf(name).await?;
+    pub async fn upgrade_node_telegraf(&self, name: &str) -> Result<()> {
+        self.ansible_provisioner.upgrade_node_telegraf(name).await?;
         Ok(())
     }
 
