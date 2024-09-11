@@ -464,12 +464,21 @@ impl AnsibleProvisioner {
         self.ansible_runner.run_playbook(
             AnsiblePlaybook::UpgradeNodeTelegrafConfig,
             AnsibleInventoryType::BootstrapNodes,
-            Some(self.build_telegraf_upgrade(name, &NodeType::Bootstrap)?),
+            Some(self.build_node_telegraf_upgrade(name, &NodeType::Bootstrap)?),
         )?;
         self.ansible_runner.run_playbook(
             AnsiblePlaybook::UpgradeNodeTelegrafConfig,
             AnsibleInventoryType::Nodes,
-            Some(self.build_telegraf_upgrade(name, &NodeType::Normal)?),
+            Some(self.build_node_telegraf_upgrade(name, &NodeType::Normal)?),
+        )?;
+        Ok(())
+    }
+
+    pub async fn upgrade_uploader_telegraf(&self, name: &str) -> Result<()> {
+        self.ansible_runner.run_playbook(
+            AnsiblePlaybook::UpgradeUploaderTelegrafConfig,
+            AnsibleInventoryType::Uploaders,
+            Some(self.build_uploader_telegraf_upgrade(name)?),
         )?;
         Ok(())
     }
@@ -712,10 +721,16 @@ impl AnsibleProvisioner {
         Ok(extra_vars.build())
     }
 
-    fn build_telegraf_upgrade(&self, name: &str, node_type: &NodeType) -> Result<String> {
+    fn build_node_telegraf_upgrade(&self, name: &str, node_type: &NodeType) -> Result<String> {
         let mut extra_vars: ExtraVarsDocBuilder = ExtraVarsDocBuilder::default();
         extra_vars.add_variable("testnet_name", name);
         extra_vars.add_variable("node_type", &node_type.to_string());
+        Ok(extra_vars.build())
+    }
+
+    fn build_uploader_telegraf_upgrade(&self, name: &str) -> Result<String> {
+        let mut extra_vars: ExtraVarsDocBuilder = ExtraVarsDocBuilder::default();
+        extra_vars.add_variable("testnet_name", name);
         Ok(extra_vars.build())
     }
 }

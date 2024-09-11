@@ -75,11 +75,18 @@
     dest: /etc/telegraf/telegraf.conf
     remote_src: yes
 
-- name: copy telegraf multi node config file
+- name: copy telegraf uploader config file
   copy:
     src: "{{ network_dashboard_repo_path }}/telegraf/ConfigurationFile/uploaders/telegraf_safe_uploader_node.conf"
     dest: /etc/telegraf/telegraf.d/telegraf_safe_uploader_node.conf
     remote_src: yes
+
+- name: add telegraf user to sudoers for safe command
+  lineinfile:
+    path: /etc/sudoers
+    line: '_telegraf ALL=(safe) NOPASSWD: /usr/local/bin/safe'
+    validate: '/usr/sbin/visudo -cf %s'
+    state: present
 
 - name: start telegraf service
   systemd:

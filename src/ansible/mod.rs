@@ -143,8 +143,10 @@ pub enum AnsiblePlaybook {
     ///
     /// Use in combination with `AnsibleInventoryType::Genesis` or `AnsibleInventoryType::Nodes`.
     UpgradeNodes,
-    /// Update the Telegraf configuration to the latest version in the repository.
+    /// Update the node Telegraf configuration to the latest version in the repository.
     UpgradeNodeTelegrafConfig,
+    /// Update the uploader Telegraf configuration to the latest version in the repository.
+    UpgradeUploaderTelegrafConfig,
     /// The uploader playbook will setup the uploader scripts on the uploader VMs.
     ///
     /// Use in combination with `AnsibleInventoryType::Uploaders`.
@@ -177,6 +179,9 @@ impl AnsiblePlaybook {
             AnsiblePlaybook::UpgradeNodes => "upgrade_nodes.yml".to_string(),
             AnsiblePlaybook::UpgradeNodeTelegrafConfig => {
                 "upgrade_node_telegraf_config.yml".to_string()
+            }
+            AnsiblePlaybook::UpgradeUploaderTelegrafConfig => {
+                "upgrade_uploader_telegraf_config.yml".to_string()
             }
             AnsiblePlaybook::Uploaders => "uploaders.yml".to_string(),
         }

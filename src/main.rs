@@ -442,9 +442,22 @@ enum Commands {
         #[arg(short = 'v', long)]
         version: String,
     },
-    /// Upgrade the Telegraf configuration on an environment.
+    /// Upgrade the node Telegraf configuration on an environment.
     #[clap(name = "upgrade-node-telegraf-config")]
     UpgradeNodeTelegrafConfig {
+        /// Maximum number of forks Ansible will use to execute tasks on target hosts.
+        #[clap(long, default_value_t = 50)]
+        forks: usize,
+        /// The name of the environment.
+        #[arg(short = 'n', long)]
+        name: String,
+        /// The cloud provider for the environment.
+        #[clap(long, value_parser = parse_provider, verbatim_doc_comment, default_value_t = CloudProvider::DigitalOcean)]
+        provider: CloudProvider,
+    },
+    /// Upgrade the uploader Telegraf configuration on an environment.
+    #[clap(name = "upgrade-uploader-telegraf-config")]
+    UpgradeUploaderTelegrafConfig {
         /// Maximum number of forks Ansible will use to execute tasks on target hosts.
         #[clap(long, default_value_t = 50)]
         forks: usize,
@@ -1471,6 +1484,32 @@ async fn main() -> Result<()> {
             }
 
             testnet_deploy.upgrade_node_telegraf(&name).await?;
+
+            Ok(())
+        }
+        Commands::UpgradeUploaderTelegrafConfig {
+            forks,
+            name,
+            provider,
+        } => {
+            let testnet_deploy = TestnetDeployBuilder::default()
+                .ansible_forks(forks)
+                .environment_name(&name)
+                .provider(provider.clone())
+                .build()?;
+
+            // This is required in the case where the command runs in a remote environment, where
+            // there won't be an existing inventory, which is required to retrieve the node
+            // registry files used to determine the status.
+            let inventory_service = DeploymentInventoryService::from(testnet_deploy.clone());
+            let inventory = inventory_service
+                .generate_or_retrieve_inventory(&name, true, None)
+                .await?;
+            if inventory.is_empty() {
+                return Err(eyre!("The {name} environment does not exist"));
+            }
+
+            testnet_deploy.upgrade_uploader_telegraf(&name).await?;
 
             Ok(())
         }

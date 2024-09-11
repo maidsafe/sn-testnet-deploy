@@ -1,0 +1,12 @@
+---
+- name: upgrade the uploader telegraf configuration
+  hosts: all
+  roles:
+    - role: uploader-metrics
+      become: True
+  tasks:
+    - name: restart telegraf service
+      systemd:
+        name: telegraf
+        enabled: yes
+        state: restarted
