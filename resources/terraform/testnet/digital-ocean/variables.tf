@@ -39,7 +39,7 @@ variable "auditor_droplet_image_id" {
 }
 
 variable "build_droplet_image_id" {
-  default = "156286538"
+  default = "165140612"
 }
 
 variable "bootstrap_droplet_image_id" {

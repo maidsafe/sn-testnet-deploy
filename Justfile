@@ -1,5 +1,13 @@
 #!/usr/bin/env just --justfile
 
+build-rust-build-image:
+  #!/usr/bin/env bash
+  (
+    cd resources/packer/build
+    packer init .
+    packer build build.pkr.hcl
+  )
+
 build-staging-bootstrap-image:
   #!/usr/bin/env bash
   (
