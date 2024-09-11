@@ -57,11 +57,11 @@ build {
     destination = "/tmp/ansible-vault-password"
   }
   provisioner "shell" {
-    script = "../scripts/install_ansible.sh"
+    script = "../../scripts/install_ansible.sh"
   }
   provisioner "ansible-local" {
-    playbook_dir = "../ansible"
-    playbook_file = "../ansible/create_build_image.yml"
+    playbook_dir = "../../ansible"
+    playbook_file = "../../ansible/create_build_image.yml"
     extra_arguments = [
       "--vault-password-file=/tmp/ansible-vault-password",
       "--extra-vars",
