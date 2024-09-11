@@ -588,6 +588,13 @@ impl TestnetDeployer {
         Ok(())
     }
 
+    pub async fn upgrade_uploader_telegraf(&self, name: &str) -> Result<()> {
+        self.ansible_provisioner
+            .upgrade_uploader_telegraf(name)
+            .await?;
+        Ok(())
+    }
+
     pub async fn clean(&self) -> Result<()> {
         let environment_type =
             get_environment_type(&self.environment_name, &self.s3_repository).await?;
