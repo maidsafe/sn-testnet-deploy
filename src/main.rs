@@ -443,8 +443,8 @@ enum Commands {
         version: String,
     },
     /// Upgrade the Telegraf configuration on an environment.
-    #[clap(name = "upgrade-telegraf")]
-    UpgradeTelegraf {
+    #[clap(name = "upgrade-node-telegraf-config")]
+    UpgradeNodeTelegrafConfig {
         /// Maximum number of forks Ansible will use to execute tasks on target hosts.
         #[clap(long, default_value_t = 50)]
         forks: usize,
@@ -1448,7 +1448,7 @@ async fn main() -> Result<()> {
                 .await?;
             Ok(())
         }
-        Commands::UpgradeTelegraf {
+        Commands::UpgradeNodeTelegrafConfig {
             forks,
             name,
             provider,
@@ -1470,7 +1470,7 @@ async fn main() -> Result<()> {
                 return Err(eyre!("The {name} environment does not exist"));
             }
 
-            testnet_deploy.upgrade_telegraf(&name).await?;
+            testnet_deploy.upgrade_node_telegraf(&name).await?;
 
             Ok(())
         }
