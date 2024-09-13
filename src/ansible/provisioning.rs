@@ -661,7 +661,7 @@ impl AnsibleProvisioner {
             extra_vars.add_variable("action", "start");
         }
         extra_vars.add_node_manager_url(&options.name, &options.binary_option);
-        extra_vars.add_faucet_url_or_version(&options.name, &options.binary_option);
+        extra_vars.add_faucet_url_or_version(&options.name, &options.binary_option)?;
         Ok(extra_vars.build())
     }
 
@@ -695,7 +695,7 @@ impl AnsibleProvisioner {
                 .unwrap_or(&DEFAULT_BETA_ENCRYPTION_KEY.to_string()),
         );
         extra_vars.add_node_manager_url(&options.name, &options.binary_option);
-        extra_vars.add_sn_auditor_url_or_version(&options.name, &options.binary_option);
+        extra_vars.add_sn_auditor_url_or_version(&options.name, &options.binary_option)?;
         Ok(extra_vars.build())
     }
 
@@ -711,7 +711,7 @@ impl AnsibleProvisioner {
         extra_vars.add_variable("testnet_name", &options.name);
         extra_vars.add_variable("genesis_multiaddr", genesis_multiaddr);
         extra_vars.add_variable("faucet_address", &faucet_address);
-        extra_vars.add_safe_url_or_version(&options.name, &options.binary_option);
+        extra_vars.add_safe_url_or_version(&options.name, &options.binary_option)?;
         Ok(extra_vars.build())
     }
 
