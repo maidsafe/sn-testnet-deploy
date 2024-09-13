@@ -156,11 +156,11 @@ pub enum BinaryOption {
     },
     /// Pre-built, versioned binaries will be fetched from S3.
     Versioned {
-        faucet_version: Version,
-        safe_version: Version,
+        faucet_version: Option<Version>,
+        safe_version: Option<Version>,
         safenode_version: Version,
         safenode_manager_version: Version,
-        sn_auditor_version: Version,
+        sn_auditor_version: Option<Version>,
     },
 }
 
@@ -870,14 +870,14 @@ pub async fn notify_slack(inventory: DeploymentInventory) -> Result<()> {
             ref sn_auditor_version,
         } => {
             message.push_str("*Version Details*\n");
-            message.push_str(&format!("faucet version: {}\n", faucet_version));
-            message.push_str(&format!("safe version: {}\n", safe_version));
-            message.push_str(&format!("safenode version: {}\n", safenode_version));
+            message.push_str(&format!("faucet version: {}\n", faucet_version.as_ref().map_or("None".to_string(), |v| v.to_string())));
+            message.push_str(&format!("safe version: {}\n", safe_version.as_ref().map_or("None".to_string(), |v| v.to_string())));
+            message.push_str(&format!("safenode version: {}\n", safenode_version.to_string()));
             message.push_str(&format!(
                 "safenode-manager version: {}\n",
-                safenode_manager_version
+                safenode_manager_version.to_string()
             ));
-            message.push_str(&format!("sn_auditor version: {}\n", sn_auditor_version));
+            message.push_str(&format!("sn_auditor version: {}\n", sn_auditor_version.as_ref().map_or("None".to_string(), |v| v.to_string())));
         }
     }
 

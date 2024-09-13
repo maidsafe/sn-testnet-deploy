@@ -108,6 +108,12 @@ pub enum Error {
         "Could not convert from DeployOptions to ProvisionOptions: node count must have a value"
     )]
     MissingNodeCount,
+    #[error("This deployment does not have an auditor. It may be a bootstrap deployment.")]
+    NoAuditorError,
+    #[error("This deployment does not have a faucet. It may be a bootstrap deployment.")]
+    NoFaucetError,
+    #[error("This deployment does not have any uploaders. It may be a bootstrap deployment.")]
+    NoUploadersError,
     #[error(transparent)]
     ReqwestError(#[from] reqwest::Error),
     #[error(transparent)]

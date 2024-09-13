@@ -291,11 +291,11 @@ impl DeploymentInventoryService {
             let sn_auditor_version = &auditor_node_registry.auditor.as_ref().unwrap().version;
 
             BinaryOption::Versioned {
-                safe_version: "0.0.1".parse()?, // todo: store safe version in the safenodeman registry?
-                faucet_version: faucet_version.parse()?,
+                safe_version: Some("0.0.1".parse()?), // todo: store safe version in the safenodeman registry?
+                faucet_version: Some(faucet_version.parse()?),
                 safenode_version: safenode_version.parse()?,
                 safenode_manager_version: safenode_manager_version.parse()?,
-                sn_auditor_version: sn_auditor_version.parse()?,
+                sn_auditor_version: Some(sn_auditor_version.parse()?),
             }
         };
 
@@ -552,11 +552,11 @@ impl DeploymentInventory {
                 println!("===============");
                 println!("Version Details");
                 println!("===============");
-                println!("faucet version: {faucet_version}");
-                println!("safe version: {safe_version}");
-                println!("safenode version: {safenode_version}");
-                println!("safenode-manager version: {safenode_manager_version}");
-                println!("sn_auditor version: {sn_auditor_version}");
+                println!("faucet version: {}", faucet_version.as_ref().map_or("none".to_string(), |v| v.to_string()));
+                println!("safe version: {}", safe_version.as_ref().map_or("none".to_string(), |v| v.to_string()));
+                println!("safenode version: {}", safenode_version);
+                println!("safenode-manager version: {}", safenode_manager_version);
+                println!("sn_auditor version: {}", sn_auditor_version.as_ref().map_or("none".to_string(), |v| v.to_string()));
                 println!();
             }
         }

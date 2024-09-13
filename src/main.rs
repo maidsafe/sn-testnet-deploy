@@ -1725,11 +1725,11 @@ async fn get_binary_option(
         let sn_auditor_version =
             get_version_from_option(sn_auditor_version, &ReleaseType::SnAuditor).await?;
         BinaryOption::Versioned {
-            faucet_version,
-            safe_version,
+            faucet_version: Some(faucet_version),
+            safe_version: Some(safe_version),
             safenode_version,
             safenode_manager_version,
-            sn_auditor_version,
+            sn_auditor_version: Some(sn_auditor_version),
         }
     } else {
         // Unwraps are justified here because it's already been asserted that both must have

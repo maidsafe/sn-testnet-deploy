@@ -3,7 +3,7 @@
 //
 // This SAFE Network Software is licensed under the BSD-3-Clause license.
 // Please see the LICENSE file for more details.
-use crate::BinaryOption;
+use crate::{BinaryOption, Error, Result};
 use std::collections::HashMap;
 
 const NODE_S3_BUCKET_URL: &str = "https://sn-node.s3.eu-west-2.amazonaws.com";
@@ -111,7 +111,7 @@ impl ExtraVarsDocBuilder {
         &mut self,
         deployment_name: &str,
         binary_option: &BinaryOption,
-    ) {
+    ) -> Result<()> {
         match binary_option {
             BinaryOption::BuildFromSource {
                 repo_owner, branch, ..
@@ -125,10 +125,17 @@ impl ExtraVarsDocBuilder {
                     branch,
                     repo_owner,
                 );
+                Ok(())
             }
-            BinaryOption::Versioned { faucet_version, .. } => self
-                .variables
-                .push(("version".to_string(), faucet_version.to_string())),
+            BinaryOption::Versioned { faucet_version, .. } => {
+                match faucet_version {
+                    Some(version) => {
+                        self.variables.push(("version".to_string(), version.to_string()));
+                        Ok(())
+                    }
+                    None => Err(Error::NoFaucetError),
+                }
+            }
         }
     }
 
@@ -220,7 +227,7 @@ impl ExtraVarsDocBuilder {
         &mut self,
         deployment_name: &str,
         binary_option: &BinaryOption,
-    ) {
+    ) -> Result<(), Error> {
         match binary_option {
             BinaryOption::BuildFromSource {
                 repo_owner, branch, ..
@@ -234,16 +241,23 @@ impl ExtraVarsDocBuilder {
                     branch,
                     repo_owner,
                 );
+                Ok(())
             }
             BinaryOption::Versioned {
                 sn_auditor_version, ..
-            } => self
-                .variables
-                .push(("version".to_string(), sn_auditor_version.to_string())),
+            } => {
+                match sn_auditor_version {
+                    Some(version) => {
+                        self.variables.push(("version".to_string(), version.to_string()));
+                        Ok(())
+                    }
+                    None => Err(Error::NoAuditorError),
+                }
+            }
         }
     }
 
-    pub fn add_safe_url_or_version(&mut self, deployment_name: &str, binary_option: &BinaryOption) {
+    pub fn add_safe_url_or_version(&mut self, deployment_name: &str, binary_option: &BinaryOption) -> Result<(), Error> {
         match binary_option {
             BinaryOption::BuildFromSource {
                 repo_owner, branch, ..
@@ -257,15 +271,22 @@ impl ExtraVarsDocBuilder {
                     branch,
                     repo_owner,
                 );
+                Ok(())
             }
             BinaryOption::Versioned { safe_version, .. } => {
-                self.variables.push((
-                    "safe_archive_url".to_string(),
-                    format!(
-                        "{}/safe-{}-x86_64-unknown-linux-musl.tar.gz",
-                        SAFE_S3_BUCKET_URL, safe_version
-                    ),
-                ));
+                match safe_version {
+                    Some(version) => {
+                        self.variables.push((
+                            "safe_archive_url".to_string(),
+                            format!(
+                                "{}/safe-{}-x86_64-unknown-linux-musl.tar.gz",
+                                SAFE_S3_BUCKET_URL, version
+                            ),
+                        ));
+                        Ok(())
+                    }
+                    None => Err(Error::NoUploadersError),
+                }
             }
         }
     }
