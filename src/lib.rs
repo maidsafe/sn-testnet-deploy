@@ -53,9 +53,45 @@ use tar::Archive;
 
 const ANSIBLE_DEFAULT_FORKS: usize = 50;
 
+#[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
+pub enum DeploymentType {
+    /// The deployment has been bootstrapped from an existing network.
+    Bootstrap,
+    /// The deployment is a new network.
+    #[default]
+    New,
+}
+
+impl std::fmt::Display for DeploymentType {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            DeploymentType::Bootstrap => write!(f, "bootstrap"),
+            DeploymentType::New => write!(f, "new"),
+        }
+    }
+}
+
+impl std::str::FromStr for DeploymentType {
+    type Err = String;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s.to_lowercase().as_str() {
+            "bootstrap" => Ok(DeploymentType::Bootstrap),
+            "new" => Ok(DeploymentType::New),
+            _ => Err(format!("Invalid deployment type: {}", s)),
+        }
+    }
+}
+
 pub enum NodeType {
     Bootstrap,
     Normal,
+}
+
+#[derive(Clone, Debug, Default, Serialize, Deserialize)]
+pub struct EnvironmentDetails {
+    pub environment_type: EnvironmentType,
+    pub deployment_type: DeploymentType,
 }
 
 #[derive(Clone, Debug, Default, Serialize, Deserialize)]
@@ -597,10 +633,10 @@ impl TestnetDeployer {
 
     pub async fn clean(&self) -> Result<()> {
         let environment_type =
-            get_environment_type(&self.environment_name, &self.s3_repository).await?;
+            get_environment_details(&self.environment_name, &self.s3_repository).await?;
         do_clean(
             &self.environment_name,
-            Some(environment_type),
+            Some(environment_type.environment_type),
             self.working_directory_path.clone(),
             &self.terraform_runner,
             vec![
@@ -925,44 +961,66 @@ pub fn get_progress_bar(length: u64) -> Result<ProgressBar> {
     Ok(progress_bar)
 }
 
-pub async fn get_environment_type(
+pub async fn get_environment_details(
     environment_name: &str,
     s3_repository: &S3Repository,
-) -> Result<EnvironmentType> {
+) -> Result<EnvironmentDetails> {
     let temp_file = tempfile::NamedTempFile::new()?;
-    s3_repository
+    match s3_repository
         .download_object("sn-environment-type", environment_name, temp_file.path())
-        .await?;
-    let environment_type = std::fs::read_to_string(temp_file.path())?;
-    // It appears to be possible for the string to have newlines in it, even if the file on S3
-    // doesn't have a newline character.
-    let environment_type_trimmed = environment_type.trim();
+        .await
+    {
+        Ok(_) => {},
+        Err(_) => return Err(Error::EnvironmentDetailsNotFound(environment_name.to_string())),
+    }
 
-    match environment_type_trimmed.parse() {
-        Ok(e) => {
+    let content = std::fs::read_to_string(temp_file.path())?;
+    let lines: Vec<&str> = content.lines().collect();
+
+    let environment_type = if lines.is_empty() {
+        None
+    } else {
+        Some(lines[0].trim())
+    };
+
+    let deployment_type = lines.get(1).map(|s| s.trim());
+
+    let environment_type = match environment_type.and_then(|s| s.parse().ok()) {
+        Some(e) => {
             debug!("Parsed the environment type from the S3 file");
-            Ok(e)
+            e
         }
-        Err(_) => {
-            // For an unknown reason, the environment type string sometimes comes back empty, even
-            // if the file on S3 is populated with a value. We can try falling back to using the
-            // name of the environment.
+        None => {
             debug!("Could not parse the environment type from the S3 file");
             debug!("Falling back to using the environment name ({environment_name})");
             if environment_name.starts_with("DEV") {
                 debug!("Using Development as the environment type");
-                Ok(EnvironmentType::Development)
+                EnvironmentType::Development
             } else if environment_name.starts_with("STG") {
                 debug!("Using Staging as the environment type");
-                Ok(EnvironmentType::Staging)
+                EnvironmentType::Staging
             } else if environment_name.starts_with("PROD") {
                 debug!("Using Production as the environment type");
-                Ok(EnvironmentType::Production)
+                EnvironmentType::Production
             } else {
-                Err(Error::EnvironmentNameFromStringError(
+                return Err(Error::EnvironmentNameFromStringError(
                     environment_name.to_string(),
-                ))
+                ));
             }
         }
-    }
+    };
+
+    let deployment_type = match deployment_type.and_then(|s| s.parse().ok()) {
+        Some(d) => d,
+        None => {
+            debug!("Could not parse the deployment type from the S3 file");
+            debug!("Using New as the default");
+            DeploymentType::New
+        }
+    };
+
+    Ok(EnvironmentDetails {
+        environment_type,
+        deployment_type,
+    })
 }

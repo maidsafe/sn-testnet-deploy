@@ -102,7 +102,7 @@ impl TestnetDeployer {
             ];
             self.plan(
                 Some(vars),
-                options.current_inventory.environment_type.clone(),
+                options.current_inventory.environment_details.environment_type.clone(),
             )
             .await?;
             return Ok(());
@@ -117,6 +117,7 @@ impl TestnetDeployer {
             false,
             &options
                 .current_inventory
+                .environment_details
                 .environment_type
                 .get_tfvars_filename(),
         )

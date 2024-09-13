@@ -9,14 +9,16 @@ use crate::{
         generate_environment_inventory, provisioning::AnsibleProvisioner, AnsibleInventoryType,
         AnsibleRunner,
     },
-    get_environment_type, get_genesis_multiaddr,
+    Error,
+    EnvironmentDetails,
+    get_environment_details, get_genesis_multiaddr,
     s3::S3Repository,
     ssh::SshClient,
     terraform::TerraformRunner,
-    BinaryOption, CloudProvider, EnvironmentType, TestnetDeployer,
+    BinaryOption, CloudProvider, DeploymentType, TestnetDeployer,
 };
 use color_eyre::{
-    eyre::{eyre, OptionExt},
+    eyre::eyre,
     Result,
 };
 use rand::seq::IteratorRandom;
@@ -102,6 +104,19 @@ impl DeploymentInventoryService {
             return Ok(inventory);
         }
 
+        let environment_details = match get_environment_details(name, &self.s3_repository).await {
+            Ok(details) => details,
+            Err(Error::EnvironmentDetailsNotFound(_)) => {
+                println!("Environment details not found: treating this as a new deployment");
+                return Ok(DeploymentInventory::empty(
+                    name,
+                    binary_option
+                        .ok_or_else(|| eyre!("For a new deployment the binary option must be set"))?,
+                ));
+            }
+            Err(e) => return Err(e.into()),
+        };
+
         // This allows for the inventory to be generated without a Terraform workspace to be
         // initialised, which is the case in the workflow for printing an inventory.
         if !force {
@@ -127,15 +142,10 @@ impl DeploymentInventoryService {
             .ansible_runner
             .get_inventory(AnsibleInventoryType::Genesis, false)
             .await?;
-        if genesis_inventory.is_empty() {
-            println!("Genesis node does not exist: we are treating this as a new deployment");
-            return Ok(DeploymentInventory::empty(
-                name,
-                binary_option
-                    .ok_or_else(|| eyre!("For a new deployment the binary option must be set"))?,
-            ));
+
+        if !genesis_inventory.is_empty() {
+            misc_vm_list.push((genesis_inventory[0].0.clone(), genesis_inventory[0].1));
         }
-        misc_vm_list.push((genesis_inventory[0].0.clone(), genesis_inventory[0].1));
 
         let mut auditor_vm_list = Vec::new();
         let auditor_inventory = self
@@ -264,52 +274,61 @@ impl DeploymentInventoryService {
             })
             .collect::<Vec<String>>();
 
+
         let binary_option = if let Some(binary_option) = binary_option {
             binary_option
         } else {
-            let (_, genesis_node_registry) = node_registries
-                .iter()
-                .find(|(_, reg)| reg.faucet.is_some())
-                .ok_or_else(|| eyre!("Unable to retrieve genesis node registry"))?;
-            let faucet_version = &genesis_node_registry.faucet.as_ref().unwrap().version;
-            let safenode_version = genesis_node_registry
-                .nodes
-                .first()
-                .ok_or_else(|| eyre!("Unable to obtain the genesis node"))?
-                .version
-                .clone();
-            let safenode_manager_version = genesis_node_registry
-                .daemon
-                .as_ref()
-                .ok_or_else(|| eyre!("Unable to obtain the daemon"))?
-                .version
-                .clone();
-            let (_, auditor_node_registry) = node_registries
-                .iter()
-                .find(|(_, reg)| reg.auditor.is_some())
-                .ok_or_else(|| eyre!("Unable to retrieve auditor node registry"))?;
-            let sn_auditor_version = &auditor_node_registry.auditor.as_ref().unwrap().version;
+            let (faucet_version, safenode_version, sn_auditor_version) = match environment_details.deployment_type {
+                DeploymentType::New => {
+                    let (_, genesis_node_registry) = node_registries
+                        .iter()
+                        .find(|(_, reg)| reg.faucet.is_some())
+                        .ok_or_else(|| eyre!("Unable to retrieve genesis node registry"))?;
+                    let faucet_version = Some(genesis_node_registry.faucet.as_ref().unwrap().version.parse()?);
+                    let safenode_version = genesis_node_registry.nodes.first()
+                        .ok_or_else(|| eyre!("Unable to obtain the genesis node"))?.version.parse()?;
+                    let (_, auditor_node_registry) = node_registries
+                        .iter()
+                        .find(|(_, reg)| reg.auditor.is_some())
+                        .ok_or_else(|| eyre!("Unable to retrieve auditor node registry"))?;
+                    let sn_auditor_version = Some(auditor_node_registry.auditor.as_ref().unwrap().version.parse()?);
+                    (faucet_version, safenode_version, sn_auditor_version)
+                },
+                DeploymentType::Bootstrap => {
+                    let safenode_version = generic_node_registries.retrieved_registries.first()
+                        .and_then(|(_, reg)| reg.nodes.first())
+                        .ok_or_else(|| eyre!("Unable to obtain a node"))?.version.parse()?;
+                    (None, safenode_version, None)
+                },
+            };
 
+            let safenode_manager_version = node_registries.iter()
+                .find_map(|(_, reg)| reg.daemon.as_ref())
+                .ok_or_else(|| eyre!("Unable to obtain the daemon"))?
+                .version.parse()?;
             BinaryOption::Versioned {
                 safe_version: Some("0.0.1".parse()?), // todo: store safe version in the safenodeman registry?
-                faucet_version: Some(faucet_version.parse()?),
-                safenode_version: safenode_version.parse()?,
-                safenode_manager_version: safenode_manager_version.parse()?,
-                sn_auditor_version: Some(sn_auditor_version.parse()?),
+                faucet_version,
+                safenode_version,
+                safenode_manager_version,
+                sn_auditor_version,
             }
         };
 
-        let (genesis_multiaddr, genesis_ip) =
-            get_genesis_multiaddr(&self.ansible_runner, &self.ssh_client).await?;
-        let environment_type = get_environment_type(name, &self.s3_repository).await?;
+        let (genesis_multiaddr, genesis_ip) = if environment_details.deployment_type == DeploymentType::New {
+            let (multiaddr, ip) = get_genesis_multiaddr(&self.ansible_runner, &self.ssh_client).await?;
+            (Some(multiaddr), Some(ip))
+        } else {
+            (None, None)
+        };
         let inventory = DeploymentInventory {
             auditor_vms: auditor_vm_list,
             binary_option,
             bootstrap_node_vms: bootstrap_vm_list,
             bootstrap_peers,
-            environment_type,
+            environment_details,
             failed_node_registry_vms,
-            faucet_address: format!("{genesis_ip}:8000"),
+            faucet_address: genesis_ip.map(|ip| format!("{ip}:8000")),
             genesis_multiaddr,
             name: name.to_string(),
             misc_vms: misc_vm_list,
@@ -432,10 +451,10 @@ pub struct DeploymentInventory {
     pub binary_option: BinaryOption,
     pub bootstrap_node_vms: Vec<VirtualMachine>,
     pub bootstrap_peers: Vec<String>,
-    pub environment_type: EnvironmentType,
+    pub environment_details: EnvironmentDetails,
     pub failed_node_registry_vms: Vec<String>,
-    pub faucet_address: String,
-    pub genesis_multiaddr: String,
+    pub faucet_address: Option<String>,
+    pub genesis_multiaddr: Option<String>,
     pub misc_vms: Vec<VirtualMachine>,
     pub name: String,
     pub node_vms: Vec<VirtualMachine>,
@@ -457,10 +476,10 @@ impl DeploymentInventory {
             auditor_vms: Vec::new(),
             bootstrap_node_vms: Vec::new(),
             bootstrap_peers: Vec::new(),
-            environment_type: EnvironmentType::Development,
-            genesis_multiaddr: String::new(),
+            environment_details: EnvironmentDetails::default(),
+            genesis_multiaddr: None,
             failed_node_registry_vms: Vec::new(),
-            faucet_address: String::new(),
+            faucet_address: None,
             misc_vms: Vec::new(),
             node_vms: Vec::new(),
             node_peers: Vec::new(),
@@ -614,7 +633,7 @@ impl DeploymentInventory {
                     println!("{peer}");
                 }
             });
-        println!("Genesis: {}", self.genesis_multiaddr);
+        println!("Genesis: {}", self.genesis_multiaddr.as_ref().map_or("N/A", |genesis| genesis));
         let inventory_file_path =
             get_data_directory()?.join(format!("{}-inventory.json", self.name));
         println!(
@@ -626,12 +645,14 @@ impl DeploymentInventory {
         println!("==============");
         println!("Faucet Details");
         println!("==============");
-        println!("Faucet address: {:?}", self.faucet_address);
-        println!("Check the faucet:");
-        println!(
-            "safe --peer {} wallet get-faucet {:?}",
-            self.genesis_multiaddr, self.faucet_address
-        );
+        println!("Faucet address: {}", self.faucet_address.as_ref().map_or("N/A", |address| address));
+        if let (Some(genesis), Some(faucet)) = (&self.genesis_multiaddr, &self.faucet_address) {
+            println!("Check the faucet:");
+            println!(
+                "safe --peer {} wallet get-faucet {}",
+                genesis, faucet
+            );
+        }
         println!();
 
         println!("===============");
@@ -651,12 +672,11 @@ impl DeploymentInventory {
         Ok(())
     }
 
-    pub fn get_genesis_ip(&self) -> Result<IpAddr> {
+    pub fn get_genesis_ip(&self) -> Option<IpAddr> {
         self.misc_vms
             .iter()
             .find(|(name, _)| name.contains("genesis"))
             .map(|(_, ip)| *ip)
-            .ok_or_eyre("Genesis node not found in inventory. This is a critical error.")
     }
 }
 

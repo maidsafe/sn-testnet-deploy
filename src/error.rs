@@ -33,6 +33,8 @@ pub enum Error {
     DigitalOceanUnexpectedResponse(u16, String),
     #[error("The public IP address was not obtainable from the API response")]
     DigitalOceanPublicIpAddressNotFound,
+    #[error("Could not retrieve environment details for '{0}'")]
+    EnvironmentDetailsNotFound(String),
     #[error("The '{0}' environment does not exist")]
     EnvironmentDoesNotExist(String),
     #[error("The environment name is required")]
