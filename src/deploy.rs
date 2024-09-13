@@ -7,7 +7,8 @@
 use crate::{
     ansible::provisioning::{NodeType, ProvisionOptions},
     error::Result,
-    get_genesis_multiaddr, BinaryOption, DeploymentInventory, EnvironmentType, LogFormat,
+    DeploymentType,
+    get_genesis_multiaddr, BinaryOption, DeploymentInventory, EnvironmentDetails, EnvironmentType, LogFormat,
     TestnetDeployer,
 };
 use colored::Colorize;
@@ -40,8 +41,11 @@ impl TestnetDeployer {
             }
         };
 
-        self.write_environment_type(&options.name, &options.environment_type)
-            .await?;
+        self.write_environment_details(&options.name, &EnvironmentDetails {
+            environment_type: options.environment_type.clone(),
+            deployment_type: DeploymentType::New,
+        })
+        .await?;
 
         self.create_or_update_infra(
             &options.name,
@@ -200,15 +204,16 @@ impl TestnetDeployer {
         Ok(())
     }
 
-    async fn write_environment_type(
+    async fn write_environment_details(
         &self,
         environment_name: &str,
-        environment_type: &EnvironmentType,
+        environment_details: &EnvironmentDetails,
     ) -> Result<()> {
         let temp_dir = tempfile::tempdir()?;
         let path = temp_dir.path().to_path_buf().join(environment_name);
         let mut file = File::create(&path)?;
-        file.write_all(environment_type.to_string().as_bytes())?;
+        let contents = format!("{}\n{}", environment_details.environment_type, environment_details.deployment_type);
+        file.write_all(contents.as_bytes())?;
         self.s3_repository
             .upload_file("sn-environment-type", &path, true)
             .await?;

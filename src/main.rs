@@ -972,8 +972,10 @@ async fn main() -> Result<()> {
                         AnsiblePlaybook::FundUploaders,
                         AnsibleInventoryType::Uploaders,
                         Some(build_fund_faucet_extra_vars_doc(
-                            &inventory.get_genesis_ip()?,
-                            &inventory.genesis_multiaddr,
+                            &inventory.get_genesis_ip().ok_or_else(||
+                                eyre!("Genesis node not found. Most likely this is a bootstrap deployment."))?,
+                            &inventory.genesis_multiaddr.clone().ok_or_else(||
+                                eyre!("Genesis node not found. Most likely this is a bootstrap deployment."))?,
                         )?),
                     )?;
                 }
@@ -1210,7 +1212,7 @@ async fn main() -> Result<()> {
 
             testnet_deploy.init().await?;
             testnet_deploy
-                .plan(None, inventory.environment_type)
+                .plan(None, inventory.environment_details.environment_type)
                 .await?;
             Ok(())
         }

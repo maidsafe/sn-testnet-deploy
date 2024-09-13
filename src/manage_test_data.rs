@@ -128,7 +128,10 @@ impl TestDataClient {
             }
         }
 
-        let faucet_addr: SocketAddr = inventory.faucet_address.parse()?;
+        let faucet_addr: SocketAddr = inventory.faucet_address
+            .as_ref()
+            .ok_or_eyre("Faucet address is not set in the inventory")?
+            .parse()?;
         let random_peer = inventory
             .get_random_peer()
             .ok_or_eyre("No peers available")?;
