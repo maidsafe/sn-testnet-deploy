@@ -128,7 +128,8 @@ impl TestDataClient {
             }
         }
 
-        let faucet_addr: SocketAddr = inventory.faucet_address
+        let faucet_addr: SocketAddr = inventory
+            .faucet_address
             .as_ref()
             .ok_or_eyre("Faucet address is not set in the inventory")?
             .parse()?;

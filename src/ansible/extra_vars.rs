@@ -127,15 +127,14 @@ impl ExtraVarsDocBuilder {
                 );
                 Ok(())
             }
-            BinaryOption::Versioned { faucet_version, .. } => {
-                match faucet_version {
-                    Some(version) => {
-                        self.variables.push(("version".to_string(), version.to_string()));
-                        Ok(())
-                    }
-                    None => Err(Error::NoFaucetError),
+            BinaryOption::Versioned { faucet_version, .. } => match faucet_version {
+                Some(version) => {
+                    self.variables
+                        .push(("version".to_string(), version.to_string()));
+                    Ok(())
                 }
-            }
+                None => Err(Error::NoFaucetError),
+            },
         }
     }
 
@@ -245,19 +244,22 @@ impl ExtraVarsDocBuilder {
             }
             BinaryOption::Versioned {
                 sn_auditor_version, ..
-            } => {
-                match sn_auditor_version {
-                    Some(version) => {
-                        self.variables.push(("version".to_string(), version.to_string()));
-                        Ok(())
-                    }
-                    None => Err(Error::NoAuditorError),
+            } => match sn_auditor_version {
+                Some(version) => {
+                    self.variables
+                        .push(("version".to_string(), version.to_string()));
+                    Ok(())
                 }
-            }
+                None => Err(Error::NoAuditorError),
+            },
         }
     }
 
-    pub fn add_safe_url_or_version(&mut self, deployment_name: &str, binary_option: &BinaryOption) -> Result<(), Error> {
+    pub fn add_safe_url_or_version(
+        &mut self,
+        deployment_name: &str,
+        binary_option: &BinaryOption,
+    ) -> Result<(), Error> {
         match binary_option {
             BinaryOption::BuildFromSource {
                 repo_owner, branch, ..
@@ -273,21 +275,19 @@ impl ExtraVarsDocBuilder {
                 );
                 Ok(())
             }
-            BinaryOption::Versioned { safe_version, .. } => {
-                match safe_version {
-                    Some(version) => {
-                        self.variables.push((
-                            "safe_archive_url".to_string(),
-                            format!(
-                                "{}/safe-{}-x86_64-unknown-linux-musl.tar.gz",
-                                SAFE_S3_BUCKET_URL, version
-                            ),
-                        ));
-                        Ok(())
-                    }
-                    None => Err(Error::NoUploadersError),
+            BinaryOption::Versioned { safe_version, .. } => match safe_version {
+                Some(version) => {
+                    self.variables.push((
+                        "safe_archive_url".to_string(),
+                        format!(
+                            "{}/safe-{}-x86_64-unknown-linux-musl.tar.gz",
+                            SAFE_S3_BUCKET_URL, version
+                        ),
+                    ));
+                    Ok(())
                 }
-            }
+                None => Err(Error::NoUploadersError),
+            },
         }
     }
 

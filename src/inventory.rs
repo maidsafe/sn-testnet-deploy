@@ -9,18 +9,13 @@ use crate::{
         generate_environment_inventory, provisioning::AnsibleProvisioner, AnsibleInventoryType,
         AnsibleRunner,
     },
-    Error,
-    EnvironmentDetails,
     get_environment_details, get_genesis_multiaddr,
     s3::S3Repository,
     ssh::SshClient,
     terraform::TerraformRunner,
-    BinaryOption, CloudProvider, DeploymentType, TestnetDeployer,
+    BinaryOption, CloudProvider, DeploymentType, EnvironmentDetails, Error, TestnetDeployer,
 };
-use color_eyre::{
-    eyre::eyre,
-    Result,
-};
+use color_eyre::{eyre::eyre, Result};
 use rand::seq::IteratorRandom;
 use serde::{Deserialize, Serialize};
 use sn_service_management::{NodeRegistry, ServiceStatus};
@@ -104,19 +99,6 @@ impl DeploymentInventoryService {
             return Ok(inventory);
         }
 
-        let environment_details = match get_environment_details(name, &self.s3_repository).await {
-            Ok(details) => details,
-            Err(Error::EnvironmentDetailsNotFound(_)) => {
-                println!("Environment details not found: treating this as a new deployment");
-                return Ok(DeploymentInventory::empty(
-                    name,
-                    binary_option
-                        .ok_or_else(|| eyre!("For a new deployment the binary option must be set"))?,
-                ));
-            }
-            Err(e) => return Err(e.into()),
-        };
-
         // This allows for the inventory to be generated without a Terraform workspace to be
         // initialised, which is the case in the workflow for printing an inventory.
         if !force {
@@ -126,7 +108,10 @@ impl DeploymentInventoryService {
             }
         }
 
-        // The following operation is idempotent.
+        // For new environments, whether it's a new or bootstrap deploy, the inventory files need
+        // to be generated for the Ansible run to work correctly.
+        //
+        // It is an idempotent operation; the files won't be generated if they already exist.
         generate_environment_inventory(
             name,
             &self.inventory_file_path,
@@ -136,6 +121,20 @@ impl DeploymentInventoryService {
                 .join("inventory"),
         )
         .await?;
+
+        let environment_details = match get_environment_details(name, &self.s3_repository).await {
+            Ok(details) => details,
+            Err(Error::EnvironmentDetailsNotFound(_)) => {
+                println!("Environment details not found: treating this as a new deployment");
+                return Ok(DeploymentInventory::empty(
+                    name,
+                    binary_option.ok_or_else(|| {
+                        eyre!("For a new deployment the binary option must be set")
+                    })?,
+                ));
+            }
+            Err(e) => return Err(e.into()),
+        };
 
         let mut misc_vm_list = Vec::new();
         let genesis_inventory = self
@@ -274,38 +273,62 @@ impl DeploymentInventoryService {
             })
             .collect::<Vec<String>>();
 
-
         let binary_option = if let Some(binary_option) = binary_option {
             binary_option
         } else {
-            let (faucet_version, safenode_version, sn_auditor_version) = match environment_details.deployment_type {
-                DeploymentType::New => {
-                    let (_, genesis_node_registry) = node_registries
-                        .iter()
-                        .find(|(_, reg)| reg.faucet.is_some())
-                        .ok_or_else(|| eyre!("Unable to retrieve genesis node registry"))?;
-                    let faucet_version = Some(genesis_node_registry.faucet.as_ref().unwrap().version.parse()?);
-                    let safenode_version = genesis_node_registry.nodes.first()
-                        .ok_or_else(|| eyre!("Unable to obtain the genesis node"))?.version.parse()?;
-                    let (_, auditor_node_registry) = node_registries
-                        .iter()
-                        .find(|(_, reg)| reg.auditor.is_some())
-                        .ok_or_else(|| eyre!("Unable to retrieve auditor node registry"))?;
-                    let sn_auditor_version = Some(auditor_node_registry.auditor.as_ref().unwrap().version.parse()?);
-                    (faucet_version, safenode_version, sn_auditor_version)
-                },
-                DeploymentType::Bootstrap => {
-                    let safenode_version = generic_node_registries.retrieved_registries.first()
-                        .and_then(|(_, reg)| reg.nodes.first())
-                        .ok_or_else(|| eyre!("Unable to obtain a node"))?.version.parse()?;
-                    (None, safenode_version, None)
-                },
-            };
+            let (faucet_version, safenode_version, sn_auditor_version) =
+                match environment_details.deployment_type {
+                    DeploymentType::New => {
+                        let (_, genesis_node_registry) = node_registries
+                            .iter()
+                            .find(|(_, reg)| reg.faucet.is_some())
+                            .ok_or_else(|| eyre!("Unable to retrieve genesis node registry"))?;
+                        let faucet_version = Some(
+                            genesis_node_registry
+                                .faucet
+                                .as_ref()
+                                .unwrap()
+                                .version
+                                .parse()?,
+                        );
+                        let safenode_version = genesis_node_registry
+                            .nodes
+                            .first()
+                            .ok_or_else(|| eyre!("Unable to obtain the genesis node"))?
+                            .version
+                            .parse()?;
+                        let (_, auditor_node_registry) = node_registries
+                            .iter()
+                            .find(|(_, reg)| reg.auditor.is_some())
+                            .ok_or_else(|| eyre!("Unable to retrieve auditor node registry"))?;
+                        let sn_auditor_version = Some(
+                            auditor_node_registry
+                                .auditor
+                                .as_ref()
+                                .unwrap()
+                                .version
+                                .parse()?,
+                        );
+                        (faucet_version, safenode_version, sn_auditor_version)
+                    }
+                    DeploymentType::Bootstrap => {
+                        let safenode_version = generic_node_registries
+                            .retrieved_registries
+                            .first()
+                            .and_then(|(_, reg)| reg.nodes.first())
+                            .ok_or_else(|| eyre!("Unable to obtain a node"))?
+                            .version
+                            .parse()?;
+                        (None, safenode_version, None)
+                    }
+                };
 
-            let safenode_manager_version = node_registries.iter()
+            let safenode_manager_version = node_registries
+                .iter()
                 .find_map(|(_, reg)| reg.daemon.as_ref())
                 .ok_or_else(|| eyre!("Unable to obtain the daemon"))?
-                .version.parse()?;
+                .version
+                .parse()?;
             BinaryOption::Versioned {
                 safe_version: Some("0.0.1".parse()?), // todo: store safe version in the safenodeman registry?
                 faucet_version,
@@ -315,12 +338,14 @@ impl DeploymentInventoryService {
             }
         };
 
-        let (genesis_multiaddr, genesis_ip) = if environment_details.deployment_type == DeploymentType::New {
-            let (multiaddr, ip) = get_genesis_multiaddr(&self.ansible_runner, &self.ssh_client).await?;
-            (Some(multiaddr), Some(ip))
-        } else {
-            (None, None)
-        };
+        let (genesis_multiaddr, genesis_ip) =
+            if environment_details.deployment_type == DeploymentType::New {
+                let (multiaddr, ip) =
+                    get_genesis_multiaddr(&self.ansible_runner, &self.ssh_client).await?;
+                (Some(multiaddr), Some(ip))
+            } else {
+                (None, None)
+            };
         let inventory = DeploymentInventory {
             auditor_vms: auditor_vm_list,
             binary_option,
@@ -571,24 +596,41 @@ impl DeploymentInventory {
                 println!("===============");
                 println!("Version Details");
                 println!("===============");
-                println!("faucet version: {}", faucet_version.as_ref().map_or("none".to_string(), |v| v.to_string()));
-                println!("safe version: {}", safe_version.as_ref().map_or("none".to_string(), |v| v.to_string()));
+                println!(
+                    "faucet version: {}",
+                    faucet_version
+                        .as_ref()
+                        .map_or("N/A".to_string(), |v| v.to_string())
+                );
+                println!(
+                    "safe version: {}",
+                    safe_version
+                        .as_ref()
+                        .map_or("N/A".to_string(), |v| v.to_string())
+                );
                 println!("safenode version: {}", safenode_version);
                 println!("safenode-manager version: {}", safenode_manager_version);
-                println!("sn_auditor version: {}", sn_auditor_version.as_ref().map_or("none".to_string(), |v| v.to_string()));
+                println!(
+                    "sn_auditor version: {}",
+                    sn_auditor_version
+                        .as_ref()
+                        .map_or("none".to_string(), |v| v.to_string())
+                );
                 println!();
             }
         }
 
-        println!("=============");
-        println!("Bootstrap VMs");
-        println!("=============");
-        for vm in self.bootstrap_node_vms.iter() {
-            println!("{}: {}", vm.0, vm.1);
+        if !self.bootstrap_node_vms.is_empty() {
+            println!("=============");
+            println!("Bootstrap VMs");
+            println!("=============");
+            for vm in self.bootstrap_node_vms.iter() {
+                println!("{}: {}", vm.0, vm.1);
+            }
+            println!("Nodes per VM: {}", self.bootstrap_node_count());
+            println!("SSH user: {}", self.ssh_user);
+            println!();
         }
-        println!("Nodes per VM: {}", self.bootstrap_node_count());
-        println!("SSH user: {}", self.ssh_user);
-        println!();
 
         println!("========");
         println!("Node VMs");
@@ -600,68 +642,85 @@ impl DeploymentInventory {
         println!("SSH user: {}", self.ssh_user);
         println!();
 
-        println!("============");
-        println!("Uploader VMs");
-        println!("============");
-        for vm in self.uploader_vms.iter() {
-            println!("{}: {}", vm.0, vm.1);
+        if !self.uploader_vms.is_empty() {
+            println!("============");
+            println!("Uploader VMs");
+            println!("============");
+            for vm in self.uploader_vms.iter() {
+                println!("{}: {}", vm.0, vm.1);
+            }
+            println!("SSH user: {}", self.ssh_user);
+            println!();
         }
-        println!("SSH user: {}", self.ssh_user);
-        println!();
 
-        println!("=========");
-        println!("Other VMs");
-        println!("=========");
-        for vm in self.misc_vms.iter() {
-            println!("{}: {}", vm.0, vm.1);
+        if !self.misc_vms.is_empty() {
+            println!("=========");
+            println!("Other VMs");
+            println!("=========");
+            for vm in self.misc_vms.iter() {
+                println!("{}: {}", vm.0, vm.1);
+            }
+            println!("SSH user: {}", self.ssh_user);
+            println!();
         }
-        println!("SSH user: {}", self.ssh_user);
-        println!();
 
-        // Take the first peer from each VM. If you just take, say, the first 10 on the peer list,
-        // they will all be from the same machine. They will be unique peers, but they won't look
-        // very random.
-        println!("============");
-        println!("Sample Peers");
-        println!("============");
-        self.bootstrap_node_vms
-            .iter()
-            .chain(self.node_vms.iter())
-            .map(|vm| vm.1.to_string())
-            .for_each(|ip| {
-                if let Some(peer) = self.peers().iter().find(|p| p.contains(&ip)) {
-                    println!("{peer}");
-                }
-            });
-        println!("Genesis: {}", self.genesis_multiaddr.as_ref().map_or("N/A", |genesis| genesis));
-        let inventory_file_path =
-            get_data_directory()?.join(format!("{}-inventory.json", self.name));
-        println!(
-            "The entire peer list can be found at {}",
-            inventory_file_path.to_string_lossy()
-        );
-        println!();
-
-        println!("==============");
-        println!("Faucet Details");
-        println!("==============");
-        println!("Faucet address: {}", self.faucet_address.as_ref().map_or("N/A", |address| address));
-        if let (Some(genesis), Some(faucet)) = (&self.genesis_multiaddr, &self.faucet_address) {
-            println!("Check the faucet:");
+        // If there are no bootstrap nodes, it's a bootstrap deploy, and in that case, we're not
+        // really interested in available peers.
+        if !self.bootstrap_node_vms.is_empty() {
+            // Take the first peer from each VM. If you just take, say, the first 10 on the peer list,
+            // they will all be from the same machine. They will be unique peers, but they won't look
+            // very random.
+            println!("============");
+            println!("Sample Peers");
+            println!("============");
+            self.bootstrap_node_vms
+                .iter()
+                .chain(self.node_vms.iter())
+                .map(|vm| vm.1.to_string())
+                .for_each(|ip| {
+                    if let Some(peer) = self.peers().iter().find(|p| p.contains(&ip)) {
+                        println!("{peer}");
+                    }
+                });
             println!(
-                "safe --peer {} wallet get-faucet {}",
-                genesis, faucet
+                "Genesis: {}",
+                self.genesis_multiaddr
+                    .as_ref()
+                    .map_or("N/A", |genesis| genesis)
             );
+            let inventory_file_path =
+                get_data_directory()?.join(format!("{}-inventory.json", self.name));
+            println!(
+                "The entire peer list can be found at {}",
+                inventory_file_path.to_string_lossy()
+            );
+            println!();
         }
-        println!();
 
-        println!("===============");
-        println!("Auditor Details");
-        println!("===============");
-        for vm in self.auditor_vms.iter() {
-            println!("{}:4242", vm.1);
+        if let Some(faucet_address) = &self.faucet_address {
+            println!("==============");
+            println!("Faucet Details");
+            println!("==============");
+            println!("Faucet address: {}", faucet_address);
+            if let Some(genesis) = &self.genesis_multiaddr {
+                println!("Check the faucet:");
+                println!(
+                    "safe --peer {} wallet get-faucet {}",
+                    genesis, faucet_address
+                );
+            }
+            println!();
         }
-        println!();
+
+        if !self.auditor_vms.is_empty() {
+            println!("===============");
+            println!("Auditor Details");
+            println!("===============");
+            for vm in self.auditor_vms.iter() {
+                println!("{}:4242", vm.1);
+            }
+            println!();
+        }
 
         if !self.uploaded_files.is_empty() {
             println!("Uploaded files:");

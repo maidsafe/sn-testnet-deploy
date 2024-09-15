@@ -9,6 +9,7 @@ use super::{
 };
 use crate::{
     ansible::generate_custom_environment_inventory,
+    bootstrap::BootstrapOptions,
     deploy::DeployOptions,
     error::{Error, Result},
     inventory::{DeploymentNodeRegistries, VirtualMachine},
@@ -51,6 +52,22 @@ pub struct ProvisionOptions {
     pub name: String,
     pub node_count: u16,
     pub public_rpc: bool,
+}
+
+impl From<BootstrapOptions> for ProvisionOptions {
+    fn from(bootstrap_options: BootstrapOptions) -> Self {
+        ProvisionOptions {
+            beta_encryption_key: None,
+            binary_option: bootstrap_options.binary_option,
+            bootstrap_node_count: 0,
+            env_variables: bootstrap_options.env_variables,
+            log_format: bootstrap_options.log_format,
+            logstash_details: None,
+            name: bootstrap_options.name,
+            node_count: bootstrap_options.node_count,
+            public_rpc: false,
+        }
+    }
 }
 
 impl From<DeployOptions> for ProvisionOptions {
@@ -248,6 +265,28 @@ impl AnsibleProvisioner {
             ),
             NodeType::Normal => (AnsibleInventoryType::Nodes, options.node_count),
         };
+
+        // For a new deployment, it's quite probable that SSH is available, because this part occurs
+        // after the genesis node has been provisioned. However, for a bootstrap deploy, we need to
+        // check that SSH is available before proceeding.
+        println!("Obtaining IP addresses for nodes...");
+        let inventory = self
+            .ansible_runner
+            .get_inventory(inventory_type.clone(), true)
+            .await?;
+
+        println!("Waiting for SSH availability on {} nodes...", node_type);
+        for (vm_name, ip) in inventory.iter() {
+            println!("Checking SSH availability for {}: {}", vm_name, ip);
+            self.ssh_client
+                .wait_for_ssh_availability(ip, &self.cloud_provider.get_ssh_user())
+                .map_err(|e| {
+                    println!("Failed to establish SSH connection to {}: {}", vm_name, e);
+                    e
+                })?;
+        }
+
+        println!("SSH is available on all nodes. Proceeding with provisioning...");
 
         self.ansible_runner.run_playbook(
             AnsiblePlaybook::Nodes,

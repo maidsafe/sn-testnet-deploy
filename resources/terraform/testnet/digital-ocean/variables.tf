@@ -58,6 +58,11 @@ variable "region" {
   default = "lon1"
 }
 
+variable "genesis_vm_count" {
+  default     = 1
+  description = "Set to 1 or 0 to control whether there is a genesis node"
+}
+
 variable "auditor_vm_count" {
   default     = 1
   description = "The number of auditor droplets"

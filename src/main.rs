@@ -14,6 +14,7 @@ use semver::Version;
 use sn_releases::{ReleaseType, SafeReleaseRepoActions};
 use sn_testnet_deploy::{
     ansible::{extra_vars::ExtraVarsDocBuilder, AnsibleInventoryType, AnsiblePlaybook},
+    bootstrap::BootstrapOptions,
     deploy::DeployOptions,
     error::Error,
     get_wallet_directory,
@@ -40,6 +41,112 @@ struct Opt {
 #[allow(clippy::large_enum_variant)]
 #[derive(Subcommand, Debug)]
 enum Commands {
+    /// Bootstrap a new network from an existing deployment.
+    Bootstrap {
+        /// Set to run Ansible with more verbose output.
+        #[arg(long)]
+        ansible_verbose: bool,
+        /// The branch of the Github repository to build from.
+        ///
+        /// If used, all binaries will be built from this branch. It is typically used for testing
+        /// changes on a fork.
+        ///
+        /// This argument must be used in conjunction with the --repo-owner argument.
+        ///
+        /// The --branch and --repo-owner arguments are mutually exclusive with the binary version
+        /// arguments. You can only supply version numbers or a custom branch, not both.
+        #[arg(long, verbatim_doc_comment)]
+        branch: Option<String>,
+        /// The peer from an existing network that we can bootstrap from.
+        #[arg(long)]
+        bootstrap_peer: String,
+        /// The type of deployment.
+        ///
+        /// Possible values are 'development', 'production' or 'staging'. The value used will
+        /// determine the sizes of VMs, the number of VMs, and the number of nodes deployed on
+        /// them. The specification will increase in size from development, to staging, to
+        /// production.
+        ///
+        /// The default is 'development'.
+        #[clap(long, default_value_t = EnvironmentType::Development, value_parser = parse_deployment_type, verbatim_doc_comment)]
+        environment_type: EnvironmentType,
+        /// Provide environment variables for the safenode service.
+        ///
+        /// This is useful to set the safenode's log levels. Each variable should be comma
+        /// separated without any space.
+        ///
+        /// Example: --env SN_LOG=all,RUST_LOG=libp2p=debug
+        #[clap(name = "env", long, use_value_delimiter = true, value_parser = parse_environment_variables, verbatim_doc_comment)]
+        env_variables: Option<Vec<(String, String)>>,
+        /// Override the maximum number of forks Ansible will use to execute tasks on target hosts.
+        ///
+        /// The default value from ansible.cfg is 50.
+        #[clap(long)]
+        forks: Option<usize>,
+        /// Specify the logging format for the nodes.
+        ///
+        /// Valid values are "default" or "json".
+        ///
+        /// If the argument is not used, the default format will be applied.
+        #[clap(long, value_parser = LogFormat::parse_from_str, verbatim_doc_comment)]
+        log_format: Option<LogFormat>,
+        /// The name of the environment
+        #[arg(short = 'n', long)]
+        name: String,
+        /// The number of safenode services to run on each VM.
+        ///
+        /// If the argument is not used, the value will be determined by the 'environment-type'
+        /// argument.
+        #[clap(long)]
+        node_count: Option<u16>,
+        /// The number of node VMs to create.
+        ///
+        /// Each VM will run many safenode services.
+        ///
+        /// If the argument is not used, the value will be determined by the 'environment-type'
+        /// argument.
+        #[clap(long)]
+        node_vm_count: Option<u16>,
+        /// The cloud provider to deploy to.
+        ///
+        /// Valid values are "aws" or "digital-ocean".
+        #[clap(long, default_value_t = CloudProvider::DigitalOcean, value_parser = parse_provider, verbatim_doc_comment)]
+        provider: CloudProvider,
+        /// The owner/org of the Github repository to build from.
+        ///
+        /// If used, all binaries will be built from this repository. It is typically used for
+        /// testing changes on a fork.
+        ///
+        /// This argument must be used in conjunction with the --repo-owner argument.
+        ///
+        /// The --branch and --repo-owner arguments are mutually exclusive with the binary version
+        /// arguments. You can only supply version numbers or a custom branch, not both.
+        #[arg(long, verbatim_doc_comment)]
+        repo_owner: Option<String>,
+        /// The features to enable on the safenode binary.
+        ///
+        /// If not provided, the default feature set specified for the safenode binary are used.
+        ///
+        /// The features argument is mutually exclusive with the --safenode-version argument.
+        #[clap(long, verbatim_doc_comment)]
+        safenode_features: Option<Vec<String>>,
+        /// Supply a version number for the safenode binary.
+        ///
+        /// There should be no 'v' prefix.
+        ///
+        /// The version arguments are mutually exclusive with the --branch and --repo-owner
+        /// arguments. You can only supply version numbers or a custom branch, not both.
+        #[arg(long, verbatim_doc_comment)]
+        safenode_version: Option<String>,
+        /// Supply a version number for the safenode-manager binary.
+        ///
+        /// There should be no 'v' prefix.
+        ///
+        /// The version arguments are mutually exclusive with the --branch and --repo-owner
+        /// arguments. You can only supply version numbers or a custom branch, not both.
+        #[arg(long, verbatim_doc_comment)]
+        safenode_manager_version: Option<String>,
+    },
     /// Clean a deployed testnet environment.
     Clean {
         /// The name of the environment.
@@ -797,6 +904,93 @@ async fn main() -> Result<()> {
 
     let opt = Opt::parse();
     match opt.command {
+        Commands::Bootstrap {
+            ansible_verbose,
+            bootstrap_peer,
+            branch,
+            environment_type,
+            env_variables,
+            forks,
+            log_format,
+            name,
+            node_count,
+            node_vm_count,
+            provider,
+            repo_owner,
+            safenode_features,
+            safenode_version,
+            safenode_manager_version,
+        } => {
+            let binary_option = get_binary_option(
+                branch,
+                None,
+                repo_owner,
+                None,
+                None,
+                safenode_version,
+                safenode_manager_version,
+                None,
+                safenode_features,
+            )
+            .await?;
+
+            let mut builder = TestnetDeployBuilder::default();
+            builder
+                .ansible_verbose_mode(ansible_verbose)
+                .deployment_type(environment_type.clone())
+                .environment_name(&name)
+                .provider(provider.clone());
+            if let Some(forks) = forks {
+                builder.ansible_forks(forks);
+            }
+            let testnet_deployer = builder.build()?;
+
+            let inventory_service = DeploymentInventoryService::from(testnet_deployer.clone());
+            inventory_service
+                .generate_or_retrieve_inventory(&name, true, Some(binary_option.clone()))
+                .await?;
+
+            match testnet_deployer.init().await {
+                Ok(_) => {}
+                Err(e @ Error::LogsForPreviousTestnetExist(_)) => {
+                    return Err(eyre!(e)
+                        .wrap_err(format!(
+                            "Logs already exist for a previous testnet with the \
+                                    name '{name}'"
+                        ))
+                        .suggestion(
+                            "If you wish to keep them, retrieve the logs with the 'logs get' \
+                                command, then remove them with 'logs rm'. If you don't need them, \
+                                simply run 'logs rm'. Then you can proceed with deploying your \
+                                new testnet.",
+                        ));
+                }
+                Err(e) => {
+                    return Err(eyre!(e));
+                }
+            }
+
+            testnet_deployer
+                .bootstrap(&BootstrapOptions {
+                    binary_option,
+                    bootstrap_peer,
+                    environment_type: environment_type.clone(),
+                    env_variables,
+                    log_format,
+                    name: name.clone(),
+                    node_count: node_count.unwrap_or(environment_type.get_default_node_count()),
+                    node_vm_count,
+                })
+                .await?;
+
+            let inventory_service = DeploymentInventoryService::from(testnet_deployer.clone());
+            let new_inventory = inventory_service
+                .generate_or_retrieve_inventory(&name, true, None)
+                .await?;
+            new_inventory.print_report()?;
+            new_inventory.save()?;
+            Ok(())
+        }
         Commands::Clean { name, provider } => {
             let testnet_deploy = TestnetDeployBuilder::default()
                 .environment_name(&name)

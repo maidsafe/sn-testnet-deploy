@@ -7,12 +7,11 @@
 use crate::{
     ansible::provisioning::{NodeType, ProvisionOptions},
     error::Result,
-    DeploymentType,
-    get_genesis_multiaddr, BinaryOption, DeploymentInventory, EnvironmentDetails, EnvironmentType, LogFormat,
-    TestnetDeployer,
+    get_genesis_multiaddr, write_environment_details, BinaryOption, DeploymentInventory,
+    DeploymentType, EnvironmentDetails, EnvironmentType, LogFormat, TestnetDeployer,
 };
 use colored::Colorize;
-use std::{fs::File, io::Write, net::SocketAddr};
+use std::net::SocketAddr;
 
 #[derive(Clone)]
 pub struct DeployOptions {
@@ -41,14 +40,19 @@ impl TestnetDeployer {
             }
         };
 
-        self.write_environment_details(&options.name, &EnvironmentDetails {
-            environment_type: options.environment_type.clone(),
-            deployment_type: DeploymentType::New,
-        })
+        write_environment_details(
+            &self.s3_repository,
+            &options.name,
+            &EnvironmentDetails {
+                environment_type: options.environment_type.clone(),
+                deployment_type: DeploymentType::New,
+            },
+        )
         .await?;
 
         self.create_or_update_infra(
             &options.name,
+            Some(1),
             None,
             options.bootstrap_node_vm_count,
             options.node_vm_count,
@@ -201,22 +205,6 @@ impl TestnetDeployer {
             println!("See the output from Ansible to determine which VMs had failures.");
         }
 
-        Ok(())
-    }
-
-    async fn write_environment_details(
-        &self,
-        environment_name: &str,
-        environment_details: &EnvironmentDetails,
-    ) -> Result<()> {
-        let temp_dir = tempfile::tempdir()?;
-        let path = temp_dir.path().to_path_buf().join(environment_name);
-        let mut file = File::create(&path)?;
-        let contents = format!("{}\n{}", environment_details.environment_type, environment_details.deployment_type);
-        file.write_all(contents.as_bytes())?;
-        self.s3_repository
-            .upload_file("sn-environment-type", &path, true)
-            .await?;
         Ok(())
     }
 }

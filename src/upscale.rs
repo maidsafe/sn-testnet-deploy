@@ -8,7 +8,7 @@ use crate::{
     ansible::provisioning::{NodeType, ProvisionOptions},
     ansible::AnsibleInventoryType,
     error::{Error, Result},
-    get_genesis_multiaddr, DeploymentInventory, TestnetDeployer,
+    get_genesis_multiaddr, DeploymentInventory, DeploymentType, TestnetDeployer,
 };
 use colored::Colorize;
 use log::debug;
@@ -102,7 +102,11 @@ impl TestnetDeployer {
             ];
             self.plan(
                 Some(vars),
-                options.current_inventory.environment_details.environment_type.clone(),
+                options
+                    .current_inventory
+                    .environment_details
+                    .environment_type
+                    .clone(),
             )
             .await?;
             return Ok(());
@@ -110,6 +114,16 @@ impl TestnetDeployer {
 
         self.create_or_update_infra(
             &options.current_inventory.name,
+            Some(
+                match options
+                    .current_inventory
+                    .environment_details
+                    .deployment_type
+                {
+                    DeploymentType::New => 1,
+                    DeploymentType::Bootstrap => 0,
+                },
+            ),
             Some(desired_auditor_vm_count),
             Some(desired_bootstrap_node_vm_count),
             Some(desired_node_vm_count),
