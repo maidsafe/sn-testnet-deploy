@@ -11,6 +11,7 @@ terraform {
 }
 
 resource "digitalocean_droplet" "genesis_bootstrap" {
+  count    = var.genesis_vm_count
   image    = var.bootstrap_droplet_image_id
   name     = "${terraform.workspace}-genesis-bootstrap"
   region   = var.region

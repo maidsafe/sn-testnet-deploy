@@ -5,6 +5,7 @@
 // Please see the LICENSE file for more details.
 
 pub mod ansible;
+pub mod bootstrap;
 pub mod deploy;
 pub mod digital_ocean;
 pub mod error;
@@ -41,7 +42,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::json;
 use std::{
     fs::File,
-    io::{BufRead, BufReader, BufWriter},
+    io::{BufRead, BufReader, BufWriter, Write},
     net::{IpAddr, SocketAddr},
     os::unix::fs::PermissionsExt,
     path::{Path, PathBuf},
@@ -655,6 +656,7 @@ impl TestnetDeployer {
     async fn create_or_update_infra(
         &self,
         name: &str,
+        genesis_vm_count: Option<u16>,
         auditor_vm_count: Option<u16>,
         bootstrap_node_vm_count: Option<u16>,
         node_vm_count: Option<u16>,
@@ -667,8 +669,13 @@ impl TestnetDeployer {
         self.terraform_runner.workspace_select(name)?;
 
         let mut args = Vec::new();
+
         if let Some(auditor_vm_count) = auditor_vm_count {
             args.push(("auditor_vm_count".to_string(), auditor_vm_count.to_string()));
+        }
+
+        if let Some(genesis_vm_count) = genesis_vm_count {
+            args.push(("genesis_vm_count".to_string(), genesis_vm_count.to_string()));
         }
 
         if let Some(bootstrap_node_vm_count) = bootstrap_node_vm_count {
@@ -906,14 +913,29 @@ pub async fn notify_slack(inventory: DeploymentInventory) -> Result<()> {
             ref sn_auditor_version,
         } => {
             message.push_str("*Version Details*\n");
-            message.push_str(&format!("faucet version: {}\n", faucet_version.as_ref().map_or("None".to_string(), |v| v.to_string())));
-            message.push_str(&format!("safe version: {}\n", safe_version.as_ref().map_or("None".to_string(), |v| v.to_string())));
-            message.push_str(&format!("safenode version: {}\n", safenode_version.to_string()));
+            message.push_str(&format!(
+                "faucet version: {}\n",
+                faucet_version
+                    .as_ref()
+                    .map_or("None".to_string(), |v| v.to_string())
+            ));
+            message.push_str(&format!(
+                "safe version: {}\n",
+                safe_version
+                    .as_ref()
+                    .map_or("None".to_string(), |v| v.to_string())
+            ));
+            message.push_str(&format!("safenode version: {}\n", safenode_version));
             message.push_str(&format!(
                 "safenode-manager version: {}\n",
-                safenode_manager_version.to_string()
+                safenode_manager_version
             ));
-            message.push_str(&format!("sn_auditor version: {}\n", sn_auditor_version.as_ref().map_or("None".to_string(), |v| v.to_string())));
+            message.push_str(&format!(
+                "sn_auditor version: {}\n",
+                sn_auditor_version
+                    .as_ref()
+                    .map_or("None".to_string(), |v| v.to_string())
+            ));
         }
     }
 
@@ -970,8 +992,12 @@ pub async fn get_environment_details(
         .download_object("sn-environment-type", environment_name, temp_file.path())
         .await
     {
-        Ok(_) => {},
-        Err(_) => return Err(Error::EnvironmentDetailsNotFound(environment_name.to_string())),
+        Ok(_) => {}
+        Err(_) => {
+            return Err(Error::EnvironmentDetailsNotFound(
+                environment_name.to_string(),
+            ))
+        }
     }
 
     let content = std::fs::read_to_string(temp_file.path())?;
@@ -1023,4 +1049,23 @@ pub async fn get_environment_details(
         environment_type,
         deployment_type,
     })
+}
+
+pub async fn write_environment_details(
+    s3_repository: &S3Repository,
+    environment_name: &str,
+    environment_details: &EnvironmentDetails,
+) -> Result<()> {
+    let temp_dir = tempfile::tempdir()?;
+    let path = temp_dir.path().to_path_buf().join(environment_name);
+    let mut file = File::create(&path)?;
+    let contents = format!(
+        "{}\n{}",
+        environment_details.environment_type, environment_details.deployment_type
+    );
+    file.write_all(contents.as_bytes())?;
+    s3_repository
+        .upload_file("sn-environment-type", &path, true)
+        .await?;
+    Ok(())
 }
