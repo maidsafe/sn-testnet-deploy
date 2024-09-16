@@ -92,6 +92,8 @@ pub enum Error {
          This is invalid for an upscale operation."
     )]
     InvalidUpscaleDesiredUploaderVmCount,
+    #[error("Options were used that are not applicable to a bootstrap deployment")]
+    InvalidUpscaleOptionsForBootstrapDeployment,
     #[error(transparent)]
     Io(#[from] std::io::Error),
     #[error("Failed to list objects in S3 bucket with prefix '{prefix}': {error}")]
@@ -112,6 +114,8 @@ pub enum Error {
     MissingNodeCount,
     #[error("This deployment does not have an auditor. It may be a bootstrap deployment.")]
     NoAuditorError,
+    #[error("Could not obtain a multiaddr from the node inventory")]
+    NodeAddressNotFound,
     #[error("This deployment does not have a faucet. It may be a bootstrap deployment.")]
     NoFaucetError,
     #[error("This deployment does not have any uploaders. It may be a bootstrap deployment.")]

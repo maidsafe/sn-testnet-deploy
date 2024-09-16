@@ -734,6 +734,32 @@ pub async fn get_genesis_multiaddr(
     Ok((multiaddr, genesis_ip))
 }
 
+pub async fn get_multiaddr(
+    ansible_runner: &AnsibleRunner,
+    ssh_client: &SshClient,
+) -> Result<(String, IpAddr)> {
+    let node_inventory = ansible_runner
+        .get_inventory(AnsibleInventoryType::Nodes, true)
+        .await?;
+    let node_ip = node_inventory[0].1;
+
+    let multiaddr =
+        ssh_client
+        .run_command(
+            &node_ip,
+            "root",
+            // fetch the first multiaddr which does not contain the localhost addr.
+            "jq -r '.nodes[] | .listen_addr[] | select(contains(\"127.0.0.1\") | not)' /var/safenode-manager/node_registry.json | head -n 1",
+            false,
+        )?.first()
+        .cloned()
+        .ok_or_else(|| Error::NodeAddressNotFound)?;
+
+    // The node_ip is obviously inside the multiaddr, but it's just being returned as a
+    // separate item for convenience.
+    Ok((multiaddr, node_ip))
+}
+
 pub async fn get_and_extract_archive_from_s3(
     s3_repository: &S3Repository,
     bucket_name: &str,
