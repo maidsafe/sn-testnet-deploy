@@ -682,20 +682,22 @@ impl DeploymentInventory {
                         println!("{peer}");
                     }
                 });
-            println!(
-                "Genesis: {}",
-                self.genesis_multiaddr
-                    .as_ref()
-                    .map_or("N/A", |genesis| genesis)
-            );
-            let inventory_file_path =
-                get_data_directory()?.join(format!("{}-inventory.json", self.name));
-            println!(
-                "The entire peer list can be found at {}",
-                inventory_file_path.to_string_lossy()
-            );
             println!();
         }
+
+        println!(
+            "Genesis: {}",
+            self.genesis_multiaddr
+                .as_ref()
+                .map_or("N/A", |genesis| genesis)
+        );
+        let inventory_file_path =
+            get_data_directory()?.join(format!("{}-inventory.json", self.name));
+        println!(
+            "The full inventory is at {}",
+            inventory_file_path.to_string_lossy()
+        );
+        println!();
 
         if let Some(faucet_address) = &self.faucet_address {
             println!("==============");
