@@ -185,11 +185,12 @@ pub struct DeployOptions {
 pub enum BinaryOption {
     /// Binaries will be built from source.
     BuildFromSource {
-        repo_owner: String,
         branch: String,
+        network_keys: Option<(String, String, String, String)>,
+        protocol_version: Option<String>,
+        repo_owner: String,
         /// A comma-separated list that will be passed to the `--features` argument.
         safenode_features: Option<String>,
-        protocol_version: Option<String>,
     },
     /// Pre-built, versioned binaries will be fetched from S3.
     Versioned {
@@ -911,6 +912,7 @@ pub async fn notify_slack(inventory: DeploymentInventory) -> Result<()> {
             ref safenode_version,
             ref safenode_manager_version,
             ref sn_auditor_version,
+            ..
         } => {
             message.push_str("*Version Details*\n");
             message.push_str(&format!(

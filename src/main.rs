@@ -83,6 +83,20 @@ enum Commands {
         /// The default value from ansible.cfg is 50.
         #[clap(long)]
         forks: Option<usize>,
+        /// Optionally set the foundation public key for a custom safenode binary.
+        ///
+        /// This argument only applies if the '--branch' and '--repo-owner' arguments are used.
+        ///
+        /// If one of the new keys is supplied, all must be supplied.
+        #[arg(long)]
+        foundation_pk: Option<String>,
+        /// Optionally set the genesis public key for a custom safenode binary.
+        ///
+        /// This argument only applies if the '--branch' and '--repo-owner' arguments are used.
+        ///
+        /// If one of the new keys is supplied, all must be supplied.
+        #[arg(long)]
+        genesis_pk: Option<String>,
         /// Specify the logging format for the nodes.
         ///
         /// Valid values are "default" or "json".
@@ -93,6 +107,13 @@ enum Commands {
         /// The name of the environment
         #[arg(short = 'n', long)]
         name: String,
+        /// Optionally set the network royalties public key for a custom safenode binary.
+        ///
+        /// This argument only applies if the '--branch' and '--repo-owner' arguments are used.
+        ///
+        /// If one of the new keys is supplied, all must be supplied.
+        #[arg(long)]
+        network_royalties_pk: Option<String>,
         /// The number of safenode services to run on each VM.
         ///
         /// If the argument is not used, the value will be determined by the 'environment-type'
@@ -107,6 +128,13 @@ enum Commands {
         /// argument.
         #[clap(long)]
         node_vm_count: Option<u16>,
+        /// Optionally set the payment forward public key for a custom safenode binary.
+        ///
+        /// This argument only applies if the '--branch' and '--repo-owner' arguments are used.
+        ///
+        /// If one of the new keys is supplied, all must be supplied.
+        #[arg(long)]
+        payment_forward_pk: Option<String>,
         /// The cloud provider to deploy to.
         ///
         /// Valid values are "aws" or "digital-ocean".
@@ -222,6 +250,20 @@ enum Commands {
         /// The default value from ansible.cfg is 50.
         #[clap(long)]
         forks: Option<usize>,
+        /// Optionally set the foundation public key for a custom safenode binary.
+        ///
+        /// This argument only applies if the '--branch' and '--repo-owner' arguments are used.
+        ///
+        /// If one of the new keys is supplied, all must be supplied.
+        #[arg(long)]
+        foundation_pk: Option<String>,
+        /// Optionally set the genesis public key for a custom safenode binary.
+        ///
+        /// This argument only applies if the '--branch' and '--repo-owner' arguments are used.
+        ///
+        /// If one of the new keys is supplied, all must be supplied.
+        #[arg(long)]
+        genesis_pk: Option<String>,
         /// Specify the logging format for the nodes.
         ///
         /// Valid values are "default" or "json".
@@ -240,6 +282,13 @@ enum Commands {
         /// If not used, the contacts file will have the same name as the environment.
         #[arg(long)]
         network_contacts_file_name: Option<String>,
+        /// Optionally set the network royalties public key for a custom safenode binary.
+        ///
+        /// This argument only applies if the '--branch' and '--repo-owner' arguments are used.
+        ///
+        /// If one of the new keys is supplied, all must be supplied.
+        #[arg(long)]
+        network_royalties_pk: Option<String>,
         /// The number of safenode services to run on each VM.
         ///
         /// If the argument is not used, the value will be determined by the 'environment-type'
@@ -254,6 +303,13 @@ enum Commands {
         /// argument.
         #[clap(long)]
         node_vm_count: Option<u16>,
+        /// Optionally set the payment forward public key for a custom safenode binary.
+        ///
+        /// This argument only applies if the '--branch' and '--repo-owner' arguments are used.
+        ///
+        /// If one of the new keys is supplied, all must be supplied.
+        #[arg(long)]
+        payment_forward_pk: Option<String>,
         /// Protocol version is used to partition the network and will not allow nodes with
         /// different protocol versions to join.
         ///
@@ -911,16 +967,27 @@ async fn main() -> Result<()> {
             environment_type,
             env_variables,
             forks,
+            foundation_pk,
+            genesis_pk,
             log_format,
             name,
+            network_royalties_pk,
             node_count,
             node_vm_count,
+            payment_forward_pk,
             provider,
             repo_owner,
             safenode_features,
             safenode_version,
             safenode_manager_version,
         } => {
+            let network_keys = validate_and_get_pks(
+                foundation_pk,
+                genesis_pk,
+                network_royalties_pk,
+                payment_forward_pk,
+            )?;
+
             let binary_option = get_binary_option(
                 branch,
                 None,
@@ -931,6 +998,7 @@ async fn main() -> Result<()> {
                 safenode_manager_version,
                 None,
                 safenode_features,
+                network_keys,
             )
             .await?;
 
@@ -1009,12 +1077,16 @@ async fn main() -> Result<()> {
             env_variables,
             faucet_version,
             forks,
+            foundation_pk,
+            genesis_pk,
             log_format,
             logstash_stack_name,
             name,
             network_contacts_file_name,
+            network_royalties_pk,
             node_count,
             node_vm_count,
+            payment_forward_pk,
             protocol_version,
             provider,
             public_rpc,
@@ -1026,6 +1098,13 @@ async fn main() -> Result<()> {
             sn_auditor_version,
             uploader_vm_count,
         } => {
+            let network_keys = validate_and_get_pks(
+                foundation_pk,
+                genesis_pk,
+                network_royalties_pk,
+                payment_forward_pk,
+            )?;
+
             let binary_option = get_binary_option(
                 branch,
                 protocol_version,
@@ -1036,6 +1115,7 @@ async fn main() -> Result<()> {
                 safenode_manager_version,
                 sn_auditor_version,
                 safenode_features,
+                network_keys,
             )
             .await?;
 
@@ -1871,6 +1951,7 @@ async fn get_binary_option(
     safenode_manager_version: Option<String>,
     sn_auditor_version: Option<String>,
     safenode_features: Option<Vec<String>>,
+    network_keys: Option<(String, String, String, String)>,
 ) -> Result<BinaryOption> {
     let mut use_versions = true;
 
@@ -1938,6 +2019,14 @@ async fn get_binary_option(
             repo_owner, branch
         ));
 
+        if let Some(ref network_keys) = network_keys {
+            println!("Using custom network keys:");
+            println!("Foundation PK: {}", network_keys.0);
+            println!("Genesis PK: {}", network_keys.1);
+            println!("Network Royalties PK: {}", network_keys.2);
+            println!("Payment Forward PK: {}", network_keys.3);
+        }
+
         let url = format!("https://github.com/{repo_owner}/safe_network/tree/{branch}",);
         let response = reqwest::get(&url).await?;
         if !response.status().is_success() {
@@ -1948,6 +2037,7 @@ async fn get_binary_option(
             branch,
             safenode_features: safenode_features.map(|list| list.join(",")),
             protocol_version,
+            network_keys,
         }
     };
 
@@ -2038,4 +2128,37 @@ fn build_fund_faucet_extra_vars_doc(
     extra_vars.add_variable("genesis_addr", &genesis_ip.to_string());
     extra_vars.add_variable("genesis_multiaddr", genesis_multiaddr);
     Ok(extra_vars.build())
+}
+
+fn validate_and_get_pks(
+    foundation_pk: Option<String>,
+    genesis_pk: Option<String>,
+    network_royalties_pk: Option<String>,
+    payment_forward_pk: Option<String>,
+) -> Result<Option<(String, String, String, String)>> {
+    let all_pks_supplied = foundation_pk.is_some()
+        && genesis_pk.is_some()
+        && network_royalties_pk.is_some()
+        && payment_forward_pk.is_some();
+    let any_pk_supplied = foundation_pk.is_some()
+        || genesis_pk.is_some()
+        || network_royalties_pk.is_some()
+        || payment_forward_pk.is_some();
+
+    if any_pk_supplied && !all_pks_supplied {
+        return Err(eyre!(
+            "The network keys are a set. They must be supplied together."
+        ));
+    }
+
+    if all_pks_supplied {
+        Ok(Some((
+            foundation_pk.unwrap(),
+            genesis_pk.unwrap(),
+            network_royalties_pk.unwrap(),
+            payment_forward_pk.unwrap(),
+        )))
+    } else {
+        Ok(None)
+    }
 }
