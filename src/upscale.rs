@@ -8,7 +8,7 @@ use crate::{
     ansible::provisioning::{NodeType, ProvisionOptions},
     ansible::AnsibleInventoryType,
     error::{Error, Result},
-    get_genesis_multiaddr, DeploymentInventory, DeploymentType, TestnetDeployer,
+    get_genesis_multiaddr, get_multiaddr, DeploymentInventory, DeploymentType, TestnetDeployer,
 };
 use colored::Colorize;
 use log::debug;
@@ -31,6 +31,23 @@ pub struct UpscaleOptions {
 
 impl TestnetDeployer {
     pub async fn upscale(&self, options: &UpscaleOptions) -> Result<()> {
+        let is_bootstrap_deploy = matches!(
+            options
+                .current_inventory
+                .environment_details
+                .deployment_type,
+            DeploymentType::Bootstrap
+        );
+
+        if is_bootstrap_deploy
+            && (options.desired_auditor_vm_count.is_some()
+                || options.desired_bootstrap_node_count.is_some()
+                || options.desired_bootstrap_node_vm_count.is_some()
+                || options.desired_uploader_vm_count.is_some())
+        {
+            return Err(Error::InvalidUpscaleOptionsForBootstrapDeployment);
+        }
+
         let desired_auditor_vm_count = options
             .desired_auditor_vm_count
             .unwrap_or(options.current_inventory.auditor_vms.len() as u16);
@@ -145,9 +162,6 @@ impl TestnetDeployer {
             return Ok(());
         }
 
-        let mut n = 1;
-        let total = 5;
-
         let provision_options = ProvisionOptions {
             beta_encryption_key: None,
             binary_option: options.current_inventory.binary_option.clone(),
@@ -160,35 +174,52 @@ impl TestnetDeployer {
             public_rpc: options.public_rpc,
         };
         let mut node_provision_failed = false;
-        let (genesis_multiaddr, genesis_ip) =
+
+        let (initial_multiaddr, initial_ip) = if is_bootstrap_deploy {
+            get_multiaddr(&self.ansible_provisioner.ansible_runner, &self.ssh_client)
+                .await
+                .map_err(|err| {
+                    println!("Failed to get node multiaddr {err:?}");
+                    err
+                })?
+        } else {
             get_genesis_multiaddr(&self.ansible_provisioner.ansible_runner, &self.ssh_client)
                 .await
                 .map_err(|err| {
                     println!("Failed to get genesis multiaddr {err:?}");
                     err
-                })?;
-        debug!("Retrieved genesis peer {genesis_multiaddr}");
+                })?
+        };
+        debug!("Retrieved initial peer {initial_multiaddr}");
 
-        self.wait_for_ssh_availability_on_new_machines(
-            AnsibleInventoryType::BootstrapNodes,
-            &options.current_inventory,
-        )
-        .await?;
-        self.ansible_provisioner
-            .print_ansible_run_banner(n, total, "Provision Bootstrap Nodes");
-        match self
-            .ansible_provisioner
-            .provision_nodes(&provision_options, &genesis_multiaddr, NodeType::Bootstrap)
-            .await
-        {
-            Ok(()) => {
-                println!("Provisioned bootstrap nodes");
+        let mut n = 1;
+        let total = if is_bootstrap_deploy { 2 } else { 5 };
+
+        if !is_bootstrap_deploy {
+            self.wait_for_ssh_availability_on_new_machines(
+                AnsibleInventoryType::BootstrapNodes,
+                &options.current_inventory,
+            )
+            .await?;
+            self.ansible_provisioner.print_ansible_run_banner(
+                n,
+                total,
+                "Provision Bootstrap Nodes",
+            );
+            match self
+                .ansible_provisioner
+                .provision_nodes(&provision_options, &initial_multiaddr, NodeType::Bootstrap)
+                .await
+            {
+                Ok(()) => {
+                    println!("Provisioned bootstrap nodes");
+                }
+                Err(_) => {
+                    node_provision_failed = true;
+                }
             }
-            Err(_) => {
-                node_provision_failed = true;
-            }
+            n += 1;
         }
-        n += 1;
 
         self.wait_for_ssh_availability_on_new_machines(
             AnsibleInventoryType::Nodes,
@@ -199,7 +230,7 @@ impl TestnetDeployer {
             .print_ansible_run_banner(n, total, "Provision Normal Nodes");
         match self
             .ansible_provisioner
-            .provision_nodes(&provision_options, &genesis_multiaddr, NodeType::Normal)
+            .provision_nodes(&provision_options, &initial_multiaddr, NodeType::Normal)
             .await
         {
             Ok(()) => {
@@ -211,43 +242,45 @@ impl TestnetDeployer {
         }
         n += 1;
 
-        // make sure faucet is running
-        self.ansible_provisioner
-            .print_ansible_run_banner(n, total, "Start Faucet");
-        self.ansible_provisioner
-            .provision_and_start_faucet(&provision_options, &genesis_multiaddr)
-            .await
-            .map_err(|err| {
-                println!("Failed to stop faucet {err:?}");
-                err
-            })?;
-        n += 1;
+        if !is_bootstrap_deploy {
+            // make sure faucet is running
+            self.ansible_provisioner
+                .print_ansible_run_banner(n, total, "Start Faucet");
+            self.ansible_provisioner
+                .provision_and_start_faucet(&provision_options, &initial_multiaddr)
+                .await
+                .map_err(|err| {
+                    println!("Failed to stop faucet {err:?}");
+                    err
+                })?;
+            n += 1;
 
-        self.wait_for_ssh_availability_on_new_machines(
-            AnsibleInventoryType::Uploaders,
-            &options.current_inventory,
-        )
-        .await?;
-        self.ansible_provisioner
-            .print_ansible_run_banner(n, total, "Provision Uploaders");
-        self.ansible_provisioner
-            .provision_uploaders(&provision_options, &genesis_multiaddr, &genesis_ip)
-            .await
-            .map_err(|err| {
-                println!("Failed to provision uploaders {err:?}");
-                err
-            })?;
-        n += 1;
+            self.wait_for_ssh_availability_on_new_machines(
+                AnsibleInventoryType::Uploaders,
+                &options.current_inventory,
+            )
+            .await?;
+            self.ansible_provisioner
+                .print_ansible_run_banner(n, total, "Provision Uploaders");
+            self.ansible_provisioner
+                .provision_uploaders(&provision_options, &initial_multiaddr, &initial_ip)
+                .await
+                .map_err(|err| {
+                    println!("Failed to provision uploaders {err:?}");
+                    err
+                })?;
+            n += 1;
 
-        self.ansible_provisioner
-            .print_ansible_run_banner(n, total, "Stop Faucet");
-        self.ansible_provisioner
-            .provision_and_stop_faucet(&provision_options, &genesis_multiaddr)
-            .await
-            .map_err(|err| {
-                println!("Failed to stop faucet {err:?}");
-                err
-            })?;
+            self.ansible_provisioner
+                .print_ansible_run_banner(n, total, "Stop Faucet");
+            self.ansible_provisioner
+                .provision_and_stop_faucet(&provision_options, &initial_multiaddr)
+                .await
+                .map_err(|err| {
+                    println!("Failed to stop faucet {err:?}");
+                    err
+                })?;
+        }
 
         if node_provision_failed {
             println!();

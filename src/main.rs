@@ -659,6 +659,8 @@ enum Commands {
         ///
         /// If there are currently 10 VMs running, and you want there to be 20, use 20 as the
         /// value, not 10 as a delta.
+        ///
+        /// This option is not applicable to a bootstrap deployment.
         #[clap(long, verbatim_doc_comment)]
         desired_auditor_vm_count: Option<u16>,
         /// The desired number of safenode services to be running on each bootstrap VM after the
@@ -669,12 +671,16 @@ enum Commands {
         ///
         /// Note: bootstrap VMs normally only use a single node service, so you probably want this
         /// value to be 1.
+        ///
+        /// This option is not applicable to a bootstrap deployment.
         #[clap(long, verbatim_doc_comment)]
         desired_bootstrap_node_count: Option<u16>,
         /// The desired number of bootstrap VMs to be running after the scale.
         ///
         /// If there are currently 10 VMs running, and you want there to be 20, use 20 as the
         /// value, not 10 as a delta.
+        ///
+        /// This option is not applicable to a bootstrap deployment.
         #[clap(long, verbatim_doc_comment)]
         desired_bootstrap_node_vm_count: Option<u16>,
         /// Set to only use Terraform to upscale the VMs and not run Ansible.
@@ -713,6 +719,8 @@ enum Commands {
         ///
         /// If there are currently 10 VMs running, and you want there to be 25, the value used
         /// should be 25, rather than 15 as a delta to reach 25.
+        ///
+        /// This option is not applicable to a bootstrap deployment.
         #[clap(long, verbatim_doc_comment)]
         desired_uploader_vm_count: Option<u16>,
         /// The cloud provider for the network.

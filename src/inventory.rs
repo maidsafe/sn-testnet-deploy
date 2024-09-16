@@ -559,11 +559,19 @@ impl DeploymentInventory {
     }
 
     pub fn bootstrap_node_count(&self) -> usize {
-        self.bootstrap_peers.len() / self.bootstrap_node_vms.len()
+        if self.bootstrap_node_vms.is_empty() {
+            0
+        } else {
+            self.bootstrap_peers.len() / self.bootstrap_node_vms.len()
+        }
     }
 
     pub fn node_count(&self) -> usize {
-        self.node_peers.len() / self.node_vms.len()
+        if self.node_vms.is_empty() {
+            0
+        } else {
+            self.node_peers.len() / self.node_vms.len()
+        }
     }
 
     pub fn print_report(&self) -> Result<()> {
@@ -614,7 +622,7 @@ impl DeploymentInventory {
                     "sn_auditor version: {}",
                     sn_auditor_version
                         .as_ref()
-                        .map_or("none".to_string(), |v| v.to_string())
+                        .map_or("N/A".to_string(), |v| v.to_string())
                 );
                 println!();
             }
