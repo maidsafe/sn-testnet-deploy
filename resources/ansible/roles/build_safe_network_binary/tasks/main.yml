@@ -17,6 +17,19 @@
     export NETWORK_VERSION_MODE={{ protocol_version }}
     {% endif %}
 
+    {% if foundation_pk is defined and foundation_pk != "" %}
+    export FOUNDATION_PK={{ foundation_pk }}
+    {% endif %}
+    {% if genesis_pk is defined and genesis_pk != "" %}
+    export GENESIS_PK={{ genesis_pk }}
+    {% endif %}
+    {% if network_royalties_pk is defined and network_royalties_pk != "" %}
+    export NETWORK_ROYALTIES_PK={{ network_royalties_pk }}
+    {% endif %}
+    {% if payment_forward_pk is defined and payment_forward_pk != "" %}
+    export PAYMENT_FORWARD_PK={{ payment_forward_pk }}
+    {% endif %}
+
     {% if bin_name == 'safenode' and safenode_features_list != "" %}
     cargo build --target x86_64-unknown-linux-musl --release --bin {{bin_name}} --no-default-features --features={{safenode_features_list}}
     {% elif bin_name == 'faucet' %}

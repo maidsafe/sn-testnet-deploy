@@ -58,6 +58,7 @@ impl ExtraVarsDocBuilder {
                 branch,
                 safenode_features,
                 protocol_version,
+                network_keys,
             } => {
                 self.add_variable("custom_bin", "true");
                 self.add_variable("testnet_name", deployment_name);
@@ -68,6 +69,12 @@ impl ExtraVarsDocBuilder {
                 }
                 if let Some(protocol_version) = protocol_version {
                     self.add_variable("protocol_version", protocol_version);
+                }
+                if let Some(network_keys) = network_keys {
+                    self.add_variable("foundation_pk", &network_keys.0);
+                    self.add_variable("genesis_pk", &network_keys.1);
+                    self.add_variable("network_royalties_pk", &network_keys.2);
+                    self.add_variable("payment_forward_pk", &network_keys.3);
                 }
             }
             BinaryOption::Versioned { .. } => {
