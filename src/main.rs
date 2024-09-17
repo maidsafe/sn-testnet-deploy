@@ -1604,7 +1604,10 @@ async fn main() -> Result<()> {
                 .setup_private_nodes(&PrivateNodeOptions {
                     ansible_verbose,
                     current_inventory: inventory,
-                    base_inventory_path: inventory_service.inventory_file_path.clone(),
+                    output_inventory_dir_path: testnet_deployer
+                        .working_directory_path
+                        .join("ansible")
+                        .join("inventory"),
                 })
                 .await?;
 
