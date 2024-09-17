@@ -88,6 +88,11 @@ pub enum Error {
     )]
     InvalidUpscaleDesiredNodeCount,
     #[error(
+        "The desired private node VM count is smaller than the current count. \
+         This is invalid for an upscale operation."
+    )]
+    InvalidUpscaleDesiredPrivateNodeVmCount,
+    #[error(
         "The desired uploader VM count is smaller than the current count. \
          This is invalid for an upscale operation."
     )]

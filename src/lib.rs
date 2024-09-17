@@ -128,6 +128,14 @@ impl EnvironmentType {
             EnvironmentType::Staging => 25,
         }
     }
+
+    pub fn get_default_private_node_count(&self) -> u16 {
+        match self {
+            EnvironmentType::Development => 1,
+            EnvironmentType::Production => 1,
+            EnvironmentType::Staging => 1,
+        }
+    }
 }
 
 impl std::fmt::Display for EnvironmentType {
@@ -666,6 +674,7 @@ impl TestnetDeployer {
         auditor_vm_count: Option<u16>,
         bootstrap_node_vm_count: Option<u16>,
         node_vm_count: Option<u16>,
+        private_node_vm_count: Option<u16>,
         uploader_vm_count: Option<u16>,
         // TODO: enable_build_vm must be provided from options when called from other places.
         // OR should we tear down the machine once used?
@@ -696,6 +705,13 @@ impl TestnetDeployer {
         if let Some(node_vm_count) = node_vm_count {
             args.push(("node_vm_count".to_string(), node_vm_count.to_string()));
         }
+        if let Some(private_node_vm_count) = private_node_vm_count {
+            args.push((
+                "private_node_vm_count".to_string(),
+                private_node_vm_count.to_string(),
+            ));
+        }
+
         if let Some(uploader_vm_count) = uploader_vm_count {
             args.push((
                 "uploader_vm_count".to_string(),

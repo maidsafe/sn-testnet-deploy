@@ -136,6 +136,14 @@ enum Commands {
         /// If one of the new keys is supplied, all must be supplied.
         #[arg(long)]
         payment_forward_pk: Option<String>,
+        /// The number of private node VMs to create.
+        ///
+        /// Each VM will run many safenode services. The services will still be public. To make them private,
+        /// use the `setup-private-nodes` command.
+        ///
+        /// If the argument is not used, the value will be determined by the 'environment-type' argument.
+        #[clap(long)]
+        private_node_vm_count: Option<u16>,
         /// The cloud provider to deploy to.
         ///
         /// Valid values are "aws" or "digital-ocean".
@@ -311,6 +319,14 @@ enum Commands {
         /// If one of the new keys is supplied, all must be supplied.
         #[arg(long)]
         payment_forward_pk: Option<String>,
+        /// The number of private node VMs to create.
+        ///
+        /// Each VM will run many safenode services. The services will still be public. To make them private,
+        /// use the `setup-private-nodes` command.
+        ///
+        /// If the argument is not used, the value will be determined by the 'environment-type' argument.
+        #[clap(long)]
+        private_node_vm_count: Option<u16>,
         /// Protocol version is used to partition the network and will not allow nodes with
         /// different protocol versions to join.
         ///
@@ -996,6 +1012,7 @@ async fn main() -> Result<()> {
             node_count,
             node_vm_count,
             payment_forward_pk,
+            private_node_vm_count,
             provider,
             repo_owner,
             safenode_features,
@@ -1068,6 +1085,8 @@ async fn main() -> Result<()> {
                     log_format,
                     name: name.clone(),
                     node_count: node_count.unwrap_or(environment_type.get_default_node_count()),
+                    private_node_vm_count: private_node_vm_count
+                        .unwrap_or(environment_type.get_default_private_node_count()),
                     node_vm_count,
                 })
                 .await?;
@@ -1108,6 +1127,7 @@ async fn main() -> Result<()> {
             node_count,
             node_vm_count,
             payment_forward_pk,
+            private_node_vm_count,
             protocol_version,
             provider,
             public_rpc,
@@ -1206,6 +1226,7 @@ async fn main() -> Result<()> {
                     name: name.clone(),
                     node_count: node_count.unwrap_or(environment_type.get_default_node_count()),
                     node_vm_count,
+                    private_node_vm_count,
                     public_rpc,
                     uploader_vm_count,
                 })

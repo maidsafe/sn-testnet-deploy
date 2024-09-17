@@ -144,6 +144,7 @@ impl TestnetDeployer {
             Some(desired_auditor_vm_count),
             Some(desired_bootstrap_node_vm_count),
             Some(desired_node_vm_count),
+            Some(options.current_inventory.private_node_vms.len() as u16),
             Some(desired_uploader_vm_count),
             false,
             options.current_inventory.nat_gateway_vm.is_some(),
@@ -194,7 +195,7 @@ impl TestnetDeployer {
         debug!("Retrieved initial peer {initial_multiaddr}");
 
         let mut n = 1;
-        let total = if is_bootstrap_deploy { 2 } else { 5 };
+        let total = if is_bootstrap_deploy { 3 } else { 6 };
 
         if !is_bootstrap_deploy {
             self.wait_for_ssh_availability_on_new_machines(

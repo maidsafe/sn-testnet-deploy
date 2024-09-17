@@ -22,6 +22,7 @@ pub struct BootstrapOptions {
     pub name: String,
     pub node_count: u16,
     pub node_vm_count: Option<u16>,
+    pub private_node_vm_count: u16,
 }
 
 impl TestnetDeployer {
@@ -49,6 +50,7 @@ impl TestnetDeployer {
             Some(0),
             Some(0),
             options.node_vm_count,
+            Some(options.private_node_vm_count),
             Some(0),
             build_custom_binaries,
             false,
