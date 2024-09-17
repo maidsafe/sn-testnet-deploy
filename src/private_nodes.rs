@@ -5,7 +5,7 @@
 // Please see the LICENSE file for more details.
 
 use crate::{
-    ansible::AnsibleInventoryType,
+    ansible::{generate_private_node_static_environment_inventory, AnsibleInventoryType},
     error::{Error, Result},
     DeploymentInventory, DeploymentType, TestnetDeployer,
 };
@@ -15,7 +15,7 @@ use std::path::PathBuf;
 pub struct PrivateNodeOptions {
     pub ansible_verbose: bool,
     pub current_inventory: DeploymentInventory,
-    pub base_inventory_path: PathBuf,
+    pub output_inventory_dir_path: PathBuf,
 }
 
 impl TestnetDeployer {
@@ -96,21 +96,20 @@ impl TestnetDeployer {
             .clone();
 
         n += 1;
-        self.ansible_provisioner.print_ansible_run_banner(
-            n,
-            total,
-            "Provision Private Nodes on the last VM",
-        );
         self.ansible_provisioner
-            .provision_home_nodes(
-                &options.current_inventory.name,
-                &nat_gateway_inventory,
-                &options.base_inventory_path,
-                &self.ssh_client.private_key_path,
-            )
+            .print_ansible_run_banner(n, total, "Provision home nodes");
+        generate_private_node_static_environment_inventory(
+            &options.current_inventory.name,
+            &options.output_inventory_dir_path,
+            &options.current_inventory.private_node_vms,
+            &Some(nat_gateway_inventory.clone()),
+            &self.ssh_client.private_key_path,
+        )?;
+        self.ansible_provisioner
+            .provision_home_nodes(&options.current_inventory.name, &nat_gateway_inventory)
             .await
             .map_err(|err| {
-                println!("Failed to provision private nodes {err:?}");
+                println!("Failed to provision home nodes {err:?}");
                 err
             })?;
 
