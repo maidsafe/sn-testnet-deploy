@@ -27,6 +27,7 @@ pub struct DeployOptions {
     pub name: String,
     pub node_count: u16,
     pub node_vm_count: Option<u16>,
+    pub private_node_vm_count: Option<u16>,
     pub public_rpc: bool,
     pub uploader_vm_count: Option<u16>,
 }
@@ -56,6 +57,7 @@ impl TestnetDeployer {
             None,
             options.bootstrap_node_vm_count,
             options.node_vm_count,
+            options.private_node_vm_count,
             options.uploader_vm_count,
             build_custom_binaries,
             false,
