@@ -61,9 +61,8 @@ resource "digitalocean_droplet" "nat_gateway" {
   tags     = ["environment:${terraform.workspace}", "type:nat_gateway"]
 }
 
-# node_vm_count - 1 nodes and 1 private node
 resource "digitalocean_droplet" "node" {
-  count    = var.node_vm_count - 1
+  count    = var.node_vm_count 
   image    = var.node_droplet_image_id
   name     = "${terraform.workspace}-node-${count.index + 1}"
   region   = var.region
@@ -73,8 +72,9 @@ resource "digitalocean_droplet" "node" {
 }
 
 resource "digitalocean_droplet" "private_node" {
+  count   = var.private_node_vm_count
   image    = var.node_droplet_image_id
-  name     = "${terraform.workspace}-private-node-1"
+  name     = "${terraform.workspace}-private-node-${count.index + 1}"
   region   = var.region
   size     = var.node_droplet_size
   ssh_keys = var.droplet_ssh_keys

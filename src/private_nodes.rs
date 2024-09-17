@@ -35,6 +35,7 @@ impl TestnetDeployer {
             Some(options.current_inventory.auditor_vms.len() as u16),
             Some(options.current_inventory.bootstrap_node_vms.len() as u16),
             Some(options.current_inventory.node_vms.len() as u16),
+            Some(options.current_inventory.private_node_vms.len() as u16),
             Some(options.current_inventory.uploader_vms.len() as u16),
             false,
             true,
