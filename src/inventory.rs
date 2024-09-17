@@ -6,7 +6,7 @@
 
 use crate::{
     ansible::{
-        generate_environment_inventory, generate_private_node_environment_inventory,
+        generate_environment_inventory, generate_private_node_static_environment_inventory,
         provisioning::AnsibleProvisioner, AnsibleInventoryType, AnsibleRunner,
     },
     get_environment_details, get_genesis_multiaddr,
@@ -158,16 +158,9 @@ impl DeploymentInventoryService {
         let nat_gateway_vm = self
             .ansible_runner
             .get_inventory(AnsibleInventoryType::NatGateway, false)
-            .await?;
-
-        // Modify the private node inventory to go through NAT gateway if it exists
-        if let Some(_nat_gateway_vm) = nat_gateway_vm.first() {
-            generate_private_node_environment_inventory(
-                name,
-                &self.inventory_file_path,
-                &output_inventory_dir_path,
-            )?;
-        }
+            .await?
+            .first()
+            .cloned();
 
         let mut node_vm_list = Vec::new();
         let nodes_inventory = self
@@ -181,6 +174,15 @@ impl DeploymentInventoryService {
             .ansible_runner
             .get_inventory(AnsibleInventoryType::PrivateNodes, false)
             .await?;
+
+        // Create static inventory for private nodes. Will be used during ansible-playbook run.
+        generate_private_node_static_environment_inventory(
+            name,
+            &output_inventory_dir_path,
+            &private_node_vms,
+            &nat_gateway_vm,
+            &self.ssh_client.private_key_path,
+        )?;
 
         let mut bootstrap_vm_list = Vec::new();
         let bootstrap_nodes_inventory = self
@@ -373,7 +375,7 @@ impl DeploymentInventoryService {
             genesis_multiaddr,
             name: name.to_string(),
             misc_vms: misc_vm_list,
-            nat_gateway_vm: nat_gateway_vm.first().cloned(),
+            nat_gateway_vm,
             node_vms: node_vm_list,
             node_peers,
             private_node_vms,

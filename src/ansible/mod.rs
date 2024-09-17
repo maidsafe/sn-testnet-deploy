@@ -223,8 +223,11 @@ pub enum AnsibleInventoryType {
     NatGateway,
     /// Use to run a playbook against all nodes except the genesis node.
     Nodes,
-    /// Use to run a playbook against the private nodes.
+    /// Use to run a inventory against the private nodes. This
     PrivateNodes,
+    /// Use to run a playbook against the private nodes. This is similar to the PrivateNodes inventory, but uses
+    /// a static custom inventory file. This is just used for running playbooks and not inventory.
+    PrivateNodesStatic,
     /// Use to run a playbook against all the uploader machines.
     Uploaders,
 }
@@ -241,6 +244,7 @@ impl std::fmt::Display for AnsibleInventoryType {
             AnsibleInventoryType::NatGateway => "NatGateway",
             AnsibleInventoryType::Nodes => "Nodes",
             AnsibleInventoryType::PrivateNodes => "PrivateNodes",
+            AnsibleInventoryType::PrivateNodesStatic => "PrivateNodesStatic",
             AnsibleInventoryType::Uploaders => "Uploaders",
         };
         write!(f, "{}", s)
@@ -285,9 +289,23 @@ impl AnsibleRunner {
     pub fn run_playbook(
         &self,
         playbook: AnsiblePlaybook,
-        inventory_type: AnsibleInventoryType,
+        mut inventory_type: AnsibleInventoryType,
         extra_vars_document: Option<String>,
     ) -> Result<()> {
+        // prioritize the static private node inventory if it exists. Else fall back to the dynamic one.
+        if matches!(inventory_type, AnsibleInventoryType::PrivateNodes)
+            && self
+                .get_inventory_path(&AnsibleInventoryType::PrivateNodesStatic)
+                .is_ok()
+        {
+            println!("Using static private node inventory to run playbook");
+            inventory_type = AnsibleInventoryType::PrivateNodesStatic;
+        }
+        debug!(
+            "Running playbook: {:?} on {inventory_type:?}",
+            playbook.get_playbook_name()
+        );
+
         // Using `to_string_lossy` will suffice here. With `to_str` returning an `Option`, to avoid
         // unwrapping you would need to `ok_or_else` on every path, and maybe even introduce a new
         // error variant, which is very cumbersome. These paths are extremely unlikely to have any
@@ -364,6 +382,10 @@ impl AnsibleRunner {
             )),
             AnsibleInventoryType::PrivateNodes => PathBuf::from("inventory").join(format!(
                 ".{}_private_node_inventory_{}.yml",
+                self.environment_name, provider
+            )),
+            AnsibleInventoryType::PrivateNodesStatic => PathBuf::from("inventory").join(format!(
+                ".{}_private_node_static_inventory_{}.yml",
                 self.environment_name, provider
             )),
             AnsibleInventoryType::Uploaders => PathBuf::from("inventory").join(format!(
@@ -445,27 +467,42 @@ pub fn generate_custom_environment_inventory(
     Ok(())
 }
 
-/// Generate the private node inventory where we use the private addr instead of the public addr.
-/// This should be generated after the private node has been provisioned to go through the NAT gateway.
-pub fn generate_private_node_environment_inventory(
+/// Generate the static inventory for the private node. This is just used during ansible-playbook.
+pub fn generate_private_node_static_environment_inventory(
     environment_name: &str,
-    base_inventory_path: &Path,
     output_inventory_dir_path: &Path,
+    private_node_vms: &[VirtualMachine],
+    nat_gateway_vm: &Option<VirtualMachine>,
+    ssh_sk_path: &Path,
 ) -> Result<()> {
-    println!("Modifying inventory file for private node with ssh proxy");
-    let inventory_type = "private_node";
-    let src_path = base_inventory_path;
+    println!(
+        "Generating private node static inventory. Via ssh proxy: {}",
+        nat_gateway_vm.is_some()
+    );
     let dest_path = output_inventory_dir_path.join(format!(
-        ".{environment_name}_{inventory_type}_inventory_digital_ocean.yml",
+        ".{environment_name}_private_node_static_inventory_digital_ocean.yml",
     ));
+    debug!("Created inventory file at {dest_path:?}");
 
-    let mut contents = std::fs::read_to_string(src_path)?;
-    contents = contents.replace("env_value", environment_name);
-    contents = contents.replace("type_value", inventory_type);
-    contents = contents.replace("'public'", "'private'");
+    let mut file = File::create(&dest_path)?;
+    writeln!(file, "[private_nodes]")?;
+    for vm in private_node_vms.iter() {
+        if nat_gateway_vm.is_some() {
+            writeln!(file, "{}", vm.private_ip_addr)?;
+        } else {
+            writeln!(file, "{}", vm.public_ip_addr)?;
+        }
+    }
 
-    std::fs::write(&dest_path, contents)?;
-    debug!("Created inventory file at {dest_path:#?}");
+    if let Some(nat_gateway_vm) = nat_gateway_vm {
+        writeln!(file, "[private_nodes:vars]")?;
+        writeln!(
+            file,
+            "ansible_ssh_common_args='-o ProxyCommand=\"ssh -p 22 -W %h:%p -q root@{} -i \"{}\"\"'",
+            nat_gateway_vm.public_ip_addr,
+            ssh_sk_path.to_string_lossy()
+        )?;
+    }
 
     debug!("Created private node inventory file with ssh proxy at {dest_path:?}");
 
