@@ -83,6 +83,11 @@ variable "node_vm_count" {
   description = "The number of droplets to launch for nodes"
 }
 
+variable "private_node_vm_count" {
+  default     = 1
+  description = "The number of droplets to launch for private nodes"
+}
+
 variable "setup_nat_gateway" {
   type        = bool
   default     = false

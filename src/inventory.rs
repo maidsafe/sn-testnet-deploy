@@ -382,6 +382,7 @@ impl DeploymentInventoryService {
             rpc_endpoints: safenode_rpc_endpoints,
             safenodemand_endpoints,
             ssh_user: self.cloud_provider.get_ssh_user(),
+            ssh_private_key_path: self.ssh_client.private_key_path.clone(),
             uploaded_files: Vec::new(),
             uploader_vms: uploader_vm_list,
         };
@@ -515,6 +516,7 @@ pub struct DeploymentInventory {
     pub rpc_endpoints: BTreeMap<String, SocketAddr>,
     pub safenodemand_endpoints: Vec<SocketAddr>,
     pub ssh_user: String,
+    pub ssh_private_key_path: PathBuf,
     pub uploaded_files: Vec<(String, String)>,
     pub uploader_vms: Vec<VirtualMachine>,
 }
@@ -541,6 +543,7 @@ impl DeploymentInventory {
             rpc_endpoints: BTreeMap::new(),
             safenodemand_endpoints: Vec::new(),
             ssh_user: "root".to_string(),
+            ssh_private_key_path: PathBuf::new(),
             uploaded_files: Vec::new(),
             uploader_vms: Vec::new(),
         }
@@ -686,18 +689,20 @@ impl DeploymentInventory {
         for vm in self.private_node_vms.iter() {
             println!("{}: {}", vm.name, vm.public_ip_addr);
             if let Some(nat_gateway_vm) = &self.nat_gateway_vm {
-                let ssh = format!(
-                    "ssh -o ProxyCommand=\"ssh -W %h:%p root@{}\" root@{}",
-                    nat_gateway_vm.public_ip_addr, vm.private_ip_addr
-                );
+                let ssh = if let Some(ssh_key_path) = self.ssh_private_key_path.to_str() {
+                    format!(
+                        "ssh -i {ssh_key_path} -o ProxyCommand=\"ssh -W %h:%p root@{} -i {ssh_key_path}\" root@{}",
+                        nat_gateway_vm.public_ip_addr, vm.private_ip_addr
+                    )
+                } else {
+                    format!(
+                        "ssh -o ProxyCommand=\"ssh -W %h:%p root@{}\" root@{}",
+                        nat_gateway_vm.public_ip_addr, vm.private_ip_addr
+                    )
+                };
                 println!("SSH using NAT gateway: {ssh}");
             } else {
                 println!("SSH using public IP");
-            }
-            if self.nat_gateway_vm.is_some() {
-                println!(
-                    "Hint: provide the SSH private key with -i <path-to-private-key> if needed"
-                );
             }
         }
         println!("Nodes per VM: {}", self.node_count());
