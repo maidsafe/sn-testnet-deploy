@@ -8,7 +8,7 @@ use super::{
     extra_vars::ExtraVarsDocBuilder, AnsibleInventoryType, AnsiblePlaybook, AnsibleRunner,
 };
 use crate::{
-    ansible::{generate_custom_environment_inventory, generate_private_node_environment_inventory},
+    ansible::generate_custom_environment_inventory,
     bootstrap::BootstrapOptions,
     deploy::DeployOptions,
     error::{Error, Result},
@@ -20,7 +20,7 @@ use semver::Version;
 use sn_service_management::NodeRegistry;
 use std::{
     net::{IpAddr, SocketAddr},
-    path::{Path, PathBuf},
+    path::PathBuf,
     time::Instant,
 };
 use walkdir::WalkDir;
@@ -348,16 +348,10 @@ impl AnsibleProvisioner {
         &self,
         name: &str,
         nat_gateway_inventory: &VirtualMachine,
-        base_inventory_path: &Path,
-        _ssh_sk_path: &Path,
     ) -> Result<()> {
         let start = Instant::now();
         println!("Provisioning private noes with a custom inventory");
-        generate_private_node_environment_inventory(
-            name,
-            base_inventory_path,
-            &self.ansible_runner.working_directory_path.join("inventory"),
-        )?;
+
         self.ansible_runner.run_playbook(
             AnsiblePlaybook::PrivateNodes,
             AnsibleInventoryType::PrivateNodes,
