@@ -445,6 +445,19 @@ pub async fn generate_environment_inventory(
         debug!("Created inventory file at {dest_path:#?}");
     }
 
+    // remove static private node inventory if it exists. We should not carry over the inventory
+    // from previous testnet with the same name.
+    let static_private_node_inventory_path = output_inventory_dir_path.join(format!(
+        ".{}_private_node_static_inventory_digital_ocean.yml",
+        environment_name
+    ));
+    if static_private_node_inventory_path.is_file() {
+        std::fs::remove_file(&static_private_node_inventory_path)?;
+        debug!(
+            "Removed static private node inventory file at {static_private_node_inventory_path:#?}"
+        );
+    }
+
     Ok(())
 }
 
