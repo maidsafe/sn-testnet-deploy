@@ -260,7 +260,7 @@ impl LogstashDeploy {
             None,
             self.working_directory_path.clone(),
             &self.terraform_runner,
-            vec!["logstash".to_string()],
+            Some(vec![AnsibleInventoryType::Logstash]),
         )
     }
 

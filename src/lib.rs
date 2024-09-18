@@ -35,6 +35,7 @@ use crate::{
     ssh::SshClient,
     terraform::TerraformRunner,
 };
+use ansible::environment_inventory::cleanup_environment_inventory;
 use flate2::read::GzDecoder;
 use indicatif::{ProgressBar, ProgressStyle};
 use log::debug;
@@ -654,11 +655,7 @@ impl TestnetDeployer {
             Some(environment_type.environment_type),
             self.working_directory_path.clone(),
             &self.terraform_runner,
-            vec![
-                "build".to_string(),
-                "genesis".to_string(),
-                "node".to_string(),
-            ],
+            None,
         )?;
         self.s3_repository
             .delete_object("sn-environment-type", &self.environment_name)
@@ -897,7 +894,7 @@ pub fn do_clean(
     environment_type: Option<EnvironmentType>,
     working_directory_path: PathBuf,
     terraform_runner: &TerraformRunner,
-    inventory_types: Vec<String>,
+    inventory_types: Option<Vec<AnsibleInventoryType>>,
 ) -> Result<()> {
     terraform_runner.init()?;
     let workspaces = terraform_runner.workspace_list()?;
@@ -916,19 +913,12 @@ pub fn do_clean(
     terraform_runner.workspace_delete(name)?;
     println!("Deleted {name} workspace");
 
-    for inventory_type in inventory_types.iter() {
-        let inventory_file_path = working_directory_path
-            .join("ansible")
-            .join("inventory")
-            .join(format!(
-                ".{}_{}_inventory_digital_ocean.yml",
-                name, inventory_type
-            ));
-        if inventory_file_path.exists() {
-            debug!("Removing inventory file at {inventory_file_path:#?}");
-            std::fs::remove_file(inventory_file_path)?;
-        }
-    }
+    cleanup_environment_inventory(
+        name,
+        &working_directory_path.join("ansible").join("inventory"),
+        inventory_types,
+    )?;
+
     println!("Deleted Ansible inventory for {name}");
     Ok(())
 }
