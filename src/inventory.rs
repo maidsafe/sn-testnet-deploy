@@ -706,8 +706,8 @@ impl DeploymentInventory {
             }
         }
         println!("Nodes per VM: {}", self.node_count());
-
         println!("SSH user: {}", self.ssh_user);
+        println!();
 
         if !self.uploader_vms.is_empty() {
             println!("============");
@@ -720,20 +720,23 @@ impl DeploymentInventory {
             println!();
         }
 
-        if !self.misc_vms.is_empty() {
+        if !self.misc_vms.is_empty() || self.nat_gateway_vm.is_some() {
             println!("=========");
             println!("Other VMs");
             println!("=========");
+        }
+        if !self.misc_vms.is_empty() {
             for vm in self.misc_vms.iter() {
                 println!("{}: {}", vm.name, vm.public_ip_addr);
             }
-            println!("SSH user: {}", self.ssh_user);
-            println!();
         }
 
         if let Some(nat_gateway_vm) = &self.nat_gateway_vm {
             println!("{}: {}", nat_gateway_vm.name, nat_gateway_vm.public_ip_addr);
         }
+
+        println!("SSH user: {}", self.ssh_user);
+        println!();
 
         // If there are no bootstrap nodes, it's a bootstrap deploy, and in that case, we're not
         // really interested in available peers.
