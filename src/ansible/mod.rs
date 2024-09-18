@@ -4,21 +4,17 @@
 // This SAFE Network Software is licensed under the BSD-3-Clause license.
 // Please see the LICENSE file for more details.
 
+pub mod environment_inventory;
 pub mod extra_vars;
 pub mod inventory;
 pub mod provisioning;
 
 use crate::{
     error::{Error, Result},
-    inventory::VirtualMachine,
     is_binary_on_path, run_external_command, CloudProvider,
 };
 use log::debug;
-use std::{
-    fs::File,
-    io::{BufWriter, Write},
-    path::{Path, PathBuf},
-};
+use std::path::PathBuf;
 
 /// Ansible has multiple 'binaries', e.g., `ansible-playbook`, `ansible-inventory` etc. that are
 /// wrappers around the main `ansible` program. It would be a bit cumbersome to create a different
@@ -254,6 +250,48 @@ impl std::fmt::Display for AnsibleInventoryType {
     }
 }
 
+impl AnsibleInventoryType {
+    pub fn get_inventory_path(&self, name: &str, provider: &str) -> PathBuf {
+        match &self {
+            Self::Auditor => PathBuf::from(format!(".{name}_auditor_inventory_{provider}.yml")),
+            Self::BootstrapNodes => {
+                PathBuf::from(format!(".{name}_bootstrap_node_inventory_{provider}.yml"))
+            }
+            Self::Build => PathBuf::from(format!(".{name}_build_inventory_{provider}.yml")),
+            Self::Custom => PathBuf::from(format!(".{name}_custom_inventory_{provider}.ini")),
+            Self::Genesis => PathBuf::from(format!(".{name}_genesis_inventory_{provider}.yml")),
+            Self::Logstash => PathBuf::from(format!(".{name}_logstash_inventory_{provider}.yml")),
+            Self::NatGateway => {
+                PathBuf::from(format!(".{name}_nat_gateway_inventory_{provider}.yml"))
+            }
+            Self::Nodes => PathBuf::from(format!(".{name}_node_inventory_{provider}.yml")),
+            Self::PrivateNodes => {
+                PathBuf::from(format!(".{name}_private_node_inventory_{provider}.yml"))
+            }
+            Self::PrivateNodesStatic => PathBuf::from(format!(
+                ".{name}_private_node_static_inventory_{provider}.yml"
+            )),
+            Self::Uploaders => PathBuf::from(format!(".{name}_uploader_inventory_{provider}.yml")),
+        }
+    }
+
+    pub fn do_tag(&self) -> &str {
+        match self {
+            Self::Auditor => "auditor",
+            Self::BootstrapNodes => "bootstrap_node",
+            Self::Build => "build",
+            Self::Custom => "custom",
+            Self::Genesis => "genesis",
+            Self::Logstash => "logstash",
+            Self::NatGateway => "nat_gateway",
+            Self::Nodes => "node",
+            Self::PrivateNodes => "private_node",
+            Self::PrivateNodesStatic => "private_node",
+            Self::Uploaders => "uploader",
+        }
+    }
+}
+
 #[derive(Clone)]
 pub struct AnsibleRunner {
     pub ansible_forks: usize,
@@ -350,53 +388,8 @@ impl AnsibleRunner {
             CloudProvider::Aws => "aws",
             CloudProvider::DigitalOcean => "digital_ocean",
         };
-        let path = match inventory_type {
-            AnsibleInventoryType::Auditor => PathBuf::from("inventory").join(format!(
-                ".{}_auditor_inventory_{}.yml",
-                self.environment_name, provider
-            )),
-            AnsibleInventoryType::BootstrapNodes => PathBuf::from("inventory").join(format!(
-                ".{}_bootstrap_node_inventory_{}.yml",
-                self.environment_name, provider
-            )),
-            AnsibleInventoryType::Build => PathBuf::from("inventory").join(format!(
-                ".{}_build_inventory_{}.yml",
-                self.environment_name, provider
-            )),
-            AnsibleInventoryType::Custom => PathBuf::from("inventory").join(format!(
-                ".{}_custom_inventory_{}.ini",
-                self.environment_name, provider
-            )),
-            AnsibleInventoryType::Genesis => PathBuf::from("inventory").join(format!(
-                ".{}_genesis_inventory_{}.yml",
-                self.environment_name, provider
-            )),
-            AnsibleInventoryType::Logstash => PathBuf::from("inventory").join(format!(
-                ".{}_logstash_inventory_{}.yml",
-                self.environment_name, provider
-            )),
-            AnsibleInventoryType::NatGateway => PathBuf::from("inventory").join(format!(
-                ".{}_nat_gateway_inventory_{}.yml",
-                self.environment_name, provider
-            )),
-            AnsibleInventoryType::Nodes => PathBuf::from("inventory").join(format!(
-                ".{}_node_inventory_{}.yml",
-                self.environment_name, provider
-            )),
-            AnsibleInventoryType::PrivateNodes => PathBuf::from("inventory").join(format!(
-                ".{}_private_node_inventory_{}.yml",
-                self.environment_name, provider
-            )),
-            AnsibleInventoryType::PrivateNodesStatic => PathBuf::from("inventory").join(format!(
-                ".{}_private_node_static_inventory_{}.yml",
-                self.environment_name, provider
-            )),
-            AnsibleInventoryType::Uploaders => PathBuf::from("inventory").join(format!(
-                ".{}_uploader_inventory_{}.yml",
-                self.environment_name, provider
-            )),
-        };
-        let path = self.working_directory_path.join(path);
+        let path = inventory_type.get_inventory_path(&self.environment_name, provider);
+        let path = self.working_directory_path.join("inventory").join(path);
         match path.exists() {
             true => Ok(path),
             false => Err(Error::EnvironmentDoesNotExist(
@@ -404,123 +397,4 @@ impl AnsibleRunner {
             )),
         }
     }
-}
-
-/// Generate necessary inventory files for a given environment.
-///
-/// These files are based from a template in the base directory.
-///
-/// Returns a three-element tuple with the paths of the generated build, genesis, and node
-/// inventories, respectively.
-pub async fn generate_environment_inventory(
-    environment_name: &str,
-    base_inventory_path: &Path,
-    output_inventory_dir_path: &Path,
-) -> Result<()> {
-    let inventory_files = [
-        "auditor",
-        "bootstrap_node",
-        "build",
-        "genesis",
-        "nat_gateway",
-        "node",
-        "private_node",
-        "uploader",
-    ];
-    for inventory_type in inventory_files.into_iter() {
-        let src_path = base_inventory_path;
-        let dest_path = output_inventory_dir_path.join(format!(
-            ".{}_{}_inventory_digital_ocean.yml",
-            environment_name, inventory_type
-        ));
-        if dest_path.is_file() {
-            // The inventory has already been generated by a previous run, so just move on.
-            continue;
-        }
-
-        let mut contents = std::fs::read_to_string(src_path)?;
-        contents = contents.replace("env_value", environment_name);
-        contents = contents.replace("type_value", inventory_type);
-        std::fs::write(&dest_path, contents)?;
-        debug!("Created inventory file at {dest_path:#?}");
-    }
-
-    // remove static private node inventory if it exists. We should not carry over the inventory
-    // from previous testnet with the same name.
-    let static_private_node_inventory_path = output_inventory_dir_path.join(format!(
-        ".{}_private_node_static_inventory_digital_ocean.yml",
-        environment_name
-    ));
-    if static_private_node_inventory_path.is_file() {
-        std::fs::remove_file(&static_private_node_inventory_path)?;
-        debug!(
-            "Removed static private node inventory file at {static_private_node_inventory_path:#?}"
-        );
-    }
-
-    Ok(())
-}
-
-pub fn generate_custom_environment_inventory(
-    vm_list: &[VirtualMachine],
-    environment_name: &str,
-    output_inventory_dir_path: &Path,
-) -> Result<()> {
-    let dest_path = output_inventory_dir_path.join(format!(
-        ".{}_custom_inventory_digital_ocean.ini",
-        environment_name
-    ));
-    let file = File::create(&dest_path)?;
-    let mut writer = BufWriter::new(file);
-
-    writeln!(writer, "[custom]")?;
-    for vm in vm_list.iter() {
-        writeln!(writer, "{}", vm.public_ip_addr)?;
-    }
-
-    debug!("Created custom inventory file at {dest_path:#?}");
-
-    Ok(())
-}
-
-/// Generate the static inventory for the private node. This is just used during ansible-playbook.
-pub fn generate_private_node_static_environment_inventory(
-    environment_name: &str,
-    output_inventory_dir_path: &Path,
-    private_node_vms: &[VirtualMachine],
-    nat_gateway_vm: &Option<VirtualMachine>,
-    ssh_sk_path: &Path,
-) -> Result<()> {
-    println!(
-        "Generating private node static inventory. Via ssh proxy: {}",
-        nat_gateway_vm.is_some()
-    );
-    let dest_path = output_inventory_dir_path.join(format!(
-        ".{environment_name}_private_node_static_inventory_digital_ocean.yml",
-    ));
-    debug!("Created inventory file at {dest_path:?}");
-
-    let mut file = File::create(&dest_path)?;
-    writeln!(file, "[private_nodes]")?;
-    for vm in private_node_vms.iter() {
-        if nat_gateway_vm.is_some() {
-            writeln!(file, "{}", vm.private_ip_addr)?;
-        } else {
-            writeln!(file, "{}", vm.public_ip_addr)?;
-        }
-    }
-
-    if let Some(nat_gateway_vm) = nat_gateway_vm {
-        writeln!(file, "[private_nodes:vars]")?;
-        writeln!(
-            file,
-            "ansible_ssh_common_args='-o ProxyCommand=\"ssh -p 22 -W %h:%p -q root@{} -i \"{}\"\"'",
-            nat_gateway_vm.public_ip_addr,
-            ssh_sk_path.to_string_lossy()
-        )?;
-    }
-
-    debug!("Created private node inventory file with ssh proxy at {dest_path:?}");
-
-    Ok(())
 }
