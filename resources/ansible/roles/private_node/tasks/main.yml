@@ -5,6 +5,7 @@
     nat_randomized_role_is_set_is_set: false
     do_gateway_is_configured: false
     nat_gateway_is_configured: false
+    do_wan_route_is_removed: false
 
 - name: check if --home-network flag is set in safenode services
   # cat to avoid exit code 1 when grep returns empty
@@ -57,25 +58,37 @@
 
 - name: check if nat gateway is configured
   command: ip route show
-  register: nat_gateway_route
+  register: ip_route_output
 
 - name: set nat_gateway_is_configured to true if nat gateway is configured
   set_fact:
     nat_gateway_is_configured: true
-  when: nat_gateway_route.stdout.find(nat_gateway_private_ip_eth1) != -1
+  when: ip_route_output.stdout.find(nat_gateway_private_ip_eth1) != -1
 
 - name: change default route to private ip of DO droplet used as a safenode gateway
   command: ip route change default via {{ nat_gateway_private_ip_eth1 }}
   when: not nat_gateway_is_configured
 
-- name: verify route is going through nat_gateway private ip
-  command: ip route get 8.8.8.8
-  register: route_output
+- name: identify /20 CIDR network route from the routing table
+  shell: ip route show | grep "dev eth0 proto kernel" | grep -v "\/16" | head -n 1 | awk '{print $1}'
+  register: do_wanroute
 
-- debug: var=route_output.stdout
+- name: set do_wan_route_is_removed to true if /20 CIDR network route is removed
+  set_fact:
+    do_wan_route_is_removed: true
+  when: ip_route_output.stdout.find(do_wanroute.stdout) == -1
+
+- name: remove /20 CIDR network route from the routing table
+  command: ip route del {{ do_wanroute.stdout }} dev eth0
+  when: not do_wan_route_is_removed
+
+- name: get private ip of eth1
+  shell: ip -4 addr show dev eth1 | grep inet | awk '{print $2}' | cut -d/ -f1
+  register: private_ip_eth1
+  when: not home_network_flag_is_set
 
 - name: setup safenode services to use --home-network flag
-  shell: sed -i 's/--rpc/--home-network --rpc/g' /etc/systemd/system/safenode*.service
+  shell: sed -i 's/--rpc/--ip {{ private_ip_eth1.stdout }} --home-network --rpc/g' /etc/systemd/system/safenode*.service
   when: not home_network_flag_is_set
 
 - name: refresh systemd daemon
