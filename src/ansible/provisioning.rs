@@ -8,7 +8,7 @@ use super::{
     extra_vars::ExtraVarsDocBuilder, AnsibleInventoryType, AnsiblePlaybook, AnsibleRunner,
 };
 use crate::{
-    ansible::generate_custom_environment_inventory,
+    ansible::environment_inventory::generate_custom_environment_inventory,
     bootstrap::BootstrapOptions,
     deploy::DeployOptions,
     error::{Error, Result},
