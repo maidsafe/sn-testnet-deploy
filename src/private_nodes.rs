@@ -5,7 +5,10 @@
 // Please see the LICENSE file for more details.
 
 use crate::{
-    ansible::{generate_private_node_static_environment_inventory, AnsibleInventoryType},
+    ansible::{
+        environment_inventory::generate_private_node_static_environment_inventory,
+        AnsibleInventoryType,
+    },
     error::{Error, Result},
     DeploymentInventory, DeploymentType, TestnetDeployer,
 };

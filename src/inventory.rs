@@ -6,8 +6,11 @@
 
 use crate::{
     ansible::{
-        generate_environment_inventory, generate_private_node_static_environment_inventory,
-        provisioning::AnsibleProvisioner, AnsibleInventoryType, AnsibleRunner,
+        environment_inventory::{
+            generate_environment_inventory, generate_private_node_static_environment_inventory,
+        },
+        provisioning::AnsibleProvisioner,
+        AnsibleInventoryType, AnsibleRunner,
     },
     get_environment_details, get_genesis_multiaddr,
     s3::S3Repository,
@@ -116,8 +119,11 @@ impl DeploymentInventoryService {
             .working_directory_path
             .join("ansible")
             .join("inventory");
-        generate_environment_inventory(name, &self.inventory_file_path, &output_inventory_dir_path)
-            .await?;
+        generate_environment_inventory(
+            name,
+            &self.inventory_file_path,
+            &output_inventory_dir_path,
+        )?;
 
         let environment_details = match get_environment_details(name, &self.s3_repository).await {
             Ok(details) => details,
