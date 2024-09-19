@@ -25,7 +25,9 @@ pub mod upscale;
 
 use crate::{
     ansible::{
-        extra_vars::ExtraVarsDocBuilder, provisioning::AnsibleProvisioner, AnsibleInventoryType,
+        extra_vars::ExtraVarsDocBuilder,
+        inventory::{cleanup_environment_inventory, AnsibleInventoryType},
+        provisioning::AnsibleProvisioner,
         AnsibleRunner,
     },
     error::{Error, Result},
@@ -35,7 +37,6 @@ use crate::{
     ssh::SshClient,
     terraform::TerraformRunner,
 };
-use ansible::environment_inventory::cleanup_environment_inventory;
 use flate2::read::GzDecoder;
 use indicatif::{ProgressBar, ProgressStyle};
 use log::debug;

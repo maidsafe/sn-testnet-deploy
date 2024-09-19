@@ -4,7 +4,7 @@
 // This SAFE Network Software is licensed under the BSD-3-Clause license.
 // Please see the LICENSE file for more details.
 
-use crate::ansible::AnsibleInventoryType;
+use crate::ansible::inventory::AnsibleInventoryType;
 use thiserror::Error;
 use tokio::task::JoinError;
 

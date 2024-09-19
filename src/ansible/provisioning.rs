@@ -8,7 +8,7 @@ use super::{
     extra_vars::ExtraVarsDocBuilder, AnsibleInventoryType, AnsiblePlaybook, AnsibleRunner,
 };
 use crate::{
-    ansible::environment_inventory::generate_custom_environment_inventory,
+    ansible::inventory::generate_custom_environment_inventory,
     bootstrap::BootstrapOptions,
     deploy::DeployOptions,
     error::{Error, Result},
@@ -344,7 +344,7 @@ impl AnsibleProvisioner {
     }
 
     /// Provision private nodes on the provided VMs.
-    pub async fn provision_home_nodes(
+    pub async fn provision_private_nodes_with_home_network_flag(
         &self,
         name: &str,
         nat_gateway_inventory: &VirtualMachine,
