@@ -4,16 +4,14 @@
 // This SAFE Network Software is licensed under the BSD-3-Clause license.
 // Please see the LICENSE file for more details.
 
-use crate::error::Result;
-use crate::inventory::VirtualMachine;
+use super::AnsibleInventoryType;
+use crate::{error::Result, inventory::VirtualMachine};
 use log::debug;
 use std::{
     fs::File,
     io::{BufWriter, Write},
     path::Path,
 };
-
-use super::AnsibleInventoryType;
 
 /// Generate necessary inventory files for a given environment.
 ///

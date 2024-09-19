@@ -1052,7 +1052,7 @@ async fn main() -> Result<()> {
             }
             let testnet_deployer = builder.build()?;
 
-            let inventory_service = DeploymentInventoryService::from(testnet_deployer.clone());
+            let inventory_service = DeploymentInventoryService::from(&testnet_deployer);
             inventory_service
                 .generate_or_retrieve_inventory(&name, true, Some(binary_option.clone()))
                 .await?;
@@ -1092,7 +1092,7 @@ async fn main() -> Result<()> {
                 })
                 .await?;
 
-            let inventory_service = DeploymentInventoryService::from(testnet_deployer.clone());
+            let inventory_service = DeploymentInventoryService::from(&testnet_deployer);
             let new_inventory = inventory_service
                 .generate_or_retrieve_inventory(&name, true, None)
                 .await?;
@@ -1101,11 +1101,11 @@ async fn main() -> Result<()> {
             Ok(())
         }
         Commands::Clean { name, provider } => {
-            let testnet_deploy = TestnetDeployBuilder::default()
+            let testnet_deployer = TestnetDeployBuilder::default()
                 .environment_name(&name)
                 .provider(provider)
                 .build()?;
-            testnet_deploy.clean().await?;
+            testnet_deployer.clean().await?;
             Ok(())
         }
         Commands::Deploy {
@@ -1172,7 +1172,7 @@ async fn main() -> Result<()> {
             }
             let testnet_deployer = builder.build()?;
 
-            let inventory_service = DeploymentInventoryService::from(testnet_deployer.clone());
+            let inventory_service = DeploymentInventoryService::from(&testnet_deployer);
             let inventory = inventory_service
                 .generate_or_retrieve_inventory(&name, true, Some(binary_option.clone()))
                 .await?;
@@ -1276,7 +1276,7 @@ async fn main() -> Result<()> {
                     .environment_name(&name)
                     .provider(provider.clone())
                     .build()?;
-                let inventory_service = DeploymentInventoryService::from(testnet_deployer.clone());
+                let inventory_service = DeploymentInventoryService::from(&testnet_deployer);
                 let inventory = inventory_service
                     .generate_or_retrieve_inventory(&name, true, None)
                     .await?;
@@ -1304,7 +1304,7 @@ async fn main() -> Result<()> {
                     .environment_name(&name)
                     .provider(provider.clone())
                     .build()?;
-                let inventory_service = DeploymentInventoryService::from(testnet_deployer.clone());
+                let inventory_service = DeploymentInventoryService::from(&testnet_deployer);
                 inventory_service
                     .generate_or_retrieve_inventory(&name, true, None)
                     .await?;
@@ -1322,7 +1322,7 @@ async fn main() -> Result<()> {
                     .environment_name(&name)
                     .provider(provider.clone())
                     .build()?;
-                let inventory_service = DeploymentInventoryService::from(testnet_deployer.clone());
+                let inventory_service = DeploymentInventoryService::from(&testnet_deployer);
                 inventory_service
                     .generate_or_retrieve_inventory(&name, true, None)
                     .await?;
@@ -1342,12 +1342,12 @@ async fn main() -> Result<()> {
             network_contacts_file_name,
             provider,
         } => {
-            let testnet_deploy = TestnetDeployBuilder::default()
+            let testnet_deployer = TestnetDeployBuilder::default()
                 .environment_name(&name)
                 .provider(provider)
                 .build()?;
 
-            let inventory_service = DeploymentInventoryService::from(testnet_deploy);
+            let inventory_service = DeploymentInventoryService::from(&testnet_deployer);
             let inventory = inventory_service
                 .generate_or_retrieve_inventory(&name, force_regeneration, None)
                 .await?;
@@ -1367,12 +1367,15 @@ async fn main() -> Result<()> {
                 resources_only,
                 vm_filter,
             } => {
-                let testnet_deploy = TestnetDeployBuilder::default()
+                let testnet_deployer = TestnetDeployBuilder::default()
                     .environment_name(&name)
                     .provider(provider)
                     .build()?;
-                testnet_deploy.init().await?;
-                testnet_deploy
+                testnet_deployer.init().await?;
+                let inventory_service = DeploymentInventoryService::from(&testnet_deployer);
+                inventory_service.setup_environment_inventory(&name).await?;
+
+                testnet_deployer
                     .rsync_logs(&name, resources_only, vm_filter)
                     .await?;
                 Ok(())
@@ -1382,12 +1385,15 @@ async fn main() -> Result<()> {
                 name,
                 provider,
             } => {
-                let testnet_deploy = TestnetDeployBuilder::default()
+                let testnet_deployer = TestnetDeployBuilder::default()
                     .environment_name(&name)
                     .provider(provider)
                     .build()?;
-                testnet_deploy.init().await?;
-                testnet_deploy.ripgrep_logs(&name, &args).await?;
+                testnet_deployer.init().await?;
+                let inventory_service = DeploymentInventoryService::from(&testnet_deployer);
+                inventory_service.setup_environment_inventory(&name).await?;
+
+                testnet_deployer.ripgrep_logs(&name, &args).await?;
                 Ok(())
             }
             LogCommands::Copy {
@@ -1395,12 +1401,15 @@ async fn main() -> Result<()> {
                 provider,
                 resources_only,
             } => {
-                let testnet_deploy = TestnetDeployBuilder::default()
+                let testnet_deployer = TestnetDeployBuilder::default()
                     .environment_name(&name)
                     .provider(provider)
                     .build()?;
-                testnet_deploy.init().await?;
-                testnet_deploy.copy_logs(&name, resources_only).await?;
+                testnet_deployer.init().await?;
+                let inventory_service = DeploymentInventoryService::from(&testnet_deployer);
+                inventory_service.setup_environment_inventory(&name).await?;
+
+                testnet_deployer.copy_logs(&name, resources_only).await?;
                 Ok(())
             }
             LogCommands::Get { name } => {
@@ -1515,11 +1524,11 @@ async fn main() -> Result<()> {
             Ok(())
         }
         Commands::Plan { name, provider } => {
-            let testnet_deploy = TestnetDeployBuilder::default()
+            let testnet_deployer = TestnetDeployBuilder::default()
                 .environment_name(&name)
                 .provider(provider)
                 .build()?;
-            let inventory_service = DeploymentInventoryService::from(testnet_deploy.clone());
+            let inventory_service = DeploymentInventoryService::from(&testnet_deployer);
             let inventory = inventory_service
                 .generate_or_retrieve_inventory(&name, true, None)
                 .await?;
@@ -1527,8 +1536,8 @@ async fn main() -> Result<()> {
                 return Err(eyre!("The {name} environment does not exist"));
             }
 
-            testnet_deploy.init().await?;
-            testnet_deploy
+            testnet_deployer.init().await?;
+            testnet_deployer
                 .plan(None, inventory.environment_details.environment_type)
                 .await?;
             Ok(())
@@ -1566,7 +1575,7 @@ async fn main() -> Result<()> {
             name,
             provider,
         } => {
-            let testnet_deploy = TestnetDeployBuilder::default()
+            let testnet_deployer = TestnetDeployBuilder::default()
                 .ansible_forks(forks)
                 .environment_name(&name)
                 .provider(provider.clone())
@@ -1575,7 +1584,7 @@ async fn main() -> Result<()> {
             // This is required in the case where the command runs in a remote environment, where
             // there won't be an existing inventory, which is required to retrieve the node
             // registry files used to determine the status.
-            let inventory_service = DeploymentInventoryService::from(testnet_deploy.clone());
+            let inventory_service = DeploymentInventoryService::from(&testnet_deployer);
             let inventory = inventory_service
                 .generate_or_retrieve_inventory(&name, true, None)
                 .await?;
@@ -1583,7 +1592,7 @@ async fn main() -> Result<()> {
                 return Err(eyre!("The {name} environment does not exist"));
             }
 
-            testnet_deploy.start().await?;
+            testnet_deployer.start().await?;
 
             Ok(())
         }
@@ -1600,7 +1609,7 @@ async fn main() -> Result<()> {
                 .build()?;
             testnet_deployer.init().await?;
 
-            let inventory_service = DeploymentInventoryService::from(testnet_deployer.clone());
+            let inventory_service = DeploymentInventoryService::from(&testnet_deployer);
             let inventory = inventory_service
                 .generate_or_retrieve_inventory(&name, true, None)
                 .await?;
@@ -1655,7 +1664,7 @@ async fn main() -> Result<()> {
             name,
             provider,
         } => {
-            let testnet_deploy = TestnetDeployBuilder::default()
+            let testnet_deployer = TestnetDeployBuilder::default()
                 .ansible_forks(forks)
                 .environment_name(&name)
                 .provider(provider.clone())
@@ -1664,7 +1673,7 @@ async fn main() -> Result<()> {
             // This is required in the case where the command runs in a remote environment, where
             // there won't be an existing inventory, which is required to retrieve the node
             // registry files used to determine the status.
-            let inventory_service = DeploymentInventoryService::from(testnet_deploy.clone());
+            let inventory_service = DeploymentInventoryService::from(&testnet_deployer);
             let inventory = inventory_service
                 .generate_or_retrieve_inventory(&name, true, None)
                 .await?;
@@ -1679,7 +1688,7 @@ async fn main() -> Result<()> {
                 None
             };
 
-            testnet_deploy.start_telegraf(custom_inventory).await?;
+            testnet_deployer.start_telegraf(custom_inventory).await?;
 
             Ok(())
         }
@@ -1688,7 +1697,7 @@ async fn main() -> Result<()> {
             name,
             provider,
         } => {
-            let testnet_deploy = TestnetDeployBuilder::default()
+            let testnet_deployer = TestnetDeployBuilder::default()
                 .ansible_forks(forks)
                 .environment_name(&name)
                 .provider(provider.clone())
@@ -1697,7 +1706,7 @@ async fn main() -> Result<()> {
             // This is required in the case where the command runs in a remote environment, where
             // there won't be an existing inventory, which is required to retrieve the node
             // registry files used to determine the status.
-            let inventory_service = DeploymentInventoryService::from(testnet_deploy.clone());
+            let inventory_service = DeploymentInventoryService::from(&testnet_deployer);
             let inventory = inventory_service
                 .generate_or_retrieve_inventory(&name, true, None)
                 .await?;
@@ -1705,7 +1714,7 @@ async fn main() -> Result<()> {
                 return Err(eyre!("The {name} environment does not exist"));
             }
 
-            testnet_deploy.status().await?;
+            testnet_deployer.status().await?;
             Ok(())
         }
         Commands::StopTelegraf {
@@ -1714,7 +1723,7 @@ async fn main() -> Result<()> {
             name,
             provider,
         } => {
-            let testnet_deploy = TestnetDeployBuilder::default()
+            let testnet_deployer = TestnetDeployBuilder::default()
                 .ansible_forks(forks)
                 .environment_name(&name)
                 .provider(provider.clone())
@@ -1723,7 +1732,7 @@ async fn main() -> Result<()> {
             // This is required in the case where the command runs in a remote environment, where
             // there won't be an existing inventory, which is required to retrieve the node
             // registry files used to determine the status.
-            let inventory_service = DeploymentInventoryService::from(testnet_deploy.clone());
+            let inventory_service = DeploymentInventoryService::from(&testnet_deployer);
             let inventory = inventory_service
                 .generate_or_retrieve_inventory(&name, true, None)
                 .await?;
@@ -1738,7 +1747,7 @@ async fn main() -> Result<()> {
                 None
             };
 
-            testnet_deploy.stop_telegraf(custom_inventory).await?;
+            testnet_deployer.stop_telegraf(custom_inventory).await?;
 
             Ok(())
         }
@@ -1759,12 +1768,12 @@ async fn main() -> Result<()> {
             // for retrieving the inventory from a large deployment. Therefore, we will use 50
             // forks for the initial run to retrieve the inventory, then recreate the deployer
             // using the smaller fork value.
-            let testnet_deploy = TestnetDeployBuilder::default()
+            let testnet_deployer = TestnetDeployBuilder::default()
                 .ansible_forks(50)
                 .environment_name(&name)
                 .provider(provider.clone())
                 .build()?;
-            let inventory_service = DeploymentInventoryService::from(testnet_deploy.clone());
+            let inventory_service = DeploymentInventoryService::from(&testnet_deployer);
             let inventory = inventory_service
                 .generate_or_retrieve_inventory(&name, true, None)
                 .await?;
@@ -1779,13 +1788,13 @@ async fn main() -> Result<()> {
                 None
             };
 
-            let testnet_deploy = TestnetDeployBuilder::default()
+            let testnet_deployer = TestnetDeployBuilder::default()
                 .ansible_forks(forks)
                 .ansible_verbose_mode(ansible_verbose)
                 .environment_name(&name)
                 .provider(provider.clone())
                 .build()?;
-            testnet_deploy
+            testnet_deployer
                 .upgrade(UpgradeOptions {
                     ansible_verbose,
                     custom_inventory,
@@ -1802,12 +1811,12 @@ async fn main() -> Result<()> {
                 .await?;
 
             // Recreate the deployer with an increased number of forks for retrieving the status.
-            let testnet_deploy = TestnetDeployBuilder::default()
+            let testnet_deployer = TestnetDeployBuilder::default()
                 .ansible_forks(50)
                 .environment_name(&name)
                 .provider(provider.clone())
                 .build()?;
-            testnet_deploy.status().await?;
+            testnet_deployer.status().await?;
 
             Ok(())
         }
@@ -1817,12 +1826,12 @@ async fn main() -> Result<()> {
             provider,
             version,
         } => {
-            let testnet_deploy = TestnetDeployBuilder::default()
+            let testnet_deployer = TestnetDeployBuilder::default()
                 .ansible_forks(50)
                 .environment_name(&name)
                 .provider(provider.clone())
                 .build()?;
-            let inventory_service = DeploymentInventoryService::from(testnet_deploy.clone());
+            let inventory_service = DeploymentInventoryService::from(&testnet_deployer);
             let inventory = inventory_service
                 .generate_or_retrieve_inventory(&name, true, None)
                 .await?;
@@ -1837,7 +1846,7 @@ async fn main() -> Result<()> {
                 None
             };
 
-            testnet_deploy
+            testnet_deployer
                 .upgrade_node_manager(version.parse()?, custom_inventory)
                 .await?;
             Ok(())
@@ -1847,7 +1856,7 @@ async fn main() -> Result<()> {
             name,
             provider,
         } => {
-            let testnet_deploy = TestnetDeployBuilder::default()
+            let testnet_deployer = TestnetDeployBuilder::default()
                 .ansible_forks(forks)
                 .environment_name(&name)
                 .provider(provider.clone())
@@ -1856,7 +1865,7 @@ async fn main() -> Result<()> {
             // This is required in the case where the command runs in a remote environment, where
             // there won't be an existing inventory, which is required to retrieve the node
             // registry files used to determine the status.
-            let inventory_service = DeploymentInventoryService::from(testnet_deploy.clone());
+            let inventory_service = DeploymentInventoryService::from(&testnet_deployer);
             let inventory = inventory_service
                 .generate_or_retrieve_inventory(&name, true, None)
                 .await?;
@@ -1864,7 +1873,7 @@ async fn main() -> Result<()> {
                 return Err(eyre!("The {name} environment does not exist"));
             }
 
-            testnet_deploy.upgrade_node_telegraf(&name).await?;
+            testnet_deployer.upgrade_node_telegraf(&name).await?;
 
             Ok(())
         }
@@ -1873,7 +1882,7 @@ async fn main() -> Result<()> {
             name,
             provider,
         } => {
-            let testnet_deploy = TestnetDeployBuilder::default()
+            let testnet_deployer = TestnetDeployBuilder::default()
                 .ansible_forks(forks)
                 .environment_name(&name)
                 .provider(provider.clone())
@@ -1882,7 +1891,7 @@ async fn main() -> Result<()> {
             // This is required in the case where the command runs in a remote environment, where
             // there won't be an existing inventory, which is required to retrieve the node
             // registry files used to determine the status.
-            let inventory_service = DeploymentInventoryService::from(testnet_deploy.clone());
+            let inventory_service = DeploymentInventoryService::from(&testnet_deployer);
             let inventory = inventory_service
                 .generate_or_retrieve_inventory(&name, true, None)
                 .await?;
@@ -1890,7 +1899,7 @@ async fn main() -> Result<()> {
                 return Err(eyre!("The {name} environment does not exist"));
             }
 
-            testnet_deploy.upgrade_uploader_telegraf(&name).await?;
+            testnet_deployer.upgrade_uploader_telegraf(&name).await?;
 
             Ok(())
         }
@@ -1900,7 +1909,7 @@ async fn main() -> Result<()> {
                     .environment_name(&name)
                     .provider(provider.clone())
                     .build()?;
-                let inventory_service = DeploymentInventoryService::from(testnet_deployer.clone());
+                let inventory_service = DeploymentInventoryService::from(&testnet_deployer);
                 inventory_service
                     .generate_or_retrieve_inventory(&name, true, None)
                     .await?;
@@ -1918,7 +1927,7 @@ async fn main() -> Result<()> {
                     .environment_name(&name)
                     .provider(provider.clone())
                     .build()?;
-                let inventory_service = DeploymentInventoryService::from(testnet_deployer.clone());
+                let inventory_service = DeploymentInventoryService::from(&testnet_deployer);
                 inventory_service
                     .generate_or_retrieve_inventory(&name, true, None)
                     .await?;
@@ -1978,7 +1987,7 @@ async fn main() -> Result<()> {
                 .build()?;
             testnet_deployer.init().await?;
 
-            let inventory_service = DeploymentInventoryService::from(testnet_deployer.clone());
+            let inventory_service = DeploymentInventoryService::from(&testnet_deployer);
             let inventory = inventory_service
                 .generate_or_retrieve_inventory(&name, true, None)
                 .await?;

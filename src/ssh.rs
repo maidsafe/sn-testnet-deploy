@@ -16,8 +16,8 @@ use std::{
     sync::{Arc, RwLock},
 };
 
-#[derive(Clone)]
-struct RoutedVms {
+#[derive(Clone, Debug)]
+pub struct RoutedVms {
     vms: Vec<VirtualMachine>,
     gateway: IpAddr,
 }
@@ -26,7 +26,7 @@ struct RoutedVms {
 pub struct SshClient {
     pub private_key_path: PathBuf,
     /// The list of VMs that are routed through a gateway.
-    routed_vms: Arc<RwLock<Option<RoutedVms>>>,
+    pub routed_vms: Arc<RwLock<Option<RoutedVms>>>,
 }
 impl SshClient {
     pub fn new(private_key_path: PathBuf) -> SshClient {
@@ -38,7 +38,7 @@ impl SshClient {
 
     /// Set the list of VMs that are routed through a gateway.
     /// This updates all the copies of the `SshClient` that have been cloned.
-    pub fn set_routed_vms(&mut self, vms: Vec<VirtualMachine>, gateway: IpAddr) -> Result<()> {
+    pub fn set_routed_vms(&self, vms: Vec<VirtualMachine>, gateway: IpAddr) -> Result<()> {
         self.routed_vms
             .write()
             .map_err(|err| {
@@ -46,6 +46,8 @@ impl SshClient {
                 Error::SshSettingsRwLockError
             })?
             .replace(RoutedVms { vms, gateway });
+
+        debug!("Routed VMs have been set.");
 
         Ok(())
     }
@@ -70,25 +72,25 @@ impl SshClient {
             log::error!("Failed to read routed VMs: {err}");
             Error::SshSettingsRwLockError
         })?;
-        if let Some(routed_vms) = routed_vm_read.as_ref() {
-            if let Some(vm) = routed_vms
+        if let Some((vm, gateway)) = routed_vm_read.as_ref().and_then(|routed_vms| {
+            routed_vms
                 .vms
                 .iter()
                 .find(|vm| vm.public_ip_addr == *ip_address)
-            {
-                println!(
-                    "Checking for SSH availability at {} ({ip_address}) via gateway {}...",
-                    vm.private_ip_addr, routed_vms.gateway
-                );
-                args.push("-o".to_string());
-                args.push(format!(
-                    "ProxyCommand=ssh -i {} -W %h:%p {}@{}",
-                    self.private_key_path.to_string_lossy(),
-                    user,
-                    routed_vms.gateway
-                ));
-                args.push(format!("{user}@{}", vm.private_ip_addr));
-            }
+                .map(|vm| (vm, routed_vms.gateway))
+        }) {
+            println!(
+                "Checking for SSH availability at {} ({ip_address}) via gateway {}...",
+                vm.private_ip_addr, gateway
+            );
+            args.push("-o".to_string());
+            args.push(format!(
+                "ProxyCommand=ssh -i {} -W %h:%p {}@{}",
+                self.private_key_path.to_string_lossy(),
+                user,
+                gateway
+            ));
+            args.push(format!("{user}@{}", vm.private_ip_addr));
         } else {
             println!("Checking for SSH availability at {ip_address}...");
             args.push(format!("{user}@{ip_address}"));
@@ -144,31 +146,29 @@ impl SshClient {
             log::error!("Failed to read routed VMs: {err}");
             Error::SshSettingsRwLockError
         })?;
-        if let Some(routed_vms) = routed_vm_read.as_ref() {
-            if let Some(vm) = routed_vms
+
+        if let Some((vm, gateway)) = routed_vm_read.as_ref().and_then(|routed_vms| {
+            routed_vms
                 .vms
                 .iter()
                 .find(|vm| vm.public_ip_addr == *ip_address)
-            {
-                debug!(
-                    "Running command '{}' on {} ({ip_address}) via gateway {}...",
-                    command, vm.private_ip_addr, routed_vms.gateway
-                );
-                args.push("-o".to_string());
-                args.push(format!(
-                    "ProxyCommand=ssh -i {} -W %h:%p {}@{}",
-                    self.private_key_path.to_string_lossy(),
-                    user,
-                    routed_vms.gateway
-                ));
-                args.push(format!("{user}@{}", vm.private_ip_addr));
-            }
+                .map(|vm| (vm, routed_vms.gateway))
+        }) {
+            debug!(
+                "Running command '{}' on {} ({ip_address}) via gateway {gateway}...",
+                command, vm.private_ip_addr
+            );
+            args.push("-o".to_string());
+            args.push(format!(
+                "ProxyCommand=ssh -i {} -W %h:%p {user}@{gateway}",
+                self.private_key_path.to_string_lossy(),
+            ));
+            args.push(format!("{user}@{}", vm.private_ip_addr));
         } else {
             debug!(
                 "Running command '{}' on {}@{}...",
                 command, user, ip_address
             );
-
             args.push(format!("{user}@{ip_address}"));
         }
         args.extend(command_args);

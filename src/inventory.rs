@@ -49,8 +49,8 @@ pub struct DeploymentInventoryService {
     pub working_directory_path: PathBuf,
 }
 
-impl From<TestnetDeployer> for DeploymentInventoryService {
-    fn from(item: TestnetDeployer) -> Self {
+impl From<&TestnetDeployer> for DeploymentInventoryService {
+    fn from(item: &TestnetDeployer) -> Self {
         let provider = match item.cloud_provider {
             CloudProvider::Aws => "aws",
             CloudProvider::DigitalOcean => "digital_ocean",
@@ -58,7 +58,7 @@ impl From<TestnetDeployer> for DeploymentInventoryService {
         DeploymentInventoryService {
             ansible_runner: item.ansible_provisioner.ansible_runner.clone(),
             ansible_provisioner: item.ansible_provisioner.clone(),
-            cloud_provider: item.cloud_provider,
+            cloud_provider: item.cloud_provider.clone(),
             inventory_file_path: item
                 .working_directory_path
                 .join("ansible")
@@ -192,8 +192,8 @@ impl DeploymentInventoryService {
 
         // Set up the SSH client to route through the NAT gateway if it exists. This updates all the client clones.
         if let Some(nat_gateway) = &nat_gateway_vm {
-            let mut ssh = self.ssh_client.clone();
-            ssh.set_routed_vms(private_node_vms.clone(), nat_gateway.public_ip_addr)?;
+            self.ssh_client
+                .set_routed_vms(private_node_vms.clone(), nat_gateway.public_ip_addr)?;
         }
 
         let mut bootstrap_vm_list = Vec::new();
@@ -399,6 +399,51 @@ impl DeploymentInventoryService {
             uploader_vms: uploader_vm_list,
         };
         Ok(inventory)
+    }
+
+    /// Create all the environment inventory files. This also updates the SSH client to route the private nodes
+    /// the NAT gateway if it exists.
+    ///
+    /// This is used when 'generate_or_retrieve_inventory' is not used, but you still need to set up the inventory files.
+    pub async fn setup_environment_inventory(&self, name: &str) -> Result<()> {
+        let output_inventory_dir_path = self
+            .working_directory_path
+            .join("ansible")
+            .join("inventory");
+        generate_environment_inventory(
+            name,
+            &self.inventory_file_path,
+            &output_inventory_dir_path,
+        )?;
+
+        let nat_gateway_vm = self
+            .ansible_runner
+            .get_inventory(AnsibleInventoryType::NatGateway, false)
+            .await?
+            .first()
+            .cloned();
+
+        let private_node_vms = self
+            .ansible_runner
+            .get_inventory(AnsibleInventoryType::PrivateNodes, false)
+            .await?;
+
+        // Create static inventory for private nodes. Will be used during ansible-playbook run.
+        generate_private_node_static_environment_inventory(
+            name,
+            &output_inventory_dir_path,
+            &private_node_vms,
+            &nat_gateway_vm,
+            &self.ssh_client.private_key_path,
+        )?;
+
+        // Set up the SSH client to route through the NAT gateway if it exists. This updates all the client clones.
+        if let Some(nat_gateway) = &nat_gateway_vm {
+            self.ssh_client
+                .set_routed_vms(private_node_vms.clone(), nat_gateway.public_ip_addr)?;
+        }
+
+        Ok(())
     }
 
     pub async fn upload_network_contacts(
