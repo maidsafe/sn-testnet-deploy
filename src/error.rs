@@ -168,4 +168,6 @@ pub enum Error {
     UpscaleInventoryTypeNotSupported(String),
     #[error(transparent)]
     VarError(#[from] std::env::VarError),
+    #[error("Failed to obtain lock to update SSH settings")]
+    SshSettingsRwLockError,
 }
