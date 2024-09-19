@@ -76,7 +76,7 @@
 - name: set do_wan_route_is_removed to true if /20 CIDR network route is removed
   set_fact:
     do_wan_route_is_removed: true
-  when: ip_route_output.stdout.find(do_wanroute.stdout) == -1
+  when: do_wanroute.stdout == ""
 
 - name: remove /20 CIDR network route from the routing table
   command: ip route del {{ do_wanroute.stdout }} dev eth0
