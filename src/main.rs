@@ -13,7 +13,7 @@ use dotenv::dotenv;
 use semver::Version;
 use sn_releases::{ReleaseType, SafeReleaseRepoActions};
 use sn_testnet_deploy::{
-    ansible::{extra_vars::ExtraVarsDocBuilder, AnsibleInventoryType, AnsiblePlaybook},
+    ansible::{extra_vars::ExtraVarsDocBuilder, inventory::AnsibleInventoryType, AnsiblePlaybook},
     bootstrap::BootstrapOptions,
     deploy::DeployOptions,
     error::Error,
@@ -24,7 +24,7 @@ use sn_testnet_deploy::{
     logstash::LogstashDeployBuilder,
     manage_test_data::TestDataClientBuilder,
     network_commands, notify_slack,
-    private_nodes::HomeNodesOptions,
+    private_nodes::PrivateNodesOptions,
     setup::setup_dotenv_file,
     upscale::UpscaleOptions,
     BinaryOption, CloudProvider, EnvironmentType, LogFormat, TestnetDeployBuilder, UpgradeOptions,
@@ -139,7 +139,7 @@ enum Commands {
         /// The number of private node VMs to create.
         ///
         /// Each VM will run many safenode services. The services will still be public. To make them private and to
-        /// add the 'home-network' flag, use the `introduce-home-nodes` command.
+        /// add the 'home-network' flag, use the `setup-private-nodes` command.
         ///
         /// If the argument is not used, the value will be determined by the 'environment-type' argument.
         #[clap(long)]
@@ -322,7 +322,7 @@ enum Commands {
         /// The number of private node VMs to create.
         ///
         /// Each VM will run many safenode services. The services will still be public. To make them private and to
-        /// add the 'home-network' flag, use the `introduce-home-nodes` command.
+        /// add the 'home-network' flag, use the `setup-private-nodes` command.
         ///
         /// If the argument is not used, the value will be determined by the 'environment-type' argument.
         #[clap(long)]
@@ -426,8 +426,8 @@ enum Commands {
         provider: CloudProvider,
     },
     /// Converts the private node VMs from public to private. It sets up a NAT gateway and adds the 'home-network'
-    ///  flag to the safenode service.
-    IntroduceHomeNodes {
+    /// flag to the safenode service.
+    SetupPrivateNodes {
         /// Set to run Ansible with more verbose output.
         #[arg(long)]
         ansible_verbose: bool,
@@ -1587,7 +1587,7 @@ async fn main() -> Result<()> {
 
             Ok(())
         }
-        Commands::IntroduceHomeNodes {
+        Commands::SetupPrivateNodes {
             ansible_verbose,
             name,
             provider,
@@ -1610,7 +1610,7 @@ async fn main() -> Result<()> {
             }
 
             testnet_deployer
-                .introduce_home_nodes(&HomeNodesOptions {
+                .setup_private_nodes(&PrivateNodesOptions {
                     ansible_verbose,
                     current_inventory: inventory,
                     output_inventory_dir_path: testnet_deployer

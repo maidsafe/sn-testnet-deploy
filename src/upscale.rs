@@ -5,8 +5,8 @@
 // Please see the LICENSE file for more details.
 
 use crate::{
+    ansible::inventory::AnsibleInventoryType,
     ansible::provisioning::{NodeType, ProvisionOptions},
-    ansible::AnsibleInventoryType,
     error::{Error, Result},
     get_genesis_multiaddr, get_multiaddr, DeploymentInventory, DeploymentType, TestnetDeployer,
 };

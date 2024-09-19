@@ -5,7 +5,7 @@
 // Please see the LICENSE file for more details.
 
 use crate::{
-    ansible::{AnsibleInventoryType, AnsiblePlaybook, AnsibleRunner},
+    ansible::{inventory::AnsibleInventoryType, AnsiblePlaybook, AnsibleRunner},
     digital_ocean::{DigitalOceanClient, DIGITAL_OCEAN_API_BASE_URL, DIGITAL_OCEAN_API_PAGE_SIZE},
     do_clean,
     error::{Error, Result},

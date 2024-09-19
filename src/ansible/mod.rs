@@ -4,7 +4,6 @@
 // This SAFE Network Software is licensed under the BSD-3-Clause license.
 // Please see the LICENSE file for more details.
 
-pub mod environment_inventory;
 pub mod extra_vars;
 pub mod inventory;
 pub mod provisioning;
@@ -13,6 +12,7 @@ use crate::{
     error::{Error, Result},
     is_binary_on_path, run_external_command, CloudProvider,
 };
+use inventory::AnsibleInventoryType;
 use log::debug;
 use std::path::PathBuf;
 
@@ -188,103 +188,6 @@ impl AnsiblePlaybook {
                 "upgrade_uploader_telegraf_config.yml".to_string()
             }
             AnsiblePlaybook::Uploaders => "uploaders.yml".to_string(),
-        }
-    }
-}
-
-/// Represents the inventory types that apply to our own domain.
-#[derive(Clone, Debug)]
-pub enum AnsibleInventoryType {
-    /// Use to run a playbook against the auditor.
-    ///
-    /// Only one machine will be returned in this inventory.
-    Auditor,
-    /// Use to run a playbook against all bootstrap nodes.
-    BootstrapNodes,
-    /// Use to run a playbook against the build machine.
-    ///
-    /// This is a larger machine that is used for building binaries from source.
-    ///
-    /// Only one machine will be returned in this inventory.
-    Build,
-    /// Provide a static list of VMs to connect to.
-    Custom,
-    /// Use to run a playbook against the genesis node.
-    ///
-    /// Only one machine will be returned in this inventory.
-    Genesis,
-    /// Use to run a playbook against the Logstash servers.
-    Logstash,
-    /// Use to run a playbook against the NAT gateway.
-    NatGateway,
-    /// Use to run a playbook against all nodes except the genesis node.
-    Nodes,
-    /// Use to run a inventory against the private nodes. This
-    PrivateNodes,
-    /// Use to run a playbook against the private nodes. This is similar to the PrivateNodes inventory, but uses
-    /// a static custom inventory file. This is just used for running playbooks and not inventory.
-    PrivateNodesStatic,
-    /// Use to run a playbook against all the uploader machines.
-    Uploaders,
-}
-
-impl std::fmt::Display for AnsibleInventoryType {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let s = match self {
-            AnsibleInventoryType::Auditor => "Auditor",
-            AnsibleInventoryType::BootstrapNodes => "BootstrapNodes",
-            AnsibleInventoryType::Build => "Build",
-            AnsibleInventoryType::Custom => "Custom",
-            AnsibleInventoryType::Genesis => "Genesis",
-            AnsibleInventoryType::Logstash => "Logstash",
-            AnsibleInventoryType::NatGateway => "NatGateway",
-            AnsibleInventoryType::Nodes => "Nodes",
-            AnsibleInventoryType::PrivateNodes => "PrivateNodes",
-            AnsibleInventoryType::PrivateNodesStatic => "PrivateNodesStatic",
-            AnsibleInventoryType::Uploaders => "Uploaders",
-        };
-        write!(f, "{}", s)
-    }
-}
-
-impl AnsibleInventoryType {
-    pub fn get_inventory_path(&self, name: &str, provider: &str) -> PathBuf {
-        match &self {
-            Self::Auditor => PathBuf::from(format!(".{name}_auditor_inventory_{provider}.yml")),
-            Self::BootstrapNodes => {
-                PathBuf::from(format!(".{name}_bootstrap_node_inventory_{provider}.yml"))
-            }
-            Self::Build => PathBuf::from(format!(".{name}_build_inventory_{provider}.yml")),
-            Self::Custom => PathBuf::from(format!(".{name}_custom_inventory_{provider}.ini")),
-            Self::Genesis => PathBuf::from(format!(".{name}_genesis_inventory_{provider}.yml")),
-            Self::Logstash => PathBuf::from(format!(".{name}_logstash_inventory_{provider}.yml")),
-            Self::NatGateway => {
-                PathBuf::from(format!(".{name}_nat_gateway_inventory_{provider}.yml"))
-            }
-            Self::Nodes => PathBuf::from(format!(".{name}_node_inventory_{provider}.yml")),
-            Self::PrivateNodes => {
-                PathBuf::from(format!(".{name}_private_node_inventory_{provider}.yml"))
-            }
-            Self::PrivateNodesStatic => PathBuf::from(format!(
-                ".{name}_private_node_static_inventory_{provider}.yml"
-            )),
-            Self::Uploaders => PathBuf::from(format!(".{name}_uploader_inventory_{provider}.yml")),
-        }
-    }
-
-    pub fn do_tag(&self) -> &str {
-        match self {
-            Self::Auditor => "auditor",
-            Self::BootstrapNodes => "bootstrap_node",
-            Self::Build => "build",
-            Self::Custom => "custom",
-            Self::Genesis => "genesis",
-            Self::Logstash => "logstash",
-            Self::NatGateway => "nat_gateway",
-            Self::Nodes => "node",
-            Self::PrivateNodes => "private_node",
-            Self::PrivateNodesStatic => "private_node",
-            Self::Uploaders => "uploader",
         }
     }
 }
