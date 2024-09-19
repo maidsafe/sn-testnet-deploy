@@ -190,6 +190,12 @@ impl DeploymentInventoryService {
             &self.ssh_client.private_key_path,
         )?;
 
+        // Set up the SSH client to route through the NAT gateway if it exists. This updates all the client clones.
+        if let Some(nat_gateway) = &nat_gateway_vm {
+            let mut ssh = self.ssh_client.clone();
+            ssh.set_routed_vms(private_node_vms.clone(), nat_gateway.public_ip_addr)?;
+        }
+
         let mut bootstrap_vm_list = Vec::new();
         let bootstrap_nodes_inventory = self
             .ansible_runner

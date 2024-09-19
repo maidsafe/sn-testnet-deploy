@@ -6,18 +6,48 @@
 
 use crate::{
     error::{Error, Result},
+    inventory::VirtualMachine,
     run_external_command,
 };
 use log::debug;
-use std::{net::IpAddr, path::PathBuf};
+use std::{
+    net::IpAddr,
+    path::PathBuf,
+    sync::{Arc, RwLock},
+};
+
+#[derive(Clone)]
+struct RoutedVms {
+    vms: Vec<VirtualMachine>,
+    gateway: IpAddr,
+}
 
 #[derive(Clone)]
 pub struct SshClient {
     pub private_key_path: PathBuf,
+    /// The list of VMs that are routed through a gateway.
+    routed_vms: Arc<RwLock<Option<RoutedVms>>>,
 }
 impl SshClient {
     pub fn new(private_key_path: PathBuf) -> SshClient {
-        SshClient { private_key_path }
+        SshClient {
+            private_key_path,
+            routed_vms: Arc::new(RwLock::new(None)),
+        }
+    }
+
+    /// Set the list of VMs that are routed through a gateway.
+    /// This updates all the copies of the `SshClient` that have been cloned.
+    pub fn set_routed_vms(&mut self, vms: Vec<VirtualMachine>, gateway: IpAddr) -> Result<()> {
+        self.routed_vms
+            .write()
+            .map_err(|err| {
+                log::error!("Failed to set routed VMs: {err}");
+                Error::SshSettingsRwLockError
+            })?
+            .replace(RoutedVms { vms, gateway });
+
+        Ok(())
     }
 
     pub fn get_private_key_path(&self) -> PathBuf {
@@ -25,27 +55,54 @@ impl SshClient {
     }
 
     pub fn wait_for_ssh_availability(&self, ip_address: &IpAddr, user: &str) -> Result<()> {
-        println!("Checking for SSH availability at {ip_address}...");
+        let mut args = vec![
+            "-i".to_string(),
+            self.private_key_path.to_string_lossy().to_string(),
+            "-q".to_string(),
+            "-o".to_string(),
+            "BatchMode=yes".to_string(),
+            "-o".to_string(),
+            "ConnectTimeout=5".to_string(),
+            "-o".to_string(),
+            "StrictHostKeyChecking=no".to_string(),
+        ];
+        let routed_vm_read = self.routed_vms.read().map_err(|err| {
+            log::error!("Failed to read routed VMs: {err}");
+            Error::SshSettingsRwLockError
+        })?;
+        if let Some(routed_vms) = routed_vm_read.as_ref() {
+            if let Some(vm) = routed_vms
+                .vms
+                .iter()
+                .find(|vm| vm.public_ip_addr == *ip_address)
+            {
+                println!(
+                    "Checking for SSH availability at {} ({ip_address}) via gateway {}...",
+                    vm.private_ip_addr, routed_vms.gateway
+                );
+                args.push("-o".to_string());
+                args.push(format!(
+                    "ProxyCommand=ssh -i {} -W %h:%p {}@{}",
+                    self.private_key_path.to_string_lossy(),
+                    user,
+                    routed_vms.gateway
+                ));
+                args.push(format!("{user}@{}", vm.private_ip_addr));
+            }
+        } else {
+            println!("Checking for SSH availability at {ip_address}...");
+            args.push(format!("{user}@{ip_address}"));
+        }
+        args.push("bash".to_string());
+        args.push("--version".to_string());
+
         let mut retries = 0;
         let max_retries = 10;
         while retries < max_retries {
             let result = run_external_command(
                 PathBuf::from("ssh"),
                 std::env::current_dir()?,
-                vec![
-                    "-i".to_string(),
-                    self.private_key_path.to_string_lossy().to_string(),
-                    "-q".to_string(),
-                    "-o".to_string(),
-                    "BatchMode=yes".to_string(),
-                    "-o".to_string(),
-                    "ConnectTimeout=5".to_string(),
-                    "-o".to_string(),
-                    "StrictHostKeyChecking=no".to_string(),
-                    format!("{user}@{ip_address}"),
-                    "bash".to_string(),
-                    "--version".to_string(),
-                ],
+                args.clone(),
                 false,
                 false,
             );
@@ -71,11 +128,6 @@ impl SshClient {
         command: &str,
         suppress_output: bool,
     ) -> Result<Vec<String>> {
-        debug!(
-            "Running command '{}' on {}@{}...",
-            command, user, ip_address
-        );
-
         let command_args: Vec<String> = command.split_whitespace().map(String::from).collect();
         let mut args = vec![
             "-i".to_string(),
@@ -87,8 +139,38 @@ impl SshClient {
             "ConnectTimeout=30".to_string(),
             "-o".to_string(),
             "StrictHostKeyChecking=no".to_string(),
-            format!("{}@{}", user, ip_address),
         ];
+        let routed_vm_read = self.routed_vms.read().map_err(|err| {
+            log::error!("Failed to read routed VMs: {err}");
+            Error::SshSettingsRwLockError
+        })?;
+        if let Some(routed_vms) = routed_vm_read.as_ref() {
+            if let Some(vm) = routed_vms
+                .vms
+                .iter()
+                .find(|vm| vm.public_ip_addr == *ip_address)
+            {
+                debug!(
+                    "Running command '{}' on {} ({ip_address}) via gateway {}...",
+                    command, vm.private_ip_addr, routed_vms.gateway
+                );
+                args.push("-o".to_string());
+                args.push(format!(
+                    "ProxyCommand=ssh -i {} -W %h:%p {}@{}",
+                    self.private_key_path.to_string_lossy(),
+                    user,
+                    routed_vms.gateway
+                ));
+                args.push(format!("{user}@{}", vm.private_ip_addr));
+            }
+        } else {
+            debug!(
+                "Running command '{}' on {}@{}...",
+                command, user, ip_address
+            );
+
+            args.push(format!("{user}@{ip_address}"));
+        }
         args.extend(command_args);
 
         let output = run_external_command(
