@@ -168,7 +168,7 @@ impl TestnetDeployer {
                 let op =
                     match self
                         .ssh_client
-                        .run_command(&vm.public_ip_addr, "safe", &rg_cmd, true)
+                        .run_command(&vm.public_ip_addr, "root", &rg_cmd, true)
                     {
                         Ok(output) => {
                             match Self::store_rg_output(
