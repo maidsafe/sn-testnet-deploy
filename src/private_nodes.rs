@@ -5,9 +5,8 @@
 // Please see the LICENSE file for more details.
 
 use crate::{
-    ansible::{
-        environment_inventory::generate_private_node_static_environment_inventory,
-        AnsibleInventoryType,
+    ansible::inventory::{
+        generate_private_node_static_environment_inventory, AnsibleInventoryType,
     },
     error::{Error, Result},
     DeploymentInventory, DeploymentType, TestnetDeployer,
@@ -15,14 +14,14 @@ use crate::{
 use std::path::PathBuf;
 
 #[derive(Clone)]
-pub struct HomeNodesOptions {
+pub struct PrivateNodesOptions {
     pub ansible_verbose: bool,
     pub current_inventory: DeploymentInventory,
     pub output_inventory_dir_path: PathBuf,
 }
 
 impl TestnetDeployer {
-    pub async fn introduce_home_nodes(&self, options: &HomeNodesOptions) -> Result<()> {
+    pub async fn setup_private_nodes(&self, options: &PrivateNodesOptions) -> Result<()> {
         self.create_or_update_infra(
             &options.current_inventory.name,
             Some(
@@ -110,7 +109,10 @@ impl TestnetDeployer {
             &self.ssh_client.private_key_path,
         )?;
         self.ansible_provisioner
-            .provision_home_nodes(&options.current_inventory.name, &nat_gateway_inventory)
+            .provision_private_nodes_with_home_network_flag(
+                &options.current_inventory.name,
+                &nat_gateway_inventory,
+            )
             .await
             .map_err(|err| {
                 println!("Failed to provision home nodes {err:?}");

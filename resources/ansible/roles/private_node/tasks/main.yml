@@ -7,7 +7,7 @@
     nat_gateway_is_configured: false
     do_wan_route_is_removed: false
 
-- name: check if --home-network flag is set in safenode services
+- name: grep for home network flag in safenode services
   # cat to avoid exit code 1 when grep returns empty
   shell: grep -- '--home-network' /etc/systemd/system/safenode*.service | cat
   register: home_network_flag
@@ -25,7 +25,7 @@
   command: safenode-manager stop
   when: not home_network_flag_is_set
 
-- name: check if telegraf role is set to NAT_RANDOMIZED_NODE
+- name: grep inside telegraph environment variable
   shell: grep NAT_RANDOMIZED_NODE /etc/default/telegraf | cat
   register: telegraf_host_role
 
@@ -43,7 +43,7 @@
   command: curl -s http://169.254.169.254/metadata/v1/interfaces/public/0/ipv4/gateway
   register: do_gateway_ip
 
-- name: check if DO gateway is configured
+- name: execute ip route show command
   command: ip route show
   register: do_gateway_route
 
@@ -56,7 +56,7 @@
   command: ip route add 169.254.168.254 via {{ do_gateway_ip.stdout }} dev eth0
   when: not do_gateway_is_configured
 
-- name: check if nat gateway is configured
+- name: execute ip route show command
   command: ip route show
   register: ip_route_output
 

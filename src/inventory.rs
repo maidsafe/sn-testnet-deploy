@@ -6,11 +6,12 @@
 
 use crate::{
     ansible::{
-        environment_inventory::{
+        inventory::AnsibleInventoryType,
+        inventory::{
             generate_environment_inventory, generate_private_node_static_environment_inventory,
         },
         provisioning::AnsibleProvisioner,
-        AnsibleInventoryType, AnsibleRunner,
+        AnsibleRunner,
     },
     get_environment_details, get_genesis_multiaddr,
     s3::S3Repository,
