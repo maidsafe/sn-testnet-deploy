@@ -24,7 +24,7 @@ use sn_testnet_deploy::{
     logstash::LogstashDeployBuilder,
     manage_test_data::TestDataClientBuilder,
     network_commands, notify_slack,
-    private_nodes::PrivateNodeOptions,
+    private_nodes::HomeNodesOptions,
     setup::setup_dotenv_file,
     upscale::UpscaleOptions,
     BinaryOption, CloudProvider, EnvironmentType, LogFormat, TestnetDeployBuilder, UpgradeOptions,
@@ -138,8 +138,8 @@ enum Commands {
         payment_forward_pk: Option<String>,
         /// The number of private node VMs to create.
         ///
-        /// Each VM will run many safenode services. The services will still be public. To make them private,
-        /// use the `setup-private-nodes` command.
+        /// Each VM will run many safenode services. The services will still be public. To make them private and to
+        /// add the 'home-network' flag, use the `introduce-home-nodes` command.
         ///
         /// If the argument is not used, the value will be determined by the 'environment-type' argument.
         #[clap(long)]
@@ -321,8 +321,8 @@ enum Commands {
         payment_forward_pk: Option<String>,
         /// The number of private node VMs to create.
         ///
-        /// Each VM will run many safenode services. The services will still be public. To make them private,
-        /// use the `setup-private-nodes` command.
+        /// Each VM will run many safenode services. The services will still be public. To make them private and to
+        /// add the 'home-network' flag, use the `introduce-home-nodes` command.
         ///
         /// If the argument is not used, the value will be determined by the 'environment-type' argument.
         #[clap(long)]
@@ -425,6 +425,19 @@ enum Commands {
         #[clap(long, default_value_t = CloudProvider::DigitalOcean, value_parser = parse_provider, verbatim_doc_comment)]
         provider: CloudProvider,
     },
+    /// Converts the private node VMs from public to private. It sets up a NAT gateway and adds the 'home-network'
+    ///  flag to the safenode service.
+    IntroduceHomeNodes {
+        /// Set to run Ansible with more verbose output.
+        #[arg(long)]
+        ansible_verbose: bool,
+        /// The name of the environment
+        #[arg(short = 'n', long)]
+        name: String,
+        /// The cloud provider for the environment.
+        #[clap(long, value_parser = parse_provider, verbatim_doc_comment, default_value_t = CloudProvider::DigitalOcean)]
+        provider: CloudProvider,
+    },
     #[clap(name = "logs", subcommand)]
     Logs(LogCommands),
     #[clap(name = "logstash", subcommand)]
@@ -474,18 +487,6 @@ enum Commands {
         #[clap(long, default_value_t = 50)]
         forks: usize,
         /// The name of the environment.
-        #[arg(short = 'n', long)]
-        name: String,
-        /// The cloud provider for the environment.
-        #[clap(long, value_parser = parse_provider, verbatim_doc_comment, default_value_t = CloudProvider::DigitalOcean)]
-        provider: CloudProvider,
-    },
-    /// Make the last VM in the environment as private. This will also setup the
-    SetupPrivateNodes {
-        /// Set to run Ansible with more verbose output.
-        #[arg(long)]
-        ansible_verbose: bool,
-        /// The name of the environment
         #[arg(short = 'n', long)]
         name: String,
         /// The cloud provider for the environment.
@@ -1602,12 +1603,12 @@ async fn main() -> Result<()> {
 
             Ok(())
         }
-        Commands::SetupPrivateNodes {
+        Commands::IntroduceHomeNodes {
             ansible_verbose,
             name,
             provider,
         } => {
-            println!("Set up private nodes...");
+            println!("Introducing home nodes...");
             let testnet_deployer = TestnetDeployBuilder::default()
                 .ansible_verbose_mode(ansible_verbose)
                 .environment_name(&name)
@@ -1617,12 +1618,15 @@ async fn main() -> Result<()> {
 
             let inventory_service = DeploymentInventoryService::from(testnet_deployer.clone());
             let inventory = inventory_service
-                // TODO: force = true
-                .generate_or_retrieve_inventory(&name, false, None)
+                .generate_or_retrieve_inventory(&name, true, None)
                 .await?;
 
+            if inventory.private_node_vms.is_empty() {
+                return Err(eyre!("No private nodes found in the inventory"));
+            }
+
             testnet_deployer
-                .setup_private_nodes(&PrivateNodeOptions {
+                .introduce_home_nodes(&HomeNodesOptions {
                     ansible_verbose,
                     current_inventory: inventory,
                     output_inventory_dir_path: testnet_deployer

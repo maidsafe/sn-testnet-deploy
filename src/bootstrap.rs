@@ -79,6 +79,8 @@ impl TestnetDeployer {
             n += 1;
         }
 
+        let mut failed_to_provision = false;
+
         self.ansible_provisioner
             .print_ansible_run_banner(n, total, "Provision Normal Nodes");
         match self
@@ -94,15 +96,37 @@ impl TestnetDeployer {
                 println!("Provisioned normal nodes");
             }
             Err(e) => {
-                println!("Failed to provision: {e:?}");
-                println!("{}", "WARNING!".yellow());
-                println!("Some nodes failed to provision without error.");
-                println!(
-                    "This usually means a small number of nodes failed to start on a few VMs."
-                );
-                println!("However, most of the time the deployment will still be usable.");
-                println!("See the output from Ansible to determine which VMs had failures.");
+                println!("Failed to provision normal nodes: {e:?}");
+                failed_to_provision = true;
             }
+        }
+
+        self.ansible_provisioner
+            .print_ansible_run_banner(n, total, "Provision Private Nodes");
+        match self
+            .ansible_provisioner
+            .provision_nodes(
+                &provision_options,
+                &options.bootstrap_peer,
+                NodeType::Private,
+            )
+            .await
+        {
+            Ok(()) => {
+                println!("Provisioned private nodes");
+            }
+            Err(e) => {
+                println!("Failed to provision private nodes: {e:?}");
+                failed_to_provision = true;
+            }
+        }
+
+        if failed_to_provision {
+            println!("{}", "WARNING!".yellow());
+            println!("Some nodes failed to provision without error.");
+            println!("This usually means a small number of nodes failed to start on a few VMs.");
+            println!("However, most of the time the deployment will still be usable.");
+            println!("See the output from Ansible to determine which VMs had failures.");
         }
 
         Ok(())
