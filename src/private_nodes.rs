@@ -15,14 +15,14 @@ use crate::{
 use std::path::PathBuf;
 
 #[derive(Clone)]
-pub struct PrivateNodeOptions {
+pub struct HomeNodesOptions {
     pub ansible_verbose: bool,
     pub current_inventory: DeploymentInventory,
     pub output_inventory_dir_path: PathBuf,
 }
 
 impl TestnetDeployer {
-    pub async fn setup_private_nodes(&self, options: &PrivateNodeOptions) -> Result<()> {
+    pub async fn introduce_home_nodes(&self, options: &HomeNodesOptions) -> Result<()> {
         self.create_or_update_infra(
             &options.current_inventory.name,
             Some(
