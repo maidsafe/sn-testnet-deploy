@@ -17,9 +17,6 @@
     home_network_flag_is_set: true
   when: home_network_flag.stdout.find('--home-network') != -1
 
-- debug: var=home_network_flag.stdout
-- debug: var=home_network_flag_is_set
-
 - name: stop safenode services
   become: true
   command: safenode-manager stop
@@ -89,6 +86,10 @@
 
 - name: setup safenode services to use --home-network flag
   shell: sed -i 's/--rpc/--ip {{ private_ip_eth1.stdout }} --home-network --rpc/g' /etc/systemd/system/safenode*.service
+  when: not home_network_flag_is_set
+
+- name: update node registry with home network flag and private ip of eth1
+  shell: sed -i 's/"home_network":false/"home_network":true/g; s/"node_ip":null/"node_ip":"{{ private_ip_eth1.stdout }}"/g' /var/safenode-manager/node_registry.json
   when: not home_network_flag_is_set
 
 - name: refresh systemd daemon
