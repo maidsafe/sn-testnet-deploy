@@ -1,0 +1,41 @@
+---
+- name: upgrade the uploaders
+  hosts: all
+  become: True
+  vars:
+    safe_version: "{{ safe_version }}"
+    safe_archive_url: "https://sn-cli.s3.eu-west-2.amazonaws.com/safe-{{ safe_version }}-x86_64-unknown-linux-musl.tar.gz"
+  tasks:
+    - name: stop the uploader service
+      systemd:
+        name: safe_uploader
+        state: stopped
+
+    # It is safer to make sure both of these are removed, because Ansible may not re-download and
+    # replace them if they already exist.
+    - name: remove existing safe binary
+      ansible.builtin.file:
+        path: /usr/local/bin/safe
+        state: absent
+
+    - name: remove existing safe archive
+      ansible.builtin.file:
+        path: /tmp/safe-latest-x86_64-unknown-linux-musl.tar.gz
+        state: absent
+
+    - name: download the new safe binary
+      ansible.builtin.get_url:
+        url: "{{ safe_archive_url }}"
+        dest: /tmp/safe-latest-x86_64-unknown-linux-musl.tar.gz
+
+    - name: extract the new safe binary
+      ansible.builtin.unarchive:
+        src: /tmp/safe-latest-x86_64-unknown-linux-musl.tar.gz
+        dest: /usr/local/bin
+        remote_src: True
+
+    - name: start the uploader service
+      systemd:
+        name: safe_uploader
+        state: started
+        enabled: true

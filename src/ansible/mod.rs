@@ -145,6 +145,8 @@ pub enum AnsiblePlaybook {
     UpgradeNodes,
     /// Update the node Telegraf configuration to the latest version in the repository.
     UpgradeNodeTelegrafConfig,
+    /// Upgrade the uploaders to the latest version of the safe client.
+    UpgradeUploaders,
     /// Update the uploader Telegraf configuration to the latest version in the repository.
     UpgradeUploaderTelegrafConfig,
     /// The uploader playbook will setup the uploader scripts on the uploader VMs.
@@ -180,6 +182,7 @@ impl AnsiblePlaybook {
             AnsiblePlaybook::UpgradeNodeTelegrafConfig => {
                 "upgrade_node_telegraf_config.yml".to_string()
             }
+            AnsiblePlaybook::UpgradeUploaders => "upgrade_uploaders.yml".to_string(),
             AnsiblePlaybook::UpgradeUploaderTelegrafConfig => {
                 "upgrade_uploader_telegraf_config.yml".to_string()
             }
