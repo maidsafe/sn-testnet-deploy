@@ -920,6 +920,22 @@ enum UploadersCommands {
         #[clap(long, default_value_t = CloudProvider::DigitalOcean, value_parser = parse_provider, verbatim_doc_comment)]
         provider: CloudProvider,
     },
+    /// Upgrade the uploaders for a given environment.
+    Upgrade {
+        /// The name of the environment.
+        #[arg(short = 'n', long)]
+        name: String,
+
+        /// The cloud provider for the environment.
+        #[clap(long, value_parser = parse_provider, verbatim_doc_comment, default_value_t = CloudProvider::DigitalOcean)]
+        provider: CloudProvider,
+
+        /// Optionally supply a version for the safe client binary to upgrade to.
+        ///
+        /// If not provided, the latest version will be used.
+        #[arg(long)]
+        safe_version: Option<String>,
+    },
 }
 
 #[derive(Subcommand, Debug)]
@@ -1832,6 +1848,37 @@ async fn main() -> Result<()> {
                     AnsibleInventoryType::Uploaders,
                     None,
                 )?;
+                Ok(())
+            }
+            UploadersCommands::Upgrade {
+                name,
+                provider,
+                safe_version,
+            } => {
+                let version = get_version_from_option(safe_version, &ReleaseType::Safe).await?;
+
+                let testnet_deploy = TestnetDeployBuilder::default()
+                    .environment_name(&name)
+                    .provider(provider.clone())
+                    .build()?;
+                let inventory_service = DeploymentInventoryService::from(testnet_deploy.clone());
+
+                let inventory = inventory_service
+                    .generate_or_retrieve_inventory(&name, true, None)
+                    .await?;
+                if inventory.is_empty() {
+                    return Err(eyre!("The '{}' environment does not exist", name));
+                }
+
+                let ansible_runner = testnet_deploy.ansible_provisioner.ansible_runner;
+                let mut extra_vars = ExtraVarsDocBuilder::default();
+                extra_vars.add_variable("safe_version", &version.to_string());
+                ansible_runner.run_playbook(
+                    AnsiblePlaybook::UpgradeUploaders,
+                    AnsibleInventoryType::Uploaders,
+                    Some(extra_vars.build()),
+                )?;
+
                 Ok(())
             }
         },
