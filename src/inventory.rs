@@ -605,26 +605,22 @@ impl DeploymentInventory {
         list.extend(
             self.bootstrap_node_vms
                 .iter()
-                .map(|node_vm| node_vm.node_multiaddr.clone())
-                .flatten(),
+                .flat_map(|node_vm| node_vm.node_multiaddr.clone()),
         );
         list.extend(
             self.genesis_vm
                 .iter()
-                .map(|node_vm| node_vm.node_multiaddr.clone())
-                .flatten(),
+                .flat_map(|node_vm| node_vm.node_multiaddr.clone()),
         );
-        list.extend(
-            self.node_vms
-                .iter()
-                .map(|node_vm| node_vm.node_multiaddr.clone())
-                .flatten(),
-        );
+        let iter = self
+            .node_vms
+            .iter()
+            .flat_map(|node_vm| node_vm.node_multiaddr.clone());
+        list.extend(iter);
         list.extend(
             self.private_node_vms
                 .iter()
-                .map(|node_vm| node_vm.node_multiaddr.clone())
-                .flatten(),
+                .flat_map(|node_vm| node_vm.node_multiaddr.clone()),
         );
         list
     }

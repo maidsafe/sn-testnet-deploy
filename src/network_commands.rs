@@ -6,7 +6,7 @@
 
 use crate::DeploymentInventory;
 use color_eyre::{
-    eyre::{bail, eyre, OptionExt, Report},
+    eyre::{bail, eyre, Report},
     Result,
 };
 use futures::StreamExt;
@@ -40,46 +40,29 @@ pub async fn perform_fixed_interval_network_churn(
     retain_peer_id: bool,
     max_churn_cycles: usize,
 ) -> Result<()> {
-    // We should not restart the genesis node as it is used as the bootstrap peer for all other nodes.
-    let genesis_ip = inventory
-        .vm_list()
-        .iter()
-        .find_map(|vm| {
-            if vm.name.contains("genesis") {
-                Some(vm.public_ip_addr)
-            } else {
-                None
-            }
-        })
-        .ok_or_eyre("Could not get the genesis VM's addr")?;
     let safenodemand_endpoints = inventory
-        .safenodemand_endpoints
+        .node_vms
         .iter()
-        .filter(|addr| addr.ip() != genesis_ip)
-        .cloned()
+        .filter_map(|node_vm| node_vm.safenodemand_endpoint)
+        .map(|endpoint| (inventory.node_count(), endpoint))
+        .chain(
+            inventory
+                .bootstrap_node_vms
+                .iter()
+                .filter_map(|node_vm| node_vm.safenodemand_endpoint)
+                .map(|endpoint| (inventory.bootstrap_node_count(), endpoint)),
+        )
         .collect::<BTreeSet<_>>();
 
-    let nodes_per_vm = {
-        let mut vms_to_ignore = 0;
-        inventory.vm_list().iter().for_each(|vm| {
-            if vm.name.contains("build") || vm.name.contains("genesis") {
-                vms_to_ignore += 1;
-            }
-        });
-        inventory.peers().len() / (inventory.vm_list().len() - vms_to_ignore)
-    };
-
-    let max_concurrent_churns = std::cmp::min(concurrent_churns, nodes_per_vm);
     let max_churn_cycles = std::cmp::max(max_churn_cycles, 1);
     println!("===== Configurations =====");
-    println!("Initiating churn of {max_concurrent_churns} nodes with a sleep interval of {sleep_interval:?}");
-    println!("This process will be repeated {max_churn_cycles} times across all VMs.");
 
     let mut n_cycles = 0;
     while n_cycles < max_churn_cycles {
         println!("===== Churn Cycle: {} =====", n_cycles + 1);
         // churn one VM at a time.
-        for daemon_endpoint in safenodemand_endpoints.iter() {
+        for (node_count, daemon_endpoint) in safenodemand_endpoints.iter() {
+            let max_concurrent_churns = std::cmp::min(concurrent_churns, *node_count);
             println!("===== Restarting nodes @ {} =====", daemon_endpoint.ip());
             let mut daemon_client = get_safenode_manager_rpc_client(*daemon_endpoint).await?;
             let nodes_to_churn = get_running_node_list(&mut daemon_client).await?;
@@ -118,23 +101,16 @@ pub async fn perform_random_interval_network_churn(
         bail!("Churn count cannot be 0");
     }
 
-    // We should not restart the genesis node as it is used as the bootstrap peer for all other nodes.
-    let genesis_ip = inventory
-        .vm_list()
-        .iter()
-        .find_map(|vm| {
-            if vm.name.contains("genesis") {
-                Some(vm.public_ip_addr)
-            } else {
-                None
-            }
-        })
-        .ok_or_eyre("Could not get the genesis VM's addr")?;
     let safenodemand_endpoints = inventory
-        .safenodemand_endpoints
+        .node_vms
         .iter()
-        .filter(|addr| addr.ip() != genesis_ip)
-        .cloned()
+        .filter_map(|node_vm| node_vm.safenodemand_endpoint)
+        .chain(
+            inventory
+                .bootstrap_node_vms
+                .iter()
+                .filter_map(|node_vm| node_vm.safenodemand_endpoint),
+        )
         .collect::<BTreeSet<_>>();
 
     let max_churn_cycles = std::cmp::max(max_churn_cycles, 1);
@@ -216,11 +192,16 @@ pub async fn update_node_log_levels(
     concurrent_updates: usize,
 ) -> Result<()> {
     let node_endpoints = inventory
-        .rpc_endpoints
-        .values()
-        .cloned()
-        .collect::<Vec<_>>();
-    let mut stream = futures::stream::iter(node_endpoints.iter())
+        .bootstrap_node_vms
+        .iter()
+        .flat_map(|node_vm| node_vm.rpc_endpoint.values())
+        .chain(
+            inventory
+                .node_vms
+                .iter()
+                .flat_map(|node_vm| node_vm.rpc_endpoint.values()),
+        );
+    let mut stream = futures::stream::iter(node_endpoints)
         .map(|endpoint| update_log_level(*endpoint, log_level.clone()))
         .buffer_unordered(concurrent_updates);
 
