@@ -395,18 +395,27 @@ impl TestnetDeployer {
             AnsibleInventoryType::BootstrapNodes => current_inventory
                 .bootstrap_node_vms
                 .iter()
+                .map(|node_vm| &node_vm.vm)
                 .cloned()
                 .collect(),
-            AnsibleInventoryType::Nodes => current_inventory.node_vms.iter().cloned().collect(),
+            AnsibleInventoryType::Nodes => current_inventory
+                .node_vms
+                .iter()
+                .map(|node_vm| &node_vm.vm)
+                .cloned()
+                .collect(),
             AnsibleInventoryType::Uploaders => {
                 current_inventory.uploader_vms.iter().cloned().collect()
             }
             AnsibleInventoryType::NatGateway => {
                 current_inventory.nat_gateway_vm.iter().cloned().collect()
             }
-            AnsibleInventoryType::PrivateNodes => {
-                current_inventory.private_node_vms.iter().cloned().collect()
-            }
+            AnsibleInventoryType::PrivateNodes => current_inventory
+                .private_node_vms
+                .iter()
+                .map(|node_vm| &node_vm.vm)
+                .cloned()
+                .collect(),
             it => return Err(Error::UpscaleInventoryTypeNotSupported(it.to_string())),
         };
         let new_vms: Vec<_> = inventory
