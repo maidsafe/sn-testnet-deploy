@@ -310,9 +310,15 @@ impl TestnetDeployer {
             AnsibleInventoryType::BootstrapNodes => current_inventory
                 .bootstrap_node_vms
                 .iter()
+                .map(|node_vm| &node_vm.vm)
                 .cloned()
                 .collect(),
-            AnsibleInventoryType::Nodes => current_inventory.node_vms.iter().cloned().collect(),
+            AnsibleInventoryType::Nodes => current_inventory
+                .node_vms
+                .iter()
+                .map(|node_vm| &node_vm.vm)
+                .cloned()
+                .collect(),
             AnsibleInventoryType::Uploaders => {
                 current_inventory.uploader_vms.iter().cloned().collect()
             }

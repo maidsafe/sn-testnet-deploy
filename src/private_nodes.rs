@@ -71,7 +71,7 @@ impl TestnetDeployer {
         self.ansible_provisioner
             .provision_nat_gateway(
                 &options.current_inventory.name,
-                private_vm_inventory.private_ip_addr,
+                private_vm_inventory.vm.private_ip_addr,
             )
             .await
             .map_err(|err| {
@@ -104,7 +104,12 @@ impl TestnetDeployer {
         generate_private_node_static_environment_inventory(
             &options.current_inventory.name,
             &options.output_inventory_dir_path,
-            &options.current_inventory.private_node_vms,
+            options
+                .current_inventory
+                .private_node_vms
+                .iter()
+                .map(|vm| vm.vm.clone())
+                .collect(),
             &Some(nat_gateway_inventory.clone()),
             &self.ssh_client.private_key_path,
         )?;

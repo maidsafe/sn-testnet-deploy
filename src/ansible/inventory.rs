@@ -290,7 +290,7 @@ pub fn generate_custom_environment_inventory(
 pub fn generate_private_node_static_environment_inventory(
     environment_name: &str,
     output_inventory_dir_path: &Path,
-    private_node_vms: &[VirtualMachine],
+    private_node_vms: Vec<VirtualMachine>,
     nat_gateway_vm: &Option<VirtualMachine>,
     ssh_sk_path: &Path,
 ) -> Result<()> {
