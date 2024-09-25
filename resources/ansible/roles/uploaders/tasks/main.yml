@@ -20,7 +20,7 @@
 
 - name: copy upload-random-data.sh to remote
   ansible.builtin.copy:
-    src: ../scripts/upload-random-data.sh
+    src: upload-random-data.sh
     dest: /home/safe/upload-random-data.sh
     owner: safe
     group: safe
