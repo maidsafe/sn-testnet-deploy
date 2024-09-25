@@ -1,0 +1,13 @@
+[Unit]
+Description=Network Downloader %i
+After=network.target
+
+[Service]
+ExecStart=/home/safe/download.sh {{ genesis_multiaddr }}
+User=safe
+Group=safe
+Restart=always
+WorkingDirectory=/home/safe
+
+[Install]
+WantedBy=multi-user.target

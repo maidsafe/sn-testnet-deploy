@@ -1,0 +1,30 @@
+---
+# This role makes the assumption that the uploaders role has already been applied.
+# The uploaders role will download the `safe` binary.
+# There is no context in which you would want to use this role without using the uploaders role.
+- name: copy download.sh to remote
+  ansible.builtin.copy:
+    src: download.sh
+    dest: /home/safe/download.sh
+    owner: safe
+    group: safe
+    mode: '0744'
+  become: yes
+  become_user: safe
+
+- name: create systemd service file
+  ansible.builtin.template:
+    src: safe_downloader.service.j2
+    dest: /etc/systemd/system/safe_downloader@.service
+    owner: root
+    group: root
+    mode: '0644'
+  become: yes
+
+- name: start and enable safe_downloader services
+  ansible.builtin.systemd:
+    name: "safe_downloader@{{ item }}"
+    state: started
+    enabled: yes
+  become: yes
+  loop: "{{ range(1, safe_downloader_instances|int + 1)|list }}"

@@ -51,6 +51,7 @@ pub struct ProvisionOptions {
     pub beta_encryption_key: Option<String>,
     pub binary_option: BinaryOption,
     pub bootstrap_node_count: u16,
+    pub downloaders_count: u16,
     pub env_variables: Option<Vec<(String, String)>>,
     pub log_format: Option<LogFormat>,
     pub logstash_details: Option<(String, Vec<SocketAddr>)>,
@@ -69,6 +70,7 @@ impl From<BootstrapOptions> for ProvisionOptions {
             beta_encryption_key: None,
             binary_option: bootstrap_options.binary_option,
             bootstrap_node_count: 0,
+            downloaders_count: 0,
             env_variables: bootstrap_options.env_variables,
             log_format: bootstrap_options.log_format,
             logstash_details: None,
@@ -89,6 +91,7 @@ impl From<DeployOptions> for ProvisionOptions {
             beta_encryption_key: deploy_options.beta_encryption_key,
             binary_option: deploy_options.binary_option,
             bootstrap_node_count: deploy_options.bootstrap_node_count,
+            downloaders_count: deploy_options.downloaders_count,
             env_variables: deploy_options.env_variables,
             log_format: deploy_options.log_format,
             logstash_details: deploy_options.logstash_details,
@@ -913,6 +916,10 @@ impl AnsibleProvisioner {
         extra_vars.add_variable("testnet_name", &options.name);
         extra_vars.add_variable("genesis_multiaddr", genesis_multiaddr);
         extra_vars.add_variable("faucet_address", &faucet_address);
+        extra_vars.add_variable(
+            "safe_downloader_instances",
+            &options.downloaders_count.to_string(),
+        );
         extra_vars.add_safe_url_or_version(&options.name, &options.binary_option)?;
         Ok(extra_vars.build())
     }
