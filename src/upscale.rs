@@ -23,6 +23,8 @@ pub struct UpscaleOptions {
     pub desired_bootstrap_node_vm_count: Option<u16>,
     pub desired_node_count: Option<u16>,
     pub desired_node_vm_count: Option<u16>,
+    pub desired_private_node_count: Option<u16>,
+    pub desired_private_node_vm_count: Option<u16>,
     pub desired_uploader_vm_count: Option<u16>,
     pub infra_only: bool,
     pub plan: bool,
@@ -74,6 +76,14 @@ impl TestnetDeployer {
         }
         debug!("Using {desired_node_vm_count} for desired node VM count");
 
+        let desired_private_node_vm_count = options
+            .desired_private_node_vm_count
+            .unwrap_or(options.current_inventory.private_node_vms.len() as u16);
+        if desired_private_node_vm_count < options.current_inventory.private_node_vms.len() as u16 {
+            return Err(Error::InvalidUpscaleDesiredPrivateNodeVmCount);
+        }
+        debug!("Using {desired_private_node_vm_count} for desired private node VM count");
+
         let desired_uploader_vm_count = options
             .desired_uploader_vm_count
             .unwrap_or(options.current_inventory.uploader_vms.len() as u16);
@@ -98,6 +108,14 @@ impl TestnetDeployer {
         }
         debug!("Using {desired_node_count} for desired node count");
 
+        let desired_private_node_count = options
+            .desired_private_node_count
+            .unwrap_or(options.current_inventory.node_count() as u16);
+        if desired_private_node_count < options.current_inventory.private_node_count() as u16 {
+            return Err(Error::InvalidUpscaleDesiredPrivateNodeCount);
+        }
+        debug!("Using {desired_private_node_count} for desired private node count");
+
         if options.plan {
             let vars = vec![
                 (
@@ -111,6 +129,10 @@ impl TestnetDeployer {
                 (
                     "node_vm_count".to_string(),
                     desired_node_vm_count.to_string(),
+                ),
+                (
+                    "private_node_vm_count".to_string(),
+                    desired_private_node_vm_count.to_string(),
                 ),
                 (
                     "uploader_vm_count".to_string(),
@@ -144,10 +166,9 @@ impl TestnetDeployer {
             Some(desired_auditor_vm_count),
             Some(desired_bootstrap_node_vm_count),
             Some(desired_node_vm_count),
-            Some(options.current_inventory.private_node_vms.len() as u16),
+            Some(desired_private_node_vm_count),
             Some(desired_uploader_vm_count),
             false,
-            options.current_inventory.nat_gateway_vm.is_some(),
             &options
                 .current_inventory
                 .environment_details
@@ -164,7 +185,7 @@ impl TestnetDeployer {
             return Ok(());
         }
 
-        let provision_options = ProvisionOptions {
+        let mut provision_options = ProvisionOptions {
             beta_encryption_key: None,
             binary_option: options.current_inventory.binary_option.clone(),
             bootstrap_node_count: desired_bootstrap_node_count,
@@ -172,7 +193,14 @@ impl TestnetDeployer {
             log_format: None,
             logstash_details: None,
             name: options.current_inventory.name.clone(),
+            nat_gateway: None,
             node_count: desired_node_count,
+            output_inventory_dir_path: self
+                .working_directory_path
+                .join("ansible")
+                .join("inventory"),
+            private_node_count: desired_private_node_count,
+            private_node_vms: Vec::new(),
             public_rpc: options.public_rpc,
         };
         let mut node_provision_failed = false;
@@ -194,8 +222,12 @@ impl TestnetDeployer {
         };
         debug!("Retrieved initial peer {initial_multiaddr}");
 
+        let should_provision_private_nodes = desired_private_node_vm_count > 0;
         let mut n = 1;
-        let total = if is_bootstrap_deploy { 3 } else { 6 };
+        let mut total = if is_bootstrap_deploy { 3 } else { 6 };
+        if should_provision_private_nodes {
+            total += 2;
+        }
 
         if !is_bootstrap_deploy {
             self.wait_for_ssh_availability_on_new_machines(
@@ -216,7 +248,8 @@ impl TestnetDeployer {
                 Ok(()) => {
                     println!("Provisioned bootstrap nodes");
                 }
-                Err(_) => {
+                Err(err) => {
+                    log::error!("Failed to provision bootstrap nodes: {err}");
                     node_provision_failed = true;
                 }
             }
@@ -238,11 +271,54 @@ impl TestnetDeployer {
             Ok(()) => {
                 println!("Provisioned normal nodes");
             }
-            Err(_) => {
+            Err(err) => {
+                log::error!("Failed to provision normal nodes: {err}");
                 node_provision_failed = true;
             }
         }
         n += 1;
+
+        if should_provision_private_nodes {
+            let private_nodes = self
+                .ansible_provisioner
+                .ansible_runner
+                .get_inventory(AnsibleInventoryType::PrivateNodes, true)
+                .await
+                .map_err(|err| {
+                    println!("Failed to obtain the inventory of private node: {err:?}");
+                    err
+                })?;
+
+            provision_options.private_node_vms = private_nodes;
+            self.ansible_provisioner
+                .print_ansible_run_banner(n, total, "Provision NAT Gateway");
+            self.ansible_provisioner
+                .provision_nat_gateway(&provision_options)
+                .await
+                .map_err(|err| {
+                    println!("Failed to provision NAT gateway {err:?}");
+                    err
+                })?;
+
+            n += 1;
+
+            self.ansible_provisioner
+                .print_ansible_run_banner(n, total, "Provision Private Nodes");
+            match self
+                .ansible_provisioner
+                .provision_private_nodes(&mut provision_options, &initial_multiaddr)
+                .await
+            {
+                Ok(()) => {
+                    println!("Provisioned private nodes");
+                }
+                Err(err) => {
+                    log::error!("Failed to provision private nodes: {err}");
+                    node_provision_failed = true;
+                }
+            }
+            n += 1;
+        }
 
         if !is_bootstrap_deploy {
             // make sure faucet is running

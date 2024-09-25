@@ -90,7 +90,6 @@ variable "private_node_vm_count" {
 
 variable "setup_nat_gateway" {
   type        = bool
-  default     = false
   description = "A boolean to enable NAT gateway VM. This is required to enable home-network nodes."
 }
 

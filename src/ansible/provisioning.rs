@@ -5,7 +5,8 @@
 // Please see the LICENSE file for more details.
 
 use super::{
-    extra_vars::ExtraVarsDocBuilder, AnsibleInventoryType, AnsiblePlaybook, AnsibleRunner,
+    extra_vars::ExtraVarsDocBuilder, inventory::generate_private_node_static_environment_inventory,
+    AnsibleInventoryType, AnsiblePlaybook, AnsibleRunner,
 };
 use crate::{
     ansible::inventory::generate_custom_environment_inventory,
@@ -15,7 +16,7 @@ use crate::{
     inventory::{DeploymentNodeRegistries, VirtualMachine},
     print_duration, BinaryOption, CloudProvider, LogFormat, SshClient, UpgradeOptions,
 };
-use log::{debug, trace};
+use log::{debug, error, trace};
 use semver::Version;
 use sn_service_management::NodeRegistry;
 use std::{
@@ -45,6 +46,7 @@ impl NodeType {
     }
 }
 
+#[derive(Clone)]
 pub struct ProvisionOptions {
     pub beta_encryption_key: Option<String>,
     pub binary_option: BinaryOption,
@@ -53,7 +55,11 @@ pub struct ProvisionOptions {
     pub log_format: Option<LogFormat>,
     pub logstash_details: Option<(String, Vec<SocketAddr>)>,
     pub name: String,
+    pub nat_gateway: Option<VirtualMachine>,
     pub node_count: u16,
+    pub output_inventory_dir_path: PathBuf,
+    pub private_node_count: u16,
+    pub private_node_vms: Vec<VirtualMachine>,
     pub public_rpc: bool,
 }
 
@@ -67,7 +73,11 @@ impl From<BootstrapOptions> for ProvisionOptions {
             log_format: bootstrap_options.log_format,
             logstash_details: None,
             name: bootstrap_options.name,
+            nat_gateway: None,
             node_count: bootstrap_options.node_count,
+            output_inventory_dir_path: bootstrap_options.output_inventory_dir_path,
+            private_node_count: bootstrap_options.private_node_count,
+            private_node_vms: Vec::new(),
             public_rpc: false,
         }
     }
@@ -83,8 +93,12 @@ impl From<DeployOptions> for ProvisionOptions {
             log_format: deploy_options.log_format,
             logstash_details: deploy_options.logstash_details,
             name: deploy_options.name,
+            nat_gateway: None,
             node_count: deploy_options.node_count,
+            output_inventory_dir_path: deploy_options.output_inventory_dir_path,
             public_rpc: deploy_options.public_rpc,
+            private_node_count: deploy_options.private_node_count,
+            private_node_vms: Vec::new(),
         }
     }
 }
@@ -266,11 +280,7 @@ impl AnsibleProvisioner {
         Ok(())
     }
 
-    pub async fn provision_nat_gateway(
-        &self,
-        name: &str,
-        safenode_private_ip: IpAddr,
-    ) -> Result<()> {
+    pub async fn provision_nat_gateway(&self, options: &ProvisionOptions) -> Result<()> {
         let start = Instant::now();
         let nat_gateway_inventory = self
             .ansible_runner
@@ -279,11 +289,23 @@ impl AnsibleProvisioner {
         let nat_gateway_ip = nat_gateway_inventory[0].public_ip_addr;
         self.ssh_client
             .wait_for_ssh_availability(&nat_gateway_ip, &self.cloud_provider.get_ssh_user())?;
+        let private_ips = options
+            .private_node_vms
+            .iter()
+            .map(|vm| vm.private_ip_addr.to_string())
+            .collect::<Vec<_>>();
+
+        if private_ips.is_empty() {
+            println!("There are no private node VM available to be routed through the NAT Gateway");
+            return Err(Error::EmptyInventory(AnsibleInventoryType::PrivateNodes));
+        }
+
         self.ansible_runner.run_playbook(
             AnsiblePlaybook::NatGateway,
             AnsibleInventoryType::NatGateway,
-            Some(format!("{{ \"testnet_name\": \"{name}\", \"safenode_private_ip_eth1\": \"{safenode_private_ip}\" }}")),
+            Some(self.build_nat_gateway_extra_vars_doc(&options.name, private_ips)),
         )?;
+
         print_duration(start.elapsed());
         Ok(())
     }
@@ -301,7 +323,10 @@ impl AnsibleProvisioner {
                 options.bootstrap_node_count,
             ),
             NodeType::Normal => (AnsibleInventoryType::Nodes, options.node_count),
-            NodeType::Private => (AnsibleInventoryType::PrivateNodes, options.node_count),
+            NodeType::Private => (
+                AnsibleInventoryType::PrivateNodes,
+                options.private_node_count,
+            ),
         };
 
         // For a new deployment, it's quite probable that SSH is available, because this part occurs
@@ -343,23 +368,40 @@ impl AnsibleProvisioner {
         Ok(())
     }
 
-    /// Provision private nodes on the provided VMs.
-    pub async fn provision_private_nodes_with_home_network_flag(
+    pub async fn provision_private_nodes(
         &self,
-        name: &str,
-        nat_gateway_inventory: &VirtualMachine,
+        options: &mut ProvisionOptions,
+        initial_contact_peer: &str,
     ) -> Result<()> {
         let start = Instant::now();
-        println!("Provisioning private noes with a custom inventory");
 
-        self.ansible_runner.run_playbook(
-            AnsiblePlaybook::PrivateNodes,
-            AnsibleInventoryType::PrivateNodes,
-            Some(format!(
-                "{{ \"testnet_name\": \"{name}\", \"nat_gateway_private_ip_eth1\": \"{}\" }}",
-                nat_gateway_inventory.private_ip_addr
-            )),
-        )?;
+        let nat_gateway_inventory = self
+            .ansible_runner
+            .get_inventory(AnsibleInventoryType::NatGateway, true)
+            .await
+            .map_err(|err| {
+                println!("Failed to get NAT Gateway inventory {err:?}");
+                err
+            })?
+            .first()
+            .ok_or_else(|| Error::EmptyInventory(AnsibleInventoryType::NatGateway))?
+            .clone();
+
+        options.nat_gateway = Some(nat_gateway_inventory.clone());
+        generate_private_node_static_environment_inventory(
+            &options.name,
+            &options.output_inventory_dir_path,
+            &options.private_node_vms,
+            &Some(nat_gateway_inventory),
+            &self.ssh_client.private_key_path,
+        )
+        .inspect_err(|err| {
+            error!("Failed to generate private node static inv with err: {err:?}")
+        })?;
+
+        self.provision_nodes(options, initial_contact_peer, NodeType::Private)
+            .await?;
+
         print_duration(start.elapsed());
         Ok(())
     }
@@ -737,6 +779,13 @@ impl AnsibleProvisioner {
         println!("{}\n{}{}\n{}", line, ansible_run_msg, s, line);
     }
 
+    fn build_nat_gateway_extra_vars_doc(&self, name: &str, private_ips: Vec<String>) -> String {
+        let mut extra_vars = ExtraVarsDocBuilder::default();
+        extra_vars.add_variable("testnet_name", name);
+        extra_vars.add_list_variable("node_private_ips_eth1", private_ips);
+        extra_vars.build()
+    }
+
     fn build_node_extra_vars_doc(
         &self,
         options: &ProvisionOptions,
@@ -761,6 +810,16 @@ impl AnsibleProvisioner {
         }
         if options.public_rpc {
             extra_vars.add_variable("public_rpc", "true");
+        }
+
+        if let Some(nat_gateway) = &options.nat_gateway {
+            extra_vars.add_variable(
+                "nat_gateway_private_ip_eth1",
+                &nat_gateway.private_ip_addr.to_string(),
+            );
+            extra_vars.add_variable("make_vm_private", "true");
+        } else if matches!(node_type, NodeType::Private) {
+            return Err(Error::NatGatewayNotSupplied);
         }
 
         extra_vars.add_node_url_or_version(&options.name, &options.binary_option);

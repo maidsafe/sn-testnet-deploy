@@ -14,7 +14,6 @@ pub mod logs;
 pub mod logstash;
 pub mod manage_test_data;
 pub mod network_commands;
-pub mod private_nodes;
 pub mod rpc_client;
 pub mod s3;
 pub mod safe;
@@ -132,11 +131,7 @@ impl EnvironmentType {
     }
 
     pub fn get_default_private_node_count(&self) -> u16 {
-        match self {
-            EnvironmentType::Development => 1,
-            EnvironmentType::Production => 1,
-            EnvironmentType::Staging => 1,
-        }
+        self.get_default_node_count()
     }
 }
 
@@ -677,7 +672,6 @@ impl TestnetDeployer {
         // TODO: enable_build_vm must be provided from options when called from other places.
         // OR should we tear down the machine once used?
         enable_build_vm: bool,
-        enable_nat_gateway_vm: bool,
         tfvars_filename: &str,
     ) -> Result<()> {
         let start = Instant::now();
@@ -708,6 +702,10 @@ impl TestnetDeployer {
                 "private_node_vm_count".to_string(),
                 private_node_vm_count.to_string(),
             ));
+            args.push((
+                "setup_nat_gateway".to_string(),
+                (private_node_vm_count > 0).to_string(),
+            ));
         }
 
         if let Some(uploader_vm_count) = uploader_vm_count {
@@ -717,10 +715,6 @@ impl TestnetDeployer {
             ));
         }
         args.push(("use_custom_bin".to_string(), enable_build_vm.to_string()));
-        args.push((
-            "setup_nat_gateway".to_string(),
-            enable_nat_gateway_vm.to_string(),
-        ));
 
         println!("Running terraform apply...");
         self.terraform_runner

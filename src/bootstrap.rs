@@ -4,8 +4,13 @@
 // This SAFE Network Software is licensed under the BSD-3-Clause license.
 // Please see the LICENSE file for more details.
 
+use std::path::PathBuf;
+
 use crate::{
-    ansible::provisioning::{NodeType, ProvisionOptions},
+    ansible::{
+        inventory::AnsibleInventoryType,
+        provisioning::{NodeType, ProvisionOptions},
+    },
     error::Result,
     write_environment_details, BinaryOption, DeploymentType, EnvironmentDetails, EnvironmentType,
     LogFormat, TestnetDeployer,
@@ -22,7 +27,9 @@ pub struct BootstrapOptions {
     pub name: String,
     pub node_count: u16,
     pub node_vm_count: Option<u16>,
-    pub private_node_vm_count: u16,
+    pub output_inventory_dir_path: PathBuf,
+    pub private_node_count: u16,
+    pub private_node_vm_count: Option<u16>,
 }
 
 impl TestnetDeployer {
@@ -33,6 +40,12 @@ impl TestnetDeployer {
                 BinaryOption::Versioned { .. } => false,
             }
         };
+
+        // All the environment types set private_node_vm count to >0 if not specified.
+        let should_provision_private_nodes = options
+            .private_node_vm_count
+            .map(|count| count > 0)
+            .unwrap_or(true);
 
         write_environment_details(
             &self.s3_repository,
@@ -50,10 +63,9 @@ impl TestnetDeployer {
             Some(0),
             Some(0),
             options.node_vm_count,
-            Some(options.private_node_vm_count),
+            options.private_node_vm_count,
             Some(0),
             build_custom_binaries,
-            false,
             &options.environment_type.get_tfvars_filename(),
         )
         .await
@@ -63,9 +75,12 @@ impl TestnetDeployer {
         })?;
 
         let mut n = 1;
-        let total = if build_custom_binaries { 2 } else { 1 };
+        let mut total = if build_custom_binaries { 2 } else { 1 };
+        if should_provision_private_nodes {
+            total += 2;
+        }
 
-        let provision_options = ProvisionOptions::from(options.clone());
+        let mut provision_options = ProvisionOptions::from(options.clone());
         if build_custom_binaries {
             self.ansible_provisioner
                 .print_ansible_run_banner(n, total, "Build Custom Binaries");
@@ -101,23 +116,44 @@ impl TestnetDeployer {
             }
         }
 
-        self.ansible_provisioner
-            .print_ansible_run_banner(n, total, "Provision Private Nodes");
-        match self
-            .ansible_provisioner
-            .provision_nodes(
-                &provision_options,
-                &options.bootstrap_peer,
-                NodeType::Private,
-            )
-            .await
-        {
-            Ok(()) => {
-                println!("Provisioned private nodes");
-            }
-            Err(e) => {
-                println!("Failed to provision private nodes: {e:?}");
-                failed_to_provision = true;
+        if should_provision_private_nodes {
+            let private_nodes = self
+                .ansible_provisioner
+                .ansible_runner
+                .get_inventory(AnsibleInventoryType::PrivateNodes, true)
+                .await
+                .map_err(|err| {
+                    println!("Failed to obtain the inventory of private node: {err:?}");
+                    err
+                })?;
+
+            provision_options.private_node_vms = private_nodes;
+            self.ansible_provisioner
+                .print_ansible_run_banner(n, total, "Provision NAT Gateway");
+            self.ansible_provisioner
+                .provision_nat_gateway(&provision_options)
+                .await
+                .map_err(|err| {
+                    println!("Failed to provision NAT gateway {err:?}");
+                    err
+                })?;
+
+            n += 1;
+
+            self.ansible_provisioner
+                .print_ansible_run_banner(n, total, "Provision Private Nodes");
+            match self
+                .ansible_provisioner
+                .provision_private_nodes(&mut provision_options, &options.bootstrap_peer)
+                .await
+            {
+                Ok(()) => {
+                    println!("Provisioned private nodes");
+                }
+                Err(err) => {
+                    log::error!("Failed to provision private nodes: {err}");
+                    failed_to_provision = true;
+                }
             }
         }
 

@@ -93,6 +93,11 @@ pub enum Error {
     )]
     InvalidUpscaleDesiredPrivateNodeVmCount,
     #[error(
+        "The desired private node count is smaller than the current count. \
+         This is invalid for an upscale operation."
+    )]
+    InvalidUpscaleDesiredPrivateNodeCount,
+    #[error(
         "The desired uploader VM count is smaller than the current count. \
          This is invalid for an upscale operation."
     )]
@@ -119,6 +124,8 @@ pub enum Error {
         "Could not convert from DeployOptions to ProvisionOptions: node count must have a value"
     )]
     MissingNodeCount,
+    #[error("The NAT gateway VM was not supplied")]
+    NatGatewayNotSupplied,
     #[error("This deployment does not have an auditor. It may be a bootstrap deployment.")]
     NoAuditorError,
     #[error("Could not obtain a multiaddr from the node inventory")]

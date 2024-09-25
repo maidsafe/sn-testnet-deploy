@@ -1,6 +1,0 @@
----
-- name: provision private node
-  hosts: all
-  become: True
-  roles:
-    - private_node

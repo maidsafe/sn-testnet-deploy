@@ -614,6 +614,15 @@ impl DeploymentInventory {
         }
     }
 
+    pub fn private_node_count(&self) -> usize {
+        if self.private_node_vms.is_empty() {
+            0
+        } else {
+            // TODO: will be fixed with upcoming PR
+            self.node_peers.len() / self.private_node_vms.len()
+        }
+    }
+
     pub fn print_report(&self) -> Result<()> {
         println!("**************************************");
         println!("*                                    *");
@@ -709,7 +718,7 @@ impl DeploymentInventory {
                 };
                 println!("SSH using NAT gateway: {ssh}");
             } else {
-                println!("SSH using public IP");
+                println!("Error: NAT gateway VM not found");
             }
         }
         println!("Nodes per VM: {}", self.node_count());

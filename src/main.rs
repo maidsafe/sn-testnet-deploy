@@ -24,13 +24,12 @@ use sn_testnet_deploy::{
     logstash::LogstashDeployBuilder,
     manage_test_data::TestDataClientBuilder,
     network_commands, notify_slack,
-    private_nodes::PrivateNodesOptions,
     setup::setup_dotenv_file,
     upscale::UpscaleOptions,
     BinaryOption, CloudProvider, EnvironmentType, LogFormat, TestnetDeployBuilder, UpgradeOptions,
 };
-use std::net::IpAddr;
 use std::time::Duration;
+use std::{env, net::IpAddr};
 
 #[derive(Parser, Debug)]
 #[clap(name = "sn-testnet-deploy", version = env!("CARGO_PKG_VERSION"))]
@@ -136,13 +135,18 @@ enum Commands {
         /// If one of the new keys is supplied, all must be supplied.
         #[arg(long)]
         payment_forward_pk: Option<String>,
+        /// The number of safenode services to be run behind a NAT on each private node VM.
+        ///
+        /// If the argument is not used, the value will be determined by the 'environment-type'
+        /// argument.
+        #[clap(long, verbatim_doc_comment)]
+        private_node_count: Option<u16>,
         /// The number of private node VMs to create.
         ///
-        /// Each VM will run many safenode services. The services will still be public. To make them private and to
-        /// add the 'home-network' flag, use the `setup-private-nodes` command.
+        /// Each VM will run many safenode services.
         ///
-        /// If the argument is not used, the value will be determined by the 'environment-type' argument.
-        #[clap(long)]
+        /// If the argument is not used, the value will be determined by the 'environment-type'
+        #[clap(long, verbatim_doc_comment)]
         private_node_vm_count: Option<u16>,
         /// The cloud provider to deploy to.
         ///
@@ -319,13 +323,18 @@ enum Commands {
         /// If one of the new keys is supplied, all must be supplied.
         #[arg(long)]
         payment_forward_pk: Option<String>,
+        /// The number of safenode services to be run behind a NAT on each private node VM.
+        ///
+        /// If the argument is not used, the value will be determined by the 'environment-type'
+        /// argument.
+        #[clap(long, verbatim_doc_comment)]
+        private_node_count: Option<u16>,
         /// The number of private node VMs to create.
         ///
-        /// Each VM will run many safenode services. The services will still be public. To make them private and to
-        /// add the 'home-network' flag, use the `setup-private-nodes` command.
+        /// Each VM will run many safenode services.
         ///
-        /// If the argument is not used, the value will be determined by the 'environment-type' argument.
-        #[clap(long)]
+        /// If the argument is not used, the value will be determined by the 'environment-type'
+        #[clap(long, verbatim_doc_comment)]
         private_node_vm_count: Option<u16>,
         /// Protocol version is used to partition the network and will not allow nodes with
         /// different protocol versions to join.
@@ -423,19 +432,6 @@ enum Commands {
         network_contacts_file_name: Option<String>,
         /// The cloud provider that was used.
         #[clap(long, default_value_t = CloudProvider::DigitalOcean, value_parser = parse_provider, verbatim_doc_comment)]
-        provider: CloudProvider,
-    },
-    /// Converts the private node VMs from public to private. It sets up a NAT gateway and adds the 'home-network'
-    /// flag to the safenode service.
-    SetupPrivateNodes {
-        /// Set to run Ansible with more verbose output.
-        #[arg(long)]
-        ansible_verbose: bool,
-        /// The name of the environment
-        #[arg(short = 'n', long)]
-        name: String,
-        /// The cloud provider for the environment.
-        #[clap(long, value_parser = parse_provider, verbatim_doc_comment, default_value_t = CloudProvider::DigitalOcean)]
         provider: CloudProvider,
     },
     #[clap(name = "logs", subcommand)]
@@ -745,6 +741,23 @@ enum Commands {
         /// should be 25, rather than 15 as a delta to reach 25.
         #[clap(long, verbatim_doc_comment)]
         desired_node_vm_count: Option<u16>,
+        /// The desired number of safenode services to be running behind a NAT on each private node VM after the
+        /// scale.
+        ///
+        /// If there are currently 10 services running on each VM, and you want there to be 25, the
+        /// value used should be 25, rather than 15 as a delta to reach 25.
+        ///
+        /// This option is not applicable to a bootstrap deployment.
+        #[clap(long, verbatim_doc_comment)]
+        desired_private_node_count: Option<u16>,
+        /// The desired number of private node VMs to be running after the scale.
+        ///
+        /// If there are currently 10 VMs running, and you want there to be 20, use 20 as the
+        /// value, not 10 as a delta.
+        ///
+        /// This option is not applicable to a bootstrap deployment.
+        #[clap(long, verbatim_doc_comment)]
+        desired_private_node_vm_count: Option<u16>,
         /// The desired number of uploader VMs to be running after the scale.
         ///
         /// If there are currently 10 VMs running, and you want there to be 25, the value used
@@ -1029,6 +1042,7 @@ async fn main() -> Result<()> {
             node_count,
             node_vm_count,
             payment_forward_pk,
+            private_node_count,
             private_node_vm_count,
             provider,
             repo_owner,
@@ -1102,7 +1116,12 @@ async fn main() -> Result<()> {
                     log_format,
                     name: name.clone(),
                     node_count: node_count.unwrap_or(environment_type.get_default_node_count()),
-                    private_node_vm_count: private_node_vm_count
+                    output_inventory_dir_path: inventory_service
+                        .working_directory_path
+                        .join("ansible")
+                        .join("inventory"),
+                    private_node_vm_count,
+                    private_node_count: private_node_count
                         .unwrap_or(environment_type.get_default_private_node_count()),
                     node_vm_count,
                 })
@@ -1144,6 +1163,7 @@ async fn main() -> Result<()> {
             node_count,
             node_vm_count,
             payment_forward_pk,
+            private_node_count,
             private_node_vm_count,
             protocol_version,
             provider,
@@ -1243,7 +1263,13 @@ async fn main() -> Result<()> {
                     name: name.clone(),
                     node_count: node_count.unwrap_or(environment_type.get_default_node_count()),
                     node_vm_count,
+                    output_inventory_dir_path: inventory_service
+                        .working_directory_path
+                        .join("ansible")
+                        .join("inventory"),
                     private_node_vm_count,
+                    private_node_count: private_node_count
+                        .unwrap_or(environment_type.get_default_private_node_count()),
                     public_rpc,
                     uploader_vm_count,
                 })
@@ -1603,68 +1629,6 @@ async fn main() -> Result<()> {
 
             Ok(())
         }
-        Commands::SetupPrivateNodes {
-            ansible_verbose,
-            name,
-            provider,
-        } => {
-            println!("Introducing home nodes...");
-            let testnet_deployer = TestnetDeployBuilder::default()
-                .ansible_verbose_mode(ansible_verbose)
-                .environment_name(&name)
-                .provider(provider.clone())
-                .build()?;
-            testnet_deployer.init().await?;
-
-            let inventory_service = DeploymentInventoryService::from(testnet_deployer.clone());
-            let inventory = inventory_service
-                .generate_or_retrieve_inventory(&name, true, None)
-                .await?;
-
-            if inventory.private_node_vms.is_empty() {
-                return Err(eyre!("No private nodes found in the inventory"));
-            }
-
-            testnet_deployer
-                .setup_private_nodes(&PrivateNodesOptions {
-                    ansible_verbose,
-                    current_inventory: inventory,
-                    output_inventory_dir_path: testnet_deployer
-                        .working_directory_path
-                        .join("ansible")
-                        .join("inventory"),
-                })
-                .await?;
-
-            println!("Generating new inventory after setting up private nodes...");
-            let max_retries = 3;
-            let mut retries = 0;
-            let inventory = loop {
-                match inventory_service
-                    .generate_or_retrieve_inventory(&name, true, None)
-                    .await
-                {
-                    Ok(inv) => break inv,
-                    Err(e) if retries < max_retries => {
-                        retries += 1;
-                        eprintln!("Failed to generate inventory on attempt {retries}: {:?}", e);
-                        eprintln!("Will retry up to {max_retries} times...");
-                    }
-                    Err(_) => {
-                        eprintln!("Failed to generate inventory after {max_retries} attempts");
-                        eprintln!(
-                            "Please try running the `inventory` command or workflow separately"
-                        );
-                        return Ok(());
-                    }
-                }
-            };
-
-            inventory.print_report()?;
-            inventory.save()?;
-
-            Ok(())
-        }
         Commands::StartTelegraf {
             custom_inventory,
             forks,
@@ -2010,6 +1974,8 @@ async fn main() -> Result<()> {
             desired_bootstrap_node_vm_count,
             desired_node_count,
             desired_node_vm_count,
+            desired_private_node_count,
+            desired_private_node_vm_count,
             desired_uploader_vm_count,
             infra_only,
             name,
@@ -2039,6 +2005,8 @@ async fn main() -> Result<()> {
                     desired_bootstrap_node_vm_count,
                     desired_node_count,
                     desired_node_vm_count,
+                    desired_private_node_count,
+                    desired_private_node_vm_count,
                     desired_uploader_vm_count,
                     infra_only,
                     plan,

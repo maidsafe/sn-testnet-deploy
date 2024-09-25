@@ -33,6 +33,11 @@
         when: provider == "aws"
       }
     - node-manager
+    - {
+        role: private_node,
+        become: True,
+        when: make_vm_private
+      }
     - node
     - role: node-metrics
       become: True

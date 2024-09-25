@@ -93,12 +93,9 @@ pub enum AnsiblePlaybook {
     /// The node playbook will setup any nodes except the genesis node. These nodes will bootstrap
     /// using genesis as a peer reference.
     ///
-    /// Use in combination with `AnsibleInventoryType::Genesis` or `AnsibleInventoryType::Nodes`.
+    /// Use in combination with `AnsibleInventoryType::Genesis`, `AnsibleInventoryType::Nodes`,
+    /// `AnsibleInventoryType::PrivateNodes` or `AnsibleInventoryType::Bootstrap`.
     Nodes,
-    /// The private nodes playbook will setup the private nodes on the last node in the inventory.
-    ///
-    /// Use in combination with `AnsibleInventoryType::Nodes`.
-    PrivateNodes,
     /// The rpc client playbook will setup the `safenode_rpc_client` binary on the genesis node.
     ///
     /// Use in combination with `AnsibleInventoryType::Genesis`.
@@ -170,7 +167,6 @@ impl AnsiblePlaybook {
             AnsiblePlaybook::NatGateway => "nat_gateway.yml".to_string(),
             AnsiblePlaybook::NodeManagerInventory => "node_manager_inventory.yml".to_string(),
             AnsiblePlaybook::Nodes => "nodes.yml".to_string(),
-            AnsiblePlaybook::PrivateNodes => "private_nodes.yml".to_string(),
             AnsiblePlaybook::RpcClient => "safenode_rpc_client.yml".to_string(),
             AnsiblePlaybook::StartFaucet => "start_faucet.yml".to_string(),
             AnsiblePlaybook::StartNodes => "start_nodes.yml".to_string(),
@@ -246,7 +242,7 @@ impl AnsibleRunner {
             inventory_type = AnsibleInventoryType::PrivateNodesStatic;
         }
         debug!(
-            "Running playbook: {:?} on {inventory_type:?}",
+            "Running playbook: {:?} on {inventory_type:?} with extra vars: {extra_vars_document:?}",
             playbook.get_playbook_name()
         );
 
