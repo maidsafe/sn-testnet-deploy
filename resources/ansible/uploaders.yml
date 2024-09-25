@@ -1,5 +1,5 @@
 ---
-- name: deploy safenode to remaining nodes
+- name: configure uploaders
   hosts: all
   become: False
   ignore_unreachable: yes
