@@ -23,6 +23,7 @@ pub struct DeployOptions {
     pub bootstrap_node_count: u16,
     pub bootstrap_node_vm_count: Option<u16>,
     pub current_inventory: DeploymentInventory,
+    pub downloaders_count: u16,
     pub environment_type: EnvironmentType,
     pub env_variables: Option<Vec<(String, String)>>,
     pub log_format: Option<LogFormat>,

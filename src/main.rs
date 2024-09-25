@@ -1,5 +1,4 @@
 // Copyright (c) 2023, MaidSafe.
-// All rights reserved.
 //
 // This SAFE Network Software is licensed under the BSD-3-Clause license.
 // Please see the LICENSE file for more details.
@@ -207,6 +206,17 @@ enum Commands {
         /// If not used a default key will be supplied.
         #[arg(long)]
         beta_encryption_key: Option<String>,
+        /// The branch of the Github repository to build from.
+        ///
+        /// If used, all binaries will be built from this branch. It is typically used for testing
+        /// changes on a fork.
+        ///
+        /// This argument must be used in conjunction with the --repo-owner argument.
+        ///
+        /// The --branch and --repo-owner arguments are mutually exclusive with the binary version
+        /// arguments. You can only supply version numbers or a custom branch, not both.
+        #[arg(long, verbatim_doc_comment)]
+        branch: Option<String>,
         /// The number of safenode services to run on each bootstrap VM.
         ///
         /// If the argument is not used, the value will be determined by the 'environment-type'
@@ -221,17 +231,13 @@ enum Commands {
         /// argument.
         #[clap(long)]
         bootstrap_node_vm_count: Option<u16>,
-        /// The branch of the Github repository to build from.
+        /// If set to a non-zero value, the uploaders will also be accompanied by the specified
+        /// number of downloaders.
         ///
-        /// If used, all binaries will be built from this branch. It is typically used for testing
-        /// changes on a fork.
-        ///
-        /// This argument must be used in conjunction with the --repo-owner argument.
-        ///
-        /// The --branch and --repo-owner arguments are mutually exclusive with the binary version
-        /// arguments. You can only supply version numbers or a custom branch, not both.
-        #[arg(long, verbatim_doc_comment)]
-        branch: Option<String>,
+        /// This will be the number on each uploader VM. So if the value here is 2 and there are
+        /// 5 uploader VMs, there will be 10 downloaders across the 5 VMs.
+        #[clap(long, default_value_t = 0)]
+        downloaders_count: u16,
         /// The type of deployment.
         ///
         /// Possible values are 'development', 'production' or 'staging'. The value used will
@@ -709,6 +715,13 @@ enum Commands {
         /// This option is not applicable to a bootstrap deployment.
         #[clap(long, verbatim_doc_comment)]
         desired_bootstrap_node_vm_count: Option<u16>,
+        /// If set to a non-zero value, the uploaders will also be accompanied by the specified
+        /// number of downloaders.
+        ///
+        /// This will be the number on each uploader VM. So if the value here is 2 and there are
+        /// 5 uploader VMs, there will be 10 downloaders across the 5 VMs.
+        #[clap(long, default_value_t = 0)]
+        downloaders_count: u16,
         /// Set to only use Terraform to upscale the VMs and not run Ansible.
         #[clap(long, default_value_t = false)]
         infra_only: bool,
@@ -1155,6 +1168,7 @@ async fn main() -> Result<()> {
             branch,
             bootstrap_node_count,
             bootstrap_node_vm_count,
+            downloaders_count,
             environment_type,
             env_variables,
             faucet_version,
@@ -1262,6 +1276,7 @@ async fn main() -> Result<()> {
                         .unwrap_or(environment_type.get_default_bootstrap_node_count()),
                     bootstrap_node_vm_count,
                     current_inventory: inventory,
+                    downloaders_count,
                     environment_type: environment_type.clone(),
                     env_variables,
                     log_format,
@@ -1994,6 +2009,7 @@ async fn main() -> Result<()> {
             desired_private_node_count,
             desired_private_node_vm_count,
             desired_uploader_vm_count,
+            downloaders_count,
             infra_only,
             name,
             plan,
@@ -2025,6 +2041,7 @@ async fn main() -> Result<()> {
                     desired_private_node_count,
                     desired_private_node_vm_count,
                     desired_uploader_vm_count,
+                    downloaders_count,
                     infra_only,
                     plan,
                     public_rpc,

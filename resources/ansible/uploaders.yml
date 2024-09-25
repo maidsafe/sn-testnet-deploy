@@ -8,7 +8,11 @@
       become: True
     - role: uploader-metrics
       become: True
-    - uploaders
+    - role: uploaders
+      become: True
+    - role: downloaders
+      become: True
+      when: safe_downloader_instances | default(0) | int > 0
 
   tasks:
     # Something is wrong with the journal service on Ubuntu that causes no
