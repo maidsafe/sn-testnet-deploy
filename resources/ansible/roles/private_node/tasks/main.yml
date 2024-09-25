@@ -1,43 +1,12 @@
 ---
+# This role should be called before setting up the nodes
 - name: define conditional variables
   set_fact:
-    home_network_flag_is_set: false
-    nat_randomized_role_is_set_is_set: false
     do_gateway_is_configured: false
     nat_gateway_is_configured: false
     do_wan_route_is_removed: false
 
-- name: grep for home network flag in safenode services
-  # cat to avoid exit code 1 when grep returns empty
-  shell: grep -- '--home-network' /etc/systemd/system/safenode*.service | cat
-  register: home_network_flag
-
-- name: set home_network_flag_is_set to true if the flag is found
-  set_fact:
-    home_network_flag_is_set: true
-  when: home_network_flag.stdout.find('--home-network') != -1
-
-- debug: var=home_network_flag.stdout
-- debug: var=home_network_flag_is_set
-
-- name: stop safenode services
-  become: true
-  command: safenode-manager stop
-  when: not home_network_flag_is_set
-
-- name: grep inside telegraph environment variable
-  shell: grep NAT_RANDOMIZED_NODE /etc/default/telegraf | cat
-  register: telegraf_host_role
-
-- name: set nat_randomized_role_is_set to true if telegraf role is set to NAT_RANDOMIZED_NODE
-  set_fact:
-    nat_randomized_role_is_set: true
-  when: telegraf_host_role.stdout.find('NAT_RANDOMIZED_NODE') != -1
-
-- name: stop telegraf
-  become: True
-  command: systemctl stop telegraf
-  when: not nat_randomized_role_is_set
+- debug: var=nat_gateway_private_ip_eth1
 
 - name: obtain DO gateway ip
   command: curl -s http://169.254.169.254/metadata/v1/interfaces/public/0/ipv4/gateway
@@ -81,28 +50,3 @@
 - name: remove /20 CIDR network route from the routing table
   command: ip route del {{ do_wanroute.stdout }} dev eth0
   when: not do_wan_route_is_removed
-
-- name: get private ip of eth1
-  shell: ip -4 addr show dev eth1 | grep inet | awk '{print $2}' | cut -d/ -f1
-  register: private_ip_eth1
-  when: not home_network_flag_is_set
-
-- name: setup safenode services to use --home-network flag
-  shell: sed -i 's/--rpc/--ip {{ private_ip_eth1.stdout }} --home-network --rpc/g' /etc/systemd/system/safenode*.service
-  when: not home_network_flag_is_set
-
-- name: refresh systemd daemon
-  command: systemctl daemon-reload
-  when: not home_network_flag_is_set
-
-- name: restart safenode services
-  command: safenode-manager start
-  when: not home_network_flag_is_set
-
-- name: change telegraf's environment variable for SAFENODE_HOST_ROLE from GENERIC_NODE to NAT_RANDOMIZED_NODE
-  shell: sed -i 's/GENERIC_NODE/NAT_RANDOMIZED_NODE/g' /etc/default/telegraf
-  when: not nat_randomized_role_is_set
-
-- name: start telegraf
-  command: systemctl start telegraf
-  when: not nat_randomized_role_is_set

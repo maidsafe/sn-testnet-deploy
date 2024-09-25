@@ -85,6 +85,14 @@
   when: use_port_range
 
 #
+# Obtain private IP if make_vm_private is set
+#
+- name: get private ip of eth1
+  shell: ip -4 addr show dev eth1 | grep inet | awk '{print $2}' | cut -d/ -f1
+  register: private_ip_eth1
+  when: make_vm_private
+
+#
 # Add the nodes
 #
 - name: add node services
@@ -101,6 +109,8 @@
       - "--owner=maidsafe"
       - "--peer={{ genesis_multiaddr }}"
       - --rpc-address={{ node_rpc_ip }}
+      - "{{ ('--node-ip=' + private_ip_eth1.stdout) if make_vm_private else omit }}"
+      - "{{ '--home-network' if make_vm_private else omit }}"
       - "{{ ('--rpc-port=' + rpc_port) if not use_port_range else omit }}"
       - "{{ ('--rpc-port=' + rpc_start_port + '-' + rpc_end_port) if use_port_range else omit }}"
       - "{{ ('--metrics-port=' + metrics_port) if not use_port_range else omit }}"

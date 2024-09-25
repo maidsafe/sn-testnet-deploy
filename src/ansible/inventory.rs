@@ -46,7 +46,8 @@ pub enum AnsibleInventoryType {
     NatGateway,
     /// Use to run a playbook against all nodes except the genesis node.
     Nodes,
-    /// Use to run a inventory against the private nodes. This
+    /// Use to run a inventory against the private nodes. This does not route the ssh connection through the NAT gateway
+    /// and hence cannot run playbooks. Use PrivateNodesStatic for that.
     PrivateNodes,
     /// Use to run a playbook against the private nodes. This is similar to the PrivateNodes inventory, but uses
     /// a static custom inventory file. This is just used for running playbooks and not inventory.
@@ -294,35 +295,36 @@ pub fn generate_private_node_static_environment_inventory(
     nat_gateway_vm: &Option<VirtualMachine>,
     ssh_sk_path: &Path,
 ) -> Result<()> {
-    println!(
-        "Generating private node static inventory. Via ssh proxy: {}",
-        nat_gateway_vm.is_some()
-    );
+    let nat_gateway_vm = nat_gateway_vm
+        .clone()
+        .ok_or(Error::EmptyInventory(AnsibleInventoryType::NatGateway))?
+        .clone();
+    if private_node_vms.is_empty() {
+        return Err(Error::EmptyInventory(AnsibleInventoryType::PrivateNodes));
+    }
+
     let dest_path = output_inventory_dir_path.join(
         AnsibleInventoryType::PrivateNodesStatic
             .get_inventory_path(environment_name, "digital_ocean"),
     );
-    debug!("Created inventory file at {dest_path:?}");
+    if dest_path.exists() {
+        return Ok(());
+    }
+    debug!("Generating private node static inventory at {dest_path:?}",);
 
     let mut file = File::create(&dest_path)?;
     writeln!(file, "[private_nodes]")?;
     for vm in private_node_vms.iter() {
-        if nat_gateway_vm.is_some() {
-            writeln!(file, "{}", vm.private_ip_addr)?;
-        } else {
-            writeln!(file, "{}", vm.public_ip_addr)?;
-        }
+        writeln!(file, "{}", vm.private_ip_addr)?;
     }
 
-    if let Some(nat_gateway_vm) = nat_gateway_vm {
-        writeln!(file, "[private_nodes:vars]")?;
-        writeln!(
-            file,
-            "ansible_ssh_common_args='-o ProxyCommand=\"ssh -p 22 -W %h:%p -q root@{} -i \"{}\"\"'",
-            nat_gateway_vm.public_ip_addr,
-            ssh_sk_path.to_string_lossy()
-        )?;
-    }
+    writeln!(file, "[private_nodes:vars]")?;
+    writeln!(
+        file,
+        "ansible_ssh_common_args='-o ProxyCommand=\"ssh -p 22 -W %h:%p -q root@{} -i \"{}\"\"'",
+        nat_gateway_vm.public_ip_addr,
+        ssh_sk_path.to_string_lossy()
+    )?;
 
     debug!("Created private node inventory file with ssh proxy at {dest_path:?}");
 

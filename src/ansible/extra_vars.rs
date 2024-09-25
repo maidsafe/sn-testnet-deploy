@@ -314,8 +314,9 @@ impl ExtraVarsDocBuilder {
             for val in list.iter() {
                 doc.push_str(&format!("\"{val}\", "));
             }
-            let mut doc = doc.strip_suffix(", ").unwrap().to_string();
-            doc.push_str("], ");
+            let mut temp_doc = doc.strip_suffix(", ").unwrap().to_string();
+            temp_doc.push_str("], ");
+            doc = temp_doc;
         }
 
         let mut doc = doc.strip_suffix(", ").unwrap().to_string();

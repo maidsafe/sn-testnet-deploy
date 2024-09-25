@@ -5,13 +5,16 @@
 // Please see the LICENSE file for more details.
 
 use crate::{
-    ansible::provisioning::{NodeType, ProvisionOptions},
+    ansible::{
+        inventory::AnsibleInventoryType,
+        provisioning::{NodeType, ProvisionOptions},
+    },
     error::Result,
     get_genesis_multiaddr, write_environment_details, BinaryOption, DeploymentInventory,
     DeploymentType, EnvironmentDetails, EnvironmentType, LogFormat, TestnetDeployer,
 };
 use colored::Colorize;
-use std::net::SocketAddr;
+use std::{net::SocketAddr, path::PathBuf};
 
 #[derive(Clone)]
 pub struct DeployOptions {
@@ -27,7 +30,9 @@ pub struct DeployOptions {
     pub name: String,
     pub node_count: u16,
     pub node_vm_count: Option<u16>,
+    pub output_inventory_dir_path: PathBuf,
     pub private_node_vm_count: Option<u16>,
+    pub private_node_count: u16,
     pub public_rpc: bool,
     pub uploader_vm_count: Option<u16>,
 }
@@ -60,7 +65,6 @@ impl TestnetDeployer {
             options.private_node_vm_count,
             options.uploader_vm_count,
             build_custom_binaries,
-            false,
             &options.environment_type.get_tfvars_filename(),
         )
         .await
@@ -69,13 +73,22 @@ impl TestnetDeployer {
             err
         })?;
 
+        // All the environment types set private_node_vm count to >0 if not specified.
+        let should_provision_private_nodes = options
+            .private_node_vm_count
+            .map(|count| count > 0)
+            .unwrap_or(true);
+
         let mut n = 1;
-        let mut total = if build_custom_binaries { 10 } else { 9 };
+        let mut total = if build_custom_binaries { 9 } else { 8 };
+        if should_provision_private_nodes {
+            total += 2;
+        }
         if !options.current_inventory.is_empty() {
             total -= 4;
         }
 
-        let provision_options = ProvisionOptions::from(options.clone());
+        let mut provision_options = ProvisionOptions::from(options.clone());
         if build_custom_binaries {
             self.ansible_provisioner
                 .print_ansible_run_banner(n, total, "Build Custom Binaries");
@@ -119,7 +132,8 @@ impl TestnetDeployer {
             Ok(()) => {
                 println!("Provisioned bootstrap nodes");
             }
-            Err(_) => {
+            Err(err) => {
+                log::error!("Failed to provision bootstrap nodes: {err}");
                 node_provision_failed = true;
             }
         }
@@ -135,27 +149,54 @@ impl TestnetDeployer {
             Ok(()) => {
                 println!("Provisioned normal nodes");
             }
-            Err(_) => {
+            Err(err) => {
+                log::error!("Failed to provision normal nodes: {err}");
                 node_provision_failed = true;
             }
         }
         n += 1;
 
-        self.ansible_provisioner
-            .print_ansible_run_banner(n, total, "Provision Private Nodes");
-        match self
-            .ansible_provisioner
-            .provision_nodes(&provision_options, &genesis_multiaddr, NodeType::Private)
-            .await
-        {
-            Ok(()) => {
-                println!("Provisioned private nodes");
+        if should_provision_private_nodes {
+            let private_nodes = self
+                .ansible_provisioner
+                .ansible_runner
+                .get_inventory(AnsibleInventoryType::PrivateNodes, true)
+                .await
+                .map_err(|err| {
+                    println!("Failed to obtain the inventory of private node: {err:?}");
+                    err
+                })?;
+
+            provision_options.private_node_vms = private_nodes;
+            self.ansible_provisioner
+                .print_ansible_run_banner(n, total, "Provision NAT Gateway");
+            self.ansible_provisioner
+                .provision_nat_gateway(&provision_options)
+                .await
+                .map_err(|err| {
+                    println!("Failed to provision NAT gateway {err:?}");
+                    err
+                })?;
+
+            n += 1;
+
+            self.ansible_provisioner
+                .print_ansible_run_banner(n, total, "Provision Private Nodes");
+            match self
+                .ansible_provisioner
+                .provision_private_nodes(&mut provision_options, &genesis_multiaddr)
+                .await
+            {
+                Ok(()) => {
+                    println!("Provisioned private nodes");
+                }
+                Err(err) => {
+                    log::error!("Failed to provision private nodes: {err}");
+                    node_provision_failed = true;
+                }
             }
-            Err(_) => {
-                node_provision_failed = true;
-            }
+            n += 1;
         }
-        n += 1;
 
         if options.current_inventory.is_empty() {
             // These steps are only necessary on the initial deploy, at which point the inventory

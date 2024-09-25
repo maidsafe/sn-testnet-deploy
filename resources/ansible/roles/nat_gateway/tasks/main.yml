@@ -3,7 +3,6 @@
 - name: define conditional variables
   set_fact:
     ipv4_forwarded: false
-    nat_configured: false
 
 - name: check if ipv4 is forwarded
   command: sysctl net.ipv4.ip_forward
@@ -27,16 +26,12 @@
   command: sed -i 's/#net.ipv4.ip_forward/net.ipv4.ip_forward/g' /etc/sysctl.conf
   when: not ipv4_forwarded
 
-- name: check if safenode_private_ip_eth1 is added to the NAT gateway
+- name: check if node_private_ips_eth1 is added to the NAT gateway
   command: iptables -t nat -L POSTROUTING -v
   register: nat_gateway_output
 
-- name: set nat_configured to true if safenode_private_ip_eth1 is found in the output
-  set_fact:
-    nat_configured: true
-  when: nat_gateway_output.stdout.find(safenode_private_ip_eth1) != -1
-
-- name: Add eth1 of safenode VM to the NAT gateway with random parameter
+- name: Add eth1 of node VM to the NAT gateway with random parameter
   command: >
-    iptables -t nat -A POSTROUTING -s {{ safenode_private_ip_eth1 }} -o eth0 -j MASQUERADE --random
-  when: not nat_configured
+    iptables -t nat -A POSTROUTING -s {{ item }} -o eth0 -j MASQUERADE --random
+  when: nat_gateway_output.stdout.find(item) == -1
+  with_items: "{{ node_private_ips_eth1 }}"
