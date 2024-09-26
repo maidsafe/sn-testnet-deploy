@@ -76,9 +76,6 @@ generate_random_data_file_and_upload() {
   fi
 
   rm "$tmpfile"
-
-  echo "Sleeping for 10 seconds..."
-  sleep 10
 }
 
 for i in $(seq 1 $total_files); do
