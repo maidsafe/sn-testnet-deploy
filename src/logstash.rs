@@ -73,10 +73,7 @@ impl LogstashDeployBuilder {
     }
 
     pub fn build(&self) -> Result<LogstashDeploy> {
-        let provider = self
-            .provider
-            .as_ref()
-            .unwrap_or(&CloudProvider::DigitalOcean);
+        let provider = self.provider.unwrap_or(CloudProvider::DigitalOcean);
         let access_token = match provider {
             CloudProvider::DigitalOcean => {
                 let digital_ocean_pat = std::env::var("DO_PAT").map_err(|_| {
@@ -133,14 +130,14 @@ impl LogstashDeployBuilder {
                 .join("terraform")
                 .join("logstash")
                 .join(provider.to_string()),
-            provider.clone(),
+            provider,
             &state_bucket_name,
         )?;
         let ansible_runner = AnsibleRunner::new(
             ANSIBLE_DEFAULT_FORKS,
             false,
             &self.environment_name,
-            provider.clone(),
+            provider,
             ssh_secret_key_path.clone(),
             vault_password_path,
             working_directory_path.join("ansible"),
@@ -152,7 +149,7 @@ impl LogstashDeployBuilder {
             SshClient::new(ssh_secret_key_path),
             digital_ocean_client,
             working_directory_path,
-            provider.clone(),
+            provider,
         );
 
         Ok(logstash)

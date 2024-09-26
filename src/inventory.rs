@@ -59,7 +59,7 @@ impl From<&TestnetDeployer> for DeploymentInventoryService {
         DeploymentInventoryService {
             ansible_runner: item.ansible_provisioner.ansible_runner.clone(),
             ansible_provisioner: item.ansible_provisioner.clone(),
-            cloud_provider: item.cloud_provider.clone(),
+            cloud_provider: item.cloud_provider,
             inventory_file_path: item
                 .working_directory_path
                 .join("ansible")
@@ -447,7 +447,13 @@ impl NodeVirtualMachine {
             let node_registry = node_registries
                 .retrieved_registries
                 .iter()
-                .find(|(name, _)| name == &vm.name)
+                .find(|(name, _)|
+                // for private nodes, DeploymentNodeRegistries::name = private_ip_addr
+                if vm.name.contains("private-node") {
+                    name == &vm.private_ip_addr.to_string()
+                } else {
+                    name == &vm.name
+                })
                 .map(|(_, reg)| reg);
             let Some(node_registry) = node_registry else {
                 continue;
@@ -511,6 +517,8 @@ pub struct VirtualMachine {
 #[derive(Clone)]
 pub struct DeploymentNodeRegistries {
     pub inventory_type: AnsibleInventoryType,
+    /// The (name, NodeRegistry) pairs for each VM that was successfully retrieved.
+    /// Note: for private nodes, the name is set to the private address of the VM.
     pub retrieved_registries: Vec<(String, NodeRegistry)>,
     pub failed_vms: Vec<String>,
 }

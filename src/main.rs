@@ -918,6 +918,9 @@ enum ChurnCommands {
         /// The name of the environment.
         #[arg(short = 'n', long)]
         name: String,
+        /// The cloud provider that was used.
+        #[clap(long, default_value_t = CloudProvider::DigitalOcean, value_parser = parse_provider, verbatim_doc_comment)]
+        provider: CloudProvider,
         /// Whether to retain the same PeerId on restart.
         #[clap(long, default_value_t = false)]
         retain_peer_id: bool,
@@ -933,6 +936,9 @@ enum ChurnCommands {
         /// The name of the environment.
         #[arg(short = 'n', long)]
         name: String,
+        /// The cloud provider that was used.
+        #[clap(long, default_value_t = CloudProvider::DigitalOcean, value_parser = parse_provider, verbatim_doc_comment)]
+        provider: CloudProvider,
         /// Whether to retain the same PeerId on restart.
         #[clap(long, default_value_t = false)]
         retain_peer_id: bool,
@@ -1076,7 +1082,7 @@ async fn main() -> Result<()> {
                 .ansible_verbose_mode(ansible_verbose)
                 .deployment_type(environment_type.clone())
                 .environment_name(&name)
-                .provider(provider.clone());
+                .provider(provider);
             if let Some(forks) = forks {
                 builder.ansible_forks(forks);
             }
@@ -1202,7 +1208,7 @@ async fn main() -> Result<()> {
                 .ansible_verbose_mode(ansible_verbose)
                 .deployment_type(environment_type.clone())
                 .environment_name(&name)
-                .provider(provider.clone());
+                .provider(provider);
             if let Some(forks) = forks {
                 builder.ansible_forks(forks);
             }
@@ -1316,7 +1322,7 @@ async fn main() -> Result<()> {
                 let testnet_deployer = TestnetDeployBuilder::default()
                     .ansible_forks(1)
                     .environment_name(&name)
-                    .provider(provider.clone())
+                    .provider(provider)
                     .build()?;
                 let inventory_service = DeploymentInventoryService::from(&testnet_deployer);
                 let inventory = inventory_service
@@ -1344,7 +1350,7 @@ async fn main() -> Result<()> {
             FaucetCommands::Start { name, provider } => {
                 let testnet_deployer = TestnetDeployBuilder::default()
                     .environment_name(&name)
-                    .provider(provider.clone())
+                    .provider(provider)
                     .build()?;
                 let inventory_service = DeploymentInventoryService::from(&testnet_deployer);
                 inventory_service
@@ -1362,7 +1368,7 @@ async fn main() -> Result<()> {
             FaucetCommands::Stop { name, provider } => {
                 let testnet_deployer = TestnetDeployBuilder::default()
                     .environment_name(&name)
-                    .provider(provider.clone())
+                    .provider(provider)
                     .build()?;
                 let inventory_service = DeploymentInventoryService::from(&testnet_deployer);
                 inventory_service
@@ -1489,25 +1495,27 @@ async fn main() -> Result<()> {
             }
         },
         Commands::Network(NetworkCommands::ChurnCommands(churn_cmds)) => {
-            let name = match &churn_cmds {
-                ChurnCommands::FixedInterval { name, .. } => name,
-                ChurnCommands::RandomInterval { name, .. } => name,
+            let (name, provider) = match &churn_cmds {
+                ChurnCommands::FixedInterval { name, provider, .. } => (name, provider),
+                ChurnCommands::RandomInterval { name, provider, .. } => (name, provider),
             };
-            let inventory_path = get_data_directory()?.join(format!("{name}-inventory.json"));
-            if !inventory_path.exists() {
-                return Err(eyre!("There is no inventory for the {name} testnet")
-                    .suggestion("Please run the inventory command to generate it"));
-            }
-
-            let inventory = DeploymentInventory::read(&inventory_path)?;
+            let testnet_deployer = TestnetDeployBuilder::default()
+                .ansible_forks(1)
+                .environment_name(name)
+                .provider(*provider)
+                .build()?;
+            let inventory_service = DeploymentInventoryService::from(&testnet_deployer);
+            let inventory = inventory_service
+                .generate_or_retrieve_inventory(name, true, None)
+                .await?;
 
             match churn_cmds {
                 ChurnCommands::FixedInterval {
                     churn_cycles,
                     concurrent_churns,
                     interval,
-                    name: _,
                     retain_peer_id,
+                    ..
                 } => {
                     network_commands::perform_fixed_interval_network_churn(
                         inventory,
@@ -1521,9 +1529,9 @@ async fn main() -> Result<()> {
                 ChurnCommands::RandomInterval {
                     churn_count,
                     churn_cycles,
-                    name: _,
                     retain_peer_id,
                     time_frame,
+                    ..
                 } => {
                     network_commands::perform_random_interval_network_churn(
                         inventory,
@@ -1620,7 +1628,7 @@ async fn main() -> Result<()> {
             let testnet_deployer = TestnetDeployBuilder::default()
                 .ansible_forks(forks)
                 .environment_name(&name)
-                .provider(provider.clone())
+                .provider(provider)
                 .build()?;
 
             // This is required in the case where the command runs in a remote environment, where
@@ -1647,7 +1655,7 @@ async fn main() -> Result<()> {
             let testnet_deployer = TestnetDeployBuilder::default()
                 .ansible_forks(forks)
                 .environment_name(&name)
-                .provider(provider.clone())
+                .provider(provider)
                 .build()?;
 
             // This is required in the case where the command runs in a remote environment, where
@@ -1680,7 +1688,7 @@ async fn main() -> Result<()> {
             let testnet_deployer = TestnetDeployBuilder::default()
                 .ansible_forks(forks)
                 .environment_name(&name)
-                .provider(provider.clone())
+                .provider(provider)
                 .build()?;
 
             // This is required in the case where the command runs in a remote environment, where
@@ -1706,7 +1714,7 @@ async fn main() -> Result<()> {
             let testnet_deployer = TestnetDeployBuilder::default()
                 .ansible_forks(forks)
                 .environment_name(&name)
-                .provider(provider.clone())
+                .provider(provider)
                 .build()?;
 
             // This is required in the case where the command runs in a remote environment, where
@@ -1751,7 +1759,7 @@ async fn main() -> Result<()> {
             let testnet_deployer = TestnetDeployBuilder::default()
                 .ansible_forks(50)
                 .environment_name(&name)
-                .provider(provider.clone())
+                .provider(provider)
                 .build()?;
             let inventory_service = DeploymentInventoryService::from(&testnet_deployer);
             let inventory = inventory_service
@@ -1772,7 +1780,7 @@ async fn main() -> Result<()> {
                 .ansible_forks(forks)
                 .ansible_verbose_mode(ansible_verbose)
                 .environment_name(&name)
-                .provider(provider.clone())
+                .provider(provider)
                 .build()?;
             testnet_deployer
                 .upgrade(UpgradeOptions {
@@ -1785,7 +1793,7 @@ async fn main() -> Result<()> {
                     forks,
                     interval,
                     name: name.clone(),
-                    provider: provider.clone(),
+                    provider,
                     safenode_version,
                 })
                 .await?;
@@ -1794,7 +1802,7 @@ async fn main() -> Result<()> {
             let testnet_deployer = TestnetDeployBuilder::default()
                 .ansible_forks(50)
                 .environment_name(&name)
-                .provider(provider.clone())
+                .provider(provider)
                 .build()?;
             testnet_deployer.status().await?;
 
@@ -1809,7 +1817,7 @@ async fn main() -> Result<()> {
             let testnet_deployer = TestnetDeployBuilder::default()
                 .ansible_forks(50)
                 .environment_name(&name)
-                .provider(provider.clone())
+                .provider(provider)
                 .build()?;
             let inventory_service = DeploymentInventoryService::from(&testnet_deployer);
             let inventory = inventory_service
@@ -1839,7 +1847,7 @@ async fn main() -> Result<()> {
             let testnet_deployer = TestnetDeployBuilder::default()
                 .ansible_forks(forks)
                 .environment_name(&name)
-                .provider(provider.clone())
+                .provider(provider)
                 .build()?;
 
             // This is required in the case where the command runs in a remote environment, where
@@ -1865,7 +1873,7 @@ async fn main() -> Result<()> {
             let testnet_deployer = TestnetDeployBuilder::default()
                 .ansible_forks(forks)
                 .environment_name(&name)
-                .provider(provider.clone())
+                .provider(provider)
                 .build()?;
 
             // This is required in the case where the command runs in a remote environment, where
@@ -1887,7 +1895,7 @@ async fn main() -> Result<()> {
             UploadersCommands::Start { name, provider } => {
                 let testnet_deployer = TestnetDeployBuilder::default()
                     .environment_name(&name)
-                    .provider(provider.clone())
+                    .provider(provider)
                     .build()?;
                 let inventory_service = DeploymentInventoryService::from(&testnet_deployer);
                 inventory_service
@@ -1905,7 +1913,7 @@ async fn main() -> Result<()> {
             UploadersCommands::Stop { name, provider } => {
                 let testnet_deployer = TestnetDeployBuilder::default()
                     .environment_name(&name)
-                    .provider(provider.clone())
+                    .provider(provider)
                     .build()?;
                 let inventory_service = DeploymentInventoryService::from(&testnet_deployer);
                 inventory_service
@@ -1929,7 +1937,7 @@ async fn main() -> Result<()> {
 
                 let testnet_deploy = TestnetDeployBuilder::default()
                     .environment_name(&name)
-                    .provider(provider.clone())
+                    .provider(provider)
                     .build()?;
                 let inventory_service = DeploymentInventoryService::from(&testnet_deploy);
 
@@ -1996,7 +2004,7 @@ async fn main() -> Result<()> {
             let testnet_deployer = TestnetDeployBuilder::default()
                 .ansible_verbose_mode(ansible_verbose)
                 .environment_name(&name)
-                .provider(provider.clone())
+                .provider(provider)
                 .build()?;
             testnet_deployer.init().await?;
 
