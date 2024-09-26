@@ -208,7 +208,7 @@ pub enum BinaryOption {
     },
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Copy)]
 pub enum CloudProvider {
     Aws,
     DigitalOcean,
@@ -365,10 +365,7 @@ impl TestnetDeployBuilder {
     }
 
     pub fn build(&self) -> Result<TestnetDeployer> {
-        let provider = self
-            .provider
-            .as_ref()
-            .unwrap_or(&CloudProvider::DigitalOcean);
+        let provider = self.provider.unwrap_or(CloudProvider::DigitalOcean);
         match provider {
             CloudProvider::DigitalOcean => {
                 let digital_ocean_pat = std::env::var("DO_PAT").map_err(|_| {
@@ -417,21 +414,21 @@ impl TestnetDeployBuilder {
                 .join("terraform")
                 .join("testnet")
                 .join(provider.to_string()),
-            provider.clone(),
+            provider,
             &state_bucket_name,
         )?;
         let ansible_runner = AnsibleRunner::new(
             self.ansible_forks.unwrap_or(ANSIBLE_DEFAULT_FORKS),
             self.ansible_verbose_mode,
             &self.environment_name,
-            provider.clone(),
+            provider,
             ssh_secret_key_path.clone(),
             vault_password_path,
             working_directory_path.join("ansible"),
         )?;
         let ssh_client = SshClient::new(ssh_secret_key_path);
         let ansible_provisioner =
-            AnsibleProvisioner::new(ansible_runner, provider.clone(), ssh_client.clone());
+            AnsibleProvisioner::new(ansible_runner, provider, ssh_client.clone());
         let rpc_client = RpcClient::new(
             PathBuf::from("/usr/local/bin/safenode_rpc_client"),
             working_directory_path.clone(),
@@ -446,7 +443,7 @@ impl TestnetDeployBuilder {
 
         let testnet = TestnetDeployer::new(
             ansible_provisioner,
-            provider.clone(),
+            provider,
             self.deployment_type.clone(),
             &self.environment_name,
             rpc_client,

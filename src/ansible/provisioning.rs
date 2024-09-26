@@ -228,6 +228,7 @@ impl AnsibleProvisioner {
                 if entry.file_type().is_file()
                     && entry.path().extension().is_some_and(|ext| ext == "json")
                 {
+                    trace!("Found file with json extension: {:?}", entry.path());
                     // tempdir/<testnet_name>-node/var/safenode-manager/node_registry.json
                     let mut vm_name = entry.path().to_path_buf();
                     trace!("Found file with json extension: {vm_name:?}");
