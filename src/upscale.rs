@@ -190,6 +190,7 @@ impl TestnetDeployer {
             beta_encryption_key: None,
             binary_option: options.current_inventory.binary_option.clone(),
             bootstrap_node_count: desired_bootstrap_node_count,
+            chunk_size: None,
             downloaders_count: options.downloaders_count,
             env_variables: None,
             log_format: None,

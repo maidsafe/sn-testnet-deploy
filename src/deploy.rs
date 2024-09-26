@@ -22,6 +22,7 @@ pub struct DeployOptions {
     pub binary_option: BinaryOption,
     pub bootstrap_node_count: u16,
     pub bootstrap_node_vm_count: Option<u16>,
+    pub chunk_size: Option<u64>,
     pub current_inventory: DeploymentInventory,
     pub downloaders_count: u16,
     pub environment_type: EnvironmentType,
