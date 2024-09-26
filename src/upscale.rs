@@ -288,8 +288,13 @@ impl TestnetDeployer {
                     println!("Failed to obtain the inventory of private node: {err:?}");
                     err
                 })?;
-
             provision_options.private_node_vms = private_nodes;
+
+            self.wait_for_ssh_availability_on_new_machines(
+                AnsibleInventoryType::NatGateway,
+                &options.current_inventory,
+            )
+            .await?;
             self.ansible_provisioner
                 .print_ansible_run_banner(n, total, "Provision NAT Gateway");
             self.ansible_provisioner
@@ -299,9 +304,13 @@ impl TestnetDeployer {
                     println!("Failed to provision NAT gateway {err:?}");
                     err
                 })?;
-
             n += 1;
 
+            self.wait_for_ssh_availability_on_new_machines(
+                AnsibleInventoryType::PrivateNodes,
+                &options.current_inventory,
+            )
+            .await?;
             self.ansible_provisioner
                 .print_ansible_run_banner(n, total, "Provision Private Nodes");
             match self
@@ -391,6 +400,12 @@ impl TestnetDeployer {
             AnsibleInventoryType::Nodes => current_inventory.node_vms.iter().cloned().collect(),
             AnsibleInventoryType::Uploaders => {
                 current_inventory.uploader_vms.iter().cloned().collect()
+            }
+            AnsibleInventoryType::NatGateway => {
+                current_inventory.nat_gateway_vm.iter().cloned().collect()
+            }
+            AnsibleInventoryType::PrivateNodes => {
+                current_inventory.private_node_vms.iter().cloned().collect()
             }
             it => return Err(Error::UpscaleInventoryTypeNotSupported(it.to_string())),
         };
