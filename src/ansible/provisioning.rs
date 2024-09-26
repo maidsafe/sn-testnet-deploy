@@ -51,6 +51,7 @@ pub struct ProvisionOptions {
     pub beta_encryption_key: Option<String>,
     pub binary_option: BinaryOption,
     pub bootstrap_node_count: u16,
+    pub chunk_size: Option<u64>,
     pub downloaders_count: u16,
     pub env_variables: Option<Vec<(String, String)>>,
     pub log_format: Option<LogFormat>,
@@ -70,6 +71,7 @@ impl From<BootstrapOptions> for ProvisionOptions {
             beta_encryption_key: None,
             binary_option: bootstrap_options.binary_option,
             bootstrap_node_count: 0,
+            chunk_size: None,
             downloaders_count: 0,
             env_variables: bootstrap_options.env_variables,
             log_format: bootstrap_options.log_format,
@@ -91,6 +93,7 @@ impl From<DeployOptions> for ProvisionOptions {
             beta_encryption_key: deploy_options.beta_encryption_key,
             binary_option: deploy_options.binary_option,
             bootstrap_node_count: deploy_options.bootstrap_node_count,
+            chunk_size: deploy_options.chunk_size,
             downloaders_count: deploy_options.downloaders_count,
             env_variables: deploy_options.env_variables,
             log_format: deploy_options.log_format,
@@ -927,6 +930,9 @@ impl AnsibleProvisioner {
     fn build_binaries_extra_vars_doc(&self, options: &ProvisionOptions) -> Result<String> {
         let mut extra_vars = ExtraVarsDocBuilder::default();
         extra_vars.add_build_variables(&options.name, &options.binary_option);
+        if let Some(chunk_size) = options.chunk_size {
+            extra_vars.add_variable("chunk_size", &chunk_size.to_string());
+        }
         Ok(extra_vars.build())
     }
 

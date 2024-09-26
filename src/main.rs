@@ -231,6 +231,11 @@ enum Commands {
         /// argument.
         #[clap(long)]
         bootstrap_node_vm_count: Option<u16>,
+        /// Specify the chunk size for the custom binaries using a 64-bit integer.
+        ///
+        /// This option only applies if the --branch and --repo-owner arguments are used.
+        #[clap(long, value_parser = parse_chunk_size)]
+        chunk_size: Option<u64>,
         /// If set to a non-zero value, the uploaders will also be accompanied by the specified
         /// number of downloaders.
         ///
@@ -1168,6 +1173,7 @@ async fn main() -> Result<()> {
             branch,
             bootstrap_node_count,
             bootstrap_node_vm_count,
+            chunk_size,
             downloaders_count,
             environment_type,
             env_variables,
@@ -1275,6 +1281,7 @@ async fn main() -> Result<()> {
                     bootstrap_node_count: bootstrap_node_count
                         .unwrap_or(environment_type.get_default_bootstrap_node_count()),
                     bootstrap_node_vm_count,
+                    chunk_size,
                     current_inventory: inventory,
                     downloaders_count,
                     environment_type: environment_type.clone(),
@@ -2281,6 +2288,15 @@ fn build_fund_faucet_extra_vars_doc(
     extra_vars.add_variable("genesis_addr", &genesis_ip.to_string());
     extra_vars.add_variable("genesis_multiaddr", genesis_multiaddr);
     Ok(extra_vars.build())
+}
+
+fn parse_chunk_size(val: &str) -> Result<u64> {
+    let size = val.parse::<u64>()?;
+    if size == 0 {
+        Err(eyre!("chunk_size must be a positive integer"))
+    } else {
+        Ok(size)
+    }
 }
 
 fn validate_and_get_pks(

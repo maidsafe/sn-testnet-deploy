@@ -17,6 +17,10 @@
     export NETWORK_VERSION_MODE={{ protocol_version }}
     {% endif %}
 
+    {% if chunk_size is defined and chunk_size != "" %}
+    export MAX_CHUNK_SIZE={{ chunk_size }}
+    {% endif %}
+
     {% if foundation_pk is defined and foundation_pk != "" %}
     export FOUNDATION_PK={{ foundation_pk }}
     {% endif %}
