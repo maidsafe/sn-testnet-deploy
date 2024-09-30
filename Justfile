@@ -32,6 +32,14 @@ build-staging-uploader-image:
     packer build -var 'size=s-2vcpu-4gb' node.pkr.hcl
   )
 
+build-prod-nat-gateway-image:
+  #!/usr/bin/env bash
+  (
+    cd resources/packer/node
+    packer init .
+    packer build -var 'size=s-1vcpu-2gb' node.pkr.hcl
+  )
+
 # This target has been copied from another repository. On other repositories, more than one
 # architecture is supported. If we want to extend for other architectures, we can do so.
 build-release-artifacts arch:

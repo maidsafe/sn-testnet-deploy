@@ -23,5 +23,15 @@ for i in $(seq 1 $max_retries); do
   fi
 done
 
-apt-get install python3-pip -y
+for i in $(seq 1 $max_retries); do
+  apt-get install python3-pip -y
+  if [[ $? -eq 0 ]]; then
+    echo "Apt index updated successfully."
+    break
+  else
+    echo "Failed attempt $i. Retrying in $retry_delay seconds..."
+    sleep $retry_delay
+  fi
+done
+
 pip3 install ansible --prefix /usr
