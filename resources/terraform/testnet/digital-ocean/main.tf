@@ -53,7 +53,7 @@ resource "digitalocean_droplet" "genesis_bootstrap" {
 
 resource "digitalocean_droplet" "nat_gateway" {
   count    = var.setup_nat_gateway ? 1 : 0
-  image    = var.bootstrap_droplet_image_id // TODO: do we need new image?
+  image    = var.nat_gateway_droplet_image_id
   name     = "${terraform.workspace}-nat-gateway"
   region   = var.region
   size     = var.nat_gateway_droplet_size
