@@ -51,6 +51,10 @@ variable "bootstrap_droplet_image_id" {
   description = "The ID of the bootstrap node droplet image. Varies per environment type."
 }
 
+variable "nat_gateway_droplet_image_id" {
+  description = "The ID of the gateway droplet image. Varies per environment type."
+}
+
 variable "node_droplet_image_id" {
   description = "The ID of the node droplet image. Varies per environment type."
 }
