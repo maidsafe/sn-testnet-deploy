@@ -321,10 +321,11 @@ pub fn generate_private_node_static_environment_inventory(
     writeln!(file, "[private_nodes:vars]")?;
     writeln!(
         file,
-        "ansible_ssh_common_args='-o ProxyCommand=\"ssh -p 22 -W %h:%p -q root@{} -i \"{}\"\"'",
+        "ansible_ssh_common_args='-o ProxyCommand=\"ssh -p 22 -W %h:%p -q root@{} -i \"{}\" -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null\"'",
         nat_gateway_vm.public_ip_addr,
         ssh_sk_path.to_string_lossy()
     )?;
+    writeln!(file, "ansible_host_key_checking=False")?;
 
     debug!("Created private node inventory file with ssh proxy at {dest_path:?}");
 
