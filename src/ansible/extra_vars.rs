@@ -266,7 +266,22 @@ impl ExtraVarsDocBuilder {
         &mut self,
         deployment_name: &str,
         binary_option: &BinaryOption,
+        safe_version: Option<String>,
     ) -> Result<(), Error> {
+        // This applies when upscaling the uploaders.
+        // In that scenario, the safe version in the binary option is not set to the correct value
+        // because it is not recorded in the inventory.
+        if let Some(version) = safe_version {
+            self.variables.push((
+                "safe_archive_url".to_string(),
+                format!(
+                    "{}/safe-{}-x86_64-unknown-linux-musl.tar.gz",
+                    SAFE_S3_BUCKET_URL, version
+                ),
+            ));
+            return Ok(());
+        }
+
         match binary_option {
             BinaryOption::BuildFromSource {
                 repo_owner, branch, ..
