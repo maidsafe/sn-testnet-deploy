@@ -45,6 +45,20 @@ metrics_header() {
   fi
 }
 
+prune_chunk_artifacts() {
+  echo "Pruning chunk artifacts more than 60 minutes old..."
+  rm -f old_chunk_artifacts.txt
+
+  start_time=$(date +%s)
+  find ~/.local/share/safe/client/chunk_artifacts -type d -mmin +60 > old_chunk_artifacts.txt
+  artifact_count=$(wc -l < old_chunk_artifacts.txt)
+  xargs -a old_chunk_artifacts.txt rm -rf
+  end_time=$(date +%s)
+
+  elapsed_time=$((end_time - start_time))
+  echo "Removed $artifact_count old chunk artifacts in $elapsed_time seconds"
+}
+
 # Generate a 10MB file of random data and log its reference
 generate_random_data_file_and_upload() {
   tmpfile=$(mktemp)
@@ -82,6 +96,6 @@ for i in $(seq 1 $total_files); do
   echo "$(date +"%A, %B %d, %Y %H:%M:%S")"
   echo "Generating and uploading file $i of $total_files..."
   generate_random_data_file_and_upload
-
+  prune_chunk_artifacts
   echo "$(safe $CONTACT_PEER_ARG wallet balance)"
 done
