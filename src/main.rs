@@ -720,33 +720,6 @@ enum Commands {
         /// This option is not applicable to a bootstrap deployment.
         #[clap(long, verbatim_doc_comment)]
         desired_bootstrap_node_vm_count: Option<u16>,
-        /// If set to a non-zero value, the uploaders will also be accompanied by the specified
-        /// number of downloaders.
-        ///
-        /// This will be the number on each uploader VM. So if the value here is 2 and there are
-        /// 5 uploader VMs, there will be 10 downloaders across the 5 VMs.
-        #[clap(long, default_value_t = 0)]
-        downloaders_count: u16,
-        /// Set to only use Terraform to upscale the VMs and not run Ansible.
-        #[clap(long, default_value_t = false)]
-        infra_only: bool,
-        /// Set to only run the Terraform plan rather than applying the changes.
-        ///
-        /// Can be useful to preview the upscale to make sure everything is ok and that no other
-        /// changes slipped in.
-        ///
-        /// The plan will run and then the command will exit without doing anything else.
-        #[clap(long, default_value_t = false)]
-        plan: bool,
-        /// If set to true, for new VMs the RPC of the node will be accessible remotely.
-        ///
-        /// By default, the safenode RPC is only accessible via the 'localhost' and is not exposed for
-        /// security reasons.
-        #[clap(long, default_value_t = false, verbatim_doc_comment)]
-        public_rpc: bool,
-        /// The name of the existing network to upscale.
-        #[arg(short = 'n', long, verbatim_doc_comment)]
-        name: String,
         /// The desired number of safenode services to be running on each node VM after the scale.
         ///
         /// If there are currently 10 services running on each VM, and you want there to be 25, the
@@ -784,9 +757,43 @@ enum Commands {
         /// This option is not applicable to a bootstrap deployment.
         #[clap(long, verbatim_doc_comment)]
         desired_uploader_vm_count: Option<u16>,
+        /// If set to a non-zero value, the uploaders will also be accompanied by the specified
+        /// number of downloaders.
+        ///
+        /// This will be the number on each uploader VM. So if the value here is 2 and there are
+        /// 5 uploader VMs, there will be 10 downloaders across the 5 VMs.
+        #[clap(long, default_value_t = 0)]
+        downloaders_count: u16,
+        /// Set to only use Terraform to upscale the VMs and not run Ansible.
+        #[clap(long, default_value_t = false)]
+        infra_only: bool,
+        /// The name of the existing network to upscale.
+        #[arg(short = 'n', long, verbatim_doc_comment)]
+        name: String,
+        /// Set to only run the Terraform plan rather than applying the changes.
+        ///
+        /// Can be useful to preview the upscale to make sure everything is ok and that no other
+        /// changes slipped in.
+        ///
+        /// The plan will run and then the command will exit without doing anything else.
+        #[clap(long, default_value_t = false)]
+        plan: bool,
         /// The cloud provider for the network.
         #[clap(long, value_parser = parse_provider, verbatim_doc_comment, default_value_t = CloudProvider::DigitalOcean)]
         provider: CloudProvider,
+        /// If set to true, for new VMs the RPC of the node will be accessible remotely.
+        ///
+        /// By default, the safenode RPC is only accessible via the 'localhost' and is not exposed for
+        /// security reasons.
+        #[clap(long, default_value_t = false, verbatim_doc_comment)]
+        public_rpc: bool,
+        /// Supply a version number for the safe binary to be used for new uploader VMs.
+        ///
+        /// There should be no 'v' prefix.
+        ///
+        /// This argument is required when the uploader count is supplied.
+        #[arg(long, verbatim_doc_comment)]
+        safe_version: Option<String>,
     },
 }
 
@@ -2022,7 +2029,12 @@ async fn main() -> Result<()> {
             plan,
             provider,
             public_rpc,
+            safe_version,
         } => {
+            if desired_uploader_vm_count.is_some() && safe_version.is_none() {
+                return Err(eyre!("The --safe-version argument is required when --desired-uploader-vm-count is used"));
+            }
+
             println!("Upscaling deployment...");
             let testnet_deployer = TestnetDeployBuilder::default()
                 .ansible_verbose_mode(ansible_verbose)
@@ -2052,6 +2064,7 @@ async fn main() -> Result<()> {
                     infra_only,
                     plan,
                     public_rpc,
+                    safe_version,
                 })
                 .await?;
 

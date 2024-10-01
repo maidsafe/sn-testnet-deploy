@@ -63,6 +63,10 @@ pub struct ProvisionOptions {
     pub private_node_count: u16,
     pub private_node_vms: Vec<VirtualMachine>,
     pub public_rpc: bool,
+    /// The safe version is also in the binary option, but only for an initial deployment.
+    /// For the upscale, it needs to be provided explicitly, because currently it is not
+    /// recorded in the inventory.
+    pub safe_version: Option<String>,
 }
 
 impl From<BootstrapOptions> for ProvisionOptions {
@@ -83,6 +87,7 @@ impl From<BootstrapOptions> for ProvisionOptions {
             private_node_count: bootstrap_options.private_node_count,
             private_node_vms: Vec::new(),
             public_rpc: false,
+            safe_version: None,
         }
     }
 }
@@ -105,6 +110,7 @@ impl From<DeployOptions> for ProvisionOptions {
             public_rpc: deploy_options.public_rpc,
             private_node_count: deploy_options.private_node_count,
             private_node_vms: Vec::new(),
+            safe_version: None,
         }
     }
 }
@@ -923,7 +929,11 @@ impl AnsibleProvisioner {
             "safe_downloader_instances",
             &options.downloaders_count.to_string(),
         );
-        extra_vars.add_safe_url_or_version(&options.name, &options.binary_option)?;
+        extra_vars.add_safe_url_or_version(
+            &options.name,
+            &options.binary_option,
+            options.safe_version.clone(),
+        )?;
         Ok(extra_vars.build())
     }
 

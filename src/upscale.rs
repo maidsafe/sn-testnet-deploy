@@ -30,6 +30,7 @@ pub struct UpscaleOptions {
     pub infra_only: bool,
     pub plan: bool,
     pub public_rpc: bool,
+    pub safe_version: Option<String>,
 }
 
 impl TestnetDeployer {
@@ -205,6 +206,7 @@ impl TestnetDeployer {
             private_node_count: desired_private_node_count,
             private_node_vms: Vec::new(),
             public_rpc: options.public_rpc,
+            safe_version: options.safe_version.clone(),
         };
         let mut node_provision_failed = false;
 
