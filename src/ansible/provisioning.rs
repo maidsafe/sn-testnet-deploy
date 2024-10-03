@@ -59,6 +59,8 @@ pub struct ProvisionOptions {
     pub name: String,
     pub nat_gateway: Option<VirtualMachine>,
     pub node_count: u16,
+    pub max_archived_log_files: u16,
+    pub max_log_files: u16,
     pub output_inventory_dir_path: PathBuf,
     pub private_node_count: u16,
     pub private_node_vms: Vec<VirtualMachine>,
@@ -82,6 +84,8 @@ impl From<BootstrapOptions> for ProvisionOptions {
             logstash_details: None,
             name: bootstrap_options.name,
             nat_gateway: None,
+            max_archived_log_files: bootstrap_options.max_archived_log_files,
+            max_log_files: bootstrap_options.max_log_files,
             node_count: bootstrap_options.node_count,
             output_inventory_dir_path: bootstrap_options.output_inventory_dir_path,
             private_node_count: bootstrap_options.private_node_count,
@@ -106,6 +110,8 @@ impl From<DeployOptions> for ProvisionOptions {
             name: deploy_options.name,
             nat_gateway: None,
             node_count: deploy_options.node_count,
+            max_archived_log_files: deploy_options.max_archived_log_files,
+            max_log_files: deploy_options.max_log_files,
             output_inventory_dir_path: deploy_options.output_inventory_dir_path,
             public_rpc: deploy_options.public_rpc,
             private_node_count: deploy_options.private_node_count,
@@ -735,6 +741,11 @@ impl AnsibleProvisioner {
         if let Some(log_format) = options.log_format {
             extra_vars.add_variable("log_format", log_format.as_str());
         }
+        extra_vars.add_variable(
+            "max_archived_log_files",
+            &options.max_archived_log_files.to_string(),
+        );
+        extra_vars.add_variable("max_log_files", &options.max_log_files.to_string());
         if options.public_rpc {
             extra_vars.add_variable("public_rpc", "true");
         }
