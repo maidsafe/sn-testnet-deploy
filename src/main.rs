@@ -807,6 +807,9 @@ enum LogCommands {
         /// The cloud provider that was used.
         #[clap(long, default_value_t = CloudProvider::DigitalOcean, value_parser = parse_provider, verbatim_doc_comment)]
         provider: CloudProvider,
+        /// Setup a cron job to perform the cleanup periodically.
+        #[clap(long)]
+        setup_cron: bool,
     },
     /// Retrieve the logs for a given environment by copying them from all the VMs.
     ///
@@ -1447,7 +1450,11 @@ async fn main() -> Result<()> {
             Ok(())
         }
         Commands::Logs(log_cmd) => match log_cmd {
-            LogCommands::Cleanup { name, provider } => {
+            LogCommands::Cleanup {
+                name,
+                provider,
+                setup_cron,
+            } => {
                 let testnet_deployer = TestnetDeployBuilder::default()
                     .environment_name(&name)
                     .provider(provider)
@@ -1456,7 +1463,7 @@ async fn main() -> Result<()> {
                 let inventory_service = DeploymentInventoryService::from(&testnet_deployer);
                 inventory_service.setup_environment_inventory(&name).await?;
 
-                testnet_deployer.cleanup_node_logs().await?;
+                testnet_deployer.cleanup_node_logs(setup_cron).await?;
                 Ok(())
             }
             LogCommands::Copy {

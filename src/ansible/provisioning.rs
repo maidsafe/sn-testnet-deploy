@@ -157,10 +157,13 @@ impl AnsibleProvisioner {
         Ok(())
     }
 
-    pub async fn cleanup_node_logs(&self) -> Result<()> {
+    pub async fn cleanup_node_logs(&self, setup_cron: bool) -> Result<()> {
         for node_inv_type in AnsibleInventoryType::iter_node_type() {
-            self.ansible_runner
-                .run_playbook(AnsiblePlaybook::CleanupLogs, node_inv_type, None)?;
+            self.ansible_runner.run_playbook(
+                AnsiblePlaybook::CleanupLogs,
+                node_inv_type,
+                Some(format!("{{ \"setup_cron\": \"{setup_cron}\" }}")),
+            )?;
         }
 
         Ok(())
