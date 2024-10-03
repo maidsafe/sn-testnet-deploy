@@ -595,8 +595,10 @@ impl TestnetDeployer {
         Ok(())
     }
 
-    pub async fn cleanup_node_logs(&self) -> Result<()> {
-        self.ansible_provisioner.cleanup_node_logs().await?;
+    pub async fn cleanup_node_logs(&self, setup_cron: bool) -> Result<()> {
+        self.ansible_provisioner
+            .cleanup_node_logs(setup_cron)
+            .await?;
         Ok(())
     }
 
