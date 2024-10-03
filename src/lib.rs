@@ -595,6 +595,11 @@ impl TestnetDeployer {
         Ok(())
     }
 
+    pub async fn cleanup_node_logs(&self) -> Result<()> {
+        self.ansible_provisioner.cleanup_node_logs().await?;
+        Ok(())
+    }
+
     pub async fn start_telegraf(
         &self,
         custom_inventory: Option<Vec<VirtualMachine>>,

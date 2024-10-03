@@ -157,37 +157,28 @@ impl AnsibleProvisioner {
         Ok(())
     }
 
+    pub async fn cleanup_node_logs(&self) -> Result<()> {
+        for node_inv_type in AnsibleInventoryType::iter_node_type() {
+            self.ansible_runner
+                .run_playbook(AnsiblePlaybook::CleanupLogs, node_inv_type, None)?;
+        }
+
+        Ok(())
+    }
+
     pub async fn copy_logs(&self, name: &str, resources_only: bool) -> Result<()> {
+        for node_inv_type in AnsibleInventoryType::iter_node_type() {
+            self.ansible_runner.run_playbook(
+                AnsiblePlaybook::CopyLogs,
+                node_inv_type,
+                Some(format!(
+                    "{{ \"env_name\": \"{name}\", \"resources_only\" : \"{resources_only}\" }}"
+                )),
+            )?;
+        }
+
         self.ansible_runner.run_playbook(
-            AnsiblePlaybook::Logs,
-            AnsibleInventoryType::Genesis,
-            Some(format!(
-                "{{ \"env_name\": \"{name}\", \"resources_only\" : \"{resources_only}\" }}"
-            )),
-        )?;
-        self.ansible_runner.run_playbook(
-            AnsiblePlaybook::Logs,
-            AnsibleInventoryType::BootstrapNodes,
-            Some(format!(
-                "{{ \"env_name\": \"{name}\", \"resources_only\" : \"{resources_only}\" }}"
-            )),
-        )?;
-        self.ansible_runner.run_playbook(
-            AnsiblePlaybook::Logs,
-            AnsibleInventoryType::Nodes,
-            Some(format!(
-                "{{ \"env_name\": \"{name}\", \"resources_only\" : \"{resources_only}\" }}"
-            )),
-        )?;
-        self.ansible_runner.run_playbook(
-            AnsiblePlaybook::Logs,
-            AnsibleInventoryType::PrivateNodes,
-            Some(format!(
-                "{{ \"env_name\": \"{name}\", \"resources_only\" : \"{resources_only}\" }}"
-            )),
-        )?;
-        self.ansible_runner.run_playbook(
-            AnsiblePlaybook::Logs,
+            AnsiblePlaybook::CopyLogs,
             AnsibleInventoryType::Auditor,
             Some(format!(
                 "{{ \"env_name\": \"{name}\", \"resources_only\" : \"{resources_only}\" }}"
@@ -197,25 +188,15 @@ impl AnsibleProvisioner {
     }
 
     pub async fn get_all_node_inventory(&self) -> Result<Vec<VirtualMachine>> {
-        let mut all_node_inventory = self
-            .ansible_runner
-            .get_inventory(AnsibleInventoryType::Genesis, false)
-            .await?;
-        all_node_inventory.extend(
-            self.ansible_runner
-                .get_inventory(AnsibleInventoryType::BootstrapNodes, false)
-                .await?,
-        );
-        all_node_inventory.extend(
-            self.ansible_runner
-                .get_inventory(AnsibleInventoryType::Nodes, false)
-                .await?,
-        );
-        all_node_inventory.extend(
-            self.ansible_runner
-                .get_inventory(AnsibleInventoryType::PrivateNodes, false)
-                .await?,
-        );
+        let mut all_node_inventory = Vec::new();
+        for node_inv_type in AnsibleInventoryType::iter_node_type() {
+            all_node_inventory.extend(
+                self.ansible_runner
+                    .get_inventory(node_inv_type, false)
+                    .await?,
+            );
+        }
+
         Ok(all_node_inventory)
     }
 
@@ -229,7 +210,7 @@ impl AnsibleProvisioner {
 
         self.ansible_runner.run_playbook(
             AnsiblePlaybook::NodeManagerInventory,
-            inventory_type.clone(),
+            *inventory_type,
             Some(format!("{{ \"dest\": {temp_dir_json} }}")),
         )?;
 
@@ -268,7 +249,7 @@ impl AnsibleProvisioner {
         }
 
         let deployment_registries = DeploymentNodeRegistries {
-            inventory_type: inventory_type.clone(),
+            inventory_type: *inventory_type,
             retrieved_registries: node_registries,
             failed_vms,
         };
@@ -348,7 +329,7 @@ impl AnsibleProvisioner {
         println!("Obtaining IP addresses for nodes...");
         let inventory = self
             .ansible_runner
-            .get_inventory(inventory_type.clone(), true)
+            .get_inventory(inventory_type, true)
             .await?;
 
         println!("Waiting for SSH availability on {node_type:?} nodes...");
@@ -503,50 +484,19 @@ impl AnsibleProvisioner {
     }
 
     pub async fn start_nodes(&self) -> Result<()> {
-        self.ansible_runner.run_playbook(
-            AnsiblePlaybook::StartNodes,
-            AnsibleInventoryType::Genesis,
-            None,
-        )?;
-        self.ansible_runner.run_playbook(
-            AnsiblePlaybook::StartNodes,
-            AnsibleInventoryType::BootstrapNodes,
-            None,
-        )?;
-        self.ansible_runner.run_playbook(
-            AnsiblePlaybook::StartNodes,
-            AnsibleInventoryType::Nodes,
-            None,
-        )?;
-        self.ansible_runner.run_playbook(
-            AnsiblePlaybook::StartNodes,
-            AnsibleInventoryType::PrivateNodes,
-            None,
-        )?;
+        for node_inv_type in AnsibleInventoryType::iter_node_type() {
+            self.ansible_runner
+                .run_playbook(AnsiblePlaybook::StartNodes, node_inv_type, None)?;
+        }
+
         Ok(())
     }
 
     pub async fn status(&self) -> Result<()> {
-        self.ansible_runner.run_playbook(
-            AnsiblePlaybook::Status,
-            AnsibleInventoryType::Genesis,
-            None,
-        )?;
-        self.ansible_runner.run_playbook(
-            AnsiblePlaybook::Status,
-            AnsibleInventoryType::BootstrapNodes,
-            None,
-        )?;
-        self.ansible_runner.run_playbook(
-            AnsiblePlaybook::Status,
-            AnsibleInventoryType::Nodes,
-            None,
-        )?;
-        self.ansible_runner.run_playbook(
-            AnsiblePlaybook::Status,
-            AnsibleInventoryType::PrivateNodes,
-            None,
-        )?;
+        for node_inv_type in AnsibleInventoryType::iter_node_type() {
+            self.ansible_runner
+                .run_playbook(AnsiblePlaybook::Status, node_inv_type, None)?;
+        }
         Ok(())
     }
 
@@ -570,26 +520,14 @@ impl AnsibleProvisioner {
             return Ok(());
         }
 
-        self.ansible_runner.run_playbook(
-            AnsiblePlaybook::StartTelegraf,
-            AnsibleInventoryType::Genesis,
-            None,
-        )?;
-        self.ansible_runner.run_playbook(
-            AnsiblePlaybook::StartTelegraf,
-            AnsibleInventoryType::BootstrapNodes,
-            None,
-        )?;
-        self.ansible_runner.run_playbook(
-            AnsiblePlaybook::StartTelegraf,
-            AnsibleInventoryType::Nodes,
-            None,
-        )?;
-        self.ansible_runner.run_playbook(
-            AnsiblePlaybook::StartTelegraf,
-            AnsibleInventoryType::PrivateNodes,
-            None,
-        )?;
+        for node_inv_type in AnsibleInventoryType::iter_node_type() {
+            self.ansible_runner.run_playbook(
+                AnsiblePlaybook::StartTelegraf,
+                node_inv_type,
+                None,
+            )?;
+        }
+
         Ok(())
     }
 
@@ -613,26 +551,11 @@ impl AnsibleProvisioner {
             return Ok(());
         }
 
-        self.ansible_runner.run_playbook(
-            AnsiblePlaybook::StopTelegraf,
-            AnsibleInventoryType::Genesis,
-            None,
-        )?;
-        self.ansible_runner.run_playbook(
-            AnsiblePlaybook::StopTelegraf,
-            AnsibleInventoryType::BootstrapNodes,
-            None,
-        )?;
-        self.ansible_runner.run_playbook(
-            AnsiblePlaybook::StopTelegraf,
-            AnsibleInventoryType::Nodes,
-            None,
-        )?;
-        self.ansible_runner.run_playbook(
-            AnsiblePlaybook::StopTelegraf,
-            AnsibleInventoryType::PrivateNodes,
-            None,
-        )?;
+        for node_inv_type in AnsibleInventoryType::iter_node_type() {
+            self.ansible_runner
+                .run_playbook(AnsiblePlaybook::StopTelegraf, node_inv_type, None)?;
+        }
+
         Ok(())
     }
 
@@ -763,26 +686,14 @@ impl AnsibleProvisioner {
             return Ok(());
         }
 
-        self.ansible_runner.run_playbook(
-            AnsiblePlaybook::UpgradeNodeManager,
-            AnsibleInventoryType::Genesis,
-            Some(extra_vars.build()),
-        )?;
-        self.ansible_runner.run_playbook(
-            AnsiblePlaybook::UpgradeNodeManager,
-            AnsibleInventoryType::BootstrapNodes,
-            Some(extra_vars.build()),
-        )?;
-        self.ansible_runner.run_playbook(
-            AnsiblePlaybook::UpgradeNodeManager,
-            AnsibleInventoryType::Nodes,
-            Some(extra_vars.build()),
-        )?;
-        self.ansible_runner.run_playbook(
-            AnsiblePlaybook::UpgradeNodeManager,
-            AnsibleInventoryType::PrivateNodes,
-            Some(extra_vars.build()),
-        )?;
+        for node_inv_type in AnsibleInventoryType::iter_node_type() {
+            self.ansible_runner.run_playbook(
+                AnsiblePlaybook::UpgradeNodeManager,
+                node_inv_type,
+                Some(extra_vars.build()),
+            )?;
+        }
+
         Ok(())
     }
 
