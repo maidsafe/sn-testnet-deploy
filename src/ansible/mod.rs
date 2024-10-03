@@ -60,6 +60,14 @@ pub enum AnsiblePlaybook {
     ///
     /// Use in combination with `AnsibleInventoryType::Build`.
     Build,
+    /// The cleanup logs playbook will remove the rotated logs from the machines it is run against.
+    ///
+    /// Use in combination with the node machines.
+    CleanupLogs,
+    /// The logs playbook will retrieve node logs from any machines it is run against.
+    ///
+    /// Use in combination with `AnsibleInventoryType::Genesis` or `AnsibleInventoryType::Nodes`.
+    CopyLogs,
     /// The faucet playbook will provision setup the faucet to run as a service. The faucet is
     /// typically running on the genesis node.
     ///
@@ -72,10 +80,6 @@ pub enum AnsiblePlaybook {
     ///
     /// Use in combination with `AnsibleInventoryType::Genesis`.
     Genesis,
-    /// The logs playbook will retrieve node logs from any machines it is run against.
-    ///
-    /// Use in combination with `AnsibleInventoryType::Genesis` or `AnsibleInventoryType::Nodes`.
-    Logs,
     /// The Logstash playbook will provision machines to run Logstash.
     ///
     /// Use in combination with `AnsibleInventoryType::Logstash`.
@@ -159,10 +163,11 @@ impl AnsiblePlaybook {
         match self {
             AnsiblePlaybook::Auditor => "auditor.yml".to_string(),
             AnsiblePlaybook::Build => "build.yml".to_string(),
+            AnsiblePlaybook::CleanupLogs => "cleanup_logs.yml".to_string(),
+            AnsiblePlaybook::CopyLogs => "copy_logs.yml".to_string(),
             AnsiblePlaybook::Genesis => "genesis_node.yml".to_string(),
             AnsiblePlaybook::Faucet => "faucet.yml".to_string(),
             AnsiblePlaybook::FundUploaders => "fund_uploaders.yml".to_string(),
-            AnsiblePlaybook::Logs => "logs.yml".to_string(),
             AnsiblePlaybook::Logstash => "logstash.yml".to_string(),
             AnsiblePlaybook::NatGateway => "nat_gateway.yml".to_string(),
             AnsiblePlaybook::NodeManagerInventory => "node_manager_inventory.yml".to_string(),

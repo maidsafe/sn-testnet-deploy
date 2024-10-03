@@ -20,7 +20,7 @@ use std::{
 };
 
 /// Represents the inventory types that apply to our own domain.
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Copy)]
 pub enum AnsibleInventoryType {
     /// Use to run a playbook against the auditor.
     ///
@@ -114,6 +114,16 @@ impl AnsibleInventoryType {
             Self::PrivateNodesStatic => "private_node",
             Self::Uploaders => "uploader",
         }
+    }
+
+    pub fn iter_node_type() -> impl Iterator<Item = Self> {
+        [
+            Self::Genesis,
+            Self::BootstrapNodes,
+            Self::Nodes,
+            Self::PrivateNodes,
+        ]
+        .into_iter()
     }
 }
 

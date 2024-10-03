@@ -1,0 +1,11 @@
+---
+- name: remove rotated logs from remote machines
+  hosts: all
+  ignore_unreachable: yes
+  max_fail_percentage: 5
+  tasks:
+    - name: remove rotated logs
+      shell: |
+        for file in $(find /var/log/safenode/ -name "*.gz"); do
+          rm $file
+        done

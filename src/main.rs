@@ -799,6 +799,15 @@ enum Commands {
 
 #[derive(Subcommand, Debug)]
 enum LogCommands {
+    /// Removes all the rotated log files from the the node VMs.
+    Cleanup {
+        /// The name of the environment
+        #[arg(short = 'n', long)]
+        name: String,
+        /// The cloud provider that was used.
+        #[clap(long, default_value_t = CloudProvider::DigitalOcean, value_parser = parse_provider, verbatim_doc_comment)]
+        provider: CloudProvider,
+    },
     /// Retrieve the logs for a given environment by copying them from all the VMs.
     ///
     /// This will write the logs to 'logs/<name>', relative to the current directory.
@@ -1438,12 +1447,7 @@ async fn main() -> Result<()> {
             Ok(())
         }
         Commands::Logs(log_cmd) => match log_cmd {
-            LogCommands::Rsync {
-                name,
-                provider,
-                resources_only,
-                vm_filter,
-            } => {
+            LogCommands::Cleanup { name, provider } => {
                 let testnet_deployer = TestnetDeployBuilder::default()
                     .environment_name(&name)
                     .provider(provider)
@@ -1452,25 +1456,7 @@ async fn main() -> Result<()> {
                 let inventory_service = DeploymentInventoryService::from(&testnet_deployer);
                 inventory_service.setup_environment_inventory(&name).await?;
 
-                testnet_deployer
-                    .rsync_logs(&name, resources_only, vm_filter)
-                    .await?;
-                Ok(())
-            }
-            LogCommands::Rg {
-                args,
-                name,
-                provider,
-            } => {
-                let testnet_deployer = TestnetDeployBuilder::default()
-                    .environment_name(&name)
-                    .provider(provider)
-                    .build()?;
-                testnet_deployer.init().await?;
-                let inventory_service = DeploymentInventoryService::from(&testnet_deployer);
-                inventory_service.setup_environment_inventory(&name).await?;
-
-                testnet_deployer.ripgrep_logs(&name, &args).await?;
+                testnet_deployer.cleanup_node_logs().await?;
                 Ok(())
             }
             LogCommands::Copy {
@@ -1497,8 +1483,44 @@ async fn main() -> Result<()> {
                 sn_testnet_deploy::logs::reassemble_logs(&name).await?;
                 Ok(())
             }
+            LogCommands::Rg {
+                args,
+                name,
+                provider,
+            } => {
+                let testnet_deployer = TestnetDeployBuilder::default()
+                    .environment_name(&name)
+                    .provider(provider)
+                    .build()?;
+                testnet_deployer.init().await?;
+                let inventory_service = DeploymentInventoryService::from(&testnet_deployer);
+                inventory_service.setup_environment_inventory(&name).await?;
+
+                testnet_deployer.ripgrep_logs(&name, &args).await?;
+                Ok(())
+            }
+
             LogCommands::Rm { name } => {
                 sn_testnet_deploy::logs::rm_logs(&name).await?;
+                Ok(())
+            }
+            LogCommands::Rsync {
+                name,
+                provider,
+                resources_only,
+                vm_filter,
+            } => {
+                let testnet_deployer = TestnetDeployBuilder::default()
+                    .environment_name(&name)
+                    .provider(provider)
+                    .build()?;
+                testnet_deployer.init().await?;
+                let inventory_service = DeploymentInventoryService::from(&testnet_deployer);
+                inventory_service.setup_environment_inventory(&name).await?;
+
+                testnet_deployer
+                    .rsync_logs(&name, resources_only, vm_filter)
+                    .await?;
                 Ok(())
             }
         },

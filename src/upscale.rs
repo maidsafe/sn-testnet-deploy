@@ -394,7 +394,7 @@ impl TestnetDeployer {
         let inventory = self
             .ansible_provisioner
             .ansible_runner
-            .get_inventory(inventory_type.clone(), true)
+            .get_inventory(inventory_type, true)
             .await?;
         let old_set: HashSet<_> = match inventory_type {
             AnsibleInventoryType::BootstrapNodes => current_inventory
