@@ -34,7 +34,9 @@
       - -v
       - add
       - --first
-      - --rpc-address={{ node_rpc_ip }}
+      - "--rpc-address={{ node_rpc_ip }}"
+      - "--max-archived-log-files={{ max_archived_log_files }}"
+      - "--max-log-files={{ max_log_files }}"
       - "{{ ('--log-format=' + log_format) if log_format is defined else omit }}"
       - "{{ ('--env=' + env_variables) if env_variables is defined else omit }}"
       - "{{ ('--version=' + version) if version is defined else ('--url=' + node_archive_url) }}"
@@ -108,7 +110,9 @@
       - "--count={{ nodes_to_add }}"
       - "--owner=maidsafe"
       - "--peer={{ genesis_multiaddr }}"
-      - --rpc-address={{ node_rpc_ip }}
+      - "--rpc-address={{ node_rpc_ip }}"
+      - "--max-archived-log-files={{ max_archived_log_files }}"
+      - "--max-log-files={{ max_log_files }}"
       - "{{ ('--node-ip=' + private_ip_eth1.stdout) if make_vm_private else omit }}"
       - "{{ '--home-network' if make_vm_private else omit }}"
       - "{{ ('--rpc-port=' + rpc_port) if not use_port_range else omit }}"

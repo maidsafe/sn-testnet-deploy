@@ -27,6 +27,8 @@ pub struct BootstrapOptions {
     pub name: String,
     pub node_count: u16,
     pub node_vm_count: Option<u16>,
+    pub max_archived_log_files: u16,
+    pub max_log_files: u16,
     pub output_inventory_dir_path: PathBuf,
     pub private_node_count: u16,
     pub private_node_vm_count: Option<u16>,

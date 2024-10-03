@@ -28,6 +28,8 @@ pub struct UpscaleOptions {
     pub desired_uploader_vm_count: Option<u16>,
     pub downloaders_count: u16,
     pub infra_only: bool,
+    pub max_archived_log_files: u16,
+    pub max_log_files: u16,
     pub plan: bool,
     pub public_rpc: bool,
     pub safe_version: Option<String>,
@@ -199,6 +201,8 @@ impl TestnetDeployer {
             name: options.current_inventory.name.clone(),
             nat_gateway: None,
             node_count: desired_node_count,
+            max_archived_log_files: options.max_archived_log_files,
+            max_log_files: options.max_log_files,
             output_inventory_dir_path: self
                 .working_directory_path
                 .join("ansible")
