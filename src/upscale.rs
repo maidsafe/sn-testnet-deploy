@@ -211,6 +211,7 @@ impl TestnetDeployer {
             private_node_vms: Vec::new(),
             public_rpc: options.public_rpc,
             safe_version: options.safe_version.clone(),
+            uploaders_count: None,
         };
         let mut node_provision_failed = false;
 

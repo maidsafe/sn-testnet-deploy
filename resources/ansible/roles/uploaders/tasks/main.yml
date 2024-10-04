@@ -1,59 +1,69 @@
 ---
 - name: check if safe binary exists
   ansible.builtin.stat:
-    path: "{{ binary_dir}}/safe"
+    path: "{{ binary_dir }}/safe"
   register: safe_binary
 
 - name: download the safe binary
   ansible.builtin.get_url:
     url: "{{ safe_archive_url }}"
-    dest: /tmp/{{ safe_archive_filename }}
+    dest: "/tmp/{{ safe_archive_filename }}"
   when: not safe_binary.stat.exists
 
 - name: extract the safe binary to /usr/local/bin
-  become: True
   ansible.builtin.unarchive:
     src: "/tmp/{{ safe_archive_filename }}"
     dest: "{{ binary_dir }}"
-    remote_src: True
+    remote_src: true
+  become: true
   when: not safe_binary.stat.exists
 
-- name: copy upload-random-data.sh to remote
+- name: create safe users
+  ansible.builtin.user:
+    name: "safe{{ item }}"
+    shell: /bin/bash
+    state: present
+  loop: "{{ range(1, safe_uploader_instances | int + 1) | list }}"
+  when: not safe_binary.stat.exists
+
+- name: copy upload-random-data.sh to remote for each safe user
   ansible.builtin.copy:
     src: upload-random-data.sh
-    dest: /home/safe/upload-random-data.sh
-    owner: safe
-    group: safe
+    dest: "/home/safe{{ item }}/upload-random-data.sh"
+    owner: "safe{{ item }}"
+    group: "safe{{ item }}"
     mode: '0744'
   become: yes
-  become_user: safe
+  become_user: "safe{{ item }}"
+  loop: "{{ range(1, safe_uploader_instances | int + 1) | list }}"
   when: not safe_binary.stat.exists
 
-- name: obtain funds from the faucet
+- name: obtain funds from the faucet for each safe user
   shell: "safe --peer {{ genesis_multiaddr }} wallet get-faucet {{ faucet_address }}"
   args:
-    chdir: /home/safe/
+    chdir: "/home/safe{{ item }}/"
     executable: /bin/bash
   become: yes
-  become_user: safe
-  # run one at a time to not be rate limited by the faucet
+  become_user: "safe{{ item }}"
   throttle: 1
+  loop: "{{ range(1, safe_uploader_instances | int + 1) | list }}"
   when: not safe_binary.stat.exists
 
 - name: create systemd service file
   ansible.builtin.template:
     src: safe_uploader.service.j2
-    dest: /etc/systemd/system/safe_uploader.service
+    dest: "/etc/systemd/system/safe_uploader@.service"
     owner: root
     group: root
     mode: '0644'
   become: yes
   when: not safe_binary.stat.exists
 
-- name: start and enable safe_uploader service
+- name: start and enable safe_uploader service for each uploader
   ansible.builtin.systemd:
-    name: safe_uploader
+    name: "safe_uploader@{{ item }}"
     state: started
     enabled: yes
   become: yes
+  loop: "{{ range(1, safe_uploader_instances | int + 1) | list }}"
   when: not safe_binary.stat.exists

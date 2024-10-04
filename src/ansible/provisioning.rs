@@ -69,6 +69,7 @@ pub struct ProvisionOptions {
     /// For the upscale, it needs to be provided explicitly, because currently it is not
     /// recorded in the inventory.
     pub safe_version: Option<String>,
+    pub uploaders_count: Option<u16>,
 }
 
 impl From<BootstrapOptions> for ProvisionOptions {
@@ -92,6 +93,7 @@ impl From<BootstrapOptions> for ProvisionOptions {
             private_node_vms: Vec::new(),
             public_rpc: false,
             safe_version: None,
+            uploaders_count: None,
         }
     }
 }
@@ -117,6 +119,7 @@ impl From<DeployOptions> for ProvisionOptions {
             private_node_count: deploy_options.private_node_count,
             private_node_vms: Vec::new(),
             safe_version: None,
+            uploaders_count: Some(deploy_options.uploaders_count),
         }
     }
 }
@@ -859,6 +862,10 @@ impl AnsibleProvisioner {
             &options.binary_option,
             options.safe_version.clone(),
         )?;
+        extra_vars.add_variable(
+            "safe_uploader_instances",
+            &options.uploaders_count.unwrap_or(1).to_string(),
+        );
         Ok(extra_vars.build())
     }
 

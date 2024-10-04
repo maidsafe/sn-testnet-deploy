@@ -38,6 +38,7 @@ pub struct DeployOptions {
     pub private_node_vm_count: Option<u16>,
     pub private_node_count: u16,
     pub public_rpc: bool,
+    pub uploaders_count: u16,
     pub uploader_vm_count: Option<u16>,
 }
 

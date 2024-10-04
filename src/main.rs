@@ -429,6 +429,9 @@ enum Commands {
         /// arguments. You can only supply version numbers or a custom branch, not both.
         #[arg(long, verbatim_doc_comment)]
         sn_auditor_version: Option<String>,
+        /// The desired number of uploaders per VM.
+        #[clap(long, default_value_t = 1)]
+        uploaders_count: u16,
         /// The number of uploader VMs to create.
         ///
         /// If the argument is not used, the value will be determined by the 'environment-type'
@@ -1243,6 +1246,7 @@ async fn main() -> Result<()> {
             safenode_version,
             safenode_manager_version,
             sn_auditor_version,
+            uploaders_count,
             uploader_vm_count,
         } => {
             let network_keys = validate_and_get_pks(
@@ -1344,6 +1348,7 @@ async fn main() -> Result<()> {
                     private_node_count: private_node_count
                         .unwrap_or(environment_type.get_default_private_node_count()),
                     public_rpc,
+                    uploaders_count,
                     uploader_vm_count,
                 })
                 .await?;
