@@ -26,6 +26,7 @@ pub struct UpscaleOptions {
     pub desired_private_node_count: Option<u16>,
     pub desired_private_node_vm_count: Option<u16>,
     pub desired_uploader_vm_count: Option<u16>,
+    pub desired_uploaders_count: Option<u16>,
     pub downloaders_count: u16,
     pub infra_only: bool,
     pub plan: bool,
@@ -207,7 +208,7 @@ impl TestnetDeployer {
             private_node_vms: Vec::new(),
             public_rpc: options.public_rpc,
             safe_version: options.safe_version.clone(),
-            uploaders_count: None,
+            uploaders_count: options.desired_uploaders_count,
         };
         let mut node_provision_failed = false;
 
