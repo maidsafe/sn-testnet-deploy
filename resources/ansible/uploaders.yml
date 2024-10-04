@@ -4,10 +4,8 @@
   become: False
   ignore_unreachable: yes
   roles:
-    - role: safe_user
-      become: True
-    - role: uploader-metrics
-      become: True
+    # - role: uploader-metrics
+    #   become: True
     - role: uploaders
       become: True
     - role: downloaders
