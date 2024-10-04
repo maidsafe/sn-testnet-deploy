@@ -772,6 +772,11 @@ enum Commands {
         /// This option is not applicable to a bootstrap deployment.
         #[clap(long, verbatim_doc_comment)]
         desired_uploader_vm_count: Option<u16>,
+        /// The desired number of uploaders to be running after the scale.
+        ///
+        /// If you want each uploader VM to run multiple uploader services, specify the total desired count.
+        #[clap(long, verbatim_doc_comment)]
+        desired_uploaders_count: Option<u16>,
         /// If set to a non-zero value, the uploaders will also be accompanied by the specified
         /// number of downloaders.
         ///
@@ -2083,6 +2088,7 @@ async fn main() -> Result<()> {
             desired_private_node_count,
             desired_private_node_vm_count,
             desired_uploader_vm_count,
+            desired_uploaders_count,
             downloaders_count,
             infra_only,
             name,
@@ -2122,6 +2128,7 @@ async fn main() -> Result<()> {
                     desired_private_node_count,
                     desired_private_node_vm_count,
                     desired_uploader_vm_count,
+                    desired_uploaders_count,
                     downloaders_count,
                     max_archived_log_files,
                     max_log_files,

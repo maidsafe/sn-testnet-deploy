@@ -24,7 +24,6 @@
     shell: /bin/bash
     state: present
   loop: "{{ range(1, safe_uploader_instances | int + 1) | list }}"
-  when: not safe_binary.stat.exists
 
 - name: copy upload-random-data.sh to remote for each safe user
   ansible.builtin.copy:
@@ -36,8 +35,10 @@
   become: yes
   become_user: "safe{{ item }}"
   loop: "{{ range(1, safe_uploader_instances | int + 1) | list }}"
-  when: not safe_binary.stat.exists
 
+# The throttle is used to avoid rate limiting from the faucet.
+# Also, when this role runs again on the upscale command, the existing uploaders will obtain
+# additional funds, but that's easier than trying to exclude them. It shouldn't do any harm.
 - name: obtain funds from the faucet for each safe user
   shell: "safe --peer {{ genesis_multiaddr }} wallet get-faucet {{ faucet_address }}"
   args:
@@ -47,7 +48,6 @@
   become_user: "safe{{ item }}"
   throttle: 1
   loop: "{{ range(1, safe_uploader_instances | int + 1) | list }}"
-  when: not safe_binary.stat.exists
 
 - name: create systemd service file
   ansible.builtin.template:
@@ -66,4 +66,3 @@
     enabled: yes
   become: yes
   loop: "{{ range(1, safe_uploader_instances | int + 1) | list }}"
-  when: not safe_binary.stat.exists
