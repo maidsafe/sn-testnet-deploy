@@ -84,9 +84,27 @@
 - name: add telegraf user to sudoers for safe command
   lineinfile:
     path: /etc/sudoers
-    line: '_telegraf ALL=(safe) NOPASSWD: /usr/local/bin/safe'
+    line: '_telegraf ALL=(ALL) NOPASSWD: /usr/local/bin/safe'
     validate: '/usr/sbin/visudo -cf %s'
     state: present
+
+- name: update telegraf service user to root
+  lineinfile:
+    path: /lib/systemd/system/telegraf.service
+    regexp: '^User='
+    line: 'User=root'
+    backup: yes
+
+- name: update telegraf service group to root
+  lineinfile:
+    path: /lib/systemd/system/telegraf.service
+    regexp: '^Group='
+    line: 'Group=root'
+    backup: yes
+
+- name: reload systemd to apply service file changes
+  systemd:
+    daemon_reload: yes
 
 - name: start telegraf service
   systemd:
