@@ -42,6 +42,13 @@ struct Opt {
 enum Commands {
     /// Bootstrap a new network from an existing deployment.
     Bootstrap {
+        /// Use this option to attach an additional volume to each node VM.
+        ///
+        /// The value is the size of the volume in gigabytes.
+        ///
+        /// The nodes will be configured to use the additional volume.
+        #[arg(long, value_parser = clap::value_parser!(u16))]
+        additional_volume_size: Option<u16>,
         /// Set to run Ansible with more verbose output.
         #[arg(long)]
         ansible_verbose: bool,
@@ -1109,6 +1116,7 @@ async fn main() -> Result<()> {
     let opt = Opt::parse();
     match opt.command {
         Commands::Bootstrap {
+            additional_volume_size,
             ansible_verbose,
             bootstrap_peer,
             branch,
@@ -1192,6 +1200,7 @@ async fn main() -> Result<()> {
 
             testnet_deployer
                 .bootstrap(&BootstrapOptions {
+                    additional_volume_size,
                     binary_option,
                     bootstrap_peer,
                     environment_type: environment_type.clone(),
@@ -2134,10 +2143,10 @@ async fn main() -> Result<()> {
             if inventory.environment_details.additional_volumes_used
                 && additional_volume_size.is_none()
             {
-                return Err(
-                    eyre!(
-                        "The original deployment used additional volumes, so the upscale must also \
-                        use them."));
+                return Err(eyre!(
+                    "The original deployment used additional volumes, so the upscale must also \
+                        use them."
+                ));
             }
 
             testnet_deployer

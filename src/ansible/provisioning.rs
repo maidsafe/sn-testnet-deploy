@@ -76,7 +76,7 @@ pub struct ProvisionOptions {
 impl From<BootstrapOptions> for ProvisionOptions {
     fn from(bootstrap_options: BootstrapOptions) -> Self {
         ProvisionOptions {
-            additional_volume_attached: false,
+            additional_volume_attached: bootstrap_options.additional_volume_size.is_some(),
             beta_encryption_key: None,
             binary_option: bootstrap_options.binary_option,
             bootstrap_node_count: 0,

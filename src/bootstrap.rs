@@ -19,6 +19,7 @@ use colored::Colorize;
 
 #[derive(Clone)]
 pub struct BootstrapOptions {
+    pub additional_volume_size: Option<u16>,
     pub binary_option: BinaryOption,
     pub bootstrap_peer: String,
     pub environment_type: EnvironmentType,
@@ -55,13 +56,13 @@ impl TestnetDeployer {
             &EnvironmentDetails {
                 environment_type: options.environment_type.clone(),
                 deployment_type: DeploymentType::Bootstrap,
-                additional_volumes_used: false,
+                additional_volumes_used: options.additional_volume_size.is_some(),
             },
         )
         .await?;
 
         self.create_or_update_infra(&InfraRunOptions {
-            additional_volume_size: None,
+            additional_volume_size: options.additional_volume_size,
             auditor_vm_count: Some(0),
             bootstrap_node_vm_count: Some(0),
             enable_build_vm: build_custom_binaries,
