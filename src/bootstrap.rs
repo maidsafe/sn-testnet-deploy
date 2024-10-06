@@ -13,12 +13,13 @@ use crate::{
     },
     error::Result,
     write_environment_details, BinaryOption, DeploymentType, EnvironmentDetails, EnvironmentType,
-    LogFormat, TestnetDeployer,
+    InfraRunOptions, LogFormat, TestnetDeployer,
 };
 use colored::Colorize;
 
 #[derive(Clone)]
 pub struct BootstrapOptions {
+    pub additional_volume_size: Option<u16>,
     pub binary_option: BinaryOption,
     pub bootstrap_peer: String,
     pub environment_type: EnvironmentType,
@@ -55,21 +56,23 @@ impl TestnetDeployer {
             &EnvironmentDetails {
                 environment_type: options.environment_type.clone(),
                 deployment_type: DeploymentType::Bootstrap,
+                additional_volumes_used: options.additional_volume_size.is_some(),
             },
         )
         .await?;
 
-        self.create_or_update_infra(
-            &options.name,
-            Some(0),
-            Some(0),
-            Some(0),
-            options.node_vm_count,
-            options.private_node_vm_count,
-            Some(0),
-            build_custom_binaries,
-            &options.environment_type.get_tfvars_filename(),
-        )
+        self.create_or_update_infra(&InfraRunOptions {
+            additional_volume_size: options.additional_volume_size,
+            auditor_vm_count: Some(0),
+            bootstrap_node_vm_count: Some(0),
+            enable_build_vm: build_custom_binaries,
+            genesis_vm_count: Some(0),
+            name: options.name.clone(),
+            node_vm_count: options.node_vm_count,
+            private_node_vm_count: options.private_node_vm_count,
+            tfvars_filename: options.environment_type.get_tfvars_filename(),
+            uploader_vm_count: None,
+        })
         .await
         .map_err(|err| {
             println!("Failed to create infra {err:?}");

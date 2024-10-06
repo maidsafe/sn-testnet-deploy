@@ -8,7 +8,8 @@ use crate::{
     ansible::inventory::AnsibleInventoryType,
     ansible::provisioning::{NodeType, ProvisionOptions},
     error::{Error, Result},
-    get_genesis_multiaddr, get_multiaddr, DeploymentInventory, DeploymentType, TestnetDeployer,
+    get_genesis_multiaddr, get_multiaddr, DeploymentInventory, DeploymentType, InfraRunOptions,
+    TestnetDeployer,
 };
 use colored::Colorize;
 use log::debug;
@@ -16,6 +17,7 @@ use std::collections::HashSet;
 
 #[derive(Clone)]
 pub struct UpscaleOptions {
+    pub additional_volume_size: Option<u16>,
     pub ansible_verbose: bool,
     pub current_inventory: DeploymentInventory,
     pub desired_auditor_vm_count: Option<u16>,
@@ -156,9 +158,12 @@ impl TestnetDeployer {
             return Ok(());
         }
 
-        self.create_or_update_infra(
-            &options.current_inventory.name,
-            Some(
+        self.create_or_update_infra(&InfraRunOptions {
+            additional_volume_size: options.additional_volume_size,
+            auditor_vm_count: Some(desired_auditor_vm_count),
+            bootstrap_node_vm_count: Some(desired_bootstrap_node_vm_count),
+            enable_build_vm: false,
+            genesis_vm_count: Some(
                 match options
                     .current_inventory
                     .environment_details
@@ -168,18 +173,16 @@ impl TestnetDeployer {
                     DeploymentType::Bootstrap => 0,
                 },
             ),
-            Some(desired_auditor_vm_count),
-            Some(desired_bootstrap_node_vm_count),
-            Some(desired_node_vm_count),
-            Some(desired_private_node_vm_count),
-            Some(desired_uploader_vm_count),
-            false,
-            &options
+            name: options.current_inventory.name.clone(),
+            node_vm_count: Some(desired_node_vm_count),
+            private_node_vm_count: Some(desired_private_node_vm_count),
+            tfvars_filename: options
                 .current_inventory
                 .environment_details
                 .environment_type
                 .get_tfvars_filename(),
-        )
+            uploader_vm_count: Some(desired_uploader_vm_count),
+        })
         .await
         .map_err(|err| {
             println!("Failed to create infra {err:?}");
@@ -191,6 +194,7 @@ impl TestnetDeployer {
         }
 
         let mut provision_options = ProvisionOptions {
+            additional_volume_attached: options.additional_volume_size.is_some(),
             beta_encryption_key: None,
             binary_option: options.current_inventory.binary_option.clone(),
             bootstrap_node_count: desired_bootstrap_node_count,

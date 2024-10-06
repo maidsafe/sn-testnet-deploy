@@ -42,6 +42,13 @@ struct Opt {
 enum Commands {
     /// Bootstrap a new network from an existing deployment.
     Bootstrap {
+        /// Use this option to attach an additional volume to each node VM.
+        ///
+        /// The value is the size of the volume in gigabytes.
+        ///
+        /// The nodes will be configured to use the additional volume.
+        #[arg(long, value_parser = clap::value_parser!(u16))]
+        additional_volume_size: Option<u16>,
         /// Set to run Ansible with more verbose output.
         #[arg(long)]
         ansible_verbose: bool,
@@ -204,6 +211,13 @@ enum Commands {
     },
     /// Deploy a new testnet environment using the latest version of the safenode binary.
     Deploy {
+        /// Use this option to attach an additional volume to each node VM.
+        ///
+        /// The value is the size of the volume in gigabytes.
+        ///
+        /// The nodes will be configured to use the additional volume.
+        #[arg(long, value_parser = clap::value_parser!(u16))]
+        additional_volume_size: Option<u16>,
         /// Set to run Ansible with more verbose output.
         #[arg(long)]
         ansible_verbose: bool,
@@ -704,6 +718,11 @@ enum Commands {
     },
     /// Upscale VMs and node services for an existing network.
     Upscale {
+        /// The additional volume size to attach to each node VM in gigabytes.
+        ///
+        /// This will configure each node VM to use the specified additional volume size.
+        #[arg(long, value_parser = clap::value_parser!(u16))]
+        additional_volume_size: Option<u16>,
         /// Set to run Ansible with more verbose output.
         #[arg(long)]
         ansible_verbose: bool,
@@ -1097,6 +1116,7 @@ async fn main() -> Result<()> {
     let opt = Opt::parse();
     match opt.command {
         Commands::Bootstrap {
+            additional_volume_size,
             ansible_verbose,
             bootstrap_peer,
             branch,
@@ -1180,6 +1200,7 @@ async fn main() -> Result<()> {
 
             testnet_deployer
                 .bootstrap(&BootstrapOptions {
+                    additional_volume_size,
                     binary_option,
                     bootstrap_peer,
                     environment_type: environment_type.clone(),
@@ -1217,6 +1238,7 @@ async fn main() -> Result<()> {
             Ok(())
         }
         Commands::Deploy {
+            additional_volume_size,
             ansible_verbose,
             beta_encryption_key,
             branch,
@@ -1328,6 +1350,7 @@ async fn main() -> Result<()> {
 
             testnet_deployer
                 .deploy(&DeployOptions {
+                    additional_volume_size,
                     beta_encryption_key,
                     binary_option: binary_option.clone(),
                     bootstrap_node_count: bootstrap_node_count
@@ -2079,6 +2102,7 @@ async fn main() -> Result<()> {
             Ok(())
         }
         Commands::Upscale {
+            additional_volume_size,
             ansible_verbose,
             desired_auditor_vm_count,
             desired_bootstrap_node_count,
@@ -2116,8 +2140,18 @@ async fn main() -> Result<()> {
                 .generate_or_retrieve_inventory(&name, true, None)
                 .await?;
 
+            if inventory.environment_details.additional_volumes_used
+                && additional_volume_size.is_none()
+            {
+                return Err(eyre!(
+                    "The original deployment used additional volumes, so the upscale must also \
+                        use them."
+                ));
+            }
+
             testnet_deployer
                 .upscale(&UpscaleOptions {
+                    additional_volume_size,
                     ansible_verbose,
                     current_inventory: inventory,
                     desired_auditor_vm_count,
