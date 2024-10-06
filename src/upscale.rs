@@ -17,6 +17,7 @@ use std::collections::HashSet;
 
 #[derive(Clone)]
 pub struct UpscaleOptions {
+    pub additional_volume_size: Option<u16>,
     pub ansible_verbose: bool,
     pub current_inventory: DeploymentInventory,
     pub desired_auditor_vm_count: Option<u16>,
@@ -158,7 +159,7 @@ impl TestnetDeployer {
         }
 
         self.create_or_update_infra(&InfraRunOptions {
-            additional_volume_size: None,
+            additional_volume_size: options.additional_volume_size,
             auditor_vm_count: Some(desired_auditor_vm_count),
             bootstrap_node_vm_count: Some(desired_bootstrap_node_vm_count),
             enable_build_vm: false,
@@ -193,7 +194,7 @@ impl TestnetDeployer {
         }
 
         let mut provision_options = ProvisionOptions {
-            additional_volume_attached: false,
+            additional_volume_attached: options.additional_volume_size.is_some(),
             beta_encryption_key: None,
             binary_option: options.current_inventory.binary_option.clone(),
             bootstrap_node_count: desired_bootstrap_node_count,

@@ -59,6 +59,7 @@ impl TestnetDeployer {
             &EnvironmentDetails {
                 environment_type: options.environment_type.clone(),
                 deployment_type: DeploymentType::New,
+                additional_volumes_used: options.additional_volume_size.is_some(),
             },
         )
         .await?;

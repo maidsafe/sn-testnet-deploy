@@ -95,6 +95,7 @@ pub enum NodeType {
 pub struct EnvironmentDetails {
     pub environment_type: EnvironmentType,
     pub deployment_type: DeploymentType,
+    pub additional_volumes_used: bool,
 }
 
 #[derive(Clone, Debug, Default, Serialize, Deserialize)]
@@ -1059,25 +1060,15 @@ pub async fn get_environment_details(
     }
 
     let content = std::fs::read_to_string(temp_file.path())?;
-    let lines: Vec<&str> = content.lines().collect();
 
-    let environment_type = if lines.is_empty() {
-        None
-    } else {
-        Some(lines[0].trim())
-    };
-
-    let deployment_type = lines.get(1).map(|s| s.trim());
-
-    let environment_type = match environment_type.and_then(|s| s.parse().ok()) {
-        Some(e) => {
-            debug!("Parsed the environment type from the S3 file");
-            e
+    match serde_json::from_str::<EnvironmentDetails>(&content) {
+        Ok(details) => {
+            debug!("Successfully deserialized environment details from JSON");
+            Ok(details)
         }
-        None => {
-            debug!("Could not parse the environment type from the S3 file");
-            debug!("Falling back to using the environment name ({environment_name})");
-            if environment_name.starts_with("DEV") {
+        Err(e) => {
+            debug!("Failed to deserialize environment details: {}", e);
+            let environment_type = if environment_name.starts_with("DEV") {
                 debug!("Using Development as the environment type");
                 EnvironmentType::Development
             } else if environment_name.starts_with("STG") {
@@ -1090,23 +1081,15 @@ pub async fn get_environment_details(
                 return Err(Error::EnvironmentNameFromStringError(
                     environment_name.to_string(),
                 ));
-            }
-        }
-    };
+            };
 
-    let deployment_type = match deployment_type.and_then(|s| s.parse().ok()) {
-        Some(d) => d,
-        None => {
-            debug!("Could not parse the deployment type from the S3 file");
-            debug!("Using New as the default");
-            DeploymentType::New
+            Ok(EnvironmentDetails {
+                environment_type,
+                deployment_type: DeploymentType::New,
+                additional_volumes_used: false,
+            })
         }
-    };
-
-    Ok(EnvironmentDetails {
-        environment_type,
-        deployment_type,
-    })
+    }
 }
 
 pub async fn write_environment_details(
@@ -1117,11 +1100,10 @@ pub async fn write_environment_details(
     let temp_dir = tempfile::tempdir()?;
     let path = temp_dir.path().to_path_buf().join(environment_name);
     let mut file = File::create(&path)?;
-    let contents = format!(
-        "{}\n{}",
-        environment_details.environment_type, environment_details.deployment_type
-    );
-    file.write_all(contents.as_bytes())?;
+
+    let json_contents = serde_json::to_string(environment_details)?;
+    file.write_all(json_contents.as_bytes())?;
+
     s3_repository
         .upload_file("sn-environment-type", &path, true)
         .await?;

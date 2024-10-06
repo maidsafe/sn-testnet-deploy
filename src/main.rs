@@ -711,6 +711,11 @@ enum Commands {
     },
     /// Upscale VMs and node services for an existing network.
     Upscale {
+        /// The additional volume size to attach to each node VM in gigabytes.
+        ///
+        /// This will configure each node VM to use the specified additional volume size.
+        #[arg(long, value_parser = clap::value_parser!(u16))]
+        additional_volume_size: Option<u16>,
         /// Set to run Ansible with more verbose output.
         #[arg(long)]
         ansible_verbose: bool,
@@ -2088,6 +2093,7 @@ async fn main() -> Result<()> {
             Ok(())
         }
         Commands::Upscale {
+            additional_volume_size,
             ansible_verbose,
             desired_auditor_vm_count,
             desired_bootstrap_node_count,
@@ -2125,8 +2131,18 @@ async fn main() -> Result<()> {
                 .generate_or_retrieve_inventory(&name, true, None)
                 .await?;
 
+            if inventory.environment_details.additional_volumes_used
+                && additional_volume_size.is_none()
+            {
+                return Err(
+                    eyre!(
+                        "The original deployment used additional volumes, so the upscale must also \
+                        use them."));
+            }
+
             testnet_deployer
                 .upscale(&UpscaleOptions {
+                    additional_volume_size,
                     ansible_verbose,
                     current_inventory: inventory,
                     desired_auditor_vm_count,

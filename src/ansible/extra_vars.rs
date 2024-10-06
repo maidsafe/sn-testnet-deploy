@@ -320,7 +320,10 @@ impl ExtraVarsDocBuilder {
     }
 
     pub fn build(&self) -> String {
-        if self.variables.is_empty() && self.list_variables.is_empty() && self.bool_variables.is_empty() {
+        if self.variables.is_empty()
+            && self.list_variables.is_empty()
+            && self.bool_variables.is_empty()
+        {
             return "{}".to_string();
         }
 
