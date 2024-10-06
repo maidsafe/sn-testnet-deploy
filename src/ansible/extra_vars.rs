@@ -15,6 +15,7 @@ const SAFE_S3_BUCKET_URL: &str = "https://sn-cli.s3.eu-west-2.amazonaws.com";
 pub struct ExtraVarsDocBuilder {
     variables: Vec<(String, String)>,
     list_variables: HashMap<String, Vec<String>>,
+    bool_variables: Vec<(String, bool)>,
 }
 
 impl ExtraVarsDocBuilder {
@@ -48,6 +49,11 @@ impl ExtraVarsDocBuilder {
         let joined_env_vars = joined_env_vars.join(",");
         self.variables
             .push((name.to_string(), joined_env_vars.to_string()));
+        self
+    }
+
+    pub fn add_boolean_variable(&mut self, name: &str, value: bool) -> &mut Self {
+        self.bool_variables.push((name.to_string(), value));
         self
     }
 
@@ -314,7 +320,7 @@ impl ExtraVarsDocBuilder {
     }
 
     pub fn build(&self) -> String {
-        if self.variables.is_empty() && self.list_variables.is_empty() {
+        if self.variables.is_empty() && self.list_variables.is_empty() && self.bool_variables.is_empty() {
             return "{}".to_string();
         }
 
@@ -332,6 +338,10 @@ impl ExtraVarsDocBuilder {
             let mut temp_doc = doc.strip_suffix(", ").unwrap().to_string();
             temp_doc.push_str("], ");
             doc = temp_doc;
+        }
+
+        for (name, value) in self.bool_variables.iter() {
+            doc.push_str(&format!("\"{name}\": {value}, "));
         }
 
         let mut doc = doc.strip_suffix(", ").unwrap().to_string();

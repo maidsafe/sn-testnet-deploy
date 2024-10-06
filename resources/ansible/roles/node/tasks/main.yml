@@ -95,6 +95,31 @@
   when: make_vm_private
 
 #
+# Setup alternate storage if additional volume is attached
+#
+- name: Ensure data directory is present
+  file:
+    path: "{{ mount_dir }}/data"
+    state: directory
+    owner: safe
+    group: safe
+    mode: '0755'
+  when:
+    - additional_volume_attached
+    - not is_genesis
+
+- name: Ensure logs directory is present
+  file:
+    path: "{{ mount_dir }}/logs"
+    state: directory
+    owner: safe
+    group: safe
+    mode: '0755'
+  when:
+    - additional_volume_attached
+    - not is_genesis
+
+#
 # Add the nodes
 #
 - name: add node services
@@ -122,9 +147,12 @@
       - "{{ ('--log-format=' + log_format) if log_format is defined else omit }}"
       - "{{ ('--env=' + env_variables) if env_variables is defined else omit }}"
       - "{{ ('--version=' + version) if version is defined else ('--url=' + node_archive_url) }}"
-  when: not is_genesis and nodes_to_add | default(0) | int > 0
+      - "{{ '--data-dir-path=' + mount_dir + '/data' if additional_volume_attached else omit }}"
+      - "{{ '--log-dir-path=' + mount_dir + '/logs' if additional_volume_attached else omit }}"
+  when: 
+    - not is_genesis 
+    - nodes_to_add | default(0) | int > 0
 
-# set "interval" to override dynamic startup delay
 - name: start the node services
   become: True
   command: safenode-manager -v start --interval 200

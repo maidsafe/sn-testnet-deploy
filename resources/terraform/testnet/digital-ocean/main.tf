@@ -71,6 +71,22 @@ resource "digitalocean_droplet" "node" {
   tags     = ["environment:${terraform.workspace}", "type:node"]
 }
 
+# The volume names are constrained to be alphanumeric and lowercase.
+resource "digitalocean_volume" "additional_node_volume" {
+  count             = var.attach_additional_volume ? var.node_vm_count : 0
+  name              = lower("${replace(terraform.workspace, "/[^a-zA-Z0-9]/", "")}-node-vol-${count.index + 1}")
+  region            = var.region
+  size              = var.additional_volume_size
+  initial_filesystem_type = "ext4"
+  initial_filesystem_label = "node_data"
+}
+
+resource "digitalocean_volume_attachment" "attach_additional_volume" {
+  count         = var.attach_additional_volume ? var.node_vm_count : 0
+  volume_id     = digitalocean_volume.additional_node_volume[count.index].id
+  droplet_id    = digitalocean_droplet.node[count.index].id
+}
+
 resource "digitalocean_droplet" "private_node" {
   count   = var.private_node_vm_count
   image    = var.node_droplet_image_id

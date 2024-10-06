@@ -29,7 +29,7 @@ use walkdir::WalkDir;
 const DEFAULT_BETA_ENCRYPTION_KEY: &str =
     "49113d2083f57a976076adbe85decb75115820de1e6e74b47e0429338cef124a";
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Eq)]
 pub enum NodeType {
     Bootstrap,
     Normal,
@@ -48,6 +48,7 @@ impl NodeType {
 
 #[derive(Clone)]
 pub struct ProvisionOptions {
+    pub additional_volume_attached: bool,
     pub beta_encryption_key: Option<String>,
     pub binary_option: BinaryOption,
     pub bootstrap_node_count: u16,
@@ -75,6 +76,7 @@ pub struct ProvisionOptions {
 impl From<BootstrapOptions> for ProvisionOptions {
     fn from(bootstrap_options: BootstrapOptions) -> Self {
         ProvisionOptions {
+            additional_volume_attached: false,
             beta_encryption_key: None,
             binary_option: bootstrap_options.binary_option,
             bootstrap_node_count: 0,
@@ -101,6 +103,7 @@ impl From<BootstrapOptions> for ProvisionOptions {
 impl From<DeployOptions> for ProvisionOptions {
     fn from(deploy_options: DeployOptions) -> Self {
         ProvisionOptions {
+            additional_volume_attached: deploy_options.additional_volume_size.is_some(),
             beta_encryption_key: deploy_options.beta_encryption_key,
             binary_option: deploy_options.binary_option,
             bootstrap_node_count: deploy_options.bootstrap_node_count,
@@ -360,11 +363,17 @@ impl AnsibleProvisioner {
 
         println!("SSH is available on all nodes. Proceeding with provisioning...");
 
+        // The bootstrap nodes will never have an additional volume attached.
+        let mut options_copy = options.clone();
+        if node_type == NodeType::Bootstrap {
+            options_copy.additional_volume_attached = false;
+        }
+
         self.ansible_runner.run_playbook(
             AnsiblePlaybook::Nodes,
             inventory_type,
             Some(self.build_node_extra_vars_doc(
-                options,
+                &options_copy,
                 node_type,
                 Some(initial_contact_peer.to_string()),
                 node_count,
@@ -739,6 +748,11 @@ impl AnsibleProvisioner {
                 &bootstrap_multiaddr.ok_or_else(|| Error::GenesisMultiAddrNotSupplied)?,
             );
         }
+
+        extra_vars.add_boolean_variable(
+            "additional_volume_attached",
+            options.additional_volume_attached,
+        );
 
         extra_vars.add_variable("node_instance_count", &node_instance_count.to_string());
         if let Some(log_format) = options.log_format {

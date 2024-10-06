@@ -107,3 +107,15 @@ variable "use_custom_bin" {
   default     = false
   description = "A boolean to enable use of a custom bin"
 }
+
+variable "attach_additional_volume" {
+  description = "Use to control whether to attach an additional volume to each node"
+  type        = bool
+  default     = false
+}
+
+variable "additional_volume_size" {
+  description = "Size of the additional volume in gigabytes"
+  type        = number
+  default     = 0
+}

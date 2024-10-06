@@ -174,6 +174,20 @@ pub struct DeployOptions {
     pub uploader_vm_count: u16,
 }
 
+#[derive(Debug, Clone)]
+pub struct InfraRunOptions {
+    pub additional_volume_size: Option<u16>,
+    pub auditor_vm_count: Option<u16>,
+    pub bootstrap_node_vm_count: Option<u16>,
+    pub enable_build_vm: bool,
+    pub genesis_vm_count: Option<u16>,
+    pub name: String,
+    pub node_vm_count: Option<u16>,
+    pub private_node_vm_count: Option<u16>,
+    pub tfvars_filename: String,
+    pub uploader_vm_count: Option<u16>,
+}
+
 /// Specify the binary option for the deployment.
 ///
 /// There are several binaries involved in the deployment:
@@ -663,45 +677,41 @@ impl TestnetDeployer {
         Ok(())
     }
 
-    #[allow(clippy::too_many_arguments)]
-    async fn create_or_update_infra(
-        &self,
-        name: &str,
-        genesis_vm_count: Option<u16>,
-        auditor_vm_count: Option<u16>,
-        bootstrap_node_vm_count: Option<u16>,
-        node_vm_count: Option<u16>,
-        private_node_vm_count: Option<u16>,
-        uploader_vm_count: Option<u16>,
-        // TODO: enable_build_vm must be provided from options when called from other places.
-        // OR should we tear down the machine once used?
-        enable_build_vm: bool,
-        tfvars_filename: &str,
-    ) -> Result<()> {
+    async fn create_or_update_infra(&self, options: &InfraRunOptions) -> Result<()> {
         let start = Instant::now();
-        println!("Selecting {} workspace...", name);
-        self.terraform_runner.workspace_select(name)?;
+        println!("Selecting {} workspace...", options.name);
+        self.terraform_runner.workspace_select(&options.name)?;
 
         let mut args = Vec::new();
 
-        if let Some(auditor_vm_count) = auditor_vm_count {
+        if let Some(additional_volume_size) = options.additional_volume_size {
+            args.push((
+                "additional_volume_size".to_string(),
+                additional_volume_size.to_string(),
+            ));
+            args.push(("attach_additional_volume".to_string(), "true".to_string()));
+        } else {
+            args.push(("attach_additional_volume".to_string(), "false".to_string()));
+        }
+
+        if let Some(auditor_vm_count) = options.auditor_vm_count {
             args.push(("auditor_vm_count".to_string(), auditor_vm_count.to_string()));
         }
 
-        if let Some(genesis_vm_count) = genesis_vm_count {
+        if let Some(genesis_vm_count) = options.genesis_vm_count {
             args.push(("genesis_vm_count".to_string(), genesis_vm_count.to_string()));
         }
 
-        if let Some(bootstrap_node_vm_count) = bootstrap_node_vm_count {
+        if let Some(bootstrap_node_vm_count) = options.bootstrap_node_vm_count {
             args.push((
                 "bootstrap_node_vm_count".to_string(),
                 bootstrap_node_vm_count.to_string(),
             ));
         }
-        if let Some(node_vm_count) = node_vm_count {
+        if let Some(node_vm_count) = options.node_vm_count {
             args.push(("node_vm_count".to_string(), node_vm_count.to_string()));
         }
-        if let Some(private_node_vm_count) = private_node_vm_count {
+        if let Some(private_node_vm_count) = options.private_node_vm_count {
             args.push((
                 "private_node_vm_count".to_string(),
                 private_node_vm_count.to_string(),
@@ -712,17 +722,20 @@ impl TestnetDeployer {
             ));
         }
 
-        if let Some(uploader_vm_count) = uploader_vm_count {
+        if let Some(uploader_vm_count) = options.uploader_vm_count {
             args.push((
                 "uploader_vm_count".to_string(),
                 uploader_vm_count.to_string(),
             ));
         }
-        args.push(("use_custom_bin".to_string(), enable_build_vm.to_string()));
+        args.push((
+            "use_custom_bin".to_string(),
+            options.enable_build_vm.to_string(),
+        ));
 
         println!("Running terraform apply...");
         self.terraform_runner
-            .apply(args, Some(tfvars_filename.to_string()))?;
+            .apply(args, Some(options.tfvars_filename.to_string()))?;
         print_duration(start.elapsed());
         Ok(())
     }

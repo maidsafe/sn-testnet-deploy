@@ -11,13 +11,15 @@ use crate::{
     },
     error::Result,
     get_genesis_multiaddr, write_environment_details, BinaryOption, DeploymentInventory,
-    DeploymentType, EnvironmentDetails, EnvironmentType, LogFormat, TestnetDeployer,
+    DeploymentType, EnvironmentDetails, EnvironmentType, InfraRunOptions, LogFormat,
+    TestnetDeployer,
 };
 use colored::Colorize;
 use std::{net::SocketAddr, path::PathBuf};
 
 #[derive(Clone)]
 pub struct DeployOptions {
+    pub additional_volume_size: Option<u16>,
     pub beta_encryption_key: Option<String>,
     pub binary_option: BinaryOption,
     pub bootstrap_node_count: u16,
@@ -61,17 +63,18 @@ impl TestnetDeployer {
         )
         .await?;
 
-        self.create_or_update_infra(
-            &options.name,
-            Some(1),
-            None,
-            options.bootstrap_node_vm_count,
-            options.node_vm_count,
-            options.private_node_vm_count,
-            options.uploader_vm_count,
-            build_custom_binaries,
-            &options.environment_type.get_tfvars_filename(),
-        )
+        self.create_or_update_infra(&InfraRunOptions {
+            additional_volume_size: options.additional_volume_size,
+            auditor_vm_count: Some(1),
+            bootstrap_node_vm_count: options.bootstrap_node_vm_count,
+            enable_build_vm: build_custom_binaries,
+            genesis_vm_count: Some(1),
+            name: options.name.clone(),
+            node_vm_count: options.node_vm_count,
+            private_node_vm_count: options.private_node_vm_count,
+            tfvars_filename: options.environment_type.get_tfvars_filename(),
+            uploader_vm_count: options.uploader_vm_count,
+        })
         .await
         .map_err(|err| {
             println!("Failed to create infra {err:?}");

@@ -204,6 +204,13 @@ enum Commands {
     },
     /// Deploy a new testnet environment using the latest version of the safenode binary.
     Deploy {
+        /// Use this option to attach an additional volume to each node VM.
+        ///
+        /// The value is the size of the volume in gigabytes.
+        ///
+        /// The nodes will be configured to use the additional volume.
+        #[arg(long, value_parser = clap::value_parser!(u16))]
+        additional_volume_size: Option<u16>,
         /// Set to run Ansible with more verbose output.
         #[arg(long)]
         ansible_verbose: bool,
@@ -1217,6 +1224,7 @@ async fn main() -> Result<()> {
             Ok(())
         }
         Commands::Deploy {
+            additional_volume_size,
             ansible_verbose,
             beta_encryption_key,
             branch,
@@ -1328,6 +1336,7 @@ async fn main() -> Result<()> {
 
             testnet_deployer
                 .deploy(&DeployOptions {
+                    additional_volume_size,
                     beta_encryption_key,
                     binary_option: binary_option.clone(),
                     bootstrap_node_count: bootstrap_node_count

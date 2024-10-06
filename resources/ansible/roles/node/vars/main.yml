@@ -1,0 +1,2 @@
+hostname_lower: "{{ ansible_hostname | lower }}"
+mount_dir: "/mnt/{{ hostname_lower | regex_replace('-node-', '_node_vol_') | replace('-', '') }}"
