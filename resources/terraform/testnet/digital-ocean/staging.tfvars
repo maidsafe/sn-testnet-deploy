@@ -1,9 +1,9 @@
 auditor_vm_count = 1
-bootstrap_droplet_size = "s-1vcpu-2gb"
+bootstrap_droplet_size = "s-2vcpu-4gb"
 bootstrap_node_vm_count = 2
 bootstrap_droplet_image_id = 162461040
 nat_gateway_droplet_image_id = 166664184
-node_droplet_size = "s-2vcpu-4gb"
+node_droplet_size = "s-4vcpu-8gb"
 node_vm_count = 39
 node_droplet_image_id = 162460774
 private_node_vm_count = 1
