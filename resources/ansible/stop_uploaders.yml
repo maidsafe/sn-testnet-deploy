@@ -5,6 +5,6 @@
   tasks:
     - name: stop safe uploader service
       systemd:
-        name: safe_uploader
+        name: "safe_uploader@*"
         enabled: yes
         state: stopped
