@@ -1,0 +1,44 @@
+---
+- name: configure swapfile
+  hosts: all
+  become: yes
+  vars:
+    swapfile_size: "{{ swapfile_size | default('120G') }}"
+    swapfile_path: /swapfile
+  tasks:
+    - name: check existing swapfile
+      stat:
+        path: "{{ swapfile_path }}"
+      register: swapfile_stats
+
+    - name: create swapfile
+      command: fallocate -l {{ swapfile_size }} {{ swapfile_path }}
+      when: not swapfile_stats.stat.exists
+
+    - name: set correct permissions on swapfile
+      file:
+        path: "{{ swapfile_path }}"
+        mode: '0600'
+
+    - name: format swapfile
+      command: mkswap {{ swapfile_path }}
+      when: not swapfile_stats.stat.exists
+
+    - name: enable swapfile
+      command: swapon {{ swapfile_path }}
+      when: ansible_swaptotal_mb == 0
+
+    - name: add swapfile entry to /etc/fstab
+      lineinfile:
+        path: /etc/fstab
+        line: '{{ swapfile_path }} none swap sw 0 0'
+        state: present
+
+    - name: show swap status
+      command: free -h
+      register: swap_status
+      changed_when: false
+
+    - name: display swap status
+      debug:
+        var: swap_status.stdout_lines
