@@ -202,6 +202,21 @@ enum Commands {
         #[clap(long, value_parser = parse_provider, verbatim_doc_comment, default_value_t = CloudProvider::DigitalOcean)]
         provider: CloudProvider,
     },
+    /// Configure a swapfile on all nodes in the environment.
+    ConfigureSwapfile {
+        /// Set to also configure swapfile on the bootstrap nodes.
+        #[arg(long)]
+        bootstrap: bool,
+        /// The name of the environment.
+        #[arg(short = 'n', long)]
+        name: String,
+        /// The size of the swapfile in GB.
+        #[arg(short = 's', long)]
+        size: u16,
+        /// The cloud provider for the environment.
+        #[clap(long, value_parser = parse_provider, verbatim_doc_comment, default_value_t = CloudProvider::DigitalOcean)]
+        provider: CloudProvider,
+    },
     /// Deploy a new testnet environment using the latest version of the safenode binary.
     Deploy {
         /// Set to run Ansible with more verbose output.
@@ -1833,6 +1848,42 @@ async fn main() -> Result<()> {
 
             Ok(())
         }
+        Commands::ConfigureSwapfile {
+            bootstrap,
+            name,
+            provider,
+            size,
+        } => {
+            let testnet_deployer = TestnetDeployBuilder::default()
+                .environment_name(&name)
+                .provider(provider)
+                .build()?;
+
+            let inventory_service = DeploymentInventoryService::from(&testnet_deployer);
+            let inventory = inventory_service
+                .generate_or_retrieve_inventory(&name, true, None)
+                .await?;
+            if inventory.is_empty() {
+                return Err(eyre!("The {name} environment does not exist"));
+            }
+
+            let ansible_runner = testnet_deployer.ansible_provisioner.ansible_runner;
+            ansible_runner.run_playbook(
+                AnsiblePlaybook::ConfigureSwapfile,
+                AnsibleInventoryType::Nodes,
+                Some(build_swapfile_extra_vars_doc(size)?),
+            )?;
+
+            if bootstrap {
+                ansible_runner.run_playbook(
+                    AnsiblePlaybook::ConfigureSwapfile,
+                    AnsibleInventoryType::BootstrapNodes,
+                    Some(build_swapfile_extra_vars_doc(size)?),
+                )?;
+            }
+
+            Ok(())
+        }
         Commands::Upgrade {
             ansible_verbose,
             custom_inventory,
@@ -2371,6 +2422,12 @@ fn build_fund_faucet_extra_vars_doc(
     let mut extra_vars = ExtraVarsDocBuilder::default();
     extra_vars.add_variable("genesis_addr", &genesis_ip.to_string());
     extra_vars.add_variable("genesis_multiaddr", genesis_multiaddr);
+    Ok(extra_vars.build())
+}
+
+fn build_swapfile_extra_vars_doc(size: u16) -> Result<String> {
+    let mut extra_vars = ExtraVarsDocBuilder::default();
+    extra_vars.add_variable("swapfile_size", &format!("{size}G"));
     Ok(extra_vars.build())
 }
 

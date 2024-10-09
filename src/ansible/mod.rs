@@ -64,6 +64,10 @@ pub enum AnsiblePlaybook {
     ///
     /// Use in combination with the node machines.
     CleanupLogs,
+    /// The configure swapfile playbook will configure the swapfile on the machines it is run against.
+    ///
+    /// Use in combination with `AnsibleInventoryType::Nodes` or `AnsibleInventoryType::Bootstrap`.
+    ConfigureSwapfile,
     /// The logs playbook will retrieve node logs from any machines it is run against.
     ///
     /// Use in combination with `AnsibleInventoryType::Genesis` or `AnsibleInventoryType::Nodes`.
@@ -164,6 +168,7 @@ impl AnsiblePlaybook {
             AnsiblePlaybook::Auditor => "auditor.yml".to_string(),
             AnsiblePlaybook::Build => "build.yml".to_string(),
             AnsiblePlaybook::CleanupLogs => "cleanup_logs.yml".to_string(),
+            AnsiblePlaybook::ConfigureSwapfile => "configure_swapfile.yml".to_string(),
             AnsiblePlaybook::CopyLogs => "copy_logs.yml".to_string(),
             AnsiblePlaybook::Genesis => "genesis_node.yml".to_string(),
             AnsiblePlaybook::Faucet => "faucet.yml".to_string(),
