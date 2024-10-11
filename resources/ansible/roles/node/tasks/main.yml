@@ -9,38 +9,6 @@
   set_fact:
     node_rpc_ip: "{{ ansible_host }}"
   when: provider == "digital-ocean" and public_rpc
-#
-# Setup genesis node on genesis run
-#
-- name: check if genesis node is already set up
-  become: True
-  ansible.builtin.command: safenode-manager status --json
-  register: genesis_status
-  when: is_genesis
-
-- name: parse genesis node status
-  set_fact:
-    genesis_exists: "{{ (genesis_status.stdout | from_json).nodes | selectattr('genesis', 'equalto', true) | list | length > 0 }}"
-  when: is_genesis and genesis_status.stdout != ""
-
-- name: add genesis node service
-  become: True
-  ansible.builtin.command:
-    # The `omit` filter is used to remove arguments that don't have values
-    argv: "{{ command_args | reject('equalto', omit) | list }}"
-  vars:
-    command_args:
-      - "{{ binary_dir }}/safenode-manager"
-      - -v
-      - add
-      - --first
-      - "--rpc-address={{ node_rpc_ip }}"
-      - "--max-archived-log-files={{ max_archived_log_files }}"
-      - "--max-log-files={{ max_log_files }}"
-      - "{{ ('--log-format=' + log_format) if log_format is defined else omit }}"
-      - "{{ ('--env=' + env_variables) if env_variables is defined else omit }}"
-      - "{{ ('--version=' + version) if version is defined else ('--url=' + node_archive_url) }}"
-  when: is_genesis and not genesis_exists | default(false)
 
 #
 # Calculate the number of nodes to add
@@ -122,9 +90,8 @@
       - "{{ ('--log-format=' + log_format) if log_format is defined else omit }}"
       - "{{ ('--env=' + env_variables) if env_variables is defined else omit }}"
       - "{{ ('--version=' + version) if version is defined else ('--url=' + node_archive_url) }}"
-  when: not is_genesis and nodes_to_add | default(0) | int > 0
+  when: nodes_to_add | default(0) | int > 0
 
-# set "interval" to override dynamic startup delay
 - name: start the node services
   become: True
   command: safenode-manager -v start --interval 200
