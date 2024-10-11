@@ -33,6 +33,8 @@ pub enum Error {
     DigitalOceanUnexpectedResponse(u16, String),
     #[error("The public IP address was not obtainable from the API response")]
     DigitalOceanPublicIpAddressNotFound,
+    #[error("The provided ansible inventory is empty or does not exists {0}")]
+    EmptyInventory(AnsibleInventoryType),
     #[error("Could not retrieve environment details for '{0}'")]
     EnvironmentDetailsNotFound(String),
     #[error("The '{0}' environment does not exist")]
@@ -41,66 +43,44 @@ pub enum Error {
     EnvironmentNameRequired,
     #[error("Could not convert '{0}' to an EnvironmentType variant")]
     EnvironmentNameFromStringError(String),
+    #[error("No EVM node found in the inventory")]
+    EvmNodeNotFound,
+    #[error("EVM testnet data not found or could not be read")]
+    EvmTestnetDataNotFound,
+    #[error("Error parsing EVM testnet data: {0}")]
+    EvmTestnetDataParsingError(String),
     #[error("Command that executed with {binary} failed. See output for details.")]
     ExternalCommandRunFailed {
         binary: String,
         exit_status: std::process::ExitStatus,
     },
-    #[error("The provided ansible inventory is empty or does not exists {0}")]
-    EmptyInventory(AnsibleInventoryType),
-    #[error("To provision the remaining nodes the multiaddr of the genesis node must be supplied")]
-    GenesisMultiAddrNotSupplied,
-    #[error("Could not obtain Genesis multiaddr")]
-    GenesisListenAddress,
-    #[error("Failed to retrieve '{0}' from '{1}")]
-    GetS3ObjectError(String, String),
     #[error("Failed to retrieve filename")]
     FilenameNotRetrieved,
     #[error(transparent)]
     FsExtraError(#[from] fs_extra::error::Error),
-    #[error(transparent)]
-    JoinError(#[from] JoinError),
+    #[error("Could not obtain Genesis multiaddr")]
+    GenesisListenAddress,
+    #[error("To provision the remaining nodes the multiaddr of the genesis node must be supplied")]
+    GenesisMultiAddrNotSupplied,
+    #[error("Failed to retrieve '{0}' from '{1}")]
+    GetS3ObjectError(String, String),
     #[error(transparent)]
     InquireError(#[from] inquire::InquireError),
-    #[error(
-        "The desired auditor VM count is smaller than the current count. \
-         This is invalid for an upscale operation."
-    )]
+    #[error("The desired auditor VM count is smaller than the current count. This is invalid for an upscale operation.")]
     InvalidUpscaleDesiredAuditorVmCount,
-    #[error(
-        "The desired bootstrap VM count is smaller than the current count. \
-         This is invalid for an upscale operation."
-    )]
+    #[error("The desired bootstrap VM count is smaller than the current count. This is invalid for an upscale operation.")]
     InvalidUpscaleDesiredBootstrapVmCount,
-    #[error(
-        "The desired bootstrap node count is smaller than the current count. \
-         This is invalid for an upscale operation."
-    )]
+    #[error("The desired bootstrap node count is smaller than the current count. This is invalid for an upscale operation.")]
     InvalidUpscaleDesiredBootstrapNodeCount,
-    #[error(
-        "The desired node VM count is smaller than the current count. \
-         This is invalid for an upscale operation."
-    )]
+    #[error("The desired node VM count is smaller than the current count. This is invalid for an upscale operation.")]
     InvalidUpscaleDesiredNodeVmCount,
-    #[error(
-        "The desired node count is smaller than the current count. \
-         This is invalid for an upscale operation."
-    )]
+    #[error("The desired node count is smaller than the current count. This is invalid for an upscale operation.")]
     InvalidUpscaleDesiredNodeCount,
-    #[error(
-        "The desired private node VM count is smaller than the current count. \
-         This is invalid for an upscale operation."
-    )]
+    #[error("The desired private node VM count is smaller than the current count. This is invalid for an upscale operation.")]
     InvalidUpscaleDesiredPrivateNodeVmCount,
-    #[error(
-        "The desired private node count is smaller than the current count. \
-         This is invalid for an upscale operation."
-    )]
+    #[error("The desired private node count is smaller than the current count. This is invalid for an upscale operation.")]
     InvalidUpscaleDesiredPrivateNodeCount,
-    #[error(
-        "The desired uploader VM count is smaller than the current count. \
-         This is invalid for an upscale operation."
-    )]
+    #[error("The desired uploader VM count is smaller than the current count. This is invalid for an upscale operation.")]
     InvalidUpscaleDesiredUploaderVmCount,
     #[error("Options were used that are not applicable to a bootstrap deployment")]
     InvalidUpscaleOptionsForBootstrapDeployment,
@@ -108,6 +88,8 @@ pub enum Error {
     Io(#[from] std::io::Error),
     #[error("Could not obtain IpDetails")]
     IpDetailsNotObtained,
+    #[error(transparent)]
+    JoinError(#[from] JoinError),
     #[error("Failed to list objects in S3 bucket with prefix '{prefix}': {error}")]
     ListS3ObjectsError { prefix: String, error: String },
     #[error("Could not configure logging: {0}")]
@@ -128,18 +110,18 @@ pub enum Error {
     NatGatewayNotSupplied,
     #[error("This deployment does not have an auditor. It may be a bootstrap deployment.")]
     NoAuditorError,
-    #[error("Could not obtain a multiaddr from the node inventory")]
-    NodeAddressNotFound,
     #[error("This deployment does not have a faucet. It may be a bootstrap deployment.")]
     NoFaucetError,
     #[error("This deployment does not have any uploaders. It may be a bootstrap deployment.")]
     NoUploadersError,
-    #[error(transparent)]
-    ReqwestError(#[from] reqwest::Error),
-    #[error(transparent)]
-    RegexError(#[from] regex::Error),
+    #[error("Could not obtain a multiaddr from the node inventory")]
+    NodeAddressNotFound,
     #[error("Failed to upload {0} to S3 bucket {1}")]
     PutS3ObjectError(String, String),
+    #[error(transparent)]
+    RegexError(#[from] regex::Error),
+    #[error(transparent)]
+    ReqwestError(#[from] reqwest::Error),
     #[error("Safe client command failed: {0}")]
     SafeCmdError(String),
     #[error("Failed to download the safe or safenode binary")]
@@ -154,20 +136,18 @@ pub enum Error {
     SlackWebhookUrlNotSupplied,
     #[error("SSH command failed: {0}")]
     SshCommandFailed(String),
+    #[error("Failed to obtain lock to update SSH settings")]
+    SshSettingsRwLockError,
     #[error("After several retry attempts an SSH connection could not be established")]
     SshUnavailable,
     #[error(transparent)]
     StripPrefixError(#[from] std::path::StripPrefixError),
     #[error(transparent)]
     TemplateError(#[from] indicatif::style::TemplateError),
-    #[error(
-        "The '{0}' binary was not found. It is required for the deploy process. Make sure it is installed."
-    )]
+    #[error("The '{0}' binary was not found. It is required for the deploy process. Make sure it is installed.")]
     ToolBinaryNotFound(String),
     #[error("The {0} type is not yet supported for an upscaling provision")]
     UpscaleInventoryTypeNotSupported(String),
     #[error(transparent)]
     VarError(#[from] std::env::VarError),
-    #[error("Failed to obtain lock to update SSH settings")]
-    SshSettingsRwLockError,
 }

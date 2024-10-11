@@ -7,9 +7,9 @@
 use crate::{
     ansible::{inventory::AnsibleInventoryType, provisioning::ProvisionOptions},
     error::Result,
-    get_genesis_multiaddr, write_environment_details, BinaryOption, DeploymentInventory,
-    DeploymentType, EnvironmentDetails, EnvironmentType, EvmNetwork, InfraRunOptions, LogFormat,
-    NodeType, TestnetDeployer,
+    get_evm_testnet_data, get_genesis_multiaddr, write_environment_details, BinaryOption,
+    DeploymentInventory, DeploymentType, EnvironmentDetails, EnvironmentType, EvmNetwork,
+    InfraRunOptions, LogFormat, NodeType, TestnetDeployer,
 };
 use colored::Colorize;
 use std::{net::SocketAddr, path::PathBuf};
@@ -28,15 +28,16 @@ pub struct DeployOptions {
     pub evm_network: EvmNetwork,
     pub log_format: Option<LogFormat>,
     pub logstash_details: Option<(String, Vec<SocketAddr>)>,
+    pub max_archived_log_files: u16,
+    pub max_log_files: u16,
     pub name: String,
     pub node_count: u16,
     pub node_vm_count: Option<u16>,
-    pub max_archived_log_files: u16,
-    pub max_log_files: u16,
     pub output_inventory_dir_path: PathBuf,
     pub private_node_vm_count: Option<u16>,
     pub private_node_count: u16,
     pub public_rpc: bool,
+    pub rewards_address: String,
     pub uploaders_count: u16,
     pub uploader_vm_count: Option<u16>,
 }
@@ -57,6 +58,7 @@ impl TestnetDeployer {
                 deployment_type: DeploymentType::New,
                 environment_type: options.environment_type.clone(),
                 evm_network: options.evm_network.clone(),
+                rewards_address: options.rewards_address.clone(),
             },
         )
         .await?;
@@ -89,7 +91,7 @@ impl TestnetDeployer {
             .unwrap_or(true);
 
         let mut n = 1;
-        let mut total = if build_custom_binaries { 9 } else { 8 };
+        let mut total = if build_custom_binaries { 6 } else { 5 };
         if should_provision_private_nodes {
             total += 2;
         }
@@ -114,7 +116,7 @@ impl TestnetDeployer {
             n += 1;
         }
 
-        if matches!(options.evm_network, EvmNetwork::Custom) {
+        let evm_testnet_data = if options.evm_network == EvmNetwork::Custom {
             self.ansible_provisioner
                 .print_ansible_run_banner(n, total, "Provision EVM Node");
             self.ansible_provisioner
@@ -125,19 +127,30 @@ impl TestnetDeployer {
                     err
                 })?;
             n += 1;
-        }
+
+            Some(
+                get_evm_testnet_data(&self.ansible_provisioner.ansible_runner, &self.ssh_client)
+                    .await
+                    .map_err(|err| {
+                        println!("Failed to get evm testnet data {err:?}");
+                        err
+                    })?,
+            )
+        } else {
+            None
+        };
 
         self.ansible_provisioner
             .print_ansible_run_banner(n, total, "Provision Genesis Node");
         self.ansible_provisioner
-            .provision_genesis_node(&provision_options)
+            .provision_genesis_node(&provision_options, evm_testnet_data.clone())
             .await
             .map_err(|err| {
                 println!("Failed to provision genesis node {err:?}");
                 err
             })?;
         n += 1;
-        let (genesis_multiaddr, genesis_ip) =
+        let (genesis_multiaddr, _) =
             get_genesis_multiaddr(&self.ansible_provisioner.ansible_runner, &self.ssh_client)
                 .await
                 .map_err(|err| {
@@ -151,7 +164,12 @@ impl TestnetDeployer {
             .print_ansible_run_banner(n, total, "Provision Bootstrap Nodes");
         match self
             .ansible_provisioner
-            .provision_nodes(&provision_options, &genesis_multiaddr, NodeType::Bootstrap)
+            .provision_nodes(
+                &provision_options,
+                &genesis_multiaddr,
+                NodeType::Bootstrap,
+                evm_testnet_data.clone(),
+            )
             .await
         {
             Ok(()) => {
@@ -168,7 +186,12 @@ impl TestnetDeployer {
             .print_ansible_run_banner(n, total, "Provision Normal Nodes");
         match self
             .ansible_provisioner
-            .provision_nodes(&provision_options, &genesis_multiaddr, NodeType::Normal)
+            .provision_nodes(
+                &provision_options,
+                &genesis_multiaddr,
+                NodeType::Normal,
+                evm_testnet_data.clone(),
+            )
             .await
         {
             Ok(()) => {
@@ -209,7 +232,11 @@ impl TestnetDeployer {
                 .print_ansible_run_banner(n, total, "Provision Private Nodes");
             match self
                 .ansible_provisioner
-                .provision_private_nodes(&mut provision_options, &genesis_multiaddr)
+                .provision_private_nodes(
+                    &mut provision_options,
+                    &genesis_multiaddr,
+                    evm_testnet_data,
+                )
                 .await
             {
                 Ok(()) => {
@@ -224,61 +251,15 @@ impl TestnetDeployer {
         }
 
         if options.current_inventory.is_empty() {
-            // These steps are only necessary on the initial deploy, at which point the inventory
-            // will be empty.
-            self.ansible_provisioner
-                .print_ansible_run_banner(n, total, "Deploy and Start Faucet");
-            self.ansible_provisioner
-                .provision_and_start_faucet(&provision_options, &genesis_multiaddr)
-                .await
-                .map_err(|err| {
-                    println!("Failed to provision faucet {err:?}");
-                    err
-                })?;
-            n += 1;
-            self.ansible_provisioner.print_ansible_run_banner(
-                n,
-                total,
-                "Provision RPC Client on Genesis Node",
-            );
-            self.ansible_provisioner
-                .provision_safenode_rpc_client(&provision_options, &genesis_multiaddr)
-                .await
-                .map_err(|err| {
-                    println!("Failed to provision safenode rpc client {err:?}");
-                    err
-                })?;
-            n += 1;
-            self.ansible_provisioner
-                .print_ansible_run_banner(n, total, "Provision Auditor");
-            self.ansible_provisioner
-                .provision_sn_auditor(&provision_options, &genesis_multiaddr)
-                .await
-                .map_err(|err| {
-                    println!("Failed to provision sn_auditor {err:?}");
-                    err
-                })?;
-            n += 1;
             self.ansible_provisioner
                 .print_ansible_run_banner(n, total, "Provision Uploaders");
-            self.ansible_provisioner
-                .provision_uploaders(&provision_options, &genesis_multiaddr, &genesis_ip)
-                .await
-                .map_err(|err| {
-                    println!("Failed to provision uploaders {err:?}");
-                    err
-                })?;
-
-            n += 1;
-            self.ansible_provisioner
-                .print_ansible_run_banner(n, total, "Stop Faucet");
-            self.ansible_provisioner
-                .provision_and_stop_faucet(&provision_options, &genesis_multiaddr)
-                .await
-                .map_err(|err| {
-                    println!("Failed to stop faucet {err:?}");
-                    err
-                })?;
+            // self.ansible_provisioner
+            //     .provision_uploaders(&provision_options, &genesis_multiaddr, &genesis_ip)
+            //     .await
+            //     .map_err(|err| {
+            //         println!("Failed to provision uploaders {err:?}");
+            //         err
+            //     })?;
         }
 
         if node_provision_failed {

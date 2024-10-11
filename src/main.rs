@@ -170,6 +170,9 @@ enum Commands {
         /// arguments. You can only supply version numbers or a custom branch, not both.
         #[arg(long, verbatim_doc_comment)]
         repo_owner: Option<String>,
+        /// The rewards address for each of the safenode services.
+        #[arg(long, required = true)]
+        rewards_address: String,
         /// The features to enable on the safenode binary.
         ///
         /// If not provided, the default feature set specified for the safenode binary are used.
@@ -413,6 +416,9 @@ enum Commands {
         /// arguments. You can only supply version numbers or a custom branch, not both.
         #[arg(long, verbatim_doc_comment)]
         repo_owner: Option<String>,
+        /// The rewards address for each of the safenode services.
+        #[arg(long, required = true)]
+        rewards_address: String,
         /// Supply a version number for the safe binary.
         ///
         /// There should be no 'v' prefix.
@@ -1140,6 +1146,7 @@ async fn main() -> Result<()> {
             private_node_vm_count,
             provider,
             repo_owner,
+            rewards_address,
             safenode_features,
             safenode_version,
             safenode_manager_version,
@@ -1222,6 +1229,7 @@ async fn main() -> Result<()> {
                     private_node_count: private_node_count
                         .unwrap_or(environment_type.get_default_private_node_count()),
                     node_vm_count,
+                    rewards_address,
                 })
                 .await?;
 
@@ -1272,6 +1280,7 @@ async fn main() -> Result<()> {
             provider,
             public_rpc,
             repo_owner,
+            rewards_address,
             safe_version,
             safenode_features,
             safenode_version,
@@ -1382,6 +1391,7 @@ async fn main() -> Result<()> {
                     public_rpc,
                     uploaders_count,
                     uploader_vm_count,
+                    rewards_address,
                 })
                 .await?;
 

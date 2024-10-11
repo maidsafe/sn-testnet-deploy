@@ -14,7 +14,8 @@ use crate::{
     deploy::DeployOptions,
     error::{Error, Result},
     inventory::{DeploymentNodeRegistries, VirtualMachine},
-    print_duration, BinaryOption, CloudProvider, LogFormat, NodeType, SshClient, UpgradeOptions,
+    print_duration, BinaryOption, CloudProvider, EvmCustomTestnetData, LogFormat, NodeType, SshClient,
+    UpgradeOptions,
 };
 use log::{debug, error, trace};
 use semver::Version;
@@ -55,6 +56,7 @@ pub struct ProvisionOptions {
     /// recorded in the inventory.
     pub safe_version: Option<String>,
     pub uploaders_count: Option<u16>,
+    pub rewards_address: String,
 }
 
 impl From<BootstrapOptions> for ProvisionOptions {
@@ -79,6 +81,7 @@ impl From<BootstrapOptions> for ProvisionOptions {
             public_rpc: false,
             safe_version: None,
             uploaders_count: None,
+            rewards_address: String::new(),
         }
     }
 }
@@ -105,6 +108,7 @@ impl From<DeployOptions> for ProvisionOptions {
             private_node_vms: Vec::new(),
             safe_version: None,
             uploaders_count: Some(deploy_options.uploaders_count),
+            rewards_address: deploy_options.rewards_address,
         }
     }
 }
@@ -277,7 +281,11 @@ impl AnsibleProvisioner {
         Ok(())
     }
 
-    pub async fn provision_genesis_node(&self, options: &ProvisionOptions) -> Result<()> {
+    pub async fn provision_genesis_node(
+        &self,
+        options: &ProvisionOptions,
+        evm_testnet_data: Option<EvmCustomTestnetData>,
+    ) -> Result<()> {
         let start = Instant::now();
         let genesis_inventory = self
             .ansible_runner
@@ -295,6 +303,7 @@ impl AnsibleProvisioner {
                 NodeType::Bootstrap,
                 None,
                 1,
+                evm_testnet_data,
             )?),
         )?;
         print_duration(start.elapsed());
@@ -339,6 +348,7 @@ impl AnsibleProvisioner {
         options: &ProvisionOptions,
         initial_contact_peer: &str,
         node_type: NodeType,
+        evm_testnet_data: Option<EvmCustomTestnetData>,
     ) -> Result<()> {
         let start = Instant::now();
         let (inventory_type, node_count) = match node_type {
@@ -387,6 +397,7 @@ impl AnsibleProvisioner {
                 node_type,
                 Some(initial_contact_peer.to_string()),
                 node_count,
+                evm_testnet_data,
             )?),
         )?;
         print_duration(start.elapsed());
@@ -397,6 +408,7 @@ impl AnsibleProvisioner {
         &self,
         options: &mut ProvisionOptions,
         initial_contact_peer: &str,
+        evm_testnet_data: Option<EvmCustomTestnetData>,
     ) -> Result<()> {
         let start = Instant::now();
 
@@ -424,8 +436,13 @@ impl AnsibleProvisioner {
             error!("Failed to generate private node static inv with err: {err:?}")
         })?;
 
-        self.provision_nodes(options, initial_contact_peer, NodeType::Private)
-            .await?;
+        self.provision_nodes(
+            options,
+            initial_contact_peer,
+            NodeType::Private,
+            evm_testnet_data,
+        )
+        .await?;
 
         print_duration(start.elapsed());
         Ok(())

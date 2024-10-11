@@ -22,14 +22,15 @@ pub struct BootstrapOptions {
     pub env_variables: Option<Vec<(String, String)>>,
     pub evm_network: EvmNetwork,
     pub log_format: Option<LogFormat>,
+    pub max_archived_log_files: u16,
+    pub max_log_files: u16,
     pub name: String,
     pub node_count: u16,
     pub node_vm_count: Option<u16>,
-    pub max_archived_log_files: u16,
-    pub max_log_files: u16,
     pub output_inventory_dir_path: PathBuf,
     pub private_node_count: u16,
     pub private_node_vm_count: Option<u16>,
+    pub rewards_address: String,
 }
 
 impl TestnetDeployer {
@@ -54,6 +55,7 @@ impl TestnetDeployer {
                 deployment_type: DeploymentType::Bootstrap,
                 environment_type: options.environment_type.clone(),
                 evm_network: options.evm_network.clone(),
+                rewards_address: options.rewards_address.clone(),
             },
         )
         .await?;
@@ -106,6 +108,7 @@ impl TestnetDeployer {
                 &provision_options,
                 &options.bootstrap_peer,
                 NodeType::Normal,
+                None,
             )
             .await
         {
@@ -146,7 +149,7 @@ impl TestnetDeployer {
                 .print_ansible_run_banner(n, total, "Provision Private Nodes");
             match self
                 .ansible_provisioner
-                .provision_private_nodes(&mut provision_options, &options.bootstrap_peer)
+                .provision_private_nodes(&mut provision_options, &options.bootstrap_peer, None)
                 .await
             {
                 Ok(()) => {
