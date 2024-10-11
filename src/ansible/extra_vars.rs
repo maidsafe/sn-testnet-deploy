@@ -5,6 +5,8 @@
 // Please see the LICENSE file for more details.
 use crate::{BinaryOption, Error, Result};
 use std::collections::HashMap;
+use crate::ansible::provisioning::{DEFAULT_BETA_ENCRYPTION_KEY, ProvisionOptions, NodeType};
+use std::net::IpAddr;
 
 const NODE_S3_BUCKET_URL: &str = "https://sn-node.s3.eu-west-2.amazonaws.com";
 const NODE_MANAGER_S3_BUCKET_URL: &str = "https://sn-node-manager.s3.eu-west-2.amazonaws.com";
@@ -346,4 +348,178 @@ impl ExtraVarsDocBuilder {
             .push(("org".to_string(), repo_owner.to_string()));
         self.variables.push((name.to_string(), value.to_string()));
     }
+}
+
+pub fn build_nat_gateway_extra_vars_doc(name: &str, private_ips: Vec<String>) -> String {
+    let mut extra_vars = ExtraVarsDocBuilder::default();
+    extra_vars.add_variable("testnet_name", name);
+    extra_vars.add_list_variable("node_private_ips_eth1", private_ips);
+    extra_vars.build()
+}
+
+pub fn build_node_extra_vars_doc(
+    cloud_provider: &str,
+    options: &ProvisionOptions,
+    node_type: NodeType,
+    bootstrap_multiaddr: Option<String>,
+    node_instance_count: u16,
+) -> Result<String> {
+    let mut extra_vars = ExtraVarsDocBuilder::default();
+    extra_vars.add_variable("provider", cloud_provider);
+    extra_vars.add_variable("testnet_name", &options.name);
+    extra_vars.add_variable("node_type", node_type.telegraph_role());
+    if bootstrap_multiaddr.is_some() {
+        extra_vars.add_variable(
+            "genesis_multiaddr",
+            &bootstrap_multiaddr.ok_or_else(|| Error::GenesisMultiAddrNotSupplied)?,
+        );
+    }
+
+    extra_vars.add_variable("node_instance_count", &node_instance_count.to_string());
+    if let Some(log_format) = options.log_format {
+        extra_vars.add_variable("log_format", log_format.as_str());
+    }
+    extra_vars.add_variable(
+        "max_archived_log_files",
+        &options.max_archived_log_files.to_string(),
+    );
+    extra_vars.add_variable("max_log_files", &options.max_log_files.to_string());
+    if options.public_rpc {
+        extra_vars.add_variable("public_rpc", "true");
+    }
+
+    if let Some(nat_gateway) = &options.nat_gateway {
+        extra_vars.add_variable(
+            "nat_gateway_private_ip_eth1",
+            &nat_gateway.private_ip_addr.to_string(),
+        );
+        extra_vars.add_variable("make_vm_private", "true");
+    } else if matches!(node_type, NodeType::Private) {
+        return Err(Error::NatGatewayNotSupplied);
+    }
+
+    extra_vars.add_node_url_or_version(&options.name, &options.binary_option);
+    extra_vars.add_node_manager_url(&options.name, &options.binary_option);
+    extra_vars.add_node_manager_daemon_url(&options.name, &options.binary_option);
+
+    if let Some(env_vars) = &options.env_variables {
+        extra_vars.add_env_variable_list("env_variables", env_vars.clone());
+    }
+
+    if let Some((logstash_stack_name, logstash_hosts)) = &options.logstash_details {
+        extra_vars.add_variable("logstash_stack_name", logstash_stack_name);
+        extra_vars.add_list_variable(
+            "logstash_hosts",
+            logstash_hosts
+                .iter()
+                .map(|s| s.to_string())
+                .collect::<Vec<String>>(),
+        );
+    }
+
+    Ok(extra_vars.build())
+}
+
+pub fn build_faucet_extra_vars_doc(
+    cloud_provider: &str,
+    options: &ProvisionOptions,
+    genesis_multiaddr: &str,
+    stop: bool,
+) -> Result<String> {
+    let mut extra_vars = ExtraVarsDocBuilder::default();
+    extra_vars.add_variable("provider", cloud_provider);
+    extra_vars.add_variable("testnet_name", &options.name);
+    extra_vars.add_variable("genesis_multiaddr", genesis_multiaddr);
+    if stop {
+        extra_vars.add_variable("action", "stop");
+    } else {
+        extra_vars.add_variable("action", "start");
+    }
+    extra_vars.add_node_manager_url(&options.name, &options.binary_option);
+    extra_vars.add_faucet_url_or_version(&options.name, &options.binary_option)?;
+    Ok(extra_vars.build())
+}
+
+pub fn build_safenode_rpc_client_extra_vars_doc(
+    cloud_provider: &str,
+    options: &ProvisionOptions,
+    genesis_multiaddr: &str,
+) -> Result<String> {
+    let mut extra_vars = ExtraVarsDocBuilder::default();
+    extra_vars.add_variable("provider", cloud_provider);
+    extra_vars.add_variable("testnet_name", &options.name);
+    extra_vars.add_variable("genesis_multiaddr", genesis_multiaddr);
+    extra_vars.add_rpc_client_url_or_version(&options.name, &options.binary_option);
+    Ok(extra_vars.build())
+}
+
+pub fn build_sn_auditor_extra_vars_doc(
+    cloud_provider: &str,
+    options: &ProvisionOptions,
+    genesis_multiaddr: &str,
+) -> Result<String> {
+    let mut extra_vars: ExtraVarsDocBuilder = ExtraVarsDocBuilder::default();
+    extra_vars.add_variable("provider", cloud_provider);
+    extra_vars.add_variable("testnet_name", &options.name);
+    extra_vars.add_variable("genesis_multiaddr", genesis_multiaddr);
+    extra_vars.add_variable(
+        "beta_encryption_key",
+        options
+            .beta_encryption_key
+            .as_ref()
+            .unwrap_or(&DEFAULT_BETA_ENCRYPTION_KEY.to_string()),
+    );
+    extra_vars.add_node_manager_url(&options.name, &options.binary_option);
+    extra_vars.add_sn_auditor_url_or_version(&options.name, &options.binary_option)?;
+    Ok(extra_vars.build())
+}
+
+pub fn build_uploaders_extra_vars_doc(
+    cloud_provider: &str,
+    options: &ProvisionOptions,
+    genesis_multiaddr: &str,
+    genesis_ip: &IpAddr,
+) -> Result<String> {
+    let faucet_address = format!("{genesis_ip}:8000");
+    let mut extra_vars: ExtraVarsDocBuilder = ExtraVarsDocBuilder::default();
+    extra_vars.add_variable("provider", cloud_provider);
+    extra_vars.add_variable("testnet_name", &options.name);
+    extra_vars.add_variable("genesis_multiaddr", genesis_multiaddr);
+    extra_vars.add_variable("faucet_address", &faucet_address);
+    extra_vars.add_variable(
+        "safe_downloader_instances",
+        &options.downloaders_count.to_string(),
+    );
+    extra_vars.add_safe_url_or_version(
+        &options.name,
+        &options.binary_option,
+        options.safe_version.clone(),
+    )?;
+    extra_vars.add_variable(
+        "safe_uploader_instances",
+        &options.uploaders_count.unwrap_or(1).to_string(),
+    );
+    Ok(extra_vars.build())
+}
+
+pub fn build_binaries_extra_vars_doc(options: &ProvisionOptions) -> Result<String> {
+    let mut extra_vars = ExtraVarsDocBuilder::default();
+    extra_vars.add_build_variables(&options.name, &options.binary_option);
+    if let Some(chunk_size) = options.chunk_size {
+        extra_vars.add_variable("chunk_size", &chunk_size.to_string());
+    }
+    Ok(extra_vars.build())
+}
+
+pub fn build_node_telegraf_upgrade(name: &str, node_type: &NodeType) -> Result<String> {
+    let mut extra_vars: ExtraVarsDocBuilder = ExtraVarsDocBuilder::default();
+    extra_vars.add_variable("testnet_name", name);
+    extra_vars.add_variable("node_type", node_type.telegraph_role());
+    Ok(extra_vars.build())
+}
+
+pub fn build_uploader_telegraf_upgrade(name: &str) -> Result<String> {
+    let mut extra_vars: ExtraVarsDocBuilder = ExtraVarsDocBuilder::default();
+    extra_vars.add_variable("testnet_name", name);
+    Ok(extra_vars.build())
 }
