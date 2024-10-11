@@ -79,6 +79,7 @@
       - "--owner=maidsafe"
       - "--peer={{ genesis_multiaddr }}"
       - "--rpc-address={{ node_rpc_ip }}"
+      - "--rewards-address={{ rewards_address }}"
       - "--max-archived-log-files={{ max_archived_log_files }}"
       - "--max-log-files={{ max_log_files }}"
       - "{{ ('--node-ip=' + private_ip_eth1.stdout) if make_vm_private else omit }}"
@@ -90,6 +91,10 @@
       - "{{ ('--log-format=' + log_format) if log_format is defined else omit }}"
       - "{{ ('--env=' + env_variables) if env_variables is defined else omit }}"
       - "{{ ('--version=' + version) if version is defined else ('--url=' + node_archive_url) }}"
+      - "{{ evm_network_type }}"
+      - "{{ ('--rpc-url=' + evm_rpc_url) if evm_network_type == 'evm-custom' else omit }}"
+      - "{{ ('--payment-token-address=' + evm_payment_token_address) if evm_network_type == 'evm-custom' else omit }}"
+      - "{{ ('--data-payments-address=' + evm_data_payments_address) if evm_network_type == 'evm-custom' else omit }}"
   when: nodes_to_add | default(0) | int > 0
 
 - name: start the node services

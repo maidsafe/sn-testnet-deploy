@@ -219,6 +219,7 @@ impl TestnetDeployer {
             private_node_count: desired_private_node_count,
             private_node_vms: Vec::new(),
             public_rpc: options.public_rpc,
+            rewards_address: options.current_inventory.environment_details.rewards_address.clone(),
             safe_version: options.safe_version.clone(),
             uploaders_count: options.desired_uploaders_count,
         };
@@ -261,7 +262,12 @@ impl TestnetDeployer {
             );
             match self
                 .ansible_provisioner
-                .provision_nodes(&provision_options, &initial_multiaddr, NodeType::Bootstrap)
+                .provision_nodes(
+                    &provision_options,
+                    &initial_multiaddr,
+                    NodeType::Bootstrap,
+                    None,
+                )
                 .await
             {
                 Ok(()) => {
@@ -284,7 +290,12 @@ impl TestnetDeployer {
             .print_ansible_run_banner(n, total, "Provision Normal Nodes");
         match self
             .ansible_provisioner
-            .provision_nodes(&provision_options, &initial_multiaddr, NodeType::Normal)
+            .provision_nodes(
+                &provision_options,
+                &initial_multiaddr,
+                NodeType::Normal,
+                None,
+            )
             .await
         {
             Ok(()) => {
@@ -334,7 +345,7 @@ impl TestnetDeployer {
                 .print_ansible_run_banner(n, total, "Provision Private Nodes");
             match self
                 .ansible_provisioner
-                .provision_private_nodes(&mut provision_options, &initial_multiaddr)
+                .provision_private_nodes(&mut provision_options, &initial_multiaddr, None)
                 .await
             {
                 Ok(()) => {

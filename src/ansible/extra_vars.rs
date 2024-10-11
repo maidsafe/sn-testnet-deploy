@@ -8,7 +8,7 @@ use crate::{
     ansible::provisioning::{ProvisionOptions, DEFAULT_BETA_ENCRYPTION_KEY},
     CloudProvider,
 };
-use crate::{BinaryOption, Error, Result};
+use crate::{BinaryOption, Error, EvmCustomTestnetData, Result};
 use std::collections::HashMap;
 use std::net::IpAddr;
 
@@ -367,6 +367,7 @@ pub fn build_node_extra_vars_doc(
     node_type: NodeType,
     bootstrap_multiaddr: Option<String>,
     node_instance_count: u16,
+    evm_testnet_data: Option<EvmCustomTestnetData>,
 ) -> Result<String> {
     let mut extra_vars = ExtraVarsDocBuilder::default();
     extra_vars.add_variable("provider", cloud_provider);
@@ -419,6 +420,17 @@ pub fn build_node_extra_vars_doc(
                 .map(|s| s.to_string())
                 .collect::<Vec<String>>(),
         );
+    }
+
+
+    extra_vars.add_variable("rewards_address", &options.rewards_address);
+    if let Some(evm_data) = evm_testnet_data {
+        extra_vars.add_variable("evm_network_type", "evm-custom");
+        extra_vars.add_variable("evm_rpc_url", &evm_data.rpc_url);
+        extra_vars.add_variable("evm_payment_token_address", &evm_data.payment_token_address);
+        extra_vars.add_variable("evm_data_payments_address", &evm_data.data_payments_address);
+    } else {
+        extra_vars.add_variable("evm_network_type", "evm-arbitrum-one");
     }
 
     Ok(extra_vars.build())

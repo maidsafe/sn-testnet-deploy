@@ -79,6 +79,14 @@ pub enum DeploymentType {
     New,
 }
 
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct EvmCustomTestnetData {
+    pub data_payments_address: String,
+    pub deployer_wallet_private_key: String,
+    pub payment_token_address: String,
+    pub rpc_url: String,
+}
+
 impl std::fmt::Display for DeploymentType {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
@@ -117,7 +125,7 @@ impl NodeType {
     }
 }
 
-#[derive(Clone, Debug, Default, Serialize, Deserialize)]
+#[derive(Clone, Debug, Default, Eq, Serialize, Deserialize, PartialEq)]
 pub enum EvmNetwork {
     #[default]
     ArbitrumOne,
@@ -147,9 +155,10 @@ impl std::str::FromStr for EvmNetwork {
 
 #[derive(Clone, Debug, Default, Serialize, Deserialize)]
 pub struct EnvironmentDetails {
-    pub environment_type: EnvironmentType,
     pub deployment_type: DeploymentType,
+    pub environment_type: EnvironmentType,
     pub evm_network: EvmNetwork,
+    pub rewards_address: String,
 }
 
 #[derive(Clone, Debug, Default, Serialize, Deserialize)]
@@ -802,6 +811,41 @@ pub async fn get_genesis_multiaddr(
     Ok((multiaddr, genesis_ip))
 }
 
+pub async fn get_evm_testnet_data(
+    ansible_runner: &AnsibleRunner,
+    ssh_client: &SshClient,
+) -> Result<EvmCustomTestnetData> {
+    let evm_inventory = ansible_runner
+        .get_inventory(AnsibleInventoryType::EvmNodes, true)
+        .await?;
+    if evm_inventory.is_empty() {
+        return Err(Error::EvmNodeNotFound);
+    }
+
+    let evm_ip = evm_inventory[0].public_ip_addr;
+    let csv_file_path = "/home/safe/.local/share/safe/evm_testnet_data.csv";
+    let csv_contents = ssh_client
+        .run_command(&evm_ip, "safe", &format!("cat {}", csv_file_path), false)?
+        .first()
+        .cloned()
+        .ok_or_else(|| Error::EvmTestnetDataNotFound)?;
+
+    let parts: Vec<&str> = csv_contents.split(',').collect();
+    if parts.len() != 4 {
+        return Err(Error::EvmTestnetDataParsingError(
+            "Expected 4 fields in the CSV".to_string(),
+        ));
+    }
+
+    let evm_testnet_data = EvmCustomTestnetData {
+        rpc_url: parts[0].trim().to_string(),
+        payment_token_address: parts[1].trim().to_string(),
+        data_payments_address: parts[2].trim().to_string(),
+        deployer_wallet_private_key: parts[3].trim().to_string(),
+    };
+    Ok(evm_testnet_data)
+}
+
 pub async fn get_multiaddr(
     ansible_runner: &AnsibleRunner,
     ssh_client: &SshClient,
@@ -1136,6 +1180,7 @@ pub async fn get_environment_details(
                         environment_type,
                         deployment_type,
                         evm_network: EvmNetwork::ArbitrumOne,
+                        rewards_address: "".to_string(),
                     })
                 }
             }

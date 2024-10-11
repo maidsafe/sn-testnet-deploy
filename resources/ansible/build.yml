@@ -6,12 +6,7 @@
   roles:
     - {
         role: build_safe_network_binary,
-        bin_name: "faucet",
-        when: custom_bin == "true"
-      }
-    - {
-        role: build_safe_network_binary,
-        bin_name: "safe",
+        bin_name: "autonomi_cli",
         when: custom_bin == "true"
       }
     - {
@@ -32,10 +27,5 @@
     - {
         role: build_safe_network_binary,
         bin_name: "safenodemand",
-        when: custom_bin == "true"
-      }
-    - {
-        role: build_safe_network_binary,
-        bin_name: "sn_auditor",
         when: custom_bin == "true"
       }
