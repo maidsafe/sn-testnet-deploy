@@ -26,7 +26,9 @@ use std::{
 };
 use walkdir::WalkDir;
 
-const DEFAULT_BETA_ENCRYPTION_KEY: &str =
+use crate::ansible::extra_vars;
+
+pub const DEFAULT_BETA_ENCRYPTION_KEY: &str =
     "49113d2083f57a976076adbe85decb75115820de1e6e74b47e0429338cef124a";
 
 #[derive(Debug)]
@@ -37,7 +39,7 @@ pub enum NodeType {
 }
 
 impl NodeType {
-    fn telegraph_role(&self) -> &'static str {
+    pub fn telegraph_role(&self) -> &'static str {
         match self {
             NodeType::Bootstrap => "BOOTSTRAP_NODE",
             NodeType::Normal => "GENERIC_NODE",
@@ -156,7 +158,7 @@ impl AnsibleProvisioner {
             .wait_for_ssh_availability(&build_ip, &self.cloud_provider.get_ssh_user())?;
 
         println!("Running ansible against build VM...");
-        let extra_vars = self.build_binaries_extra_vars_doc(options)?;
+        let extra_vars = extra_vars::build_binaries_extra_vars_doc(options)?;
         self.ansible_runner.run_playbook(
             AnsiblePlaybook::Build,
             AnsibleInventoryType::Build,
@@ -280,7 +282,13 @@ impl AnsibleProvisioner {
         self.ansible_runner.run_playbook(
             AnsiblePlaybook::Genesis,
             AnsibleInventoryType::Genesis,
-            Some(self.build_node_extra_vars_doc(options, NodeType::Bootstrap, None, 1)?),
+            Some(extra_vars::build_node_extra_vars_doc(
+                &self.cloud_provider.to_string(),
+                options,
+                NodeType::Bootstrap,
+                None,
+                1,
+            )?),
         )?;
         print_duration(start.elapsed());
         Ok(())
@@ -309,7 +317,7 @@ impl AnsibleProvisioner {
         self.ansible_runner.run_playbook(
             AnsiblePlaybook::NatGateway,
             AnsibleInventoryType::NatGateway,
-            Some(self.build_nat_gateway_extra_vars_doc(&options.name, private_ips)),
+            Some(extra_vars::build_nat_gateway_extra_vars_doc(&options.name, private_ips)),
         )?;
 
         print_duration(start.elapsed());
@@ -363,7 +371,8 @@ impl AnsibleProvisioner {
         self.ansible_runner.run_playbook(
             AnsiblePlaybook::Nodes,
             inventory_type,
-            Some(self.build_node_extra_vars_doc(
+            Some(extra_vars::build_node_extra_vars_doc(
+                &self.cloud_provider.to_string(),
                 options,
                 node_type,
                 Some(initial_contact_peer.to_string()),
@@ -423,7 +432,12 @@ impl AnsibleProvisioner {
         self.ansible_runner.run_playbook(
             AnsiblePlaybook::Faucet,
             AnsibleInventoryType::Genesis,
-            Some(self.build_faucet_extra_vars_doc(options, genesis_multiaddr, false)?),
+            Some(extra_vars::build_faucet_extra_vars_doc(
+                &self.cloud_provider.to_string(),
+                options,
+                genesis_multiaddr,
+                false,
+            )?),
         )?;
         print_duration(start.elapsed());
         Ok(())
@@ -440,7 +454,12 @@ impl AnsibleProvisioner {
         self.ansible_runner.run_playbook(
             AnsiblePlaybook::Faucet,
             AnsibleInventoryType::Genesis,
-            Some(self.build_faucet_extra_vars_doc(options, genesis_multiaddr, true)?),
+            Some(extra_vars::build_faucet_extra_vars_doc(
+                &self.cloud_provider.to_string(),
+                options,
+                genesis_multiaddr,
+                true,
+            )?),
         )?;
         print_duration(start.elapsed());
         Ok(())
@@ -456,7 +475,11 @@ impl AnsibleProvisioner {
         self.ansible_runner.run_playbook(
             AnsiblePlaybook::RpcClient,
             AnsibleInventoryType::Genesis,
-            Some(self.build_safenode_rpc_client_extra_vars_doc(options, genesis_multiaddr)?),
+            Some(extra_vars::build_safenode_rpc_client_extra_vars_doc(
+                &self.cloud_provider.to_string(),
+                options,
+                genesis_multiaddr,
+            )?),
         )?;
         print_duration(start.elapsed());
         Ok(())
@@ -472,7 +495,11 @@ impl AnsibleProvisioner {
         self.ansible_runner.run_playbook(
             AnsiblePlaybook::Auditor,
             AnsibleInventoryType::Auditor,
-            Some(self.build_sn_auditor_extra_vars_doc(options, genesis_multiaddr)?),
+            Some(extra_vars::build_sn_auditor_extra_vars_doc(
+                &self.cloud_provider.to_string(),
+                options,
+                genesis_multiaddr,
+            )?),
         )?;
         print_duration(start.elapsed());
         Ok(())
@@ -489,7 +516,12 @@ impl AnsibleProvisioner {
         self.ansible_runner.run_playbook(
             AnsiblePlaybook::Uploaders,
             AnsibleInventoryType::Uploaders,
-            Some(self.build_uploaders_extra_vars_doc(options, genesis_multiaddr, genesis_ip)?),
+            Some(extra_vars::build_uploaders_extra_vars_doc(
+                &self.cloud_provider.to_string(),
+                options,
+                genesis_multiaddr,
+                genesis_ip,
+            )?),
         )?;
         print_duration(start.elapsed());
         Ok(())
@@ -575,18 +607,18 @@ impl AnsibleProvisioner {
         self.ansible_runner.run_playbook(
             AnsiblePlaybook::UpgradeNodeTelegrafConfig,
             AnsibleInventoryType::BootstrapNodes,
-            Some(self.build_node_telegraf_upgrade(name, &NodeType::Bootstrap)?),
+            Some(extra_vars::build_node_telegraf_upgrade(name, &NodeType::Bootstrap)?),
         )?;
         self.ansible_runner.run_playbook(
             AnsiblePlaybook::UpgradeNodeTelegrafConfig,
             AnsibleInventoryType::Nodes,
-            Some(self.build_node_telegraf_upgrade(name, &NodeType::Normal)?),
+            Some(extra_vars::build_node_telegraf_upgrade(name, &NodeType::Normal)?),
         )?;
 
         self.ansible_runner.run_playbook(
             AnsiblePlaybook::UpgradeNodeTelegrafConfig,
             AnsibleInventoryType::PrivateNodes,
-            Some(self.build_node_telegraf_upgrade(name, &NodeType::Private)?),
+            Some(extra_vars::build_node_telegraf_upgrade(name, &NodeType::Private)?),
         )?;
         Ok(())
     }
@@ -595,7 +627,7 @@ impl AnsibleProvisioner {
         self.ansible_runner.run_playbook(
             AnsiblePlaybook::UpgradeUploaderTelegrafConfig,
             AnsibleInventoryType::Uploaders,
-            Some(self.build_uploader_telegraf_upgrade(name)?),
+            Some(extra_vars::build_uploader_telegraf_upgrade(name)?),
         )?;
         Ok(())
     }
@@ -713,181 +745,5 @@ impl AnsibleProvisioner {
         let ansible_run_msg = format!("Ansible Run {} of {}: ", n, total);
         let line = "=".repeat(s.len() + ansible_run_msg.len());
         println!("{}\n{}{}\n{}", line, ansible_run_msg, s, line);
-    }
-
-    fn build_nat_gateway_extra_vars_doc(&self, name: &str, private_ips: Vec<String>) -> String {
-        let mut extra_vars = ExtraVarsDocBuilder::default();
-        extra_vars.add_variable("testnet_name", name);
-        extra_vars.add_list_variable("node_private_ips_eth1", private_ips);
-        extra_vars.build()
-    }
-
-    fn build_node_extra_vars_doc(
-        &self,
-        options: &ProvisionOptions,
-        node_type: NodeType,
-        bootstrap_multiaddr: Option<String>,
-        node_instance_count: u16,
-    ) -> Result<String> {
-        let mut extra_vars = ExtraVarsDocBuilder::default();
-        extra_vars.add_variable("provider", &self.cloud_provider.to_string());
-        extra_vars.add_variable("testnet_name", &options.name);
-        extra_vars.add_variable("node_type", node_type.telegraph_role());
-        if bootstrap_multiaddr.is_some() {
-            extra_vars.add_variable(
-                "genesis_multiaddr",
-                &bootstrap_multiaddr.ok_or_else(|| Error::GenesisMultiAddrNotSupplied)?,
-            );
-        }
-
-        extra_vars.add_variable("node_instance_count", &node_instance_count.to_string());
-        if let Some(log_format) = options.log_format {
-            extra_vars.add_variable("log_format", log_format.as_str());
-        }
-        extra_vars.add_variable(
-            "max_archived_log_files",
-            &options.max_archived_log_files.to_string(),
-        );
-        extra_vars.add_variable("max_log_files", &options.max_log_files.to_string());
-        if options.public_rpc {
-            extra_vars.add_variable("public_rpc", "true");
-        }
-
-        if let Some(nat_gateway) = &options.nat_gateway {
-            extra_vars.add_variable(
-                "nat_gateway_private_ip_eth1",
-                &nat_gateway.private_ip_addr.to_string(),
-            );
-            extra_vars.add_variable("make_vm_private", "true");
-        } else if matches!(node_type, NodeType::Private) {
-            return Err(Error::NatGatewayNotSupplied);
-        }
-
-        extra_vars.add_node_url_or_version(&options.name, &options.binary_option);
-        extra_vars.add_node_manager_url(&options.name, &options.binary_option);
-        extra_vars.add_node_manager_daemon_url(&options.name, &options.binary_option);
-
-        if let Some(env_vars) = &options.env_variables {
-            extra_vars.add_env_variable_list("env_variables", env_vars.clone());
-        }
-
-        if let Some((logstash_stack_name, logstash_hosts)) = &options.logstash_details {
-            extra_vars.add_variable("logstash_stack_name", logstash_stack_name);
-            extra_vars.add_list_variable(
-                "logstash_hosts",
-                logstash_hosts
-                    .iter()
-                    .map(|s| s.to_string())
-                    .collect::<Vec<String>>(),
-            );
-        }
-
-        Ok(extra_vars.build())
-    }
-
-    /// If the `stop` flag is set to true, the playbook will stop the faucet service.
-    /// Otherwise, it will start the faucet service.
-    fn build_faucet_extra_vars_doc(
-        &self,
-        options: &ProvisionOptions,
-        genesis_multiaddr: &str,
-        stop: bool,
-    ) -> Result<String> {
-        let mut extra_vars = ExtraVarsDocBuilder::default();
-        extra_vars.add_variable("provider", &self.cloud_provider.to_string());
-        extra_vars.add_variable("testnet_name", &options.name);
-        extra_vars.add_variable("genesis_multiaddr", genesis_multiaddr);
-        if stop {
-            extra_vars.add_variable("action", "stop");
-        } else {
-            extra_vars.add_variable("action", "start");
-        }
-        extra_vars.add_node_manager_url(&options.name, &options.binary_option);
-        extra_vars.add_faucet_url_or_version(&options.name, &options.binary_option)?;
-        Ok(extra_vars.build())
-    }
-
-    fn build_safenode_rpc_client_extra_vars_doc(
-        &self,
-        options: &ProvisionOptions,
-        genesis_multiaddr: &str,
-    ) -> Result<String> {
-        let mut extra_vars = ExtraVarsDocBuilder::default();
-        extra_vars.add_variable("provider", &self.cloud_provider.to_string());
-        extra_vars.add_variable("testnet_name", &options.name);
-        extra_vars.add_variable("genesis_multiaddr", genesis_multiaddr);
-        extra_vars.add_rpc_client_url_or_version(&options.name, &options.binary_option);
-        Ok(extra_vars.build())
-    }
-
-    fn build_sn_auditor_extra_vars_doc(
-        &self,
-        options: &ProvisionOptions,
-        genesis_multiaddr: &str,
-    ) -> Result<String> {
-        let mut extra_vars: ExtraVarsDocBuilder = ExtraVarsDocBuilder::default();
-        extra_vars.add_variable("provider", &self.cloud_provider.to_string());
-        extra_vars.add_variable("testnet_name", &options.name);
-        extra_vars.add_variable("genesis_multiaddr", genesis_multiaddr);
-        extra_vars.add_variable(
-            "beta_encryption_key",
-            options
-                .beta_encryption_key
-                .as_ref()
-                .unwrap_or(&DEFAULT_BETA_ENCRYPTION_KEY.to_string()),
-        );
-        extra_vars.add_node_manager_url(&options.name, &options.binary_option);
-        extra_vars.add_sn_auditor_url_or_version(&options.name, &options.binary_option)?;
-        Ok(extra_vars.build())
-    }
-
-    fn build_uploaders_extra_vars_doc(
-        &self,
-        options: &ProvisionOptions,
-        genesis_multiaddr: &str,
-        genesis_ip: &IpAddr,
-    ) -> Result<String> {
-        let faucet_address = format!("{genesis_ip}:8000");
-        let mut extra_vars: ExtraVarsDocBuilder = ExtraVarsDocBuilder::default();
-        extra_vars.add_variable("provider", &self.cloud_provider.to_string());
-        extra_vars.add_variable("testnet_name", &options.name);
-        extra_vars.add_variable("genesis_multiaddr", genesis_multiaddr);
-        extra_vars.add_variable("faucet_address", &faucet_address);
-        extra_vars.add_variable(
-            "safe_downloader_instances",
-            &options.downloaders_count.to_string(),
-        );
-        extra_vars.add_safe_url_or_version(
-            &options.name,
-            &options.binary_option,
-            options.safe_version.clone(),
-        )?;
-        extra_vars.add_variable(
-            "safe_uploader_instances",
-            &options.uploaders_count.unwrap_or(1).to_string(),
-        );
-        Ok(extra_vars.build())
-    }
-
-    fn build_binaries_extra_vars_doc(&self, options: &ProvisionOptions) -> Result<String> {
-        let mut extra_vars = ExtraVarsDocBuilder::default();
-        extra_vars.add_build_variables(&options.name, &options.binary_option);
-        if let Some(chunk_size) = options.chunk_size {
-            extra_vars.add_variable("chunk_size", &chunk_size.to_string());
-        }
-        Ok(extra_vars.build())
-    }
-
-    fn build_node_telegraf_upgrade(&self, name: &str, node_type: &NodeType) -> Result<String> {
-        let mut extra_vars: ExtraVarsDocBuilder = ExtraVarsDocBuilder::default();
-        extra_vars.add_variable("testnet_name", name);
-        extra_vars.add_variable("node_type", node_type.telegraph_role());
-        Ok(extra_vars.build())
-    }
-
-    fn build_uploader_telegraf_upgrade(&self, name: &str) -> Result<String> {
-        let mut extra_vars: ExtraVarsDocBuilder = ExtraVarsDocBuilder::default();
-        extra_vars.add_variable("testnet_name", name);
-        Ok(extra_vars.build())
     }
 }
