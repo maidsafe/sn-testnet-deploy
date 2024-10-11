@@ -27,4 +27,4 @@
         when: provider == "aws"
       }
     - node-manager
-    - node
+    - genesis-node
