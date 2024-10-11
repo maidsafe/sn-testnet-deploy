@@ -7,13 +7,10 @@
 use std::path::PathBuf;
 
 use crate::{
-    ansible::{
-        inventory::AnsibleInventoryType,
-        provisioning::{NodeType, ProvisionOptions},
-    },
+    ansible::{inventory::AnsibleInventoryType, provisioning::ProvisionOptions},
     error::Result,
     write_environment_details, BinaryOption, DeploymentType, EnvironmentDetails, EnvironmentType,
-    LogFormat, TestnetDeployer,
+    LogFormat, NodeType, TestnetDeployer,
 };
 use colored::Colorize;
 

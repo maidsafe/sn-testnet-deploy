@@ -3,9 +3,10 @@
 //
 // This SAFE Network Software is licensed under the BSD-3-Clause license.
 // Please see the LICENSE file for more details.
+use crate::ansible::provisioning::{ProvisionOptions, DEFAULT_BETA_ENCRYPTION_KEY};
+use crate::NodeType;
 use crate::{BinaryOption, Error, Result};
 use std::collections::HashMap;
-use crate::ansible::provisioning::{DEFAULT_BETA_ENCRYPTION_KEY, ProvisionOptions, NodeType};
 use std::net::IpAddr;
 
 const NODE_S3_BUCKET_URL: &str = "https://sn-node.s3.eu-west-2.amazonaws.com";
