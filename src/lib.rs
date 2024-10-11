@@ -86,9 +86,21 @@ impl std::str::FromStr for DeploymentType {
     }
 }
 
+#[derive(Debug)]
 pub enum NodeType {
     Bootstrap,
     Normal,
+    Private,
+}
+
+impl NodeType {
+    pub fn telegraph_role(&self) -> &'static str {
+        match self {
+            NodeType::Bootstrap => "BOOTSTRAP_NODE",
+            NodeType::Normal => "GENERIC_NODE",
+            NodeType::Private => "NAT_RANDOMIZED_NODE",
+        }
+    }
 }
 
 #[derive(Clone, Debug, Default, Serialize, Deserialize)]

@@ -6,9 +6,10 @@
 
 use crate::{
     ansible::inventory::AnsibleInventoryType,
-    ansible::provisioning::{NodeType, ProvisionOptions},
+    ansible::provisioning::ProvisionOptions,
     error::{Error, Result},
-    get_genesis_multiaddr, get_multiaddr, DeploymentInventory, DeploymentType, TestnetDeployer,
+    get_genesis_multiaddr, get_multiaddr, DeploymentInventory, DeploymentType, NodeType,
+    TestnetDeployer,
 };
 use colored::Colorize;
 use log::debug;

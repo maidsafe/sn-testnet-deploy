@@ -5,13 +5,10 @@
 // Please see the LICENSE file for more details.
 
 use crate::{
-    ansible::{
-        inventory::AnsibleInventoryType,
-        provisioning::{NodeType, ProvisionOptions},
-    },
+    ansible::{inventory::AnsibleInventoryType, provisioning::ProvisionOptions},
     error::Result,
     get_genesis_multiaddr, write_environment_details, BinaryOption, DeploymentInventory,
-    DeploymentType, EnvironmentDetails, EnvironmentType, LogFormat, TestnetDeployer,
+    DeploymentType, EnvironmentDetails, EnvironmentType, LogFormat, NodeType, TestnetDeployer,
 };
 use colored::Colorize;
 use std::{net::SocketAddr, path::PathBuf};

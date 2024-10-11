@@ -14,7 +14,7 @@ use crate::{
     deploy::DeployOptions,
     error::{Error, Result},
     inventory::{DeploymentNodeRegistries, VirtualMachine},
-    print_duration, BinaryOption, CloudProvider, LogFormat, SshClient, UpgradeOptions,
+    print_duration, BinaryOption, CloudProvider, LogFormat, NodeType, SshClient, UpgradeOptions,
 };
 use log::{debug, error, trace};
 use semver::Version;
@@ -30,23 +30,6 @@ use crate::ansible::extra_vars;
 
 pub const DEFAULT_BETA_ENCRYPTION_KEY: &str =
     "49113d2083f57a976076adbe85decb75115820de1e6e74b47e0429338cef124a";
-
-#[derive(Debug)]
-pub enum NodeType {
-    Bootstrap,
-    Normal,
-    Private,
-}
-
-impl NodeType {
-    pub fn telegraph_role(&self) -> &'static str {
-        match self {
-            NodeType::Bootstrap => "BOOTSTRAP_NODE",
-            NodeType::Normal => "GENERIC_NODE",
-            NodeType::Private => "NAT_RANDOMIZED_NODE",
-        }
-    }
-}
 
 #[derive(Clone)]
 pub struct ProvisionOptions {
@@ -317,7 +300,10 @@ impl AnsibleProvisioner {
         self.ansible_runner.run_playbook(
             AnsiblePlaybook::NatGateway,
             AnsibleInventoryType::NatGateway,
-            Some(extra_vars::build_nat_gateway_extra_vars_doc(&options.name, private_ips)),
+            Some(extra_vars::build_nat_gateway_extra_vars_doc(
+                &options.name,
+                private_ips,
+            )),
         )?;
 
         print_duration(start.elapsed());
@@ -607,18 +593,27 @@ impl AnsibleProvisioner {
         self.ansible_runner.run_playbook(
             AnsiblePlaybook::UpgradeNodeTelegrafConfig,
             AnsibleInventoryType::BootstrapNodes,
-            Some(extra_vars::build_node_telegraf_upgrade(name, &NodeType::Bootstrap)?),
+            Some(extra_vars::build_node_telegraf_upgrade(
+                name,
+                &NodeType::Bootstrap,
+            )?),
         )?;
         self.ansible_runner.run_playbook(
             AnsiblePlaybook::UpgradeNodeTelegrafConfig,
             AnsibleInventoryType::Nodes,
-            Some(extra_vars::build_node_telegraf_upgrade(name, &NodeType::Normal)?),
+            Some(extra_vars::build_node_telegraf_upgrade(
+                name,
+                &NodeType::Normal,
+            )?),
         )?;
 
         self.ansible_runner.run_playbook(
             AnsiblePlaybook::UpgradeNodeTelegrafConfig,
             AnsibleInventoryType::PrivateNodes,
-            Some(extra_vars::build_node_telegraf_upgrade(name, &NodeType::Private)?),
+            Some(extra_vars::build_node_telegraf_upgrade(
+                name,
+                &NodeType::Private,
+            )?),
         )?;
         Ok(())
     }
