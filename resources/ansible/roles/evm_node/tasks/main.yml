@@ -1,0 +1,55 @@
+---
+- name: install foundry
+  ansible.builtin.shell: |
+    curl -L https://foundry.paradigm.xyz | bash
+    ~/.foundry/bin/foundryup
+  args:
+    executable: /bin/bash
+    creates: "{{ ansible_env.HOME }}/.foundry"
+
+- name: copy foundry binaries to /usr/local/bin
+  ansible.builtin.shell: >
+    cp ~/.foundry/bin/* /usr/local/bin
+  args:
+    executable: /bin/bash
+    creates: /usr/local/bin/anvil
+
+- name: check if evm_testnet binary exists
+  ansible.builtin.stat:
+    path: "/usr/local/bin/evm_testnet"
+  register: evm_testnet_binary
+
+- name: clone safe_network repo
+  ansible.builtin.git:
+    repo: https://github.com/{{ org }}/safe_network
+    version: "{{ branch }}"
+    dest: "{{ ansible_env.HOME }}/safe_network"
+
+- name: "build {{ bin_name }} binary"
+  ansible.builtin.shell: |
+    source $HOME/.cargo/env
+    cargo build --release --bin {{bin_name}}
+  args:
+    chdir: "{{ ansible_env.HOME }}/safe_network"
+    creates: "{{ ansible_env.HOME }}/safe_network/target/release/{{bin_name}}"
+    executable: /bin/bash
+
+- name: copy binary to /usr/local/bin
+  ansible.builtin.command:
+    chdir: "{{ ansible_env.HOME }}/safe_network/target/release"
+    cmd: cp {{bin_name}} /usr/local/bin
+
+- name: create systemd service file
+  ansible.builtin.template:
+    src: evm_node.service.j2
+    dest: "/etc/systemd/system/evm_node.service"
+    owner: root
+    group: root
+    mode: '0644'
+  when: not evm_testnet_binary.stat.exists
+
+- name: start and enable evm_testnet service
+  ansible.builtin.systemd:
+    name: evm_node
+    state: started
+    enabled: yes

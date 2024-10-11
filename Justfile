@@ -8,6 +8,17 @@ build-rust-build-image:
     packer build build.pkr.hcl
   )
 
+build-evm-node-image:
+  #!/usr/bin/env bash
+  (
+    cd resources/packer/build
+    packer init .
+    packer build \
+      -var 'size=s-4vcpu-8gb' \
+      -var 'snapshot_name=evm-node' \
+      build.pkr.hcl
+  )
+
 build-staging-bootstrap-image:
   #!/usr/bin/env bash
   (

@@ -72,6 +72,10 @@ pub enum AnsiblePlaybook {
     ///
     /// Use in combination with `AnsibleInventoryType::Genesis` or `AnsibleInventoryType::Nodes`.
     CopyLogs,
+    /// The EVM node playbook will setup and manage EVM nodes for the deployment.
+    ///
+    /// Use in combination with `AnsibleInventoryType::EvmNodes`.
+    EvmNodes,
     /// The faucet playbook will provision setup the faucet to run as a service. The faucet is
     /// typically running on the genesis node.
     ///
@@ -170,9 +174,10 @@ impl AnsiblePlaybook {
             AnsiblePlaybook::CleanupLogs => "cleanup_logs.yml".to_string(),
             AnsiblePlaybook::ConfigureSwapfile => "configure_swapfile.yml".to_string(),
             AnsiblePlaybook::CopyLogs => "copy_logs.yml".to_string(),
-            AnsiblePlaybook::Genesis => "genesis_node.yml".to_string(),
+            AnsiblePlaybook::EvmNodes => "evm_nodes.yml".to_string(),
             AnsiblePlaybook::Faucet => "faucet.yml".to_string(),
             AnsiblePlaybook::FundUploaders => "fund_uploaders.yml".to_string(),
+            AnsiblePlaybook::Genesis => "genesis_node.yml".to_string(),
             AnsiblePlaybook::Logstash => "logstash.yml".to_string(),
             AnsiblePlaybook::NatGateway => "nat_gateway.yml".to_string(),
             AnsiblePlaybook::NodeManagerInventory => "node_manager_inventory.yml".to_string(),

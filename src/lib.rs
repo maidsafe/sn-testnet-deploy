@@ -56,6 +56,20 @@ use tar::Archive;
 
 const ANSIBLE_DEFAULT_FORKS: usize = 50;
 
+#[derive(Clone, Debug)]
+pub struct InfraRunOptions {
+    pub auditor_vm_count: Option<u16>,
+    pub bootstrap_node_vm_count: Option<u16>,
+    pub enable_build_vm: bool,
+    pub evm_node_count: Option<u16>,
+    pub genesis_vm_count: Option<u16>,
+    pub name: String,
+    pub node_vm_count: Option<u16>,
+    pub private_node_vm_count: Option<u16>,
+    pub tfvars_filename: String,
+    pub uploader_vm_count: Option<u16>,
+}
+
 #[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
 pub enum DeploymentType {
     /// The deployment has been bootstrapped from an existing network.
@@ -104,9 +118,38 @@ impl NodeType {
 }
 
 #[derive(Clone, Debug, Default, Serialize, Deserialize)]
+pub enum EvmNetwork {
+    #[default]
+    ArbitrumOne,
+    Custom,
+}
+
+impl std::fmt::Display for EvmNetwork {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            EvmNetwork::ArbitrumOne => write!(f, "arbitrum-one"),
+            EvmNetwork::Custom => write!(f, "custom"),
+        }
+    }
+}
+
+impl std::str::FromStr for EvmNetwork {
+    type Err = String;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s.to_lowercase().as_str() {
+            "arbitrum-one" => Ok(EvmNetwork::ArbitrumOne),
+            "custom" => Ok(EvmNetwork::Custom),
+            _ => Err(format!("Invalid EVM network type: {}", s)),
+        }
+    }
+}
+
+#[derive(Clone, Debug, Default, Serialize, Deserialize)]
 pub struct EnvironmentDetails {
     pub environment_type: EnvironmentType,
     pub deployment_type: DeploymentType,
+    pub evm_network: EvmNetwork,
 }
 
 #[derive(Clone, Debug, Default, Serialize, Deserialize)]
@@ -675,45 +718,31 @@ impl TestnetDeployer {
         Ok(())
     }
 
-    #[allow(clippy::too_many_arguments)]
-    async fn create_or_update_infra(
-        &self,
-        name: &str,
-        genesis_vm_count: Option<u16>,
-        auditor_vm_count: Option<u16>,
-        bootstrap_node_vm_count: Option<u16>,
-        node_vm_count: Option<u16>,
-        private_node_vm_count: Option<u16>,
-        uploader_vm_count: Option<u16>,
-        // TODO: enable_build_vm must be provided from options when called from other places.
-        // OR should we tear down the machine once used?
-        enable_build_vm: bool,
-        tfvars_filename: &str,
-    ) -> Result<()> {
+    async fn create_or_update_infra(&self, options: &InfraRunOptions) -> Result<()> {
         let start = Instant::now();
-        println!("Selecting {} workspace...", name);
-        self.terraform_runner.workspace_select(name)?;
+        println!("Selecting {} workspace...", options.name);
+        self.terraform_runner.workspace_select(&options.name)?;
 
         let mut args = Vec::new();
 
-        if let Some(auditor_vm_count) = auditor_vm_count {
+        if let Some(auditor_vm_count) = options.auditor_vm_count {
             args.push(("auditor_vm_count".to_string(), auditor_vm_count.to_string()));
         }
 
-        if let Some(genesis_vm_count) = genesis_vm_count {
+        if let Some(genesis_vm_count) = options.genesis_vm_count {
             args.push(("genesis_vm_count".to_string(), genesis_vm_count.to_string()));
         }
 
-        if let Some(bootstrap_node_vm_count) = bootstrap_node_vm_count {
+        if let Some(bootstrap_node_vm_count) = options.bootstrap_node_vm_count {
             args.push((
                 "bootstrap_node_vm_count".to_string(),
                 bootstrap_node_vm_count.to_string(),
             ));
         }
-        if let Some(node_vm_count) = node_vm_count {
+        if let Some(node_vm_count) = options.node_vm_count {
             args.push(("node_vm_count".to_string(), node_vm_count.to_string()));
         }
-        if let Some(private_node_vm_count) = private_node_vm_count {
+        if let Some(private_node_vm_count) = options.private_node_vm_count {
             args.push((
                 "private_node_vm_count".to_string(),
                 private_node_vm_count.to_string(),
@@ -724,17 +753,20 @@ impl TestnetDeployer {
             ));
         }
 
-        if let Some(uploader_vm_count) = uploader_vm_count {
+        if let Some(uploader_vm_count) = options.uploader_vm_count {
             args.push((
                 "uploader_vm_count".to_string(),
                 uploader_vm_count.to_string(),
             ));
         }
-        args.push(("use_custom_bin".to_string(), enable_build_vm.to_string()));
+        args.push((
+            "use_custom_bin".to_string(),
+            options.enable_build_vm.to_string(),
+        ));
 
         println!("Running terraform apply...");
         self.terraform_runner
-            .apply(args, Some(tfvars_filename.to_string()))?;
+            .apply(args, Some(options.tfvars_filename.clone()))?;
         print_duration(start.elapsed());
         Ok(())
     }
@@ -1049,63 +1081,69 @@ pub async fn get_environment_details(
         .download_object("sn-environment-type", environment_name, temp_file.path())
         .await
     {
-        Ok(_) => {}
-        Err(_) => {
-            return Err(Error::EnvironmentDetailsNotFound(
-                environment_name.to_string(),
-            ))
-        }
-    }
+        Ok(_) => {
+            let content = std::fs::read_to_string(temp_file.path())?;
+            match serde_json::from_str(&content) {
+                Ok(environment_details) => Ok(environment_details),
+                Err(_) => {
+                    let lines: Vec<&str> = content.lines().collect();
 
-    let content = std::fs::read_to_string(temp_file.path())?;
-    let lines: Vec<&str> = content.lines().collect();
+                    let environment_type = if lines.is_empty() {
+                        None
+                    } else {
+                        Some(lines[0].trim())
+                    };
 
-    let environment_type = if lines.is_empty() {
-        None
-    } else {
-        Some(lines[0].trim())
-    };
+                    let deployment_type = lines.get(1).map(|s| s.trim());
 
-    let deployment_type = lines.get(1).map(|s| s.trim());
+                    let environment_type = match environment_type.and_then(|s| s.parse().ok()) {
+                        Some(e) => {
+                            debug!("Parsed the environment type from the S3 file");
+                            e
+                        }
+                        None => {
+                            debug!("Could not parse the environment type from the S3 file");
+                            debug!(
+                                "Falling back to using the environment name ({environment_name})"
+                            );
+                            if environment_name.starts_with("DEV") {
+                                debug!("Using Development as the environment type");
+                                EnvironmentType::Development
+                            } else if environment_name.starts_with("STG") {
+                                debug!("Using Staging as the environment type");
+                                EnvironmentType::Staging
+                            } else if environment_name.starts_with("PROD") {
+                                debug!("Using Production as the environment type");
+                                EnvironmentType::Production
+                            } else {
+                                return Err(Error::EnvironmentNameFromStringError(
+                                    environment_name.to_string(),
+                                ));
+                            }
+                        }
+                    };
 
-    let environment_type = match environment_type.and_then(|s| s.parse().ok()) {
-        Some(e) => {
-            debug!("Parsed the environment type from the S3 file");
-            e
-        }
-        None => {
-            debug!("Could not parse the environment type from the S3 file");
-            debug!("Falling back to using the environment name ({environment_name})");
-            if environment_name.starts_with("DEV") {
-                debug!("Using Development as the environment type");
-                EnvironmentType::Development
-            } else if environment_name.starts_with("STG") {
-                debug!("Using Staging as the environment type");
-                EnvironmentType::Staging
-            } else if environment_name.starts_with("PROD") {
-                debug!("Using Production as the environment type");
-                EnvironmentType::Production
-            } else {
-                return Err(Error::EnvironmentNameFromStringError(
-                    environment_name.to_string(),
-                ));
+                    let deployment_type = match deployment_type.and_then(|s| s.parse().ok()) {
+                        Some(d) => d,
+                        None => {
+                            debug!("Could not parse the deployment type from the S3 file");
+                            debug!("Using New as the default");
+                            DeploymentType::New
+                        }
+                    };
+
+                    Ok(EnvironmentDetails {
+                        environment_type,
+                        deployment_type,
+                        evm_network: EvmNetwork::ArbitrumOne,
+                    })
+                }
             }
         }
-    };
-
-    let deployment_type = match deployment_type.and_then(|s| s.parse().ok()) {
-        Some(d) => d,
-        None => {
-            debug!("Could not parse the deployment type from the S3 file");
-            debug!("Using New as the default");
-            DeploymentType::New
-        }
-    };
-
-    Ok(EnvironmentDetails {
-        environment_type,
-        deployment_type,
-    })
+        Err(_) => Err(Error::EnvironmentDetailsNotFound(
+            environment_name.to_string(),
+        )),
+    }
 }
 
 pub async fn write_environment_details(
@@ -1116,11 +1154,8 @@ pub async fn write_environment_details(
     let temp_dir = tempfile::tempdir()?;
     let path = temp_dir.path().to_path_buf().join(environment_name);
     let mut file = File::create(&path)?;
-    let contents = format!(
-        "{}\n{}",
-        environment_details.environment_type, environment_details.deployment_type
-    );
-    file.write_all(contents.as_bytes())?;
+    let json = serde_json::to_string(environment_details)?;
+    file.write_all(json.as_bytes())?;
     s3_repository
         .upload_file("sn-environment-type", &path, true)
         .await?;

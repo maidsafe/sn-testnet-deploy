@@ -107,3 +107,16 @@ variable "use_custom_bin" {
   default     = false
   description = "A boolean to enable use of a custom bin"
 }
+
+variable "evm_node_vm_count" {
+  default     = 0
+  description = "The number of droplets to launch for EVM nodes"
+}
+
+variable "evm_node_droplet_size" {
+  description = "The size of the droplet for EVM node VMs"
+}
+
+variable "evm_node_droplet_image_id" {
+  description = "The ID of the EVM node droplet image. Varies per environment type."
+}

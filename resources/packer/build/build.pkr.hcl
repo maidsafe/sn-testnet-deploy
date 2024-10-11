@@ -33,6 +33,12 @@ variable "size" {
   description = "This is quite a powerful image but it means the build time will be fast"
 }
 
+variable "snapshot_name" {
+  type = string
+  default = "safe_network-build"
+  description = "The name of the snapshot that will be created"
+}
+
 variable "ssh_username" {
   type = string
   default = "root"
@@ -43,7 +49,7 @@ source "digitalocean" "build" {
   image         = var.droplet_image
   region        = var.region
   size          = var.size
-  snapshot_name = "safe_network-build-{{timestamp}}"
+  snapshot_name = "${var.snapshot_name}-{{timestamp}}"
   ssh_username  = var.ssh_username
 }
 
