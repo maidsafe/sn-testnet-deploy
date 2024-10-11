@@ -36,6 +36,8 @@ pub enum AnsibleInventoryType {
     Build,
     /// Provide a static list of VMs to connect to.
     Custom,
+    /// Use to run a playbook against all EVM nodes.
+    EvmNodes,
     /// Use to run a playbook against the genesis node.
     ///
     /// Only one machine will be returned in this inventory.
@@ -63,6 +65,7 @@ impl std::fmt::Display for AnsibleInventoryType {
             AnsibleInventoryType::BootstrapNodes => "BootstrapNodes",
             AnsibleInventoryType::Build => "Build",
             AnsibleInventoryType::Custom => "Custom",
+            AnsibleInventoryType::EvmNodes => "EvmNodes",
             AnsibleInventoryType::Genesis => "Genesis",
             AnsibleInventoryType::Logstash => "Logstash",
             AnsibleInventoryType::NatGateway => "NatGateway",
@@ -84,6 +87,7 @@ impl AnsibleInventoryType {
             }
             Self::Build => PathBuf::from(format!(".{name}_build_inventory_{provider}.yml")),
             Self::Custom => PathBuf::from(format!(".{name}_custom_inventory_{provider}.ini")),
+            Self::EvmNodes => PathBuf::from(format!(".{name}_evm_node_inventory_{provider}.yml")),
             Self::Genesis => PathBuf::from(format!(".{name}_genesis_inventory_{provider}.yml")),
             Self::Logstash => PathBuf::from(format!(".{name}_logstash_inventory_{provider}.yml")),
             Self::NatGateway => {
@@ -106,6 +110,7 @@ impl AnsibleInventoryType {
             Self::BootstrapNodes => "bootstrap_node",
             Self::Build => "build",
             Self::Custom => "custom",
+            Self::EvmNodes => "evm_node",
             Self::Genesis => "genesis",
             Self::Logstash => "logstash",
             Self::NatGateway => "nat_gateway",
@@ -122,6 +127,7 @@ impl AnsibleInventoryType {
             Self::BootstrapNodes,
             Self::Nodes,
             Self::PrivateNodes,
+            Self::EvmNodes,
         ]
         .into_iter()
     }
@@ -221,6 +227,7 @@ pub fn generate_environment_inventory(
         AnsibleInventoryType::Nodes,
         AnsibleInventoryType::PrivateNodes,
         AnsibleInventoryType::Uploaders,
+        AnsibleInventoryType::EvmNodes,
     ];
     for inventory_type in inventory_types.into_iter() {
         let src_path = base_inventory_path;
@@ -259,6 +266,7 @@ pub fn cleanup_environment_inventory(
         AnsibleInventoryType::PrivateNodes,
         AnsibleInventoryType::PrivateNodesStatic,
         AnsibleInventoryType::Uploaders,
+        AnsibleInventoryType::EvmNodes,
     ];
     let inventory_types = inventory_types
         .as_deref()

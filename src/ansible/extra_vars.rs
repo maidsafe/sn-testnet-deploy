@@ -3,8 +3,11 @@
 //
 // This SAFE Network Software is licensed under the BSD-3-Clause license.
 // Please see the LICENSE file for more details.
-use crate::ansible::provisioning::{ProvisionOptions, DEFAULT_BETA_ENCRYPTION_KEY};
 use crate::NodeType;
+use crate::{
+    ansible::provisioning::{ProvisionOptions, DEFAULT_BETA_ENCRYPTION_KEY},
+    CloudProvider,
+};
 use crate::{BinaryOption, Error, Result};
 use std::collections::HashMap;
 use std::net::IpAddr;
@@ -523,4 +526,11 @@ pub fn build_uploader_telegraf_upgrade(name: &str) -> Result<String> {
     let mut extra_vars: ExtraVarsDocBuilder = ExtraVarsDocBuilder::default();
     extra_vars.add_variable("testnet_name", name);
     Ok(extra_vars.build())
+}
+
+pub fn build_evm_nodes_extra_vars_doc(name: &str, cloud_provider: &CloudProvider) -> String {
+    let mut extra_vars = ExtraVarsDocBuilder::default();
+    extra_vars.add_variable("testnet_name", name);
+    extra_vars.add_variable("provider", &cloud_provider.to_string());
+    extra_vars.build()
 }

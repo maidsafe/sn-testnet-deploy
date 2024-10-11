@@ -25,7 +25,8 @@ use sn_testnet_deploy::{
     network_commands, notify_slack,
     setup::setup_dotenv_file,
     upscale::UpscaleOptions,
-    BinaryOption, CloudProvider, EnvironmentType, LogFormat, TestnetDeployBuilder, UpgradeOptions,
+    BinaryOption, CloudProvider, EnvironmentType, EvmNetwork, LogFormat, TestnetDeployBuilder,
+    UpgradeOptions,
 };
 use std::time::Duration;
 use std::{env, net::IpAddr};
@@ -282,6 +283,13 @@ enum Commands {
         /// Example: --env SN_LOG=all,RUST_LOG=libp2p=debug
         #[clap(name = "env", long, use_value_delimiter = true, value_parser = parse_environment_variables, verbatim_doc_comment)]
         env_variables: Option<Vec<(String, String)>>,
+        /// The EVM network type to use for the deployment.
+        ///
+        /// Possible values are 'arbitrum-one' or 'custom'.
+        ///
+        /// If not used, the default is 'arbitrum-one'.
+        #[clap(long, default_value = "arbitrum-one", value_parser = parse_evm_network)]
+        evm_network_type: EvmNetwork,
         /// Supply a version number to be used for the faucet binary.
         ///
         /// There should be no 'v' prefix.
@@ -1199,6 +1207,8 @@ async fn main() -> Result<()> {
                     bootstrap_peer,
                     environment_type: environment_type.clone(),
                     env_variables,
+                    // TODO: Should come from the previous deployment.
+                    evm_network: EvmNetwork::ArbitrumOne,
                     log_format,
                     name: name.clone(),
                     node_count: node_count.unwrap_or(environment_type.get_default_node_count()),
@@ -1241,6 +1251,7 @@ async fn main() -> Result<()> {
             downloaders_count,
             environment_type,
             env_variables,
+            evm_network_type,
             faucet_version,
             forks,
             foundation_pk,
@@ -1353,6 +1364,7 @@ async fn main() -> Result<()> {
                     downloaders_count,
                     environment_type: environment_type.clone(),
                     env_variables,
+                    evm_network: evm_network_type,
                     log_format,
                     logstash_details,
                     name: name.clone(),
@@ -2470,5 +2482,13 @@ fn validate_and_get_pks(
         )))
     } else {
         Ok(None)
+    }
+}
+
+fn parse_evm_network(s: &str) -> Result<EvmNetwork, String> {
+    match s.to_lowercase().as_str() {
+        "arbitrum-one" => Ok(EvmNetwork::ArbitrumOne),
+        "custom" => Ok(EvmNetwork::Custom),
+        _ => Err(format!("Invalid EVM network type: {}", s)),
     }
 }

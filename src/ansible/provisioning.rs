@@ -253,6 +253,30 @@ impl AnsibleProvisioner {
         Ok(deployment_registries)
     }
 
+    pub async fn provision_evm_nodes(&self, options: &ProvisionOptions) -> Result<()> {
+        let start = Instant::now();
+        println!("Obtaining IP address for EVM nodes...");
+        let evm_node_inventory = self
+            .ansible_runner
+            .get_inventory(AnsibleInventoryType::EvmNodes, true)
+            .await?;
+        let evm_node_ip = evm_node_inventory[0].public_ip_addr;
+        self.ssh_client
+            .wait_for_ssh_availability(&evm_node_ip, &self.cloud_provider.get_ssh_user())?;
+
+        println!("Running ansible against EVM nodes...");
+        self.ansible_runner.run_playbook(
+            AnsiblePlaybook::EvmNodes,
+            AnsibleInventoryType::EvmNodes,
+            Some(extra_vars::build_evm_nodes_extra_vars_doc(
+                &options.name,
+                &self.cloud_provider,
+            )),
+        )?;
+        print_duration(start.elapsed());
+        Ok(())
+    }
+
     pub async fn provision_genesis_node(&self, options: &ProvisionOptions) -> Result<()> {
         let start = Instant::now();
         let genesis_inventory = self

@@ -10,7 +10,7 @@ use crate::{
     ansible::{inventory::AnsibleInventoryType, provisioning::ProvisionOptions},
     error::Result,
     write_environment_details, BinaryOption, DeploymentType, EnvironmentDetails, EnvironmentType,
-    LogFormat, NodeType, TestnetDeployer,
+    EvmNetwork, InfraRunOptions, LogFormat, NodeType, TestnetDeployer,
 };
 use colored::Colorize;
 
@@ -20,6 +20,7 @@ pub struct BootstrapOptions {
     pub bootstrap_peer: String,
     pub environment_type: EnvironmentType,
     pub env_variables: Option<Vec<(String, String)>>,
+    pub evm_network: EvmNetwork,
     pub log_format: Option<LogFormat>,
     pub name: String,
     pub node_count: u16,
@@ -50,23 +51,25 @@ impl TestnetDeployer {
             &self.s3_repository,
             &options.name,
             &EnvironmentDetails {
-                environment_type: options.environment_type.clone(),
                 deployment_type: DeploymentType::Bootstrap,
+                environment_type: options.environment_type.clone(),
+                evm_network: options.evm_network.clone(),
             },
         )
         .await?;
 
-        self.create_or_update_infra(
-            &options.name,
-            Some(0),
-            Some(0),
-            Some(0),
-            options.node_vm_count,
-            options.private_node_vm_count,
-            Some(0),
-            build_custom_binaries,
-            &options.environment_type.get_tfvars_filename(),
-        )
+        self.create_or_update_infra(&InfraRunOptions {
+            auditor_vm_count: None,
+            bootstrap_node_vm_count: None,
+            enable_build_vm: build_custom_binaries,
+            evm_node_count: None,
+            genesis_vm_count: None,
+            name: options.name.clone(),
+            node_vm_count: options.node_vm_count,
+            private_node_vm_count: options.private_node_vm_count,
+            tfvars_filename: options.environment_type.get_tfvars_filename().to_string(),
+            uploader_vm_count: None,
+        })
         .await
         .map_err(|err| {
             println!("Failed to create infra {err:?}");

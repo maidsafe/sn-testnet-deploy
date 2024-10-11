@@ -8,7 +8,8 @@ use crate::{
     ansible::{inventory::AnsibleInventoryType, provisioning::ProvisionOptions},
     error::Result,
     get_genesis_multiaddr, write_environment_details, BinaryOption, DeploymentInventory,
-    DeploymentType, EnvironmentDetails, EnvironmentType, LogFormat, NodeType, TestnetDeployer,
+    DeploymentType, EnvironmentDetails, EnvironmentType, EvmNetwork, InfraRunOptions, LogFormat,
+    NodeType, TestnetDeployer,
 };
 use colored::Colorize;
 use std::{net::SocketAddr, path::PathBuf};
@@ -24,6 +25,7 @@ pub struct DeployOptions {
     pub downloaders_count: u16,
     pub environment_type: EnvironmentType,
     pub env_variables: Option<Vec<(String, String)>>,
+    pub evm_network: EvmNetwork,
     pub log_format: Option<LogFormat>,
     pub logstash_details: Option<(String, Vec<SocketAddr>)>,
     pub name: String,
@@ -52,23 +54,28 @@ impl TestnetDeployer {
             &self.s3_repository,
             &options.name,
             &EnvironmentDetails {
-                environment_type: options.environment_type.clone(),
                 deployment_type: DeploymentType::New,
+                environment_type: options.environment_type.clone(),
+                evm_network: options.evm_network.clone(),
             },
         )
         .await?;
 
-        self.create_or_update_infra(
-            &options.name,
-            Some(1),
-            None,
-            options.bootstrap_node_vm_count,
-            options.node_vm_count,
-            options.private_node_vm_count,
-            options.uploader_vm_count,
-            build_custom_binaries,
-            &options.environment_type.get_tfvars_filename(),
-        )
+        self.create_or_update_infra(&InfraRunOptions {
+            auditor_vm_count: Some(1),
+            bootstrap_node_vm_count: options.bootstrap_node_vm_count,
+            enable_build_vm: build_custom_binaries,
+            evm_node_count: match options.evm_network {
+                EvmNetwork::ArbitrumOne => Some(0),
+                EvmNetwork::Custom => Some(1),
+            },
+            genesis_vm_count: Some(1),
+            name: options.name.clone(),
+            node_vm_count: options.node_vm_count,
+            private_node_vm_count: options.private_node_vm_count,
+            tfvars_filename: options.environment_type.get_tfvars_filename(),
+            uploader_vm_count: options.uploader_vm_count,
+        })
         .await
         .map_err(|err| {
             println!("Failed to create infra {err:?}");
@@ -87,7 +94,10 @@ impl TestnetDeployer {
             total += 2;
         }
         if !options.current_inventory.is_empty() {
-            total -= 4;
+            total -= 5;
+        }
+        if matches!(options.evm_network, EvmNetwork::Custom) {
+            total += 1;
         }
 
         let mut provision_options = ProvisionOptions::from(options.clone());
@@ -99,6 +109,19 @@ impl TestnetDeployer {
                 .await
                 .map_err(|err| {
                     println!("Failed to build safe network binaries {err:?}");
+                    err
+                })?;
+            n += 1;
+        }
+
+        if matches!(options.evm_network, EvmNetwork::Custom) {
+            self.ansible_provisioner
+                .print_ansible_run_banner(n, total, "Provision EVM Node");
+            self.ansible_provisioner
+                .provision_evm_nodes(&provision_options)
+                .await
+                .map_err(|err| {
+                    println!("Failed to provision evm node {err:?}");
                     err
                 })?;
             n += 1;

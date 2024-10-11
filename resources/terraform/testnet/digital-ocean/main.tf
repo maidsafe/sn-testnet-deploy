@@ -90,3 +90,13 @@ resource "digitalocean_droplet" "uploader" {
   ssh_keys = var.droplet_ssh_keys
   tags     = ["environment:${terraform.workspace}", "type:uploader"]
 }
+
+resource "digitalocean_droplet" "evm_node" {
+  count    = var.evm_node_vm_count
+  image    = var.evm_node_droplet_image_id
+  name     = "${terraform.workspace}-evm-node-${count.index + 1}"
+  region   = var.region
+  size     = var.evm_node_droplet_size
+  ssh_keys = var.droplet_ssh_keys
+  tags     = ["environment:${terraform.workspace}", "type:evm_node"]
+}
