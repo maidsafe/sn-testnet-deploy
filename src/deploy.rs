@@ -51,18 +51,6 @@ impl TestnetDeployer {
             }
         };
 
-        write_environment_details(
-            &self.s3_repository,
-            &options.name,
-            &EnvironmentDetails {
-                deployment_type: DeploymentType::New,
-                environment_type: options.environment_type.clone(),
-                evm_network: options.evm_network.clone(),
-                rewards_address: options.rewards_address.clone(),
-            },
-        )
-        .await?;
-
         self.create_or_update_infra(&InfraRunOptions {
             auditor_vm_count: Some(1),
             bootstrap_node_vm_count: options.bootstrap_node_vm_count,
@@ -103,19 +91,6 @@ impl TestnetDeployer {
         }
 
         let mut provision_options = ProvisionOptions::from(options.clone());
-        if build_custom_binaries {
-            self.ansible_provisioner
-                .print_ansible_run_banner(n, total, "Build Custom Binaries");
-            self.ansible_provisioner
-                .build_safe_network_binaries(&provision_options)
-                .await
-                .map_err(|err| {
-                    println!("Failed to build safe network binaries {err:?}");
-                    err
-                })?;
-            n += 1;
-        }
-
         let evm_testnet_data = if options.evm_network == EvmNetwork::Custom {
             self.ansible_provisioner
                 .print_ansible_run_banner(n, total, "Provision EVM Node");
@@ -139,6 +114,32 @@ impl TestnetDeployer {
         } else {
             None
         };
+
+        write_environment_details(
+            &self.s3_repository,
+            &options.name,
+            &EnvironmentDetails {
+                deployment_type: DeploymentType::New,
+                environment_type: options.environment_type.clone(),
+                evm_network: options.evm_network.clone(),
+                rewards_address: options.rewards_address.clone(),
+                evm_testnet_data: evm_testnet_data.clone(),
+            },
+        )
+        .await?;
+
+        if build_custom_binaries {
+            self.ansible_provisioner
+                .print_ansible_run_banner(n, total, "Build Custom Binaries");
+            self.ansible_provisioner
+                .build_safe_network_binaries(&provision_options)
+                .await
+                .map_err(|err| {
+                    println!("Failed to build safe network binaries {err:?}");
+                    err
+                })?;
+            n += 1;
+        }
 
         self.ansible_provisioner
             .print_ansible_run_banner(n, total, "Provision Genesis Node");

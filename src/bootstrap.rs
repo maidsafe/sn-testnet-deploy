@@ -55,6 +55,7 @@ impl TestnetDeployer {
                 deployment_type: DeploymentType::Bootstrap,
                 environment_type: options.environment_type.clone(),
                 evm_network: options.evm_network.clone(),
+                evm_testnet_data: None,
                 rewards_address: options.rewards_address.clone(),
             },
         )

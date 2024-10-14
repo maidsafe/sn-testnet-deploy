@@ -159,6 +159,7 @@ pub struct EnvironmentDetails {
     pub deployment_type: DeploymentType,
     pub environment_type: EnvironmentType,
     pub evm_network: EvmNetwork,
+    pub evm_testnet_data: Option<EvmCustomTestnetData>,
     pub rewards_address: String,
 }
 
@@ -1201,6 +1202,7 @@ pub async fn get_environment_details(
                         deployment_type,
                         evm_network: EvmNetwork::ArbitrumOne,
                         rewards_address: "".to_string(),
+                        evm_testnet_data: None,
                     })
                 }
             }
