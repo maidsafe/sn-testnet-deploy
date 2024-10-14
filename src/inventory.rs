@@ -936,6 +936,22 @@ impl DeploymentInventory {
                 println!("{}: {}", file.0, file.1);
             }
         }
+
+        if let Some(evm_testnet_data) = &self.environment_details.evm_testnet_data {
+            println!("==================");
+            println!("Custom EVM Details");
+            println!("==================");
+            println!(
+                "EVM data payments address: {}",
+                evm_testnet_data.data_payments_address
+            );
+            println!(
+                "EVM payment token address: {}",
+                evm_testnet_data.payment_token_address
+            );
+            println!("EVM RPC URL: {}", evm_testnet_data.rpc_url);
+        }
+
         Ok(())
     }
 
