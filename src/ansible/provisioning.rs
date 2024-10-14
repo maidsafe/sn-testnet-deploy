@@ -14,17 +14,13 @@ use crate::{
     deploy::DeployOptions,
     error::{Error, Result},
     inventory::{DeploymentNodeRegistries, VirtualMachine},
-    print_duration, BinaryOption, CloudProvider, EvmCustomTestnetData, LogFormat, NodeType, SshClient,
-    UpgradeOptions,
+    print_duration, BinaryOption, CloudProvider, EvmCustomTestnetData, LogFormat, NodeType,
+    SshClient, UpgradeOptions,
 };
 use log::{debug, error, trace};
 use semver::Version;
 use sn_service_management::NodeRegistry;
-use std::{
-    net::{IpAddr, SocketAddr},
-    path::PathBuf,
-    time::Instant,
-};
+use std::{net::SocketAddr, path::PathBuf, time::Instant};
 use walkdir::WalkDir;
 
 use crate::ansible::extra_vars;
@@ -536,7 +532,7 @@ impl AnsibleProvisioner {
         &self,
         options: &ProvisionOptions,
         genesis_multiaddr: &str,
-        genesis_ip: &IpAddr,
+        evm_testnet_data: Option<EvmCustomTestnetData>,
     ) -> Result<()> {
         let start = Instant::now();
         println!("Running ansible against uploader machine to start the uploader script.");
@@ -547,7 +543,7 @@ impl AnsibleProvisioner {
                 &self.cloud_provider.to_string(),
                 options,
                 genesis_multiaddr,
-                genesis_ip,
+                evm_testnet_data,
             )?),
         )?;
         print_duration(start.elapsed());

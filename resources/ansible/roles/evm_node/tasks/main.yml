@@ -38,6 +38,7 @@
   ansible.builtin.command:
     chdir: "{{ ansible_env.HOME }}/safe_network/target/release"
     cmd: cp {{bin_name}} /usr/local/bin
+  when: not evm_testnet_binary.stat.exists
 
 - name: create systemd service file
   ansible.builtin.template:

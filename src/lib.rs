@@ -53,6 +53,7 @@ use std::{
     time::{Duration, Instant},
 };
 use tar::Archive;
+use tokio::time::{sleep, Duration as TokioDuration};
 
 const ANSIBLE_DEFAULT_FORKS: usize = 50;
 
@@ -824,26 +825,45 @@ pub async fn get_evm_testnet_data(
 
     let evm_ip = evm_inventory[0].public_ip_addr;
     let csv_file_path = "/home/safe/.local/share/safe/evm_testnet_data.csv";
-    let csv_contents = ssh_client
-        .run_command(&evm_ip, "safe", &format!("cat {}", csv_file_path), false)?
-        .first()
-        .cloned()
-        .ok_or_else(|| Error::EvmTestnetDataNotFound)?;
 
-    let parts: Vec<&str> = csv_contents.split(',').collect();
-    if parts.len() != 4 {
-        return Err(Error::EvmTestnetDataParsingError(
-            "Expected 4 fields in the CSV".to_string(),
-        ));
+    const MAX_ATTEMPTS: u8 = 5;
+    const RETRY_DELAY: TokioDuration = TokioDuration::from_secs(5);
+
+    for attempt in 1..=MAX_ATTEMPTS {
+        match ssh_client.run_command(&evm_ip, "safe", &format!("cat {}", csv_file_path), false) {
+            Ok(output) => {
+                if let Some(csv_contents) = output.first() {
+                    let parts: Vec<&str> = csv_contents.split(',').collect();
+                    if parts.len() != 4 {
+                        return Err(Error::EvmTestnetDataParsingError(
+                            "Expected 4 fields in the CSV".to_string(),
+                        ));
+                    }
+
+                    let evm_testnet_data = EvmCustomTestnetData {
+                        rpc_url: parts[0].trim().to_string(),
+                        payment_token_address: parts[1].trim().to_string(),
+                        data_payments_address: parts[2].trim().to_string(),
+                        deployer_wallet_private_key: parts[3].trim().to_string(),
+                    };
+                    return Ok(evm_testnet_data);
+                }
+            }
+            Err(e) => {
+                if attempt == MAX_ATTEMPTS {
+                    return Err(e);
+                }
+                println!(
+                    "Attempt {} failed to read EVM testnet data. Retrying in {} seconds...",
+                    attempt,
+                    RETRY_DELAY.as_secs()
+                );
+            }
+        }
+        sleep(RETRY_DELAY).await;
     }
 
-    let evm_testnet_data = EvmCustomTestnetData {
-        rpc_url: parts[0].trim().to_string(),
-        payment_token_address: parts[1].trim().to_string(),
-        data_payments_address: parts[2].trim().to_string(),
-        deployer_wallet_private_key: parts[3].trim().to_string(),
-    };
-    Ok(evm_testnet_data)
+    Err(Error::EvmTestnetDataNotFound)
 }
 
 pub async fn get_multiaddr(

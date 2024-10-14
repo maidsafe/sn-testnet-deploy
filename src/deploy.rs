@@ -91,7 +91,7 @@ impl TestnetDeployer {
             .unwrap_or(true);
 
         let mut n = 1;
-        let mut total = if build_custom_binaries { 6 } else { 5 };
+        let mut total = if build_custom_binaries { 5 } else { 4 };
         if should_provision_private_nodes {
             total += 2;
         }
@@ -235,7 +235,7 @@ impl TestnetDeployer {
                 .provision_private_nodes(
                     &mut provision_options,
                     &genesis_multiaddr,
-                    evm_testnet_data,
+                    evm_testnet_data.clone(),
                 )
                 .await
             {
@@ -253,13 +253,13 @@ impl TestnetDeployer {
         if options.current_inventory.is_empty() {
             self.ansible_provisioner
                 .print_ansible_run_banner(n, total, "Provision Uploaders");
-            // self.ansible_provisioner
-            //     .provision_uploaders(&provision_options, &genesis_multiaddr, &genesis_ip)
-            //     .await
-            //     .map_err(|err| {
-            //         println!("Failed to provision uploaders {err:?}");
-            //         err
-            //     })?;
+            self.ansible_provisioner
+                .provision_uploaders(&provision_options, &genesis_multiaddr, evm_testnet_data)
+                .await
+                .map_err(|err| {
+                    println!("Failed to provision uploaders {err:?}");
+                    err
+                })?;
         }
 
         if node_provision_failed {
