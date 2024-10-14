@@ -10,7 +10,6 @@ use crate::{
 };
 use crate::{BinaryOption, Error, EvmCustomTestnetData, Result};
 use std::collections::HashMap;
-use std::net::IpAddr;
 
 const NODE_S3_BUCKET_URL: &str = "https://sn-node.s3.eu-west-2.amazonaws.com";
 const NODE_MANAGER_S3_BUCKET_URL: &str = "https://sn-node-manager.s3.eu-west-2.amazonaws.com";
@@ -268,7 +267,7 @@ impl ExtraVarsDocBuilder {
         }
     }
 
-    pub fn add_safe_url_or_version(
+    pub fn add_autonomi_url_or_version(
         &mut self,
         deployment_name: &str,
         binary_option: &BinaryOption,
@@ -279,9 +278,9 @@ impl ExtraVarsDocBuilder {
         // because it is not recorded in the inventory.
         if let Some(version) = safe_version {
             self.variables.push((
-                "safe_archive_url".to_string(),
+                "autonomi_archive_url".to_string(),
                 format!(
-                    "{}/safe-{}-x86_64-unknown-linux-musl.tar.gz",
+                    "{}/autonomi_cli-{}-x86_64-unknown-linux-musl.tar.gz",
                     SAFE_S3_BUCKET_URL, version
                 ),
             ));
@@ -293,9 +292,9 @@ impl ExtraVarsDocBuilder {
                 repo_owner, branch, ..
             } => {
                 self.add_branch_url_variable(
-                    "safe_archive_url",
+                    "autonomi_archive_url",
                     &format!(
-                        "{}/{}/{}/safe-{}-x86_64-unknown-linux-musl.tar.gz",
+                        "{}/{}/{}/autonomi_cli-{}-x86_64-unknown-linux-musl.tar.gz",
                         NODE_S3_BUCKET_URL, repo_owner, branch, deployment_name
                     ),
                     branch,
@@ -306,9 +305,9 @@ impl ExtraVarsDocBuilder {
             BinaryOption::Versioned { safe_version, .. } => match safe_version {
                 Some(version) => {
                     self.variables.push((
-                        "safe_archive_url".to_string(),
+                        "autonomi_archive_url".to_string(),
                         format!(
-                            "{}/safe-{}-x86_64-unknown-linux-musl.tar.gz",
+                            "{}/autonomi_cli-{}-x86_64-unknown-linux-musl.tar.gz",
                             SAFE_S3_BUCKET_URL, version
                         ),
                     ));
@@ -422,7 +421,6 @@ pub fn build_node_extra_vars_doc(
         );
     }
 
-
     extra_vars.add_variable("rewards_address", &options.rewards_address);
     if let Some(evm_data) = evm_testnet_data {
         extra_vars.add_variable("evm_network_type", "evm-custom");
@@ -494,27 +492,40 @@ pub fn build_uploaders_extra_vars_doc(
     cloud_provider: &str,
     options: &ProvisionOptions,
     genesis_multiaddr: &str,
-    genesis_ip: &IpAddr,
+    evm_testnet_data: Option<EvmCustomTestnetData>,
 ) -> Result<String> {
-    let faucet_address = format!("{genesis_ip}:8000");
     let mut extra_vars: ExtraVarsDocBuilder = ExtraVarsDocBuilder::default();
     extra_vars.add_variable("provider", cloud_provider);
     extra_vars.add_variable("testnet_name", &options.name);
     extra_vars.add_variable("genesis_multiaddr", genesis_multiaddr);
-    extra_vars.add_variable("faucet_address", &faucet_address);
     extra_vars.add_variable(
         "safe_downloader_instances",
         &options.downloaders_count.to_string(),
     );
-    extra_vars.add_safe_url_or_version(
+    extra_vars.add_autonomi_url_or_version(
         &options.name,
         &options.binary_option,
         options.safe_version.clone(),
     )?;
     extra_vars.add_variable(
-        "safe_uploader_instances",
+        "autonomi_uploader_instances",
         &options.uploaders_count.unwrap_or(1).to_string(),
     );
+    if let Some(evm_testnet_data) = evm_testnet_data {
+        extra_vars.add_variable("evm_rpc_url", &evm_testnet_data.rpc_url);
+        extra_vars.add_variable(
+            "evm_payment_token_address",
+            &evm_testnet_data.payment_token_address,
+        );
+        extra_vars.add_variable(
+            "evm_data_payments_address",
+            &evm_testnet_data.data_payments_address,
+        );
+        extra_vars.add_variable(
+            "autonomi_secret_key",
+            &evm_testnet_data.deployer_wallet_private_key,
+        );
+    }
     Ok(extra_vars.build())
 }
 
