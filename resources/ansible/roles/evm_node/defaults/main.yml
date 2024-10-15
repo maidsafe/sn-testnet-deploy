@@ -1,3 +1,3 @@
 bin_name: evm_testnet
-org: jacderida
-branch: feat-evm_testnet_non_local
+org: maidsafe
+branch: main

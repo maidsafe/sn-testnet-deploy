@@ -59,7 +59,6 @@ const ANSIBLE_DEFAULT_FORKS: usize = 50;
 
 #[derive(Clone, Debug)]
 pub struct InfraRunOptions {
-    pub auditor_vm_count: Option<u16>,
     pub bootstrap_node_vm_count: Option<u16>,
     pub enable_build_vm: bool,
     pub evm_node_count: Option<u16>,
@@ -270,7 +269,6 @@ pub enum BinaryOption {
         safe_version: Option<Version>,
         safenode_version: Version,
         safenode_manager_version: Version,
-        sn_auditor_version: Option<Version>,
     },
 }
 
@@ -736,10 +734,6 @@ impl TestnetDeployer {
 
         let mut args = Vec::new();
 
-        if let Some(auditor_vm_count) = options.auditor_vm_count {
-            args.push(("auditor_vm_count".to_string(), auditor_vm_count.to_string()));
-        }
-
         if let Some(genesis_vm_count) = options.genesis_vm_count {
             args.push(("genesis_vm_count".to_string(), genesis_vm_count.to_string()));
         }
@@ -1063,7 +1057,6 @@ pub async fn notify_slack(inventory: DeploymentInventory) -> Result<()> {
             ref safe_version,
             ref safenode_version,
             ref safenode_manager_version,
-            ref sn_auditor_version,
             ..
         } => {
             message.push_str("*Version Details*\n");
@@ -1083,12 +1076,6 @@ pub async fn notify_slack(inventory: DeploymentInventory) -> Result<()> {
             message.push_str(&format!(
                 "safenode-manager version: {}\n",
                 safenode_manager_version
-            ));
-            message.push_str(&format!(
-                "sn_auditor version: {}\n",
-                sn_auditor_version
-                    .as_ref()
-                    .map_or("None".to_string(), |v| v.to_string())
             ));
         }
     }

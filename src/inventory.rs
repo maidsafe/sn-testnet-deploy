@@ -145,10 +145,6 @@ impl DeploymentInventoryService {
             .get_inventory(AnsibleInventoryType::Genesis, false)
             .await?;
 
-        let auditor_vms = self
-            .ansible_runner
-            .get_inventory(AnsibleInventoryType::Auditor, true)
-            .await?;
         let mut misc_vms = Vec::new();
         let build_vm = self
             .ansible_runner
@@ -229,67 +225,48 @@ impl DeploymentInventoryService {
             None
         };
 
-        let auditor_node_registry = self
-            .ansible_provisioner
-            .get_node_registries(&AnsibleInventoryType::Auditor)?;
-
         failed_node_registry_vms.extend(bootstrap_node_registries.failed_vms);
         failed_node_registry_vms.extend(generic_node_registries.failed_vms);
         failed_node_registry_vms.extend(private_node_registries.failed_vms);
         failed_node_registry_vms.extend(genesis_node_registry.failed_vms);
-        failed_node_registry_vms.extend(auditor_node_registry.failed_vms);
 
         let binary_option = if let Some(binary_option) = binary_option {
             binary_option
         } else {
-            let (faucet_version, safenode_version, sn_auditor_version) =
-                match environment_details.deployment_type {
-                    DeploymentType::New => {
-                        let (_, genesis_node_registry) = genesis_node_registry
-                            .retrieved_registries
-                            .iter()
-                            .find(|(_, reg)| reg.faucet.is_some())
-                            .ok_or_else(|| eyre!("Unable to retrieve genesis node registry"))?;
-                        let faucet_version = Some(
-                            genesis_node_registry
-                                .faucet
-                                .as_ref()
-                                .unwrap()
-                                .version
-                                .parse()?,
-                        );
-                        let safenode_version = genesis_node_registry
-                            .nodes
-                            .first()
-                            .ok_or_else(|| eyre!("Unable to obtain the genesis node"))?
+            let (faucet_version, safenode_version) = match environment_details.deployment_type {
+                DeploymentType::New => {
+                    let (_, genesis_node_registry) = genesis_node_registry
+                        .retrieved_registries
+                        .iter()
+                        .find(|(_, reg)| reg.faucet.is_some())
+                        .ok_or_else(|| eyre!("Unable to retrieve genesis node registry"))?;
+                    let faucet_version = Some(
+                        genesis_node_registry
+                            .faucet
+                            .as_ref()
+                            .unwrap()
                             .version
-                            .parse()?;
-                        let (_, auditor_node_registry) = auditor_node_registry
-                            .retrieved_registries
-                            .iter()
-                            .find(|(_, reg)| reg.auditor.is_some())
-                            .ok_or_else(|| eyre!("Unable to retrieve auditor node registry"))?;
-                        let sn_auditor_version = Some(
-                            auditor_node_registry
-                                .auditor
-                                .as_ref()
-                                .unwrap()
-                                .version
-                                .parse()?,
-                        );
-                        (faucet_version, safenode_version, sn_auditor_version)
-                    }
-                    DeploymentType::Bootstrap => {
-                        let safenode_version = generic_node_registries
-                            .retrieved_registries
-                            .first()
-                            .and_then(|(_, reg)| reg.nodes.first())
-                            .ok_or_else(|| eyre!("Unable to obtain a node"))?
-                            .version
-                            .parse()?;
-                        (None, safenode_version, None)
-                    }
-                };
+                            .parse()?,
+                    );
+                    let safenode_version = genesis_node_registry
+                        .nodes
+                        .first()
+                        .ok_or_else(|| eyre!("Unable to obtain the genesis node"))?
+                        .version
+                        .parse()?;
+                    (faucet_version, safenode_version)
+                }
+                DeploymentType::Bootstrap => {
+                    let safenode_version = generic_node_registries
+                        .retrieved_registries
+                        .first()
+                        .and_then(|(_, reg)| reg.nodes.first())
+                        .ok_or_else(|| eyre!("Unable to obtain a node"))?
+                        .version
+                        .parse()?;
+                    (None, safenode_version)
+                }
+            };
 
             // get the safenode manager version from a random generic node vm
             let safenode_manager_version = genesis_node_registry
@@ -304,7 +281,6 @@ impl DeploymentInventoryService {
                 faucet_version,
                 safenode_version,
                 safenode_manager_version,
-                sn_auditor_version,
             }
         };
 
@@ -317,7 +293,6 @@ impl DeploymentInventoryService {
                 (None, None)
             };
         let inventory = DeploymentInventory {
-            auditor_vms,
             binary_option,
             bootstrap_node_vms,
             environment_details,
@@ -572,7 +547,6 @@ impl DeploymentNodeRegistries {
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct DeploymentInventory {
-    pub auditor_vms: Vec<VirtualMachine>,
     pub binary_option: BinaryOption,
     pub bootstrap_node_vms: Vec<NodeVirtualMachine>,
     pub environment_details: EnvironmentDetails,
@@ -597,7 +571,6 @@ impl DeploymentInventory {
     pub fn empty(name: &str, binary_option: BinaryOption) -> DeploymentInventory {
         Self {
             binary_option,
-            auditor_vms: Vec::new(),
             bootstrap_node_vms: Vec::new(),
             environment_details: EnvironmentDetails::default(),
             genesis_vm: None,
@@ -622,7 +595,6 @@ impl DeploymentInventory {
 
     pub fn vm_list(&self) -> Vec<VirtualMachine> {
         let mut list = Vec::new();
-        list.extend(self.auditor_vms.clone());
         list.extend(self.nat_gateway_vm.clone());
         list.extend(
             self.bootstrap_node_vms
@@ -764,7 +736,6 @@ impl DeploymentInventory {
                 safe_version,
                 safenode_version,
                 safenode_manager_version,
-                sn_auditor_version,
             } => {
                 println!("===============");
                 println!("Version Details");
@@ -783,12 +754,6 @@ impl DeploymentInventory {
                 );
                 println!("safenode version: {}", safenode_version);
                 println!("safenode-manager version: {}", safenode_manager_version);
-                println!(
-                    "sn_auditor version: {}",
-                    sn_auditor_version
-                        .as_ref()
-                        .map_or("N/A".to_string(), |v| v.to_string())
-                );
                 println!();
             }
         }
@@ -916,16 +881,6 @@ impl DeploymentInventory {
                     "safe --peer {} wallet get-faucet {}",
                     genesis, faucet_address
                 );
-            }
-            println!();
-        }
-
-        if !self.auditor_vms.is_empty() {
-            println!("===============");
-            println!("Auditor Details");
-            println!("===============");
-            for vm in self.auditor_vms.iter() {
-                println!("{}:4242", vm.public_ip_addr);
             }
             println!();
         }

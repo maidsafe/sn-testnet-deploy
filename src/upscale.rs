@@ -56,14 +56,6 @@ impl TestnetDeployer {
             return Err(Error::InvalidUpscaleOptionsForBootstrapDeployment);
         }
 
-        let desired_auditor_vm_count = options
-            .desired_auditor_vm_count
-            .unwrap_or(options.current_inventory.auditor_vms.len() as u16);
-        if desired_auditor_vm_count < options.current_inventory.auditor_vms.len() as u16 {
-            return Err(Error::InvalidUpscaleDesiredAuditorVmCount);
-        }
-        debug!("Using {desired_auditor_vm_count} for desired auditor node VM count");
-
         let desired_bootstrap_node_vm_count = options
             .desired_bootstrap_node_vm_count
             .unwrap_or(options.current_inventory.bootstrap_node_vms.len() as u16);
@@ -125,10 +117,6 @@ impl TestnetDeployer {
         if options.plan {
             let vars = vec![
                 (
-                    "auditor_vm_count".to_string(),
-                    desired_auditor_vm_count.to_string(),
-                ),
-                (
                     "bootstrap_node_vm_count".to_string(),
                     desired_bootstrap_node_vm_count.to_string(),
                 ),
@@ -158,7 +146,6 @@ impl TestnetDeployer {
         }
 
         self.create_or_update_infra(&InfraRunOptions {
-            auditor_vm_count: Some(desired_auditor_vm_count),
             bootstrap_node_vm_count: Some(desired_bootstrap_node_vm_count),
             enable_build_vm: false,
             evm_node_count: Some(
@@ -199,7 +186,6 @@ impl TestnetDeployer {
         }
 
         let mut provision_options = ProvisionOptions {
-            beta_encryption_key: None,
             binary_option: options.current_inventory.binary_option.clone(),
             bootstrap_node_count: desired_bootstrap_node_count,
             chunk_size: None,

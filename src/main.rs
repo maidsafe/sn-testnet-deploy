@@ -226,11 +226,6 @@ enum Commands {
         /// Set to run Ansible with more verbose output.
         #[arg(long)]
         ansible_verbose: bool,
-        /// Supply the beta encryption key for the auditor.
-        ///
-        /// If not used a default key will be supplied.
-        #[arg(long)]
-        beta_encryption_key: Option<String>,
         /// The branch of the Github repository to build from.
         ///
         /// If used, all binaries will be built from this branch. It is typically used for testing
@@ -450,14 +445,6 @@ enum Commands {
         /// arguments. You can only supply version numbers or a custom branch, not both.
         #[arg(long, verbatim_doc_comment)]
         safenode_manager_version: Option<String>,
-        /// Supply a version number for the sn_auditor binary.
-        ///
-        /// There should be no 'v' prefix.
-        ///
-        /// The version arguments are mutually exclusive with the --branch and --repo-owner
-        /// arguments. You can only supply version numbers or a custom branch, not both.
-        #[arg(long, verbatim_doc_comment)]
-        sn_auditor_version: Option<String>,
         /// The desired number of uploaders per VM.
         #[clap(long, default_value_t = 1)]
         uploaders_count: u16,
@@ -1166,7 +1153,6 @@ async fn main() -> Result<()> {
                 None,
                 safenode_version,
                 safenode_manager_version,
-                None,
                 safenode_features,
                 network_keys,
             )
@@ -1251,7 +1237,6 @@ async fn main() -> Result<()> {
         }
         Commands::Deploy {
             ansible_verbose,
-            beta_encryption_key,
             branch,
             bootstrap_node_count,
             bootstrap_node_vm_count,
@@ -1285,7 +1270,6 @@ async fn main() -> Result<()> {
             safenode_features,
             safenode_version,
             safenode_manager_version,
-            sn_auditor_version,
             uploaders_count,
             uploader_vm_count,
         } => {
@@ -1304,7 +1288,6 @@ async fn main() -> Result<()> {
                 safe_version,
                 safenode_version,
                 safenode_manager_version,
-                sn_auditor_version,
                 safenode_features,
                 network_keys,
             )
@@ -1363,7 +1346,6 @@ async fn main() -> Result<()> {
 
             testnet_deployer
                 .deploy(&DeployOptions {
-                    beta_encryption_key,
                     binary_option: binary_option.clone(),
                     bootstrap_node_count: bootstrap_node_count
                         .unwrap_or(environment_type.get_default_bootstrap_node_count()),
@@ -2267,7 +2249,6 @@ async fn get_binary_option(
     safe_version: Option<String>,
     safenode_version: Option<String>,
     safenode_manager_version: Option<String>,
-    sn_auditor_version: Option<String>,
     safenode_features: Option<Vec<String>>,
     network_keys: Option<(String, String, String, String)>,
 ) -> Result<BinaryOption> {
@@ -2317,14 +2298,11 @@ async fn get_binary_option(
         let safenode_manager_version =
             get_version_from_option(safenode_manager_version, &ReleaseType::SafenodeManager)
                 .await?;
-        let sn_auditor_version =
-            get_version_from_option(sn_auditor_version, &ReleaseType::SnAuditor).await?;
         BinaryOption::Versioned {
             faucet_version: Some(faucet_version),
             safe_version: Some(safe_version),
             safenode_version,
             safenode_manager_version,
-            sn_auditor_version: Some(sn_auditor_version),
         }
     } else {
         // Unwraps are justified here because it's already been asserted that both must have

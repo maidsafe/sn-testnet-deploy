@@ -16,7 +16,6 @@ use std::{net::SocketAddr, path::PathBuf};
 
 #[derive(Clone)]
 pub struct DeployOptions {
-    pub beta_encryption_key: Option<String>,
     pub binary_option: BinaryOption,
     pub bootstrap_node_count: u16,
     pub bootstrap_node_vm_count: Option<u16>,
@@ -52,7 +51,6 @@ impl TestnetDeployer {
         };
 
         self.create_or_update_infra(&InfraRunOptions {
-            auditor_vm_count: Some(1),
             bootstrap_node_vm_count: options.bootstrap_node_vm_count,
             enable_build_vm: build_custom_binaries,
             evm_node_count: match options.evm_network {
@@ -89,6 +87,19 @@ impl TestnetDeployer {
         if matches!(options.evm_network, EvmNetwork::Custom) {
             total += 1;
         }
+
+        write_environment_details(
+            &self.s3_repository,
+            &options.name,
+            &EnvironmentDetails {
+                deployment_type: DeploymentType::New,
+                environment_type: options.environment_type.clone(),
+                evm_network: options.evm_network.clone(),
+                rewards_address: options.rewards_address.clone(),
+                evm_testnet_data: None,
+            },
+        )
+        .await?;
 
         let mut provision_options = ProvisionOptions::from(options.clone());
         let evm_testnet_data = if options.evm_network == EvmNetwork::Custom {

@@ -10,17 +10,6 @@ terraform {
   }
 }
 
-resource "digitalocean_droplet" "auditor" {
-  count    = var.auditor_vm_count
-  image    = var.auditor_droplet_image_id
-  name     = "${terraform.workspace}-auditor-${count.index + 1}"
-  region   = var.region
-  size     = var.node_droplet_size
-  backups  = true
-  ssh_keys = var.droplet_ssh_keys
-  tags     = ["environment:${terraform.workspace}", "type:auditor"]
-}
-
 resource "digitalocean_droplet" "bootstrap_node" {
   count    = var.bootstrap_node_vm_count
   image    = var.bootstrap_droplet_image_id

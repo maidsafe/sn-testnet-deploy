@@ -4,10 +4,7 @@
 // This SAFE Network Software is licensed under the BSD-3-Clause license.
 // Please see the LICENSE file for more details.
 use crate::NodeType;
-use crate::{
-    ansible::provisioning::{ProvisionOptions, DEFAULT_BETA_ENCRYPTION_KEY},
-    CloudProvider,
-};
+use crate::{ansible::provisioning::ProvisionOptions, CloudProvider};
 use crate::{BinaryOption, Error, EvmCustomTestnetData, Result};
 use std::collections::HashMap;
 
@@ -234,39 +231,6 @@ impl ExtraVarsDocBuilder {
         }
     }
 
-    pub fn add_sn_auditor_url_or_version(
-        &mut self,
-        deployment_name: &str,
-        binary_option: &BinaryOption,
-    ) -> Result<(), Error> {
-        match binary_option {
-            BinaryOption::BuildFromSource {
-                repo_owner, branch, ..
-            } => {
-                self.add_branch_url_variable(
-                    "sn_auditor_archive_url",
-                    &format!(
-                        "{}/{}/{}/sn_auditor-{}-x86_64-unknown-linux-musl.tar.gz",
-                        NODE_S3_BUCKET_URL, repo_owner, branch, deployment_name
-                    ),
-                    branch,
-                    repo_owner,
-                );
-                Ok(())
-            }
-            BinaryOption::Versioned {
-                sn_auditor_version, ..
-            } => match sn_auditor_version {
-                Some(version) => {
-                    self.variables
-                        .push(("version".to_string(), version.to_string()));
-                    Ok(())
-                }
-                None => Err(Error::NoAuditorError),
-            },
-        }
-    }
-
     pub fn add_autonomi_url_or_version(
         &mut self,
         deployment_name: &str,
@@ -464,27 +428,6 @@ pub fn build_safenode_rpc_client_extra_vars_doc(
     extra_vars.add_variable("testnet_name", &options.name);
     extra_vars.add_variable("genesis_multiaddr", genesis_multiaddr);
     extra_vars.add_rpc_client_url_or_version(&options.name, &options.binary_option);
-    Ok(extra_vars.build())
-}
-
-pub fn build_sn_auditor_extra_vars_doc(
-    cloud_provider: &str,
-    options: &ProvisionOptions,
-    genesis_multiaddr: &str,
-) -> Result<String> {
-    let mut extra_vars: ExtraVarsDocBuilder = ExtraVarsDocBuilder::default();
-    extra_vars.add_variable("provider", cloud_provider);
-    extra_vars.add_variable("testnet_name", &options.name);
-    extra_vars.add_variable("genesis_multiaddr", genesis_multiaddr);
-    extra_vars.add_variable(
-        "beta_encryption_key",
-        options
-            .beta_encryption_key
-            .as_ref()
-            .unwrap_or(&DEFAULT_BETA_ENCRYPTION_KEY.to_string()),
-    );
-    extra_vars.add_node_manager_url(&options.name, &options.binary_option);
-    extra_vars.add_sn_auditor_url_or_version(&options.name, &options.binary_option)?;
     Ok(extra_vars.build())
 }
 

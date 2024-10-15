@@ -39,10 +39,6 @@ variable "build_machine_size" {
   default = "s-8vcpu-16gb"
 }
 
-variable "auditor_droplet_image_id" {
-  default = "156295663"
-}
-
 variable "build_droplet_image_id" {
   default = "165140612"
 }
@@ -70,11 +66,6 @@ variable "region" {
 variable "genesis_vm_count" {
   default     = 1
   description = "Set to 1 or 0 to control whether there is a genesis node"
-}
-
-variable "auditor_vm_count" {
-  default     = 1
-  description = "The number of auditor droplets"
 }
 
 variable "bootstrap_node_vm_count" {

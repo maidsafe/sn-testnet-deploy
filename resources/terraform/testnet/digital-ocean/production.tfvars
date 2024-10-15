@@ -1,4 +1,3 @@
-auditor_vm_count = 1
 bootstrap_droplet_size = "s-8vcpu-16gb"
 bootstrap_node_vm_count = 50
 bootstrap_droplet_image_id = 157362431
