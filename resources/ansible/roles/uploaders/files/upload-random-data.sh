@@ -23,13 +23,12 @@ total_files=10000
 
 write_metrics_on_success() {
   local time=$1
-  local file_size=$2
+  local file_size_kb=$2
   metrics_header
-  number_of_chunks=$(echo "$stdout" | rg -o 'Among [0-9]+' | rg -o '[0-9]+')
-  store_cost=$(echo "$stdout" | rg -o 'Made payment of NanoTokens\([0-9]+' | rg -o '[0-9]+' | head -n 1)
-  royalty_fees=$(echo "$stdout" | rg -o 'Made payment of NanoTokens\([0-9]+' | rg -o '[0-9]+' | tail -n 1)
+  number_of_chunks=$(echo "$stdout" | rg -o 'Number of chunks uploaded: [0-9]+' | rg -o '[0-9]+')
+  store_cost=$(echo "$stdout" | rg -o 'Total cost: [0-9]+' | rg -o '[0-9]+' | head -n 1)
 
-  echo "$time,$file_size_kb,$number_of_chunks,$store_cost,$royalty_fees" >> "./uploader_metrics.csv"
+  echo "$time,$file_size_kb,$number_of_chunks,$store_cost" >> "./uploader_metrics.csv"
 }
 
 write_metrics_on_failure() {
@@ -41,7 +40,7 @@ write_metrics_on_failure() {
 
 metrics_header() {
   if [ ! -f "./uploader_metrics.csv" ]; then
-    echo "Total Time(s),File Size (KB),Number of Chunks,Store Cost (NanoTokens),Royalty Fees (NanoTokens)" > "./uploader_metrics.csv"
+    echo "Total Time(s),File Size (KB),Number of Chunks,Store Cost (AttoTokens)" > "./uploader_metrics.csv"
   fi
 }
 
