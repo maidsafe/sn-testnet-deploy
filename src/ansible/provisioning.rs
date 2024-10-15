@@ -30,7 +30,6 @@ pub const DEFAULT_BETA_ENCRYPTION_KEY: &str =
 
 #[derive(Clone)]
 pub struct ProvisionOptions {
-    pub beta_encryption_key: Option<String>,
     pub binary_option: BinaryOption,
     pub bootstrap_node_count: u16,
     pub chunk_size: Option<u64>,
@@ -58,7 +57,6 @@ pub struct ProvisionOptions {
 impl From<BootstrapOptions> for ProvisionOptions {
     fn from(bootstrap_options: BootstrapOptions) -> Self {
         ProvisionOptions {
-            beta_encryption_key: None,
             binary_option: bootstrap_options.binary_option,
             bootstrap_node_count: 0,
             chunk_size: None,
@@ -85,7 +83,6 @@ impl From<BootstrapOptions> for ProvisionOptions {
 impl From<DeployOptions> for ProvisionOptions {
     fn from(deploy_options: DeployOptions) -> Self {
         ProvisionOptions {
-            beta_encryption_key: deploy_options.beta_encryption_key,
             binary_option: deploy_options.binary_option,
             bootstrap_node_count: deploy_options.bootstrap_node_count,
             chunk_size: deploy_options.chunk_size,
@@ -173,14 +170,6 @@ impl AnsibleProvisioner {
                 )),
             )?;
         }
-
-        self.ansible_runner.run_playbook(
-            AnsiblePlaybook::CopyLogs,
-            AnsibleInventoryType::Auditor,
-            Some(format!(
-                "{{ \"env_name\": \"{name}\", \"resources_only\" : \"{resources_only}\" }}"
-            )),
-        )?;
         Ok(())
     }
 
@@ -499,26 +488,6 @@ impl AnsibleProvisioner {
             AnsiblePlaybook::RpcClient,
             AnsibleInventoryType::Genesis,
             Some(extra_vars::build_safenode_rpc_client_extra_vars_doc(
-                &self.cloud_provider.to_string(),
-                options,
-                genesis_multiaddr,
-            )?),
-        )?;
-        print_duration(start.elapsed());
-        Ok(())
-    }
-
-    pub async fn provision_sn_auditor(
-        &self,
-        options: &ProvisionOptions,
-        genesis_multiaddr: &str,
-    ) -> Result<()> {
-        let start = Instant::now();
-        println!("Running ansible against auditor machine to start sn_auditor service...");
-        self.ansible_runner.run_playbook(
-            AnsiblePlaybook::Auditor,
-            AnsibleInventoryType::Auditor,
-            Some(extra_vars::build_sn_auditor_extra_vars_doc(
                 &self.cloud_provider.to_string(),
                 options,
                 genesis_multiaddr,

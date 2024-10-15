@@ -22,10 +22,6 @@ use std::{
 /// Represents the inventory types that apply to our own domain.
 #[derive(Clone, Debug, Copy)]
 pub enum AnsibleInventoryType {
-    /// Use to run a playbook against the auditor.
-    ///
-    /// Only one machine will be returned in this inventory.
-    Auditor,
     /// Use to run a playbook against all bootstrap nodes.
     BootstrapNodes,
     /// Use to run a playbook against the build machine.
@@ -61,7 +57,6 @@ pub enum AnsibleInventoryType {
 impl std::fmt::Display for AnsibleInventoryType {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let s = match self {
-            AnsibleInventoryType::Auditor => "Auditor",
             AnsibleInventoryType::BootstrapNodes => "BootstrapNodes",
             AnsibleInventoryType::Build => "Build",
             AnsibleInventoryType::Custom => "Custom",
@@ -81,7 +76,6 @@ impl std::fmt::Display for AnsibleInventoryType {
 impl AnsibleInventoryType {
     pub fn get_inventory_path(&self, name: &str, provider: &str) -> PathBuf {
         match &self {
-            Self::Auditor => PathBuf::from(format!(".{name}_auditor_inventory_{provider}.yml")),
             Self::BootstrapNodes => {
                 PathBuf::from(format!(".{name}_bootstrap_node_inventory_{provider}.yml"))
             }
@@ -106,7 +100,6 @@ impl AnsibleInventoryType {
 
     pub fn tag(&self) -> &str {
         match self {
-            Self::Auditor => "auditor",
             Self::BootstrapNodes => "bootstrap_node",
             Self::Build => "build",
             Self::Custom => "custom",
@@ -219,7 +212,6 @@ pub fn generate_environment_inventory(
     output_inventory_dir_path: &Path,
 ) -> Result<()> {
     let inventory_types = [
-        AnsibleInventoryType::Auditor,
         AnsibleInventoryType::BootstrapNodes,
         AnsibleInventoryType::Build,
         AnsibleInventoryType::Genesis,
@@ -257,7 +249,6 @@ pub fn cleanup_environment_inventory(
     inventory_types: Option<Vec<AnsibleInventoryType>>,
 ) -> Result<()> {
     let default_inventory_types = [
-        AnsibleInventoryType::Auditor,
         AnsibleInventoryType::BootstrapNodes,
         AnsibleInventoryType::Build,
         AnsibleInventoryType::Genesis,

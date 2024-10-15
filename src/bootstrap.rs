@@ -62,7 +62,6 @@ impl TestnetDeployer {
         .await?;
 
         self.create_or_update_infra(&InfraRunOptions {
-            auditor_vm_count: None,
             bootstrap_node_vm_count: None,
             enable_build_vm: build_custom_binaries,
             evm_node_count: None,
