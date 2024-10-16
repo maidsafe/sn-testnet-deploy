@@ -1,22 +1,22 @@
 ---
-- name: check if autonomi_cli binary exists
+- name: check if autonomi binary exists
   ansible.builtin.stat:
-    path: "{{ binary_dir }}/autonomi_cli"
-  register: autonomi_cli_binary
+    path: "{{ binary_dir }}/autonomi"
+  register: autonomi_binary
 
-- name: download the autonomi_cli binary
+- name: download the autonomi binary
   ansible.builtin.get_url:
     url: "{{ autonomi_archive_url }}"
     dest: "/tmp/{{ autonomi_archive_filename }}"
-  when: not autonomi_cli_binary.stat.exists
+  when: not autonomi_binary.stat.exists
 
-- name: extract the autonomi_cli binary to /usr/local/bin
+- name: extract the autonomi binary to /usr/local/bin
   ansible.builtin.unarchive:
     src: "/tmp/{{ autonomi_archive_filename }}"
     dest: "{{ binary_dir }}"
     remote_src: true
   become: true
-  when: not autonomi_cli_binary.stat.exists
+  when: not autonomi_binary.stat.exists
 
 - name: create safe users
   ansible.builtin.user:
@@ -44,7 +44,7 @@
     group: root
     mode: '0644'
   become: yes
-  when: not autonomi_cli_binary.stat.exists
+  when: not autonomi_binary.stat.exists
 
 - name: start and enable autonomi_uploader service for each uploader
   ansible.builtin.systemd:

@@ -6,7 +6,7 @@
   roles:
     - {
         role: build_safe_network_binary,
-        bin_name: "autonomi_cli",
+        bin_name: "autonomi",
         when: custom_bin == "true"
       }
     - {
