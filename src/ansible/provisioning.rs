@@ -14,8 +14,8 @@ use crate::{
     deploy::DeployOptions,
     error::{Error, Result},
     inventory::{DeploymentNodeRegistries, VirtualMachine},
-    print_duration, BinaryOption, CloudProvider, EvmCustomTestnetData, LogFormat, NodeType,
-    SshClient, UpgradeOptions,
+    print_duration, BinaryOption, CloudProvider, EvmCustomTestnetData, EvmNetwork, LogFormat,
+    NodeType, SshClient, UpgradeOptions,
 };
 use log::{debug, error, trace};
 use semver::Version;
@@ -35,6 +35,7 @@ pub struct ProvisionOptions {
     pub chunk_size: Option<u64>,
     pub downloaders_count: u16,
     pub env_variables: Option<Vec<(String, String)>>,
+    pub evm_network: EvmNetwork,
     pub log_format: Option<LogFormat>,
     pub logstash_details: Option<(String, Vec<SocketAddr>)>,
     pub name: String,
@@ -52,6 +53,7 @@ pub struct ProvisionOptions {
     pub safe_version: Option<String>,
     pub uploaders_count: Option<u16>,
     pub rewards_address: String,
+    pub wallet_secret_key: Option<String>,
 }
 
 impl From<BootstrapOptions> for ProvisionOptions {
@@ -62,6 +64,7 @@ impl From<BootstrapOptions> for ProvisionOptions {
             chunk_size: None,
             downloaders_count: 0,
             env_variables: bootstrap_options.env_variables,
+            evm_network: bootstrap_options.evm_network,
             log_format: bootstrap_options.log_format,
             logstash_details: None,
             name: bootstrap_options.name,
@@ -76,6 +79,7 @@ impl From<BootstrapOptions> for ProvisionOptions {
             safe_version: None,
             uploaders_count: None,
             rewards_address: String::new(),
+            wallet_secret_key: None,
         }
     }
 }
@@ -88,6 +92,7 @@ impl From<DeployOptions> for ProvisionOptions {
             chunk_size: deploy_options.chunk_size,
             downloaders_count: deploy_options.downloaders_count,
             env_variables: deploy_options.env_variables,
+            evm_network: deploy_options.evm_network,
             log_format: deploy_options.log_format,
             logstash_details: deploy_options.logstash_details,
             name: deploy_options.name,
@@ -102,6 +107,7 @@ impl From<DeployOptions> for ProvisionOptions {
             safe_version: None,
             uploaders_count: Some(deploy_options.uploaders_count),
             rewards_address: deploy_options.rewards_address,
+            wallet_secret_key: deploy_options.wallet_secret_key,
         }
     }
 }
@@ -288,6 +294,7 @@ impl AnsibleProvisioner {
                 NodeType::Bootstrap,
                 None,
                 1,
+                options.evm_network.clone(),
                 evm_testnet_data,
             )?),
         )?;
@@ -382,6 +389,7 @@ impl AnsibleProvisioner {
                 node_type,
                 Some(initial_contact_peer.to_string()),
                 node_count,
+                options.evm_network.clone(),
                 evm_testnet_data,
             )?),
         )?;

@@ -4,7 +4,7 @@
 // This SAFE Network Software is licensed under the BSD-3-Clause license.
 // Please see the LICENSE file for more details.
 use crate::NodeType;
-use crate::{ansible::provisioning::ProvisionOptions, CloudProvider};
+use crate::{ansible::provisioning::ProvisionOptions, CloudProvider, EvmNetwork};
 use crate::{BinaryOption, Error, EvmCustomTestnetData, Result};
 use std::collections::HashMap;
 
@@ -330,6 +330,7 @@ pub fn build_node_extra_vars_doc(
     node_type: NodeType,
     bootstrap_multiaddr: Option<String>,
     node_instance_count: u16,
+    evm_network: EvmNetwork,
     evm_testnet_data: Option<EvmCustomTestnetData>,
 ) -> Result<String> {
     let mut extra_vars = ExtraVarsDocBuilder::default();
@@ -386,13 +387,11 @@ pub fn build_node_extra_vars_doc(
     }
 
     extra_vars.add_variable("rewards_address", &options.rewards_address);
+    extra_vars.add_variable("evm_network_type", &evm_network.to_string());
     if let Some(evm_data) = evm_testnet_data {
-        extra_vars.add_variable("evm_network_type", "evm-custom");
         extra_vars.add_variable("evm_rpc_url", &evm_data.rpc_url);
         extra_vars.add_variable("evm_payment_token_address", &evm_data.payment_token_address);
         extra_vars.add_variable("evm_data_payments_address", &evm_data.data_payments_address);
-    } else {
-        extra_vars.add_variable("evm_network_type", "evm-arbitrum-one");
     }
 
     Ok(extra_vars.build())
@@ -454,7 +453,8 @@ pub fn build_uploaders_extra_vars_doc(
         "autonomi_uploader_instances",
         &options.uploaders_count.unwrap_or(1).to_string(),
     );
-    if let Some(evm_testnet_data) = evm_testnet_data {
+    extra_vars.add_variable("evm_network_type", &options.evm_network.to_string());
+    if let Some(evm_testnet_data) = &evm_testnet_data {
         extra_vars.add_variable("evm_rpc_url", &evm_testnet_data.rpc_url);
         extra_vars.add_variable(
             "evm_payment_token_address",
@@ -464,11 +464,17 @@ pub fn build_uploaders_extra_vars_doc(
             "evm_data_payments_address",
             &evm_testnet_data.data_payments_address,
         );
+    }
+
+    if let Some(secret_key) = options.wallet_secret_key.as_ref() {
+        extra_vars.add_variable("autonomi_secret_key", secret_key);
+    } else if let Some(evm_testnet_data) = &evm_testnet_data {
         extra_vars.add_variable(
             "autonomi_secret_key",
             &evm_testnet_data.deployer_wallet_private_key,
         );
     }
+
     Ok(extra_vars.build())
 }
 

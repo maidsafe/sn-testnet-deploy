@@ -4,9 +4,15 @@ After=network.target
 
 [Service]
 Environment="SECRET_KEY={{ autonomi_secret_key }}"
+{% if evm_network_type == "evm-custom" %}
 Environment="RPC_URL={{ evm_rpc_url }}"
 Environment="PAYMENT_TOKEN_ADDRESS={{ evm_payment_token_address }}"
 Environment="DATA_PAYMENTS_ADDRESS={{ evm_data_payments_address }}"
+{% elif evm_network_type == "evm-arbitrum-sepolia" %}
+Environment="EVM_NETWORK=arbitrum-sepolia"
+{% elif evm_network_type == "evm-arbitrum-one" %}
+Environment="EVM_NETWORK=arbitrum-one"
+{% endif %}
 User=safe%i
 ExecStart=/home/safe%i/upload-random-data.sh {{ genesis_multiaddr }}
 Restart=always
