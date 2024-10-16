@@ -9,8 +9,8 @@ if [ -n "$CONTACT_PEER" ]; then
   CONTACT_PEER_ARG="--peer $CONTACT_PEER"
 fi
 
-if ! command -v autonomi_cli &> /dev/null; then
-  echo "Error: 'autonomi_cli' not found in PATH."
+if ! command -v autonomi &> /dev/null; then
+  echo "Error: 'autonomi' not found in PATH."
   exit 1
 fi
 
@@ -67,7 +67,7 @@ generate_random_data_file_and_upload() {
   file_size_kb=$(du -k "$tmpfile" | cut -f1)
 
   now=$(date +"%s")
-  stdout=$(autonomi_cli $CONTACT_PEER_ARG file upload "$tmpfile" 2>&1)
+  stdout=$(autonomi $CONTACT_PEER_ARG file upload "$tmpfile" 2>&1)
   echo "$stdout"
 
   if [ $? -eq 0 ]; then
@@ -97,5 +97,5 @@ for i in $(seq 1 $total_files); do
   generate_random_data_file_and_upload
   # prune_chunk_artifacts
   # TODO: re-enable when the new CLI has a `wallet balance` command
-  # echo "$(autonomi_cli $CONTACT_PEER_ARG wallet balance)"
+  # echo "$(autonomi $CONTACT_PEER_ARG wallet balance)"
 done

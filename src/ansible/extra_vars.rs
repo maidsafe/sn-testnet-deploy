@@ -244,7 +244,7 @@ impl ExtraVarsDocBuilder {
             self.variables.push((
                 "autonomi_archive_url".to_string(),
                 format!(
-                    "{}/autonomi_cli-{}-x86_64-unknown-linux-musl.tar.gz",
+                    "{}/autonomi-{}-x86_64-unknown-linux-musl.tar.gz",
                     SAFE_S3_BUCKET_URL, version
                 ),
             ));
@@ -258,7 +258,7 @@ impl ExtraVarsDocBuilder {
                 self.add_branch_url_variable(
                     "autonomi_archive_url",
                     &format!(
-                        "{}/{}/{}/autonomi_cli-{}-x86_64-unknown-linux-musl.tar.gz",
+                        "{}/{}/{}/autonomi-{}-x86_64-unknown-linux-musl.tar.gz",
                         NODE_S3_BUCKET_URL, repo_owner, branch, deployment_name
                     ),
                     branch,
@@ -271,7 +271,7 @@ impl ExtraVarsDocBuilder {
                     self.variables.push((
                         "autonomi_archive_url".to_string(),
                         format!(
-                            "{}/autonomi_cli-{}-x86_64-unknown-linux-musl.tar.gz",
+                            "{}/autonomi-{}-x86_64-unknown-linux-musl.tar.gz",
                             SAFE_S3_BUCKET_URL, version
                         ),
                     ));
