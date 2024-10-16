@@ -39,6 +39,7 @@ pub struct DeployOptions {
     pub rewards_address: String,
     pub uploaders_count: u16,
     pub uploader_vm_count: Option<u16>,
+    pub wallet_secret_key: Option<String>,
 }
 
 impl TestnetDeployer {
@@ -56,6 +57,7 @@ impl TestnetDeployer {
             evm_node_count: match options.evm_network {
                 EvmNetwork::ArbitrumOne => Some(0),
                 EvmNetwork::Custom => Some(1),
+                EvmNetwork::ArbitrumSepolia => Some(0),
             },
             genesis_vm_count: Some(1),
             name: options.name.clone(),

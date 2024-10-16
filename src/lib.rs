@@ -129,14 +129,16 @@ impl NodeType {
 pub enum EvmNetwork {
     #[default]
     ArbitrumOne,
+    ArbitrumSepolia,
     Custom,
 }
 
 impl std::fmt::Display for EvmNetwork {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            EvmNetwork::ArbitrumOne => write!(f, "arbitrum-one"),
-            EvmNetwork::Custom => write!(f, "custom"),
+            EvmNetwork::ArbitrumOne => write!(f, "evm-arbitrum-one"),
+            EvmNetwork::Custom => write!(f, "evm-custom"),
+            EvmNetwork::ArbitrumSepolia => write!(f, "evm-arbitrum-sepolia"),
         }
     }
 }
@@ -148,6 +150,7 @@ impl std::str::FromStr for EvmNetwork {
         match s.to_lowercase().as_str() {
             "arbitrum-one" => Ok(EvmNetwork::ArbitrumOne),
             "custom" => Ok(EvmNetwork::Custom),
+            "arbitrum-sepolia" => Ok(EvmNetwork::ArbitrumSepolia),
             _ => Err(format!("Invalid EVM network type: {}", s)),
         }
     }

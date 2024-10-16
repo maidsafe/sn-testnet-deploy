@@ -35,6 +35,7 @@ pub struct UpscaleOptions {
     pub plan: bool,
     pub public_rpc: bool,
     pub safe_version: Option<String>,
+    pub wallet_secret_key: Option<String>,
 }
 
 impl TestnetDeployer {
@@ -152,6 +153,7 @@ impl TestnetDeployer {
                 match options.current_inventory.environment_details.evm_network {
                     EvmNetwork::Custom => 1,
                     EvmNetwork::ArbitrumOne => 0,
+                    EvmNetwork::ArbitrumSepolia => 0,
                 },
             ),
             genesis_vm_count: Some(
@@ -191,6 +193,11 @@ impl TestnetDeployer {
             chunk_size: None,
             downloaders_count: options.downloaders_count,
             env_variables: None,
+            evm_network: options
+                .current_inventory
+                .environment_details
+                .evm_network
+                .clone(),
             log_format: None,
             logstash_details: None,
             name: options.current_inventory.name.clone(),
@@ -212,6 +219,7 @@ impl TestnetDeployer {
                 .clone(),
             safe_version: options.safe_version.clone(),
             uploaders_count: options.desired_uploaders_count,
+            wallet_secret_key: options.wallet_secret_key.clone(),
         };
         let mut node_provision_failed = false;
 

@@ -454,6 +454,11 @@ enum Commands {
         /// argument.
         #[clap(long)]
         uploader_vm_count: Option<u16>,
+        /// A wallet secret key for the uploaders.
+        ///
+        /// This argument only applies when Arbitrum or Sepolia networks are used.
+        #[clap(long)]
+        wallet_secret_key: Option<String>,
     },
     /// Manage the faucet for an environment
     #[clap(name = "faucet", subcommand)]
@@ -836,6 +841,11 @@ enum Commands {
         /// This argument is required when the uploader count is supplied.
         #[arg(long, verbatim_doc_comment)]
         safe_version: Option<String>,
+        /// A wallet secret key for the uploaders.
+        ///
+        /// This argument only applies when Arbitrum or Sepolia networks are used.
+        #[clap(long)]
+        wallet_secret_key: Option<String>,
     },
 }
 
@@ -1272,6 +1282,7 @@ async fn main() -> Result<()> {
             safenode_manager_version,
             uploaders_count,
             uploader_vm_count,
+            wallet_secret_key,
         } => {
             let network_keys = validate_and_get_pks(
                 foundation_pk,
@@ -1279,6 +1290,12 @@ async fn main() -> Result<()> {
                 network_royalties_pk,
                 payment_forward_pk,
             )?;
+
+            if wallet_secret_key.is_some() && evm_network_type == EvmNetwork::Custom {
+                return Err(eyre!(
+                    "Wallet secret key only applies to Arbitrum or Sepolia networks"
+                ));
+            }
 
             let binary_option = get_binary_option(
                 branch,
@@ -1374,6 +1391,7 @@ async fn main() -> Result<()> {
                     uploaders_count,
                     uploader_vm_count,
                     rewards_address,
+                    wallet_secret_key,
                 })
                 .await?;
 
@@ -2153,6 +2171,7 @@ async fn main() -> Result<()> {
             provider,
             public_rpc,
             safe_version,
+            wallet_secret_key,
         } => {
             if desired_uploader_vm_count.is_some() && safe_version.is_none() {
                 return Err(eyre!("The --safe-version argument is required when --desired-uploader-vm-count is used"));
@@ -2191,6 +2210,7 @@ async fn main() -> Result<()> {
                     plan,
                     public_rpc,
                     safe_version,
+                    wallet_secret_key,
                 })
                 .await?;
 
@@ -2476,6 +2496,7 @@ fn validate_and_get_pks(
 fn parse_evm_network(s: &str) -> Result<EvmNetwork, String> {
     match s.to_lowercase().as_str() {
         "arbitrum-one" => Ok(EvmNetwork::ArbitrumOne),
+        "arbitrum-sepolia" => Ok(EvmNetwork::ArbitrumSepolia),
         "custom" => Ok(EvmNetwork::Custom),
         _ => Err(format!("Invalid EVM network type: {}", s)),
     }
