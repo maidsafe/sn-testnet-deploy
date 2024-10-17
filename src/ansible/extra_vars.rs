@@ -11,7 +11,7 @@ use std::collections::HashMap;
 const NODE_S3_BUCKET_URL: &str = "https://sn-node.s3.eu-west-2.amazonaws.com";
 const NODE_MANAGER_S3_BUCKET_URL: &str = "https://sn-node-manager.s3.eu-west-2.amazonaws.com";
 const RPC_CLIENT_BUCKET_URL: &str = "https://sn-node-rpc-client.s3.eu-west-2.amazonaws.com";
-const SAFE_S3_BUCKET_URL: &str = "https://sn-cli.s3.eu-west-2.amazonaws.com";
+const SAFE_S3_BUCKET_URL: &str = "https://autonomi-cli.s3.eu-west-2.amazonaws.com";
 
 #[derive(Default)]
 pub struct ExtraVarsDocBuilder {
