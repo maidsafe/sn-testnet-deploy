@@ -1,1 +1,3 @@
 binary_dir: /usr/local/bin
+autonomi_archive_filename: autonomi-latest-x86_64-unknown-linux-musl.tar.gz
+autonomi_archive_url: https://autonomi-cli.s3.eu-west-2.amazonaws.com/{{ autonomi_archive_filename }}
