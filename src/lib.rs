@@ -761,6 +761,13 @@ impl TestnetDeployer {
             ));
         }
 
+        if let Some(evm_node_count) = options.evm_node_count {
+            args.push((
+                "evm_node_vm_count".to_string(),
+                evm_node_count.to_string(),
+            ));
+        }
+
         if let Some(uploader_vm_count) = options.uploader_vm_count {
             args.push((
                 "uploader_vm_count".to_string(),
