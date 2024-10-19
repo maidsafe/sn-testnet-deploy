@@ -16,12 +16,10 @@ use sn_testnet_deploy::{
     bootstrap::BootstrapOptions,
     deploy::DeployOptions,
     error::Error,
-    get_wallet_directory,
     inventory::{
         get_data_directory, DeploymentInventory, DeploymentInventoryService, VirtualMachine,
     },
     logstash::LogstashDeployBuilder,
-    manage_test_data::TestDataClientBuilder,
     network_commands, notify_slack,
     setup::setup_dotenv_file,
     upscale::UpscaleOptions,
@@ -505,22 +503,6 @@ enum Commands {
         provider: CloudProvider,
     },
     Setup {},
-    /// Run a smoke test against a given network.
-    #[clap(name = "smoke-test")]
-    SmokeTest {
-        /// The name of the environment
-        #[arg(short = 'n', long)]
-        name: String,
-        /// Supply a version number for the safe binary to be used in the smoke test.
-        ///
-        /// This does not apply to a testnet that was deployed with a custom branch reference, in
-        /// which case, the safe binary used for the test will be the one that was built along with
-        /// the deployment.
-        ///
-        /// There should be no 'v' prefix.
-        #[arg(long)]
-        safe_version: Option<String>,
-    },
     /// Start all nodes in an environment.
     ///
     /// This can be useful if all nodes did not upgrade successfully.
@@ -707,22 +689,6 @@ enum Commands {
     /// Manage uploaders for an environment
     #[clap(name = "uploaders", subcommand)]
     Uploaders(UploadersCommands),
-    /// Clean a deployed testnet environment.
-    #[clap(name = "upload-test-data")]
-    UploadTestData {
-        /// The name of the environment.
-        #[arg(short = 'n', long)]
-        name: String,
-        /// Supply a version number for the safe binary to be used in the smoke test.
-        ///
-        /// This does not apply to a testnet that was deployed with a custom branch reference, in
-        /// which case, the safe binary used for the test will be the one that was built along with
-        /// the deployment.
-        ///
-        /// There should be no 'v' prefix.
-        #[arg(long)]
-        safe_version: Option<String>,
-    },
     /// Upscale VMs and node services for an existing network.
     Upscale {
         /// Set to run Ansible with more verbose output.
@@ -1727,30 +1693,6 @@ async fn main() -> Result<()> {
             setup_dotenv_file()?;
             Ok(())
         }
-        Commands::SmokeTest { name, safe_version } => {
-            let wallet_dir_path = get_wallet_directory()?;
-            if wallet_dir_path.exists() {
-                return Err(eyre!(
-                    "A previous wallet directory exists. The smoke test is intended \
-                    to be for a new network."
-                )
-                .suggestion("Please remove your previous wallet directory and try again"));
-            }
-
-            let inventory_path = get_data_directory()?.join(format!("{name}-inventory.json"));
-            if !inventory_path.exists() {
-                return Err(eyre!("There is no inventory for the {name} testnet")
-                    .suggestion("Please run the inventory command to generate it"));
-            }
-
-            let mut inventory = DeploymentInventory::read(&inventory_path)?;
-            let test_data_client = TestDataClientBuilder::default().build()?;
-            test_data_client
-                .smoke_test(&mut inventory, safe_version)
-                .await?;
-            inventory.save()?;
-            Ok(())
-        }
         Commands::Start {
             forks,
             name,
@@ -2127,30 +2069,6 @@ async fn main() -> Result<()> {
                 Ok(())
             }
         },
-        Commands::UploadTestData { name, safe_version } => {
-            let inventory_path = get_data_directory()?.join(format!("{name}-inventory.json"));
-            if !inventory_path.exists() {
-                return Err(eyre!("There is no inventory for the {name} testnet")
-                    .suggestion("Please run the inventory command to generate it"));
-            }
-
-            let mut inventory = DeploymentInventory::read(&inventory_path)?;
-            let random_peer = &inventory.get_random_peer().ok_or_eyre("No peers found")?;
-
-            let test_data_client = TestDataClientBuilder::default().build()?;
-            let uploaded_files = test_data_client
-                .upload_test_data(&name, random_peer, &inventory.binary_option, safe_version)
-                .await?;
-
-            println!("Uploaded files:");
-            for (path, address) in uploaded_files.iter() {
-                println!("{path}: {address}");
-            }
-            inventory.add_uploaded_files(uploaded_files.clone());
-            inventory.save()?;
-
-            Ok(())
-        }
         Commands::Upscale {
             ansible_verbose,
             desired_auditor_vm_count,

@@ -12,7 +12,6 @@ pub mod error;
 pub mod inventory;
 pub mod logs;
 pub mod logstash;
-pub mod manage_test_data;
 pub mod network_commands;
 pub mod rpc_client;
 pub mod s3;
@@ -46,7 +45,6 @@ use std::{
     fs::File,
     io::{BufRead, BufReader, BufWriter, Write},
     net::{IpAddr, SocketAddr},
-    os::unix::fs::PermissionsExt,
     path::{Path, PathBuf},
     process::{Command, Stdio},
     str::FromStr,
@@ -606,9 +604,13 @@ impl TestnetDeployer {
                 &self.working_directory_path,
             )
             .await?;
-            let mut permissions = std::fs::metadata(&rpc_client_path)?.permissions();
-            permissions.set_mode(0o755); // rwxr-xr-x
-            std::fs::set_permissions(&rpc_client_path, permissions)?;
+            #[cfg(unix)]
+            {
+                use std::os::unix::fs::PermissionsExt;
+                let mut permissions = std::fs::metadata(&rpc_client_path)?.permissions();
+                permissions.set_mode(0o755); // rwxr-xr-x
+                std::fs::set_permissions(&rpc_client_path, permissions)?;
+            }
         }
 
         Ok(())
