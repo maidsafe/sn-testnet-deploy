@@ -63,14 +63,18 @@ impl TestnetDeployer {
 
         self.create_or_update_infra(&InfraRunOptions {
             bootstrap_node_vm_count: None,
+            bootstrap_node_vm_size: None,
             enable_build_vm: build_custom_binaries,
             evm_node_count: None,
+            evm_node_vm_size: None,
             genesis_vm_count: None,
             name: options.name.clone(),
             node_vm_count: options.node_vm_count,
+            node_vm_size: None,
             private_node_vm_count: options.private_node_vm_count,
             tfvars_filename: options.environment_type.get_tfvars_filename().to_string(),
             uploader_vm_count: None,
+            uploader_vm_size: None,
         })
         .await
         .map_err(|err| {

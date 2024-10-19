@@ -19,12 +19,14 @@ pub struct DeployOptions {
     pub binary_option: BinaryOption,
     pub bootstrap_node_count: u16,
     pub bootstrap_node_vm_count: Option<u16>,
+    pub bootstrap_node_vm_size: Option<String>,
     pub chunk_size: Option<u64>,
     pub current_inventory: DeploymentInventory,
     pub downloaders_count: u16,
     pub environment_type: EnvironmentType,
     pub env_variables: Option<Vec<(String, String)>>,
     pub evm_network: EvmNetwork,
+    pub evm_node_vm_size: Option<String>,
     pub log_format: Option<LogFormat>,
     pub logstash_details: Option<(String, Vec<SocketAddr>)>,
     pub max_archived_log_files: u16,
@@ -32,13 +34,15 @@ pub struct DeployOptions {
     pub name: String,
     pub node_count: u16,
     pub node_vm_count: Option<u16>,
+    pub node_vm_size: Option<String>,
     pub output_inventory_dir_path: PathBuf,
-    pub private_node_vm_count: Option<u16>,
     pub private_node_count: u16,
+    pub private_node_vm_count: Option<u16>,
     pub public_rpc: bool,
     pub rewards_address: String,
-    pub uploaders_count: u16,
     pub uploader_vm_count: Option<u16>,
+    pub uploader_vm_size: Option<String>,
+    pub uploaders_count: u16,
     pub wallet_secret_key: Option<String>,
 }
 
@@ -53,18 +57,22 @@ impl TestnetDeployer {
 
         self.create_or_update_infra(&InfraRunOptions {
             bootstrap_node_vm_count: options.bootstrap_node_vm_count,
+            bootstrap_node_vm_size: options.bootstrap_node_vm_size.clone(),
             enable_build_vm: build_custom_binaries,
             evm_node_count: match options.evm_network {
                 EvmNetwork::ArbitrumOne => Some(0),
                 EvmNetwork::Custom => Some(1),
                 EvmNetwork::ArbitrumSepolia => Some(0),
             },
+            evm_node_vm_size: options.evm_node_vm_size.clone(),
             genesis_vm_count: Some(1),
             name: options.name.clone(),
             node_vm_count: options.node_vm_count,
+            node_vm_size: options.node_vm_size.clone(),
             private_node_vm_count: options.private_node_vm_count,
             tfvars_filename: options.environment_type.get_tfvars_filename(),
             uploader_vm_count: options.uploader_vm_count,
+            uploader_vm_size: options.uploader_vm_size.clone(),
         })
         .await
         .map_err(|err| {

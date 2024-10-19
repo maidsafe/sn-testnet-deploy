@@ -148,6 +148,7 @@ impl TestnetDeployer {
 
         self.create_or_update_infra(&InfraRunOptions {
             bootstrap_node_vm_count: Some(desired_bootstrap_node_vm_count),
+            bootstrap_node_vm_size: None,
             enable_build_vm: false,
             evm_node_count: Some(
                 match options.current_inventory.environment_details.evm_network {
@@ -156,6 +157,7 @@ impl TestnetDeployer {
                     EvmNetwork::ArbitrumSepolia => 0,
                 },
             ),
+            evm_node_vm_size: None,
             genesis_vm_count: Some(
                 match options
                     .current_inventory
@@ -168,6 +170,7 @@ impl TestnetDeployer {
             ),
             name: options.current_inventory.name.clone(),
             node_vm_count: Some(desired_node_vm_count),
+            node_vm_size: None,
             private_node_vm_count: Some(desired_private_node_vm_count),
             tfvars_filename: options
                 .current_inventory
@@ -176,6 +179,7 @@ impl TestnetDeployer {
                 .get_tfvars_filename()
                 .to_string(),
             uploader_vm_count: Some(desired_uploader_vm_count),
+            uploader_vm_size: None,
         })
         .await
         .map_err(|err| {
