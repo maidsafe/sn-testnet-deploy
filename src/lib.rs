@@ -58,14 +58,18 @@ const ANSIBLE_DEFAULT_FORKS: usize = 50;
 #[derive(Clone, Debug)]
 pub struct InfraRunOptions {
     pub bootstrap_node_vm_count: Option<u16>,
+    pub bootstrap_node_vm_size: Option<String>,
     pub enable_build_vm: bool,
     pub evm_node_count: Option<u16>,
+    pub evm_node_vm_size: Option<String>,
     pub genesis_vm_count: Option<u16>,
     pub name: String,
     pub node_vm_count: Option<u16>,
+    pub node_vm_size: Option<String>,
     pub private_node_vm_count: Option<u16>,
     pub tfvars_filename: String,
     pub uploader_vm_count: Option<u16>,
+    pub uploader_vm_size: Option<String>,
 }
 
 #[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
@@ -225,19 +229,24 @@ impl FromStr for EnvironmentType {
 }
 
 pub struct DeployOptions {
-    pub beta_encryption_key: Option<String>,
-    pub binary_option: BinaryOption,
     pub bootstrap_node_count: u16,
-    pub bootstrap_node_vm_count: u16,
+    pub bootstrap_node_vm_count: Option<u16>,
+    pub bootstrap_node_vm_size: Option<String>,
+    pub binary_option: BinaryOption,
     pub current_inventory: DeploymentInventory,
     pub env_variables: Option<Vec<(String, String)>>,
+    pub evm_network: EvmNetwork,
+    pub evm_node_vm_size: Option<String>,
     pub log_format: Option<LogFormat>,
     pub logstash_details: Option<(String, Vec<SocketAddr>)>,
     pub name: String,
     pub node_count: u16,
-    pub node_vm_count: u16,
+    pub node_vm_count: Option<u16>,
+    pub node_vm_size: Option<String>,
     pub public_rpc: bool,
-    pub uploader_vm_count: u16,
+    pub rewards_address: String,
+    pub uploader_vm_count: Option<u16>,
+    pub uploader_vm_size: Option<String>,
 }
 
 /// Specify the binary option for the deployment.
@@ -297,7 +306,7 @@ impl CloudProvider {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy)]
 pub enum LogFormat {
     Default,
     Json,
@@ -764,10 +773,7 @@ impl TestnetDeployer {
         }
 
         if let Some(evm_node_count) = options.evm_node_count {
-            args.push((
-                "evm_node_vm_count".to_string(),
-                evm_node_count.to_string(),
-            ));
+            args.push(("evm_node_vm_count".to_string(), evm_node_count.to_string()));
         }
 
         if let Some(uploader_vm_count) = options.uploader_vm_count {
@@ -780,6 +786,31 @@ impl TestnetDeployer {
             "use_custom_bin".to_string(),
             options.enable_build_vm.to_string(),
         ));
+
+        if let Some(node_vm_size) = &options.node_vm_size {
+            args.push(("node_droplet_size".to_string(), node_vm_size.clone()));
+        }
+
+        if let Some(bootstrap_vm_size) = &options.bootstrap_node_vm_size {
+            args.push((
+                "bootstrap_droplet_size".to_string(),
+                bootstrap_vm_size.clone(),
+            ));
+        }
+
+        if let Some(uploader_vm_size) = &options.uploader_vm_size {
+            args.push((
+                "uploader_droplet_size".to_string(),
+                uploader_vm_size.clone(),
+            ));
+        }
+
+        if let Some(evm_node_vm_size) = &options.evm_node_vm_size {
+            args.push((
+                "evm_node_droplet_size".to_string(),
+                evm_node_vm_size.clone(),
+            ));
+        }
 
         println!("Running terraform apply...");
         self.terraform_runner

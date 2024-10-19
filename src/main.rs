@@ -249,6 +249,9 @@ enum Commands {
         /// argument.
         #[clap(long)]
         bootstrap_node_vm_count: Option<u16>,
+        /// Override the size of the bootstrap node VMs.
+        #[clap(long)]
+        bootstrap_node_vm_size: Option<String>,
         /// Specify the chunk size for the custom binaries using a 64-bit integer.
         ///
         /// This option only applies if the --branch and --repo-owner arguments are used.
@@ -286,6 +289,9 @@ enum Commands {
         /// If not used, the default is 'arbitrum-one'.
         #[clap(long, default_value = "arbitrum-one", value_parser = parse_evm_network)]
         evm_network_type: EvmNetwork,
+        /// Override the size of the EVM node VMs.
+        #[clap(long)]
+        evm_node_vm_size: Option<String>,
         /// Supply a version number to be used for the faucet binary.
         ///
         /// There should be no 'v' prefix.
@@ -323,6 +329,12 @@ enum Commands {
         /// The name of the Logstash stack to forward logs to.
         #[clap(long, default_value = "main")]
         logstash_stack_name: String,
+        /// The maximum of archived log files to keep. After reaching this limit, the older files are deleted.
+        #[clap(long, default_value = "5")]
+        max_archived_log_files: u16,
+        /// The maximum number of log files to keep. After reaching this limit, the older files are archived.
+        #[clap(long, default_value = "10")]
+        max_log_files: u16,
         /// The name of the environment
         #[arg(short = 'n', long)]
         name: String,
@@ -344,6 +356,9 @@ enum Commands {
         /// argument.
         #[clap(long)]
         node_count: Option<u16>,
+        /// Override the size of the node VMs.
+        #[clap(long)]
+        node_vm_size: Option<String>,
         /// The number of node VMs to create.
         ///
         /// Each VM will run many safenode services.
@@ -352,12 +367,6 @@ enum Commands {
         /// argument.
         #[clap(long)]
         node_vm_count: Option<u16>,
-        /// The maximum of archived log files to keep. After reaching this limit, the older files are deleted.
-        #[clap(long, default_value = "5")]
-        max_archived_log_files: u16,
-        /// The maximum number of log files to keep. After reaching this limit, the older files are archived.
-        #[clap(long, default_value = "10")]
-        max_log_files: u16,
         /// Optionally set the payment forward public key for a custom safenode binary.
         ///
         /// This argument only applies if the '--branch' and '--repo-owner' arguments are used.
@@ -427,14 +436,6 @@ enum Commands {
         /// The features argument is mutually exclusive with the --safenode-version argument.
         #[clap(long, verbatim_doc_comment)]
         safenode_features: Option<Vec<String>>,
-        /// Supply a version number for the safenode binary.
-        ///
-        /// There should be no 'v' prefix.
-        ///
-        /// The version arguments are mutually exclusive with the --branch and --repo-owner
-        /// arguments. You can only supply version numbers or a custom branch, not both.
-        #[arg(long, verbatim_doc_comment)]
-        safenode_version: Option<String>,
         /// Supply a version number for the safenode-manager binary.
         ///
         /// There should be no 'v' prefix.
@@ -443,6 +444,14 @@ enum Commands {
         /// arguments. You can only supply version numbers or a custom branch, not both.
         #[arg(long, verbatim_doc_comment)]
         safenode_manager_version: Option<String>,
+        /// Supply a version number for the safenode binary.
+        ///
+        /// There should be no 'v' prefix.
+        ///
+        /// The version arguments are mutually exclusive with the --branch and --repo-owner
+        /// arguments. You can only supply version numbers or a custom branch, not both.
+        #[arg(long, verbatim_doc_comment)]
+        safenode_version: Option<String>,
         /// The desired number of uploaders per VM.
         #[clap(long, default_value_t = 1)]
         uploaders_count: u16,
@@ -452,6 +461,9 @@ enum Commands {
         /// argument.
         #[clap(long)]
         uploader_vm_count: Option<u16>,
+        /// Override the size of the uploader VMs.
+        #[clap(long)]
+        uploader_vm_size: Option<String>,
         /// A wallet secret key for the uploaders.
         ///
         /// This argument only applies when Arbitrum or Sepolia networks are used.
@@ -1249,6 +1261,10 @@ async fn main() -> Result<()> {
             uploaders_count,
             uploader_vm_count,
             wallet_secret_key,
+            node_vm_size,
+            bootstrap_node_vm_size,
+            uploader_vm_size,
+            evm_node_vm_size,
         } => {
             let network_keys = validate_and_get_pks(
                 foundation_pk,
@@ -1358,6 +1374,10 @@ async fn main() -> Result<()> {
                     uploader_vm_count,
                     rewards_address,
                     wallet_secret_key,
+                    node_vm_size,
+                    bootstrap_node_vm_size,
+                    uploader_vm_size,
+                    evm_node_vm_size,
                 })
                 .await?;
 
