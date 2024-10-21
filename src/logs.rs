@@ -23,7 +23,7 @@ use std::{
 };
 
 impl TestnetDeployer {
-    pub async fn rsync_logs(
+    pub fn rsync_logs(
         &self,
         name: &str,
         resources_only: bool,
@@ -31,7 +31,7 @@ impl TestnetDeployer {
     ) -> Result<()> {
         // take root_dir at the top as `get_all_node_inventory` changes the working dir.
         let root_dir = std::env::current_dir()?;
-        let all_node_inventory = self.get_all_node_inventory(name).await?;
+        let all_node_inventory = self.get_all_node_inventory(name)?;
         let all_node_inventory = if let Some(filter) = vm_filter {
             all_node_inventory
                 .into_iter()
@@ -149,10 +149,10 @@ impl TestnetDeployer {
         Ok(())
     }
 
-    pub async fn ripgrep_logs(&self, name: &str, rg_args: &str) -> Result<()> {
+    pub fn ripgrep_logs(&self, name: &str, rg_args: &str) -> Result<()> {
         // take root_dir at the top as `get_all_node_inventory` changes the working dir.
         let root_dir = std::env::current_dir()?;
-        let all_node_inventory = self.get_all_node_inventory(name).await?;
+        let all_node_inventory = self.get_all_node_inventory(name)?;
         let log_abs_dest = create_initial_log_dir_setup(&root_dir, name, &all_node_inventory)?;
 
         let rg_cmd = format!("rg {rg_args} /var/log/safenode/");
@@ -265,32 +265,30 @@ impl TestnetDeployer {
     ///
     /// It needs to be part of `TestnetDeploy` because the Ansible runner is already setup in that
     /// context.
-    pub async fn copy_logs(&self, name: &str, resources_only: bool) -> Result<()> {
+    pub fn copy_logs(&self, name: &str, resources_only: bool) -> Result<()> {
         let dest = PathBuf::from(".").join("logs").join(name);
         if dest.exists() {
             println!("Removing existing {} directory", dest.to_string_lossy());
             remove(dest.clone())?;
         }
         std::fs::create_dir_all(&dest)?;
-        self.ansible_provisioner
-            .copy_logs(name, resources_only)
-            .await?;
+        self.ansible_provisioner.copy_logs(name, resources_only)?;
         Ok(())
     }
 
     // Return the list of all the node machines.
-    async fn get_all_node_inventory(&self, name: &str) -> Result<Vec<VirtualMachine>> {
+    fn get_all_node_inventory(&self, name: &str) -> Result<Vec<VirtualMachine>> {
         let environments = self.terraform_runner.workspace_list()?;
         if !environments.contains(&name.to_string()) {
             return Err(Error::EnvironmentDoesNotExist(name.to_string()));
         }
-        self.ansible_provisioner.get_all_node_inventory().await
+        self.ansible_provisioner.get_all_node_inventory()
     }
 }
 
 pub async fn get_logs(name: &str) -> Result<()> {
     let dest_path = std::env::current_dir()?.join("logs").join(name);
-    tokio::fs::create_dir_all(dest_path.clone()).await?;
+    std::fs::create_dir_all(dest_path.clone())?;
     let s3_repository = S3Repository {};
     s3_repository
         .download_folder("sn-testnet", &format!("testnet-logs/{name}"), &dest_path)
@@ -298,7 +296,7 @@ pub async fn get_logs(name: &str) -> Result<()> {
     Ok(())
 }
 
-pub async fn reassemble_logs(name: &str) -> Result<()> {
+pub fn reassemble_logs(name: &str) -> Result<()> {
     let src = PathBuf::from(".").join("logs").join(name);
     if !src.exists() {
         return Err(Error::LogsNotRetrievedError(name.to_string()));

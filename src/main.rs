@@ -1520,9 +1520,9 @@ async fn main() -> Result<()> {
                     .build()?;
                 testnet_deployer.init().await?;
                 let inventory_service = DeploymentInventoryService::from(&testnet_deployer);
-                inventory_service.setup_environment_inventory(&name).await?;
+                inventory_service.setup_environment_inventory(&name)?;
 
-                testnet_deployer.cleanup_node_logs(setup_cron).await?;
+                testnet_deployer.cleanup_node_logs(setup_cron)?;
                 Ok(())
             }
             LogCommands::Copy {
@@ -1536,9 +1536,9 @@ async fn main() -> Result<()> {
                     .build()?;
                 testnet_deployer.init().await?;
                 let inventory_service = DeploymentInventoryService::from(&testnet_deployer);
-                inventory_service.setup_environment_inventory(&name).await?;
+                inventory_service.setup_environment_inventory(&name)?;
 
-                testnet_deployer.copy_logs(&name, resources_only).await?;
+                testnet_deployer.copy_logs(&name, resources_only)?;
                 Ok(())
             }
             LogCommands::Get { name } => {
@@ -1546,7 +1546,7 @@ async fn main() -> Result<()> {
                 Ok(())
             }
             LogCommands::Reassemble { name } => {
-                sn_testnet_deploy::logs::reassemble_logs(&name).await?;
+                sn_testnet_deploy::logs::reassemble_logs(&name)?;
                 Ok(())
             }
             LogCommands::Rg {
@@ -1560,9 +1560,9 @@ async fn main() -> Result<()> {
                     .build()?;
                 testnet_deployer.init().await?;
                 let inventory_service = DeploymentInventoryService::from(&testnet_deployer);
-                inventory_service.setup_environment_inventory(&name).await?;
+                inventory_service.setup_environment_inventory(&name)?;
 
-                testnet_deployer.ripgrep_logs(&name, &args).await?;
+                testnet_deployer.ripgrep_logs(&name, &args)?;
                 Ok(())
             }
 
@@ -1582,11 +1582,9 @@ async fn main() -> Result<()> {
                     .build()?;
                 testnet_deployer.init().await?;
                 let inventory_service = DeploymentInventoryService::from(&testnet_deployer);
-                inventory_service.setup_environment_inventory(&name).await?;
+                inventory_service.setup_environment_inventory(&name)?;
 
-                testnet_deployer
-                    .rsync_logs(&name, resources_only, vm_filter)
-                    .await?;
+                testnet_deployer.rsync_logs(&name, resources_only, vm_filter)?;
                 Ok(())
             }
         },
@@ -1595,7 +1593,7 @@ async fn main() -> Result<()> {
                 let logstash_deploy = LogstashDeployBuilder::default()
                     .provider(provider)
                     .build()?;
-                logstash_deploy.clean(&name).await?;
+                logstash_deploy.clean(&name)?;
                 Ok(())
             }
             LogstashCommands::Deploy {
@@ -1607,7 +1605,7 @@ async fn main() -> Result<()> {
                     .provider(provider)
                     .build()?;
                 logstash_deploy.init(&name).await?;
-                logstash_deploy.deploy(&name, vm_count).await?;
+                logstash_deploy.deploy(&name, vm_count)?;
                 Ok(())
             }
         },
@@ -1704,9 +1702,7 @@ async fn main() -> Result<()> {
             }
 
             testnet_deployer.init().await?;
-            testnet_deployer
-                .plan(None, inventory.environment_details.environment_type)
-                .await?;
+            testnet_deployer.plan(None, inventory.environment_details.environment_type)?;
             Ok(())
         }
         Commands::Setup {} => {
@@ -1735,7 +1731,7 @@ async fn main() -> Result<()> {
                 return Err(eyre!("The {name} environment does not exist"));
             }
 
-            testnet_deployer.start().await?;
+            testnet_deployer.start()?;
 
             Ok(())
         }
@@ -1769,7 +1765,7 @@ async fn main() -> Result<()> {
                 None
             };
 
-            testnet_deployer.start_telegraf(custom_inventory).await?;
+            testnet_deployer.start_telegraf(custom_inventory)?;
 
             Ok(())
         }
@@ -1795,7 +1791,7 @@ async fn main() -> Result<()> {
                 return Err(eyre!("The {name} environment does not exist"));
             }
 
-            testnet_deployer.status().await?;
+            testnet_deployer.status()?;
             Ok(())
         }
         Commands::StopTelegraf {
@@ -1828,7 +1824,7 @@ async fn main() -> Result<()> {
                 None
             };
 
-            testnet_deployer.stop_telegraf(custom_inventory).await?;
+            testnet_deployer.stop_telegraf(custom_inventory)?;
 
             Ok(())
         }
@@ -1911,21 +1907,19 @@ async fn main() -> Result<()> {
                 .environment_name(&name)
                 .provider(provider)
                 .build()?;
-            testnet_deployer
-                .upgrade(UpgradeOptions {
-                    ansible_verbose,
-                    custom_inventory,
-                    env_variables,
-                    faucet_version,
-                    force_faucet,
-                    force_safenode,
-                    forks,
-                    interval,
-                    name: name.clone(),
-                    provider,
-                    safenode_version,
-                })
-                .await?;
+            testnet_deployer.upgrade(UpgradeOptions {
+                ansible_verbose,
+                custom_inventory,
+                env_variables,
+                faucet_version,
+                force_faucet,
+                force_safenode,
+                forks,
+                interval,
+                name: name.clone(),
+                provider,
+                safenode_version,
+            })?;
 
             // Recreate the deployer with an increased number of forks for retrieving the status.
             let testnet_deployer = TestnetDeployBuilder::default()
@@ -1933,7 +1927,7 @@ async fn main() -> Result<()> {
                 .environment_name(&name)
                 .provider(provider)
                 .build()?;
-            testnet_deployer.status().await?;
+            testnet_deployer.status()?;
 
             Ok(())
         }
@@ -1963,9 +1957,7 @@ async fn main() -> Result<()> {
                 None
             };
 
-            testnet_deployer
-                .upgrade_node_manager(version.parse()?, custom_inventory)
-                .await?;
+            testnet_deployer.upgrade_node_manager(version.parse()?, custom_inventory)?;
             Ok(())
         }
         Commands::UpgradeNodeTelegrafConfig {
@@ -1990,7 +1982,7 @@ async fn main() -> Result<()> {
                 return Err(eyre!("The {name} environment does not exist"));
             }
 
-            testnet_deployer.upgrade_node_telegraf(&name).await?;
+            testnet_deployer.upgrade_node_telegraf(&name)?;
 
             Ok(())
         }
@@ -2016,7 +2008,7 @@ async fn main() -> Result<()> {
                 return Err(eyre!("The {name} environment does not exist"));
             }
 
-            testnet_deployer.upgrade_uploader_telegraf(&name).await?;
+            testnet_deployer.upgrade_uploader_telegraf(&name)?;
 
             Ok(())
         }
@@ -2128,29 +2120,27 @@ async fn main() -> Result<()> {
                 .generate_or_retrieve_inventory(&name, true, None)
                 .await?;
 
-            testnet_deployer
-                .upscale(&UpscaleOptions {
-                    ansible_verbose,
-                    current_inventory: inventory,
-                    desired_auditor_vm_count,
-                    desired_bootstrap_node_count,
-                    desired_bootstrap_node_vm_count,
-                    desired_node_count,
-                    desired_node_vm_count,
-                    desired_private_node_count,
-                    desired_private_node_vm_count,
-                    desired_uploader_vm_count,
-                    desired_uploaders_count,
-                    downloaders_count,
-                    max_archived_log_files,
-                    max_log_files,
-                    infra_only,
-                    plan,
-                    public_rpc,
-                    safe_version,
-                    wallet_secret_key,
-                })
-                .await?;
+            testnet_deployer.upscale(&UpscaleOptions {
+                ansible_verbose,
+                current_inventory: inventory,
+                desired_auditor_vm_count,
+                desired_bootstrap_node_count,
+                desired_bootstrap_node_vm_count,
+                desired_node_count,
+                desired_node_vm_count,
+                desired_private_node_count,
+                desired_private_node_vm_count,
+                desired_uploader_vm_count,
+                desired_uploaders_count,
+                downloaders_count,
+                max_archived_log_files,
+                max_log_files,
+                infra_only,
+                plan,
+                public_rpc,
+                safe_version,
+                wallet_secret_key,
+            })?;
 
             if plan {
                 return Ok(());

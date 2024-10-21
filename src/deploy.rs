@@ -74,7 +74,6 @@ impl TestnetDeployer {
             uploader_vm_count: options.uploader_vm_count,
             uploader_vm_size: options.uploader_vm_size.clone(),
         })
-        .await
         .map_err(|err| {
             println!("Failed to create infra {err:?}");
             err
@@ -117,7 +116,6 @@ impl TestnetDeployer {
                 .print_ansible_run_banner(n, total, "Provision EVM Node");
             self.ansible_provisioner
                 .provision_evm_nodes(&provision_options)
-                .await
                 .map_err(|err| {
                     println!("Failed to provision evm node {err:?}");
                     err
@@ -126,7 +124,6 @@ impl TestnetDeployer {
 
             Some(
                 get_evm_testnet_data(&self.ansible_provisioner.ansible_runner, &self.ssh_client)
-                    .await
                     .map_err(|err| {
                         println!("Failed to get evm testnet data {err:?}");
                         err
@@ -154,7 +151,6 @@ impl TestnetDeployer {
                 .print_ansible_run_banner(n, total, "Build Custom Binaries");
             self.ansible_provisioner
                 .build_safe_network_binaries(&provision_options)
-                .await
                 .map_err(|err| {
                     println!("Failed to build safe network binaries {err:?}");
                     err
@@ -166,7 +162,6 @@ impl TestnetDeployer {
             .print_ansible_run_banner(n, total, "Provision Genesis Node");
         self.ansible_provisioner
             .provision_genesis_node(&provision_options, evm_testnet_data.clone())
-            .await
             .map_err(|err| {
                 println!("Failed to provision genesis node {err:?}");
                 err
@@ -174,7 +169,6 @@ impl TestnetDeployer {
         n += 1;
         let (genesis_multiaddr, _) =
             get_genesis_multiaddr(&self.ansible_provisioner.ansible_runner, &self.ssh_client)
-                .await
                 .map_err(|err| {
                     println!("Failed to get genesis multiaddr {err:?}");
                     err
@@ -184,16 +178,12 @@ impl TestnetDeployer {
         let mut node_provision_failed = false;
         self.ansible_provisioner
             .print_ansible_run_banner(n, total, "Provision Bootstrap Nodes");
-        match self
-            .ansible_provisioner
-            .provision_nodes(
-                &provision_options,
-                &genesis_multiaddr,
-                NodeType::Bootstrap,
-                evm_testnet_data.clone(),
-            )
-            .await
-        {
+        match self.ansible_provisioner.provision_nodes(
+            &provision_options,
+            &genesis_multiaddr,
+            NodeType::Bootstrap,
+            evm_testnet_data.clone(),
+        ) {
             Ok(()) => {
                 println!("Provisioned bootstrap nodes");
             }
@@ -206,16 +196,12 @@ impl TestnetDeployer {
 
         self.ansible_provisioner
             .print_ansible_run_banner(n, total, "Provision Normal Nodes");
-        match self
-            .ansible_provisioner
-            .provision_nodes(
-                &provision_options,
-                &genesis_multiaddr,
-                NodeType::Normal,
-                evm_testnet_data.clone(),
-            )
-            .await
-        {
+        match self.ansible_provisioner.provision_nodes(
+            &provision_options,
+            &genesis_multiaddr,
+            NodeType::Normal,
+            evm_testnet_data.clone(),
+        ) {
             Ok(()) => {
                 println!("Provisioned normal nodes");
             }
@@ -231,7 +217,6 @@ impl TestnetDeployer {
                 .ansible_provisioner
                 .ansible_runner
                 .get_inventory(AnsibleInventoryType::PrivateNodes, true)
-                .await
                 .map_err(|err| {
                     println!("Failed to obtain the inventory of private node: {err:?}");
                     err
@@ -242,7 +227,6 @@ impl TestnetDeployer {
                 .print_ansible_run_banner(n, total, "Provision NAT Gateway");
             self.ansible_provisioner
                 .provision_nat_gateway(&provision_options)
-                .await
                 .map_err(|err| {
                     println!("Failed to provision NAT gateway {err:?}");
                     err
@@ -252,15 +236,11 @@ impl TestnetDeployer {
 
             self.ansible_provisioner
                 .print_ansible_run_banner(n, total, "Provision Private Nodes");
-            match self
-                .ansible_provisioner
-                .provision_private_nodes(
-                    &mut provision_options,
-                    &genesis_multiaddr,
-                    evm_testnet_data.clone(),
-                )
-                .await
-            {
+            match self.ansible_provisioner.provision_private_nodes(
+                &mut provision_options,
+                &genesis_multiaddr,
+                evm_testnet_data.clone(),
+            ) {
                 Ok(()) => {
                     println!("Provisioned private nodes");
                 }
@@ -277,7 +257,6 @@ impl TestnetDeployer {
                 .print_ansible_run_banner(n, total, "Provision Uploaders");
             self.ansible_provisioner
                 .provision_uploaders(&provision_options, &genesis_multiaddr, evm_testnet_data)
-                .await
                 .map_err(|err| {
                     println!("Failed to provision uploaders {err:?}");
                     err

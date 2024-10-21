@@ -216,7 +216,7 @@ impl LogstashDeploy {
         Ok(())
     }
 
-    pub async fn create_infra(&self, name: &str, vm_count: u16) -> Result<()> {
+    pub fn create_infra(&self, name: &str, vm_count: u16) -> Result<()> {
         println!("Selecting {name} workspace...");
         self.terraform_runner.workspace_select(name)?;
         println!("Running terraform apply...");
@@ -225,12 +225,11 @@ impl LogstashDeploy {
         Ok(())
     }
 
-    pub async fn provision(&self, name: &str) -> Result<()> {
+    pub fn provision(&self, name: &str) -> Result<()> {
         println!("Obtaining IP address for Logstash VM...");
         let logstash_inventory = self
             .ansible_runner
-            .get_inventory(AnsibleInventoryType::Logstash, false)
-            .await?;
+            .get_inventory(AnsibleInventoryType::Logstash, false)?;
         let logstash_ip = logstash_inventory[0].public_ip_addr;
         self.ssh_client
             .wait_for_ssh_availability(&logstash_ip, &self.cloud_provider.get_ssh_user())?;
@@ -245,13 +244,13 @@ impl LogstashDeploy {
         Ok(())
     }
 
-    pub async fn deploy(&self, name: &str, vm_count: u16) -> Result<()> {
-        self.create_infra(name, vm_count).await?;
-        self.provision(name).await?;
+    pub fn deploy(&self, name: &str, vm_count: u16) -> Result<()> {
+        self.create_infra(name, vm_count)?;
+        self.provision(name)?;
         Ok(())
     }
 
-    pub async fn clean(&self, name: &str) -> Result<()> {
+    pub fn clean(&self, name: &str) -> Result<()> {
         do_clean(
             name,
             None,

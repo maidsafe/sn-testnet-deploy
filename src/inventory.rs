@@ -142,32 +142,27 @@ impl DeploymentInventoryService {
 
         let genesis_vm = self
             .ansible_runner
-            .get_inventory(AnsibleInventoryType::Genesis, false)
-            .await?;
+            .get_inventory(AnsibleInventoryType::Genesis, false)?;
 
         let mut misc_vms = Vec::new();
         let build_vm = self
             .ansible_runner
-            .get_inventory(AnsibleInventoryType::Build, false)
-            .await?;
+            .get_inventory(AnsibleInventoryType::Build, false)?;
         misc_vms.extend(build_vm);
 
         let nat_gateway_vm = self
             .ansible_runner
-            .get_inventory(AnsibleInventoryType::NatGateway, false)
-            .await?
+            .get_inventory(AnsibleInventoryType::NatGateway, false)?
             .first()
             .cloned();
 
         let generic_node_vms = self
             .ansible_runner
-            .get_inventory(AnsibleInventoryType::Nodes, false)
-            .await?;
+            .get_inventory(AnsibleInventoryType::Nodes, false)?;
 
         let private_node_vms = self
             .ansible_runner
-            .get_inventory(AnsibleInventoryType::PrivateNodes, false)
-            .await?;
+            .get_inventory(AnsibleInventoryType::PrivateNodes, false)?;
 
         // Create static inventory for private nodes. Will be used during ansible-playbook run.
         generate_private_node_static_environment_inventory(
@@ -186,13 +181,11 @@ impl DeploymentInventoryService {
 
         let bootstrap_node_vms = self
             .ansible_runner
-            .get_inventory(AnsibleInventoryType::BootstrapNodes, false)
-            .await?;
+            .get_inventory(AnsibleInventoryType::BootstrapNodes, false)?;
 
         let uploader_vms = self
             .ansible_runner
-            .get_inventory(AnsibleInventoryType::Uploaders, false)
-            .await?;
+            .get_inventory(AnsibleInventoryType::Uploaders, false)?;
 
         println!("Retrieving node registries from all VMs...");
         let mut failed_node_registry_vms = Vec::new();
@@ -284,14 +277,14 @@ impl DeploymentInventoryService {
             }
         };
 
-        let (genesis_multiaddr, genesis_ip) =
-            if environment_details.deployment_type == DeploymentType::New {
-                let (multiaddr, ip) =
-                    get_genesis_multiaddr(&self.ansible_runner, &self.ssh_client).await?;
-                (Some(multiaddr), Some(ip))
-            } else {
-                (None, None)
-            };
+        let (genesis_multiaddr, genesis_ip) = if environment_details.deployment_type
+            == DeploymentType::New
+        {
+            let (multiaddr, ip) = get_genesis_multiaddr(&self.ansible_runner, &self.ssh_client)?;
+            (Some(multiaddr), Some(ip))
+        } else {
+            (None, None)
+        };
         let inventory = DeploymentInventory {
             binary_option,
             bootstrap_node_vms,
@@ -317,7 +310,7 @@ impl DeploymentInventoryService {
     /// the NAT gateway if it exists.
     ///
     /// This is used when 'generate_or_retrieve_inventory' is not used, but you still need to set up the inventory files.
-    pub async fn setup_environment_inventory(&self, name: &str) -> Result<()> {
+    pub fn setup_environment_inventory(&self, name: &str) -> Result<()> {
         let output_inventory_dir_path = self
             .working_directory_path
             .join("ansible")
@@ -330,15 +323,13 @@ impl DeploymentInventoryService {
 
         let nat_gateway_vm = self
             .ansible_runner
-            .get_inventory(AnsibleInventoryType::NatGateway, false)
-            .await?
+            .get_inventory(AnsibleInventoryType::NatGateway, false)?
             .first()
             .cloned();
 
         let private_node_vms = self
             .ansible_runner
-            .get_inventory(AnsibleInventoryType::PrivateNodes, false)
-            .await?;
+            .get_inventory(AnsibleInventoryType::PrivateNodes, false)?;
 
         // Create static inventory for private nodes. Will be used during ansible-playbook run.
         generate_private_node_static_environment_inventory(

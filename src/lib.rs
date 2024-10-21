@@ -51,7 +51,6 @@ use std::{
     time::{Duration, Instant},
 };
 use tar::Archive;
-use tokio::time::{sleep, Duration as TokioDuration};
 
 const ANSIBLE_DEFAULT_FORKS: usize = 50;
 
@@ -625,7 +624,7 @@ impl TestnetDeployer {
         Ok(())
     }
 
-    pub async fn plan(
+    pub fn plan(
         &self,
         vars: Option<Vec<(String, String)>>,
         environment_type: EnvironmentType,
@@ -638,8 +637,8 @@ impl TestnetDeployer {
         Ok(())
     }
 
-    pub async fn start(&self) -> Result<()> {
-        self.ansible_provisioner.start_nodes().await?;
+    pub fn start(&self) -> Result<()> {
+        self.ansible_provisioner.start_nodes()?;
         Ok(())
     }
 
@@ -648,8 +647,8 @@ impl TestnetDeployer {
     /// First, a playbook runs `safenode-manager status` against all the machines, to get the
     /// current state of all the nodes. Then all the node registry files are retrieved and
     /// deserialized to a `NodeRegistry`, allowing us to output the status of each node on each VM.
-    pub async fn status(&self) -> Result<()> {
-        self.ansible_provisioner.status().await?;
+    pub fn status(&self) -> Result<()> {
+        self.ansible_provisioner.status()?;
 
         let bootstrap_node_registries = self
             .ansible_provisioner
@@ -673,55 +672,48 @@ impl TestnetDeployer {
         Ok(())
     }
 
-    pub async fn cleanup_node_logs(&self, setup_cron: bool) -> Result<()> {
+    pub fn cleanup_node_logs(&self, setup_cron: bool) -> Result<()> {
+        self.ansible_provisioner.cleanup_node_logs(setup_cron)?;
+        Ok(())
+    }
+
+    pub fn start_telegraf(&self, custom_inventory: Option<Vec<VirtualMachine>>) -> Result<()> {
         self.ansible_provisioner
-            .cleanup_node_logs(setup_cron)
-            .await?;
+            .start_telegraf(&self.environment_name, custom_inventory)?;
         Ok(())
     }
 
-    pub async fn start_telegraf(
-        &self,
-        custom_inventory: Option<Vec<VirtualMachine>>,
-    ) -> Result<()> {
+    pub fn stop_telegraf(&self, custom_inventory: Option<Vec<VirtualMachine>>) -> Result<()> {
         self.ansible_provisioner
-            .start_telegraf(&self.environment_name, custom_inventory)
-            .await?;
+            .stop_telegraf(&self.environment_name, custom_inventory)?;
         Ok(())
     }
 
-    pub async fn stop_telegraf(&self, custom_inventory: Option<Vec<VirtualMachine>>) -> Result<()> {
-        self.ansible_provisioner
-            .stop_telegraf(&self.environment_name, custom_inventory)
-            .await?;
+    pub fn upgrade(&self, options: UpgradeOptions) -> Result<()> {
+        self.ansible_provisioner.upgrade_nodes(&options)?;
         Ok(())
     }
 
-    pub async fn upgrade(&self, options: UpgradeOptions) -> Result<()> {
-        self.ansible_provisioner.upgrade_nodes(&options).await?;
-        Ok(())
-    }
-
-    pub async fn upgrade_node_manager(
+    pub fn upgrade_node_manager(
         &self,
         version: Version,
         custom_inventory: Option<Vec<VirtualMachine>>,
     ) -> Result<()> {
-        self.ansible_provisioner
-            .upgrade_node_manager(&self.environment_name, &version, custom_inventory)
-            .await?;
+        self.ansible_provisioner.upgrade_node_manager(
+            &self.environment_name,
+            &version,
+            custom_inventory,
+        )?;
         Ok(())
     }
 
-    pub async fn upgrade_node_telegraf(&self, name: &str) -> Result<()> {
-        self.ansible_provisioner.upgrade_node_telegraf(name).await?;
+    pub fn upgrade_node_telegraf(&self, name: &str) -> Result<()> {
+        self.ansible_provisioner.upgrade_node_telegraf(name)?;
         Ok(())
     }
 
-    pub async fn upgrade_uploader_telegraf(&self, name: &str) -> Result<()> {
-        self.ansible_provisioner
-            .upgrade_uploader_telegraf(name)
-            .await?;
+    pub fn upgrade_uploader_telegraf(&self, name: &str) -> Result<()> {
+        self.ansible_provisioner.upgrade_uploader_telegraf(name)?;
         Ok(())
     }
 
@@ -741,7 +733,7 @@ impl TestnetDeployer {
         Ok(())
     }
 
-    async fn create_or_update_infra(&self, options: &InfraRunOptions) -> Result<()> {
+    fn create_or_update_infra(&self, options: &InfraRunOptions) -> Result<()> {
         let start = Instant::now();
         println!("Selecting {} workspace...", options.name);
         self.terraform_runner.workspace_select(&options.name)?;
@@ -824,13 +816,11 @@ impl TestnetDeployer {
 /// Shared Helpers
 ///
 
-pub async fn get_genesis_multiaddr(
+pub fn get_genesis_multiaddr(
     ansible_runner: &AnsibleRunner,
     ssh_client: &SshClient,
 ) -> Result<(String, IpAddr)> {
-    let genesis_inventory = ansible_runner
-        .get_inventory(AnsibleInventoryType::Genesis, true)
-        .await?;
+    let genesis_inventory = ansible_runner.get_inventory(AnsibleInventoryType::Genesis, true)?;
     let genesis_ip = genesis_inventory[0].public_ip_addr;
 
     let multiaddr =
@@ -850,13 +840,11 @@ pub async fn get_genesis_multiaddr(
     Ok((multiaddr, genesis_ip))
 }
 
-pub async fn get_evm_testnet_data(
+pub fn get_evm_testnet_data(
     ansible_runner: &AnsibleRunner,
     ssh_client: &SshClient,
 ) -> Result<EvmCustomTestnetData> {
-    let evm_inventory = ansible_runner
-        .get_inventory(AnsibleInventoryType::EvmNodes, true)
-        .await?;
+    let evm_inventory = ansible_runner.get_inventory(AnsibleInventoryType::EvmNodes, true)?;
     if evm_inventory.is_empty() {
         return Err(Error::EvmNodeNotFound);
     }
@@ -865,7 +853,7 @@ pub async fn get_evm_testnet_data(
     let csv_file_path = "/home/safe/.local/share/safe/evm_testnet_data.csv";
 
     const MAX_ATTEMPTS: u8 = 5;
-    const RETRY_DELAY: TokioDuration = TokioDuration::from_secs(5);
+    const RETRY_DELAY: Duration = Duration::from_secs(5);
 
     for attempt in 1..=MAX_ATTEMPTS {
         match ssh_client.run_command(&evm_ip, "safe", &format!("cat {}", csv_file_path), false) {
@@ -898,19 +886,17 @@ pub async fn get_evm_testnet_data(
                 );
             }
         }
-        sleep(RETRY_DELAY).await;
+        std::thread::sleep(RETRY_DELAY);
     }
 
     Err(Error::EvmTestnetDataNotFound)
 }
 
-pub async fn get_multiaddr(
+pub fn get_multiaddr(
     ansible_runner: &AnsibleRunner,
     ssh_client: &SshClient,
 ) -> Result<(String, IpAddr)> {
-    let node_inventory = ansible_runner
-        .get_inventory(AnsibleInventoryType::Nodes, true)
-        .await?;
+    let node_inventory = ansible_runner.get_inventory(AnsibleInventoryType::Nodes, true)?;
     let node_ip = node_inventory[0].public_ip_addr;
 
     let multiaddr =
@@ -943,11 +929,11 @@ pub async fn get_and_extract_archive_from_s3(
     s3_repository
         .download_object(bucket_name, archive_bucket_path, &archive_dest_path)
         .await?;
-    extract_archive(&archive_dest_path, dest_path).await?;
+    extract_archive(&archive_dest_path, dest_path)?;
     Ok(())
 }
 
-pub async fn extract_archive(archive_path: &Path, dest_path: &Path) -> Result<()> {
+pub fn extract_archive(archive_path: &Path, dest_path: &Path) -> Result<()> {
     let archive_file = File::open(archive_path)?;
     let decoder = GzDecoder::new(archive_file);
     let mut archive = Archive::new(decoder);

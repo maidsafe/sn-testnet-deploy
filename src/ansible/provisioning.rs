@@ -132,13 +132,12 @@ impl AnsibleProvisioner {
         }
     }
 
-    pub async fn build_safe_network_binaries(&self, options: &ProvisionOptions) -> Result<()> {
+    pub fn build_safe_network_binaries(&self, options: &ProvisionOptions) -> Result<()> {
         let start = Instant::now();
         println!("Obtaining IP address for build VM...");
         let build_inventory = self
             .ansible_runner
-            .get_inventory(AnsibleInventoryType::Build, true)
-            .await?;
+            .get_inventory(AnsibleInventoryType::Build, true)?;
         let build_ip = build_inventory[0].public_ip_addr;
         self.ssh_client
             .wait_for_ssh_availability(&build_ip, &self.cloud_provider.get_ssh_user())?;
@@ -154,7 +153,7 @@ impl AnsibleProvisioner {
         Ok(())
     }
 
-    pub async fn cleanup_node_logs(&self, setup_cron: bool) -> Result<()> {
+    pub fn cleanup_node_logs(&self, setup_cron: bool) -> Result<()> {
         for node_inv_type in AnsibleInventoryType::iter_node_type() {
             self.ansible_runner.run_playbook(
                 AnsiblePlaybook::CleanupLogs,
@@ -166,7 +165,7 @@ impl AnsibleProvisioner {
         Ok(())
     }
 
-    pub async fn copy_logs(&self, name: &str, resources_only: bool) -> Result<()> {
+    pub fn copy_logs(&self, name: &str, resources_only: bool) -> Result<()> {
         for node_inv_type in AnsibleInventoryType::iter_node_type() {
             self.ansible_runner.run_playbook(
                 AnsiblePlaybook::CopyLogs,
@@ -179,14 +178,10 @@ impl AnsibleProvisioner {
         Ok(())
     }
 
-    pub async fn get_all_node_inventory(&self) -> Result<Vec<VirtualMachine>> {
+    pub fn get_all_node_inventory(&self) -> Result<Vec<VirtualMachine>> {
         let mut all_node_inventory = Vec::new();
         for node_inv_type in AnsibleInventoryType::iter_node_type() {
-            all_node_inventory.extend(
-                self.ansible_runner
-                    .get_inventory(node_inv_type, false)
-                    .await?,
-            );
+            all_node_inventory.extend(self.ansible_runner.get_inventory(node_inv_type, false)?);
         }
 
         Ok(all_node_inventory)
@@ -248,13 +243,12 @@ impl AnsibleProvisioner {
         Ok(deployment_registries)
     }
 
-    pub async fn provision_evm_nodes(&self, options: &ProvisionOptions) -> Result<()> {
+    pub fn provision_evm_nodes(&self, options: &ProvisionOptions) -> Result<()> {
         let start = Instant::now();
         println!("Obtaining IP address for EVM nodes...");
         let evm_node_inventory = self
             .ansible_runner
-            .get_inventory(AnsibleInventoryType::EvmNodes, true)
-            .await?;
+            .get_inventory(AnsibleInventoryType::EvmNodes, true)?;
         let evm_node_ip = evm_node_inventory[0].public_ip_addr;
         self.ssh_client
             .wait_for_ssh_availability(&evm_node_ip, &self.cloud_provider.get_ssh_user())?;
@@ -272,7 +266,7 @@ impl AnsibleProvisioner {
         Ok(())
     }
 
-    pub async fn provision_genesis_node(
+    pub fn provision_genesis_node(
         &self,
         options: &ProvisionOptions,
         evm_testnet_data: Option<EvmCustomTestnetData>,
@@ -280,8 +274,7 @@ impl AnsibleProvisioner {
         let start = Instant::now();
         let genesis_inventory = self
             .ansible_runner
-            .get_inventory(AnsibleInventoryType::Genesis, true)
-            .await?;
+            .get_inventory(AnsibleInventoryType::Genesis, true)?;
         let genesis_ip = genesis_inventory[0].public_ip_addr;
         self.ssh_client
             .wait_for_ssh_availability(&genesis_ip, &self.cloud_provider.get_ssh_user())?;
@@ -302,12 +295,11 @@ impl AnsibleProvisioner {
         Ok(())
     }
 
-    pub async fn provision_nat_gateway(&self, options: &ProvisionOptions) -> Result<()> {
+    pub fn provision_nat_gateway(&self, options: &ProvisionOptions) -> Result<()> {
         let start = Instant::now();
         let nat_gateway_inventory = self
             .ansible_runner
-            .get_inventory(AnsibleInventoryType::NatGateway, true)
-            .await?;
+            .get_inventory(AnsibleInventoryType::NatGateway, true)?;
         let nat_gateway_ip = nat_gateway_inventory[0].public_ip_addr;
         self.ssh_client
             .wait_for_ssh_availability(&nat_gateway_ip, &self.cloud_provider.get_ssh_user())?;
@@ -335,7 +327,7 @@ impl AnsibleProvisioner {
         Ok(())
     }
 
-    pub async fn provision_nodes(
+    pub fn provision_nodes(
         &self,
         options: &ProvisionOptions,
         initial_contact_peer: &str,
@@ -359,10 +351,7 @@ impl AnsibleProvisioner {
         // after the genesis node has been provisioned. However, for a bootstrap deploy, we need to
         // check that SSH is available before proceeding.
         println!("Obtaining IP addresses for nodes...");
-        let inventory = self
-            .ansible_runner
-            .get_inventory(inventory_type, true)
-            .await?;
+        let inventory = self.ansible_runner.get_inventory(inventory_type, true)?;
 
         println!("Waiting for SSH availability on {node_type:?} nodes...");
         for vm in inventory.iter() {
@@ -397,7 +386,7 @@ impl AnsibleProvisioner {
         Ok(())
     }
 
-    pub async fn provision_private_nodes(
+    pub fn provision_private_nodes(
         &self,
         options: &mut ProvisionOptions,
         initial_contact_peer: &str,
@@ -408,7 +397,6 @@ impl AnsibleProvisioner {
         let nat_gateway_inventory = self
             .ansible_runner
             .get_inventory(AnsibleInventoryType::NatGateway, true)
-            .await
             .map_err(|err| {
                 println!("Failed to get NAT Gateway inventory {err:?}");
                 err
@@ -434,15 +422,14 @@ impl AnsibleProvisioner {
             initial_contact_peer,
             NodeType::Private,
             evm_testnet_data,
-        )
-        .await?;
+        )?;
 
         print_duration(start.elapsed());
         Ok(())
     }
 
     /// Provision the faucet service on the genesis node and start it.
-    pub async fn provision_and_start_faucet(
+    pub fn provision_and_start_faucet(
         &self,
         options: &ProvisionOptions,
         genesis_multiaddr: &str,
@@ -464,7 +451,7 @@ impl AnsibleProvisioner {
     }
 
     /// Stop the faucet service on the genesis node. If the faucet is not provisioned, this will also provision it.
-    pub async fn provision_and_stop_faucet(
+    pub fn provision_and_stop_faucet(
         &self,
         options: &ProvisionOptions,
         genesis_multiaddr: &str,
@@ -485,7 +472,7 @@ impl AnsibleProvisioner {
         Ok(())
     }
 
-    pub async fn provision_safenode_rpc_client(
+    pub fn provision_safenode_rpc_client(
         &self,
         options: &ProvisionOptions,
         genesis_multiaddr: &str,
@@ -505,7 +492,7 @@ impl AnsibleProvisioner {
         Ok(())
     }
 
-    pub async fn provision_uploaders(
+    pub fn provision_uploaders(
         &self,
         options: &ProvisionOptions,
         genesis_multiaddr: &str,
@@ -527,7 +514,7 @@ impl AnsibleProvisioner {
         Ok(())
     }
 
-    pub async fn start_nodes(&self) -> Result<()> {
+    pub fn start_nodes(&self) -> Result<()> {
         for node_inv_type in AnsibleInventoryType::iter_node_type() {
             self.ansible_runner
                 .run_playbook(AnsiblePlaybook::StartNodes, node_inv_type, None)?;
@@ -536,7 +523,7 @@ impl AnsibleProvisioner {
         Ok(())
     }
 
-    pub async fn status(&self) -> Result<()> {
+    pub fn status(&self) -> Result<()> {
         for node_inv_type in AnsibleInventoryType::iter_node_type() {
             self.ansible_runner
                 .run_playbook(AnsiblePlaybook::Status, node_inv_type, None)?;
@@ -544,7 +531,7 @@ impl AnsibleProvisioner {
         Ok(())
     }
 
-    pub async fn start_telegraf(
+    pub fn start_telegraf(
         &self,
         environment_name: &str,
         custom_inventory: Option<Vec<VirtualMachine>>,
@@ -575,7 +562,7 @@ impl AnsibleProvisioner {
         Ok(())
     }
 
-    pub async fn stop_telegraf(
+    pub fn stop_telegraf(
         &self,
         environment_name: &str,
         custom_inventory: Option<Vec<VirtualMachine>>,
@@ -603,7 +590,7 @@ impl AnsibleProvisioner {
         Ok(())
     }
 
-    pub async fn upgrade_node_telegraf(&self, name: &str) -> Result<()> {
+    pub fn upgrade_node_telegraf(&self, name: &str) -> Result<()> {
         self.ansible_runner.run_playbook(
             AnsiblePlaybook::UpgradeNodeTelegrafConfig,
             AnsibleInventoryType::BootstrapNodes,
@@ -632,7 +619,7 @@ impl AnsibleProvisioner {
         Ok(())
     }
 
-    pub async fn upgrade_uploader_telegraf(&self, name: &str) -> Result<()> {
+    pub fn upgrade_uploader_telegraf(&self, name: &str) -> Result<()> {
         self.ansible_runner.run_playbook(
             AnsiblePlaybook::UpgradeUploaderTelegrafConfig,
             AnsibleInventoryType::Uploaders,
@@ -641,7 +628,7 @@ impl AnsibleProvisioner {
         Ok(())
     }
 
-    pub async fn upgrade_nodes(&self, options: &UpgradeOptions) -> Result<()> {
+    pub fn upgrade_nodes(&self, options: &UpgradeOptions) -> Result<()> {
         if let Some(custom_inventory) = &options.custom_inventory {
             println!("Running the upgrade with a custom inventory");
             generate_custom_environment_inventory(
@@ -715,7 +702,7 @@ impl AnsibleProvisioner {
         Ok(())
     }
 
-    pub async fn upgrade_node_manager(
+    pub fn upgrade_node_manager(
         &self,
         environment_name: &str,
         version: &Version,
