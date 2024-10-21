@@ -76,7 +76,6 @@ impl TestnetDeployer {
             uploader_vm_count: None,
             uploader_vm_size: None,
         })
-        .await
         .map_err(|err| {
             println!("Failed to create infra {err:?}");
             err
@@ -94,7 +93,6 @@ impl TestnetDeployer {
                 .print_ansible_run_banner(n, total, "Build Custom Binaries");
             self.ansible_provisioner
                 .build_safe_network_binaries(&provision_options)
-                .await
                 .map_err(|err| {
                     println!("Failed to build safe network binaries {err:?}");
                     err
@@ -106,16 +104,12 @@ impl TestnetDeployer {
 
         self.ansible_provisioner
             .print_ansible_run_banner(n, total, "Provision Normal Nodes");
-        match self
-            .ansible_provisioner
-            .provision_nodes(
-                &provision_options,
-                &options.bootstrap_peer,
-                NodeType::Normal,
-                None,
-            )
-            .await
-        {
+        match self.ansible_provisioner.provision_nodes(
+            &provision_options,
+            &options.bootstrap_peer,
+            NodeType::Normal,
+            None,
+        ) {
             Ok(()) => {
                 println!("Provisioned normal nodes");
             }
@@ -130,7 +124,6 @@ impl TestnetDeployer {
                 .ansible_provisioner
                 .ansible_runner
                 .get_inventory(AnsibleInventoryType::PrivateNodes, true)
-                .await
                 .map_err(|err| {
                     println!("Failed to obtain the inventory of private node: {err:?}");
                     err
@@ -141,7 +134,6 @@ impl TestnetDeployer {
                 .print_ansible_run_banner(n, total, "Provision NAT Gateway");
             self.ansible_provisioner
                 .provision_nat_gateway(&provision_options)
-                .await
                 .map_err(|err| {
                     println!("Failed to provision NAT gateway {err:?}");
                     err
@@ -151,11 +143,11 @@ impl TestnetDeployer {
 
             self.ansible_provisioner
                 .print_ansible_run_banner(n, total, "Provision Private Nodes");
-            match self
-                .ansible_provisioner
-                .provision_private_nodes(&mut provision_options, &options.bootstrap_peer, None)
-                .await
-            {
+            match self.ansible_provisioner.provision_private_nodes(
+                &mut provision_options,
+                &options.bootstrap_peer,
+                None,
+            ) {
                 Ok(()) => {
                     println!("Provisioned private nodes");
                 }

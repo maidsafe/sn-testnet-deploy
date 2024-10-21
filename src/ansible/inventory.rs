@@ -128,7 +128,7 @@ impl AnsibleInventoryType {
 
 impl AnsibleRunner {
     /// Runs Ansible's inventory command and returns a list of VirtualMachines.
-    pub async fn get_inventory(
+    pub fn get_inventory(
         &self,
         inventory_type: AnsibleInventoryType,
         re_attempt: bool,
@@ -193,7 +193,7 @@ impl AnsibleRunner {
                 break;
             }
             debug!("Inventory list is empty, re-running after a few seconds.");
-            tokio::time::sleep(Duration::from_secs(3)).await;
+            std::thread::sleep(Duration::from_secs(3));
         }
         if inventory.is_empty() {
             warn!("Inventory list is empty after {retry_count} retries");

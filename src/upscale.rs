@@ -39,7 +39,7 @@ pub struct UpscaleOptions {
 }
 
 impl TestnetDeployer {
-    pub async fn upscale(&self, options: &UpscaleOptions) -> Result<()> {
+    pub fn upscale(&self, options: &UpscaleOptions) -> Result<()> {
         let is_bootstrap_deploy = matches!(
             options
                 .current_inventory
@@ -141,8 +141,7 @@ impl TestnetDeployer {
                     .environment_details
                     .environment_type
                     .clone(),
-            )
-            .await?;
+            )?;
             return Ok(());
         }
 
@@ -181,7 +180,6 @@ impl TestnetDeployer {
             uploader_vm_count: Some(desired_uploader_vm_count),
             uploader_vm_size: None,
         })
-        .await
         .map_err(|err| {
             println!("Failed to create infra {err:?}");
             err
@@ -228,15 +226,14 @@ impl TestnetDeployer {
         let mut node_provision_failed = false;
 
         let (initial_multiaddr, _) = if is_bootstrap_deploy {
-            get_multiaddr(&self.ansible_provisioner.ansible_runner, &self.ssh_client)
-                .await
-                .map_err(|err| {
+            get_multiaddr(&self.ansible_provisioner.ansible_runner, &self.ssh_client).map_err(
+                |err| {
                     println!("Failed to get node multiaddr {err:?}");
                     err
-                })?
+                },
+            )?
         } else {
             get_genesis_multiaddr(&self.ansible_provisioner.ansible_runner, &self.ssh_client)
-                .await
                 .map_err(|err| {
                     println!("Failed to get genesis multiaddr {err:?}");
                     err
@@ -255,23 +252,18 @@ impl TestnetDeployer {
             self.wait_for_ssh_availability_on_new_machines(
                 AnsibleInventoryType::BootstrapNodes,
                 &options.current_inventory,
-            )
-            .await?;
+            )?;
             self.ansible_provisioner.print_ansible_run_banner(
                 n,
                 total,
                 "Provision Bootstrap Nodes",
             );
-            match self
-                .ansible_provisioner
-                .provision_nodes(
-                    &provision_options,
-                    &initial_multiaddr,
-                    NodeType::Bootstrap,
-                    None,
-                )
-                .await
-            {
+            match self.ansible_provisioner.provision_nodes(
+                &provision_options,
+                &initial_multiaddr,
+                NodeType::Bootstrap,
+                None,
+            ) {
                 Ok(()) => {
                     println!("Provisioned bootstrap nodes");
                 }
@@ -286,20 +278,15 @@ impl TestnetDeployer {
         self.wait_for_ssh_availability_on_new_machines(
             AnsibleInventoryType::Nodes,
             &options.current_inventory,
-        )
-        .await?;
+        )?;
         self.ansible_provisioner
             .print_ansible_run_banner(n, total, "Provision Normal Nodes");
-        match self
-            .ansible_provisioner
-            .provision_nodes(
-                &provision_options,
-                &initial_multiaddr,
-                NodeType::Normal,
-                None,
-            )
-            .await
-        {
+        match self.ansible_provisioner.provision_nodes(
+            &provision_options,
+            &initial_multiaddr,
+            NodeType::Normal,
+            None,
+        ) {
             Ok(()) => {
                 println!("Provisioned normal nodes");
             }
@@ -315,7 +302,6 @@ impl TestnetDeployer {
                 .ansible_provisioner
                 .ansible_runner
                 .get_inventory(AnsibleInventoryType::PrivateNodes, true)
-                .await
                 .map_err(|err| {
                     println!("Failed to obtain the inventory of private node: {err:?}");
                     err
@@ -325,13 +311,11 @@ impl TestnetDeployer {
             self.wait_for_ssh_availability_on_new_machines(
                 AnsibleInventoryType::NatGateway,
                 &options.current_inventory,
-            )
-            .await?;
+            )?;
             self.ansible_provisioner
                 .print_ansible_run_banner(n, total, "Provision NAT Gateway");
             self.ansible_provisioner
                 .provision_nat_gateway(&provision_options)
-                .await
                 .map_err(|err| {
                     println!("Failed to provision NAT gateway {err:?}");
                     err
@@ -341,15 +325,14 @@ impl TestnetDeployer {
             self.wait_for_ssh_availability_on_new_machines(
                 AnsibleInventoryType::PrivateNodes,
                 &options.current_inventory,
-            )
-            .await?;
+            )?;
             self.ansible_provisioner
                 .print_ansible_run_banner(n, total, "Provision Private Nodes");
-            match self
-                .ansible_provisioner
-                .provision_private_nodes(&mut provision_options, &initial_multiaddr, None)
-                .await
-            {
+            match self.ansible_provisioner.provision_private_nodes(
+                &mut provision_options,
+                &initial_multiaddr,
+                None,
+            ) {
                 Ok(()) => {
                     println!("Provisioned private nodes");
                 }
@@ -367,7 +350,6 @@ impl TestnetDeployer {
                 .print_ansible_run_banner(n, total, "Start Faucet");
             self.ansible_provisioner
                 .provision_and_start_faucet(&provision_options, &initial_multiaddr)
-                .await
                 .map_err(|err| {
                     println!("Failed to stop faucet {err:?}");
                     err
@@ -377,13 +359,11 @@ impl TestnetDeployer {
             self.wait_for_ssh_availability_on_new_machines(
                 AnsibleInventoryType::Uploaders,
                 &options.current_inventory,
-            )
-            .await?;
+            )?;
             self.ansible_provisioner
                 .print_ansible_run_banner(n, total, "Provision Uploaders");
             self.ansible_provisioner
                 .provision_uploaders(&provision_options, &initial_multiaddr, None)
-                .await
                 .map_err(|err| {
                     println!("Failed to provision uploaders {err:?}");
                     err
@@ -394,7 +374,6 @@ impl TestnetDeployer {
                 .print_ansible_run_banner(n, total, "Stop Faucet");
             self.ansible_provisioner
                 .provision_and_stop_faucet(&provision_options, &initial_multiaddr)
-                .await
                 .map_err(|err| {
                     println!("Failed to stop faucet {err:?}");
                     err
@@ -413,7 +392,7 @@ impl TestnetDeployer {
         Ok(())
     }
 
-    async fn wait_for_ssh_availability_on_new_machines(
+    fn wait_for_ssh_availability_on_new_machines(
         &self,
         inventory_type: AnsibleInventoryType,
         current_inventory: &DeploymentInventory,
@@ -421,8 +400,7 @@ impl TestnetDeployer {
         let inventory = self
             .ansible_provisioner
             .ansible_runner
-            .get_inventory(inventory_type, true)
-            .await?;
+            .get_inventory(inventory_type, true)?;
         let old_set: HashSet<_> = match inventory_type {
             AnsibleInventoryType::BootstrapNodes => current_inventory
                 .bootstrap_node_vms
