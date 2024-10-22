@@ -428,50 +428,6 @@ impl AnsibleProvisioner {
         Ok(())
     }
 
-    /// Provision the faucet service on the genesis node and start it.
-    pub fn provision_and_start_faucet(
-        &self,
-        options: &ProvisionOptions,
-        genesis_multiaddr: &str,
-    ) -> Result<()> {
-        let start = Instant::now();
-        println!("Running ansible against genesis node to deploy and start faucet...");
-        self.ansible_runner.run_playbook(
-            AnsiblePlaybook::Faucet,
-            AnsibleInventoryType::Genesis,
-            Some(extra_vars::build_faucet_extra_vars_doc(
-                &self.cloud_provider.to_string(),
-                options,
-                genesis_multiaddr,
-                false,
-            )?),
-        )?;
-        print_duration(start.elapsed());
-        Ok(())
-    }
-
-    /// Stop the faucet service on the genesis node. If the faucet is not provisioned, this will also provision it.
-    pub fn provision_and_stop_faucet(
-        &self,
-        options: &ProvisionOptions,
-        genesis_multiaddr: &str,
-    ) -> Result<()> {
-        let start = Instant::now();
-        println!("Running ansible against genesis node stop the faucet...");
-        self.ansible_runner.run_playbook(
-            AnsiblePlaybook::Faucet,
-            AnsibleInventoryType::Genesis,
-            Some(extra_vars::build_faucet_extra_vars_doc(
-                &self.cloud_provider.to_string(),
-                options,
-                genesis_multiaddr,
-                true,
-            )?),
-        )?;
-        print_duration(start.elapsed());
-        Ok(())
-    }
-
     pub fn provision_safenode_rpc_client(
         &self,
         options: &ProvisionOptions,

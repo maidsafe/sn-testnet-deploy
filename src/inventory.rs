@@ -226,39 +226,27 @@ impl DeploymentInventoryService {
         let binary_option = if let Some(binary_option) = binary_option {
             binary_option
         } else {
-            let (faucet_version, safenode_version) = match environment_details.deployment_type {
+            let safenode_version = match environment_details.deployment_type {
                 DeploymentType::New => {
                     let (_, genesis_node_registry) = genesis_node_registry
                         .retrieved_registries
                         .iter()
                         .find(|(_, reg)| reg.faucet.is_some())
                         .ok_or_else(|| eyre!("Unable to retrieve genesis node registry"))?;
-                    let faucet_version = Some(
-                        genesis_node_registry
-                            .faucet
-                            .as_ref()
-                            .unwrap()
-                            .version
-                            .parse()?,
-                    );
-                    let safenode_version = genesis_node_registry
+                    genesis_node_registry
                         .nodes
                         .first()
                         .ok_or_else(|| eyre!("Unable to obtain the genesis node"))?
                         .version
-                        .parse()?;
-                    (faucet_version, safenode_version)
+                        .parse()?
                 }
-                DeploymentType::Bootstrap => {
-                    let safenode_version = generic_node_registries
-                        .retrieved_registries
-                        .first()
-                        .and_then(|(_, reg)| reg.nodes.first())
-                        .ok_or_else(|| eyre!("Unable to obtain a node"))?
-                        .version
-                        .parse()?;
-                    (None, safenode_version)
-                }
+                DeploymentType::Bootstrap => generic_node_registries
+                    .retrieved_registries
+                    .first()
+                    .and_then(|(_, reg)| reg.nodes.first())
+                    .ok_or_else(|| eyre!("Unable to obtain a node"))?
+                    .version
+                    .parse()?,
             };
 
             // get the safenode manager version from a random generic node vm
@@ -271,7 +259,6 @@ impl DeploymentInventoryService {
                 .parse()?;
             BinaryOption::Versioned {
                 safe_version: Some("0.0.1".parse()?), // todo: store safe version in the safenodeman registry?
-                faucet_version,
                 safenode_version,
                 safenode_manager_version,
             }
@@ -433,12 +420,13 @@ impl NodeVirtualMachine {
                     .map(|node| {
                         if let Some(listen_addresses) = &node.listen_addr {
                             // Find the public address with quic-v1 protocol
-                            listen_addresses.iter()
+                            listen_addresses
+                                .iter()
                                 .find(|&addr| {
                                     let addr_str = addr.to_string();
-                                    addr_str.contains("/quic-v1") && 
-                                    !addr_str.starts_with("/ip4/127.0.0.1") && 
-                                    !addr_str.starts_with("/ip4/10.")
+                                    addr_str.contains("/quic-v1")
+                                        && !addr_str.starts_with("/ip4/127.0.0.1")
+                                        && !addr_str.starts_with("/ip4/10.")
                                 })
                                 .map(|addr| addr.to_string())
                                 .unwrap_or_else(|| UNAVAILABLE_NODE.to_string())
@@ -729,7 +717,6 @@ impl DeploymentInventory {
                 println!();
             }
             BinaryOption::Versioned {
-                faucet_version,
                 safe_version,
                 safenode_version,
                 safenode_manager_version,
@@ -737,12 +724,6 @@ impl DeploymentInventory {
                 println!("===============");
                 println!("Version Details");
                 println!("===============");
-                println!(
-                    "faucet version: {}",
-                    faucet_version
-                        .as_ref()
-                        .map_or("N/A".to_string(), |v| v.to_string())
-                );
                 println!(
                     "safe version: {}",
                     safe_version
@@ -866,21 +847,6 @@ impl DeploymentInventory {
             inventory_file_path.to_string_lossy()
         );
         println!();
-
-        if let Some(faucet_address) = &self.faucet_address {
-            println!("==============");
-            println!("Faucet Details");
-            println!("==============");
-            println!("Faucet address: {}", faucet_address);
-            if let Some(genesis) = &self.genesis_multiaddr {
-                println!("Check the faucet:");
-                println!(
-                    "safe --peer {} wallet get-faucet {}",
-                    genesis, faucet_address
-                );
-            }
-            println!();
-        }
 
         if !self.uploaded_files.is_empty() {
             println!("Uploaded files:");

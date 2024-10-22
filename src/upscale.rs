@@ -243,7 +243,7 @@ impl TestnetDeployer {
 
         let should_provision_private_nodes = desired_private_node_vm_count > 0;
         let mut n = 1;
-        let mut total = if is_bootstrap_deploy { 3 } else { 6 };
+        let mut total = if is_bootstrap_deploy { 3 } else { 4 };
         if should_provision_private_nodes {
             total += 2;
         }
@@ -345,17 +345,6 @@ impl TestnetDeployer {
         }
 
         if !is_bootstrap_deploy {
-            // make sure faucet is running
-            self.ansible_provisioner
-                .print_ansible_run_banner(n, total, "Start Faucet");
-            self.ansible_provisioner
-                .provision_and_start_faucet(&provision_options, &initial_multiaddr)
-                .map_err(|err| {
-                    println!("Failed to stop faucet {err:?}");
-                    err
-                })?;
-            n += 1;
-
             self.wait_for_ssh_availability_on_new_machines(
                 AnsibleInventoryType::Uploaders,
                 &options.current_inventory,
@@ -366,16 +355,6 @@ impl TestnetDeployer {
                 .provision_uploaders(&provision_options, &initial_multiaddr, None)
                 .map_err(|err| {
                     println!("Failed to provision uploaders {err:?}");
-                    err
-                })?;
-            n += 1;
-
-            self.ansible_provisioner
-                .print_ansible_run_banner(n, total, "Stop Faucet");
-            self.ansible_provisioner
-                .provision_and_stop_faucet(&provision_options, &initial_multiaddr)
-                .map_err(|err| {
-                    println!("Failed to stop faucet {err:?}");
                     err
                 })?;
         }

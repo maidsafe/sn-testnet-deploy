@@ -4,7 +4,7 @@
   become: True
   vars:
     safe_version: "{{ safe_version }}"
-    safe_archive_url: "https://sn-cli.s3.eu-west-2.amazonaws.com/safe-{{ safe_version }}-x86_64-unknown-linux-musl.tar.gz"
+    safe_archive_url: "https://autonomi-cli.s3.eu-west-2.amazonaws.com/safe-{{ safe_version }}-x86_64-unknown-linux-musl.tar.gz"
   tasks:
     - name: stop the uploader service
       systemd:
