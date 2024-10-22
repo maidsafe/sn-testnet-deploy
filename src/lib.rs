@@ -9,6 +9,7 @@ pub mod bootstrap;
 pub mod deploy;
 pub mod digital_ocean;
 pub mod error;
+pub mod funding;
 pub mod inventory;
 pub mod logs;
 pub mod logstash;

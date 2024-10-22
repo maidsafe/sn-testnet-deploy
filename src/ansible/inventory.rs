@@ -304,10 +304,11 @@ pub fn generate_private_node_static_environment_inventory(
     nat_gateway_vm: &Option<VirtualMachine>,
     ssh_sk_path: &Path,
 ) -> Result<()> {
-    let nat_gateway_vm = nat_gateway_vm
-        .clone()
-        .ok_or(Error::EmptyInventory(AnsibleInventoryType::NatGateway))?
-        .clone();
+    let Some(nat_gateway_vm) = nat_gateway_vm.clone() else {
+        println!("No NAT gateway VM found. Skipping private node static inventory generation.");
+        return Ok(());
+    };
+
     if private_node_vms.is_empty() {
         return Err(Error::EmptyInventory(AnsibleInventoryType::PrivateNodes));
     }

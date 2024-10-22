@@ -3,8 +3,11 @@
   hosts: all
   become: True
   tasks:
-    - name: stop safe uploader service
-      systemd:
-        name: "safe_uploader@*"
-        enabled: yes
+    - name: stop all autonomi uploader service
+      ansible.builtin.systemd:
+        name: "autonomi_uploader_{{ item }}"
         state: stopped
+        enabled: yes
+      become: true
+      loop: "{{ range(1, autonomi_uploader_instances | int + 1) | list }}"
+      ignore_errors: "{{ skip_err | default(false) }}"

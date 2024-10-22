@@ -32,24 +32,38 @@
     owner: "safe{{ item }}"
     group: "safe{{ item }}"
     mode: '0744'
-  become: yes
+  become: true
   become_user: "safe{{ item }}"
   loop: "{{ range(1, autonomi_uploader_instances | int + 1) | list }}"
+
+- name: Check if systemd service file exists
+  ansible.builtin.stat:
+    path: "/etc/systemd/system/autonomi_uploader_{{ item }}.service"
+  register: service_file_stat
+  loop: "{{ range(1, autonomi_uploader_instances | int + 1) | list }}"
+
+- name: Retrieve secret keys
+  set_fact:
+    secret_keys_per_machine: "{{ autonomi_secret_key_map[inventory_hostname] | regex_replace('\"', '') }}"
 
 - name: create systemd service file
   ansible.builtin.template:
     src: autonomi_uploader.service.j2
-    dest: "/etc/systemd/system/autonomi_uploader@.service"
-    owner: root
-    group: root
+    dest: "/etc/systemd/system/autonomi_uploader_{{ item.0 }}.service"
+    owner: "safe{{ item.0 }}"
+    group: "safe{{ item.0 }}"
     mode: '0644'
-  become: yes
-  when: not autonomi_binary.stat.exists
+  become: true
+  when: not service_file_stat.results[item.0 - 1].stat.exists
+  loop: "{{ range(1, autonomi_uploader_instances | int + 1) | zip(secret_keys_per_machine) }}"
+  vars: 
+    count: "{{ item.0 }}"
+    secret_key: "{{ item.1 }}"
 
 - name: start and enable autonomi_uploader service for each uploader
   ansible.builtin.systemd:
-    name: "autonomi_uploader@{{ item }}"
+    name: "autonomi_uploader_{{ item }}"
     state: started
     enabled: yes
-  become: yes
+  become: true
   loop: "{{ range(1, autonomi_uploader_instances | int + 1) | list }}"

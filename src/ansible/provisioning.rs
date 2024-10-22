@@ -13,6 +13,7 @@ use crate::{
     bootstrap::BootstrapOptions,
     deploy::DeployOptions,
     error::{Error, Result},
+    funding::FundingOptions,
     inventory::{DeploymentNodeRegistries, VirtualMachine},
     print_duration, BinaryOption, CloudProvider, EvmCustomTestnetData, EvmNetwork, LogFormat,
     NodeType, SshClient, UpgradeOptions,
@@ -36,6 +37,7 @@ pub struct ProvisionOptions {
     pub downloaders_count: u16,
     pub env_variables: Option<Vec<(String, String)>>,
     pub evm_network: EvmNetwork,
+    pub funding_wallet_secret_key: Option<String>,
     pub log_format: Option<LogFormat>,
     pub logstash_details: Option<(String, Vec<SocketAddr>)>,
     pub name: String,
@@ -53,7 +55,6 @@ pub struct ProvisionOptions {
     pub safe_version: Option<String>,
     pub uploaders_count: Option<u16>,
     pub rewards_address: String,
-    pub wallet_secret_key: Option<String>,
 }
 
 impl From<BootstrapOptions> for ProvisionOptions {
@@ -65,6 +66,7 @@ impl From<BootstrapOptions> for ProvisionOptions {
             downloaders_count: 0,
             env_variables: bootstrap_options.env_variables,
             evm_network: bootstrap_options.evm_network,
+            funding_wallet_secret_key: None,
             log_format: bootstrap_options.log_format,
             logstash_details: None,
             name: bootstrap_options.name,
@@ -79,7 +81,6 @@ impl From<BootstrapOptions> for ProvisionOptions {
             safe_version: None,
             uploaders_count: None,
             rewards_address: String::new(),
-            wallet_secret_key: None,
         }
     }
 }
@@ -93,6 +94,7 @@ impl From<DeployOptions> for ProvisionOptions {
             downloaders_count: deploy_options.downloaders_count,
             env_variables: deploy_options.env_variables,
             evm_network: deploy_options.evm_network,
+            funding_wallet_secret_key: deploy_options.funding_wallet_secret_key,
             log_format: deploy_options.log_format,
             logstash_details: deploy_options.logstash_details,
             name: deploy_options.name,
@@ -107,7 +109,6 @@ impl From<DeployOptions> for ProvisionOptions {
             safe_version: None,
             uploaders_count: Some(deploy_options.uploaders_count),
             rewards_address: deploy_options.rewards_address,
-            wallet_secret_key: deploy_options.wallet_secret_key,
         }
     }
 }
@@ -448,14 +449,39 @@ impl AnsibleProvisioner {
         Ok(())
     }
 
-    pub fn provision_uploaders(
+    pub async fn provision_uploaders(
         &self,
         options: &ProvisionOptions,
         genesis_multiaddr: &str,
         evm_testnet_data: Option<EvmCustomTestnetData>,
     ) -> Result<()> {
         let start = Instant::now();
+        println!("Stopping the uploaders");
+        debug!("Stopping the uploaders");
+
+        self.ansible_runner.run_playbook(
+            AnsiblePlaybook::StopUploaders,
+            AnsibleInventoryType::Uploaders,
+            Some(extra_vars::build_start_or_stop_uploader_extra_vars_doc(
+                &self.cloud_provider.to_string(),
+                options,
+                true,
+            )),
+        )?;
+
+        let sk_map = self
+            .fund_uploader_wallets(&FundingOptions {
+                uploaders_count: options.uploaders_count,
+                evm_network: options.evm_network.clone(),
+                funding_wallet_secret_key: options.funding_wallet_secret_key.clone(),
+                token_amount: None,
+                gas_amount: None,
+            })
+            .await?;
+
         println!("Running ansible against uploader machine to start the uploader script.");
+        debug!("Running ansible against uploader machine to start the uploader script.");
+
         self.ansible_runner.run_playbook(
             AnsiblePlaybook::Uploaders,
             AnsibleInventoryType::Uploaders,
@@ -464,6 +490,7 @@ impl AnsibleProvisioner {
                 options,
                 genesis_multiaddr,
                 evm_testnet_data,
+                &sk_map,
             )?),
         )?;
         print_duration(start.elapsed());

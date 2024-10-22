@@ -7,6 +7,7 @@
 use crate::NodeType;
 use crate::{ansible::provisioning::ProvisionOptions, CloudProvider, EvmNetwork};
 use crate::{BinaryOption, Error, EvmCustomTestnetData, Result};
+use alloy::hex::ToHexExt;
 use alloy::signers::local::PrivateKeySigner;
 use serde_json::Value;
 use std::collections::HashMap;
@@ -375,6 +376,7 @@ pub fn build_uploaders_extra_vars_doc(
     options: &ProvisionOptions,
     genesis_multiaddr: &str,
     evm_testnet_data: Option<EvmCustomTestnetData>,
+    sk_map: &HashMap<String, Vec<PrivateKeySigner>>,
 ) -> Result<String> {
     let mut extra_vars: ExtraVarsDocBuilder = ExtraVarsDocBuilder::default();
     extra_vars.add_variable("provider", cloud_provider);
@@ -406,16 +408,36 @@ pub fn build_uploaders_extra_vars_doc(
         );
     }
 
-    if let Some(secret_key) = options.wallet_secret_key.as_ref() {
-        extra_vars.add_variable("autonomi_secret_key", secret_key);
-    } else if let Some(evm_testnet_data) = &evm_testnet_data {
-        extra_vars.add_variable(
-            "autonomi_secret_key",
-            &evm_testnet_data.deployer_wallet_private_key,
-        );
+    let mut serde_map = serde_json::Map::new();
+    for (k, v) in sk_map {
+        let sks = v
+            .iter()
+            .map(|sk| format!("{:?}", sk.to_bytes().encode_hex_with_prefix()))
+            .collect::<Vec<String>>();
+        let sks = Value::Array(sks.into_iter().map(Value::String).collect());
+        serde_map.insert(k.to_owned(), sks);
     }
+    let serde_map = Value::Object(serde_map);
+
+    extra_vars.add_serde_value("autonomi_secret_key_map", serde_map);
 
     Ok(extra_vars.build())
+}
+
+pub fn build_start_or_stop_uploader_extra_vars_doc(
+    cloud_provider: &str,
+    options: &ProvisionOptions,
+    skip_err: bool,
+) -> String {
+    let mut extra_vars = ExtraVarsDocBuilder::default();
+    extra_vars.add_variable("provider", cloud_provider);
+    extra_vars.add_variable("testnet_name", &options.name);
+    extra_vars.add_variable(
+        "autonomi_uploader_instances",
+        &options.uploaders_count.unwrap_or(1).to_string(),
+    );
+    extra_vars.add_variable("skip_err", &skip_err.to_string());
+    extra_vars.build()
 }
 
 pub fn build_binaries_extra_vars_doc(options: &ProvisionOptions) -> Result<String> {

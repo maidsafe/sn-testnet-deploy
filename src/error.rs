@@ -5,6 +5,7 @@
 // Please see the LICENSE file for more details.
 
 use crate::ansible::inventory::AnsibleInventoryType;
+use evmlib::contract::network_token;
 use thiserror::Error;
 use tokio::task::JoinError;
 
@@ -80,6 +81,8 @@ pub enum Error {
     InvalidUpscaleDesiredPrivateNodeVmCount,
     #[error("The desired private node count is smaller than the current count. This is invalid for an upscale operation.")]
     InvalidUpscaleDesiredPrivateNodeCount,
+    #[error("The desired uploader count is smaller than the current count. This is invalid for an upscale operation.")]
+    InvalidUpscaleDesiredUploaderCount,
     #[error("The desired uploader VM count is smaller than the current count. This is invalid for an upscale operation.")]
     InvalidUpscaleDesiredUploaderVmCount,
     #[error("Options were used that are not applicable to a bootstrap deployment")]
@@ -108,6 +111,8 @@ pub enum Error {
     MissingNodeCount,
     #[error("The NAT gateway VM was not supplied")]
     NatGatewayNotSupplied,
+    #[error(transparent)]
+    NetworkTokenError(#[from] network_token::Error),
     #[error("This deployment does not have an auditor. It may be a bootstrap deployment.")]
     NoAuditorError,
     #[error("This deployment does not have a faucet. It may be a bootstrap deployment.")]
@@ -128,6 +133,10 @@ pub enum Error {
     SafeBinaryDownloadError,
     #[error("Error in byte stream when attempting to retrieve S3 object")]
     S3ByteStreamError,
+    #[error("Failed to parse secret key")]
+    SecretKeyParseError,
+    #[error("The secret key was not found in the environment")]
+    SecretKeyNotFound,
     #[error(transparent)]
     SerdeJson(#[from] serde_json::Error),
     #[error("An unexpected error occurred during the setup process")]

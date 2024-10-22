@@ -3,6 +3,7 @@
 // This SAFE Network Software is licensed under the BSD-3-Clause license.
 // Please see the LICENSE file for more details.
 
+use alloy::primitives::U256;
 use clap::{Parser, Subcommand};
 use color_eyre::{
     eyre::{bail, eyre, OptionExt},
@@ -16,6 +17,7 @@ use sn_testnet_deploy::{
     bootstrap::BootstrapOptions,
     deploy::DeployOptions,
     error::Error,
+    funding::FundingOptions,
     inventory::{
         get_data_directory, DeploymentInventory, DeploymentInventoryService, VirtualMachine,
     },
@@ -312,6 +314,11 @@ enum Commands {
         /// If one of the new keys is supplied, all must be supplied.
         #[arg(long)]
         foundation_pk: Option<String>,
+        /// The secret key for the wallet that will fund all the uploaders.
+        ///
+        /// This argument only applies when Arbitrum or Sepolia networks are used.
+        #[clap(long)]
+        funding_wallet_secret_key: Option<String>,
         /// Optionally set the genesis public key for a custom safenode binary.
         ///
         /// This argument only applies if the '--branch' and '--repo-owner' arguments are used.
@@ -464,15 +471,37 @@ enum Commands {
         /// Override the size of the uploader VMs.
         #[clap(long)]
         uploader_vm_size: Option<String>,
-        /// A wallet secret key for the uploaders.
-        ///
-        /// This argument only applies when Arbitrum or Sepolia networks are used.
-        #[clap(long)]
-        wallet_secret_key: Option<String>,
     },
     /// Manage the faucet for an environment
     #[clap(name = "faucet", subcommand)]
     Faucet(FaucetCommands),
+    /// Transfer funds from the funding wallet to all uploaders
+    Fund {
+        /// The EVM network type to use for the deployment.
+        ///
+        /// Possible values are 'arbitrum-one' or 'custom'.
+        ///
+        /// If not used, the default is 'arbitrum-one'.
+        #[clap(long, default_value = "arbitrum-one", value_parser = parse_evm_network)]
+        evm_network_type: EvmNetwork,
+        /// The secret key for the wallet that will fund all the uploaders.
+        ///
+        /// This argument only applies when Arbitrum or Sepolia networks are used.
+        #[clap(long)]
+        funding_wallet_secret_key: Option<String>,
+        /// The number of gas to transfer, in U256
+        #[arg(long)]
+        gas_to_transfer: U256,
+        /// The name of the environment.
+        #[arg(short = 'n', long)]
+        name: String,
+        /// The cloud provider for the environment.
+        #[clap(long, value_parser = parse_provider, verbatim_doc_comment, default_value_t = CloudProvider::DigitalOcean)]
+        provider: CloudProvider,
+        /// The number of tokens to transfer, in U256
+        #[arg(long)]
+        tokens_to_transfer: U256,
+    },
     Inventory {
         /// If set to true, the inventory will be regenerated.
         ///
@@ -783,6 +812,11 @@ enum Commands {
         /// 5 uploader VMs, there will be 10 downloaders across the 5 VMs.
         #[clap(long, default_value_t = 0)]
         downloaders_count: u16,
+        /// The secret key for the wallet that will fund all the uploaders.
+        ///
+        /// This argument only applies when Arbitrum or Sepolia networks are used.
+        #[clap(long)]
+        funding_wallet_secret_key: Option<String>,
         /// Set to only use Terraform to upscale the VMs and not run Ansible.
         #[clap(long, default_value_t = false)]
         infra_only: bool,
@@ -819,11 +853,6 @@ enum Commands {
         /// This argument is required when the uploader count is supplied.
         #[arg(long, verbatim_doc_comment)]
         safe_version: Option<String>,
-        /// A wallet secret key for the uploaders.
-        ///
-        /// This argument only applies when Arbitrum or Sepolia networks are used.
-        #[clap(long)]
-        wallet_secret_key: Option<String>,
     },
 }
 
@@ -1260,7 +1289,7 @@ async fn main() -> Result<()> {
             safenode_manager_version,
             uploaders_count,
             uploader_vm_count,
-            wallet_secret_key,
+            funding_wallet_secret_key,
             node_vm_size,
             bootstrap_node_vm_size,
             uploader_vm_size,
@@ -1273,7 +1302,7 @@ async fn main() -> Result<()> {
                 payment_forward_pk,
             )?;
 
-            if wallet_secret_key.is_some() && evm_network_type == EvmNetwork::Custom {
+            if funding_wallet_secret_key.is_some() && evm_network_type == EvmNetwork::Custom {
                 return Err(eyre!(
                     "Wallet secret key only applies to Arbitrum or Sepolia networks"
                 ));
@@ -1355,6 +1384,7 @@ async fn main() -> Result<()> {
                     environment_type: environment_type.clone(),
                     env_variables,
                     evm_network: evm_network_type,
+                    funding_wallet_secret_key,
                     log_format,
                     logstash_details,
                     name: name.clone(),
@@ -1373,7 +1403,6 @@ async fn main() -> Result<()> {
                     uploaders_count,
                     uploader_vm_count,
                     rewards_address,
-                    wallet_secret_key,
                     node_vm_size,
                     bootstrap_node_vm_size,
                     uploader_vm_size,
@@ -1484,6 +1513,39 @@ async fn main() -> Result<()> {
                 Ok(())
             }
         },
+        Commands::Fund {
+            evm_network_type,
+            funding_wallet_secret_key,
+            gas_to_transfer,
+            name,
+            provider,
+            tokens_to_transfer,
+        } => {
+            if funding_wallet_secret_key.is_some() && evm_network_type == EvmNetwork::Custom {
+                return Err(eyre!(
+                    "Wallet secret key only applies to Arbitrum or Sepolia networks"
+                ));
+            }
+
+            let testnet_deployer = TestnetDeployBuilder::default()
+                .environment_name(&name)
+                .provider(provider)
+                .build()?;
+
+            let options = FundingOptions {
+                evm_network: evm_network_type,
+                funding_wallet_secret_key,
+                uploaders_count: None,
+                token_amount: Some(tokens_to_transfer),
+                gas_amount: Some(gas_to_transfer),
+            };
+            testnet_deployer
+                .ansible_provisioner
+                .fund_uploader_wallets(&options)
+                .await?;
+
+            Ok(())
+        }
         Commands::Inventory {
             force_regeneration,
             name,
@@ -2093,6 +2155,7 @@ async fn main() -> Result<()> {
             desired_uploader_vm_count,
             desired_uploaders_count,
             downloaders_count,
+            funding_wallet_secret_key,
             infra_only,
             name,
             max_archived_log_files,
@@ -2101,7 +2164,6 @@ async fn main() -> Result<()> {
             provider,
             public_rpc,
             safe_version,
-            wallet_secret_key,
         } => {
             if desired_uploader_vm_count.is_some() && safe_version.is_none() {
                 return Err(eyre!("The --safe-version argument is required when --desired-uploader-vm-count is used"));
@@ -2120,27 +2182,29 @@ async fn main() -> Result<()> {
                 .generate_or_retrieve_inventory(&name, true, None)
                 .await?;
 
-            testnet_deployer.upscale(&UpscaleOptions {
-                ansible_verbose,
-                current_inventory: inventory,
-                desired_auditor_vm_count,
-                desired_bootstrap_node_count,
-                desired_bootstrap_node_vm_count,
-                desired_node_count,
-                desired_node_vm_count,
-                desired_private_node_count,
-                desired_private_node_vm_count,
-                desired_uploader_vm_count,
-                desired_uploaders_count,
-                downloaders_count,
-                max_archived_log_files,
-                max_log_files,
-                infra_only,
-                plan,
-                public_rpc,
-                safe_version,
-                wallet_secret_key,
-            })?;
+            testnet_deployer
+                .upscale(&UpscaleOptions {
+                    ansible_verbose,
+                    current_inventory: inventory,
+                    desired_auditor_vm_count,
+                    desired_bootstrap_node_count,
+                    desired_bootstrap_node_vm_count,
+                    desired_node_count,
+                    desired_node_vm_count,
+                    desired_private_node_count,
+                    desired_private_node_vm_count,
+                    desired_uploader_vm_count,
+                    desired_uploaders_count,
+                    downloaders_count,
+                    funding_wallet_secret_key,
+                    max_archived_log_files,
+                    max_log_files,
+                    infra_only,
+                    plan,
+                    public_rpc,
+                    safe_version,
+                })
+                .await?;
 
             if plan {
                 return Ok(());
