@@ -29,17 +29,17 @@ pub struct UpscaleOptions {
     pub desired_uploader_vm_count: Option<u16>,
     pub desired_uploaders_count: Option<u16>,
     pub downloaders_count: u16,
+    pub funding_wallet_secret_key: Option<String>,
     pub infra_only: bool,
     pub max_archived_log_files: u16,
     pub max_log_files: u16,
     pub plan: bool,
     pub public_rpc: bool,
     pub safe_version: Option<String>,
-    pub wallet_secret_key: Option<String>,
 }
 
 impl TestnetDeployer {
-    pub fn upscale(&self, options: &UpscaleOptions) -> Result<()> {
+    pub async fn upscale(&self, options: &UpscaleOptions) -> Result<()> {
         let is_bootstrap_deploy = matches!(
             options
                 .current_inventory
@@ -200,6 +200,7 @@ impl TestnetDeployer {
                 .environment_details
                 .evm_network
                 .clone(),
+            funding_wallet_secret_key: options.funding_wallet_secret_key.clone(),
             log_format: None,
             logstash_details: None,
             name: options.current_inventory.name.clone(),
@@ -221,7 +222,6 @@ impl TestnetDeployer {
                 .clone(),
             safe_version: options.safe_version.clone(),
             uploaders_count: options.desired_uploaders_count,
-            wallet_secret_key: options.wallet_secret_key.clone(),
         };
         let mut node_provision_failed = false;
 
@@ -353,6 +353,7 @@ impl TestnetDeployer {
                 .print_ansible_run_banner(n, total, "Provision Uploaders");
             self.ansible_provisioner
                 .provision_uploaders(&provision_options, &initial_multiaddr, None)
+                .await
                 .map_err(|err| {
                     println!("Failed to provision uploaders {err:?}");
                     err

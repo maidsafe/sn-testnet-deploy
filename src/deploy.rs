@@ -27,6 +27,7 @@ pub struct DeployOptions {
     pub env_variables: Option<Vec<(String, String)>>,
     pub evm_network: EvmNetwork,
     pub evm_node_vm_size: Option<String>,
+    pub funding_wallet_secret_key: Option<String>,
     pub log_format: Option<LogFormat>,
     pub logstash_details: Option<(String, Vec<SocketAddr>)>,
     pub max_archived_log_files: u16,
@@ -43,7 +44,6 @@ pub struct DeployOptions {
     pub uploader_vm_count: Option<u16>,
     pub uploader_vm_size: Option<String>,
     pub uploaders_count: u16,
-    pub wallet_secret_key: Option<String>,
 }
 
 impl TestnetDeployer {
@@ -257,6 +257,7 @@ impl TestnetDeployer {
                 .print_ansible_run_banner(n, total, "Provision Uploaders");
             self.ansible_provisioner
                 .provision_uploaders(&provision_options, &genesis_multiaddr, evm_testnet_data)
+                .await
                 .map_err(|err| {
                     println!("Failed to provision uploaders {err:?}");
                     err
