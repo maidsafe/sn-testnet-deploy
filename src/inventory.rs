@@ -432,10 +432,16 @@ impl NodeVirtualMachine {
                     .iter()
                     .map(|node| {
                         if let Some(listen_addresses) = &node.listen_addr {
-                            // It seems to be the case that the listening address with the public IP is
-                            // always in the second position. If this ever changes, we could do some
-                            // filtering to find the address that does not start with "127." or "10.".
-                            listen_addresses[1].to_string()
+                            // Find the public address with quic-v1 protocol
+                            listen_addresses.iter()
+                                .find(|&addr| {
+                                    let addr_str = addr.to_string();
+                                    addr_str.contains("/quic-v1") && 
+                                    !addr_str.starts_with("/ip4/127.0.0.1") && 
+                                    !addr_str.starts_with("/ip4/10.")
+                                })
+                                .map(|addr| addr.to_string())
+                                .unwrap_or_else(|| UNAVAILABLE_NODE.to_string())
                         } else {
                             UNAVAILABLE_NODE.to_string()
                         }
