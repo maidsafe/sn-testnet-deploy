@@ -274,7 +274,6 @@ pub enum BinaryOption {
     },
     /// Pre-built, versioned binaries will be fetched from S3.
     Versioned {
-        faucet_version: Option<Version>,
         safe_version: Option<Version>,
         safenode_version: Version,
         safenode_manager_version: Version,
@@ -1082,19 +1081,12 @@ pub async fn notify_slack(inventory: DeploymentInventory) -> Result<()> {
             message.push_str(&format!("Branch: {}\n", branch));
         }
         BinaryOption::Versioned {
-            ref faucet_version,
             ref safe_version,
             ref safenode_version,
             ref safenode_manager_version,
             ..
         } => {
             message.push_str("*Version Details*\n");
-            message.push_str(&format!(
-                "faucet version: {}\n",
-                faucet_version
-                    .as_ref()
-                    .map_or("None".to_string(), |v| v.to_string())
-            ));
             message.push_str(&format!(
                 "safe version: {}\n",
                 safe_version
@@ -1244,4 +1236,3 @@ pub async fn write_environment_details(
         .await?;
     Ok(())
 }
-

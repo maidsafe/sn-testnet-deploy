@@ -4164,9 +4164,9 @@ checksum = "3c5e1a9a646d36c3599cd173a41282daf47c44583ad367b8e6837255952e5c67"
 
 [[package]]
 name = "sn-releases"
-version = "0.2.6"
+version = "0.3.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9160dd891b488e9a41b8e8a481a3f39648d58a94a19b177af863d93c7fc52a54"
+checksum = "7786e530f6940356aa4fbb110b6e9238d764653bc14df4a522f96096c26ac7d7"
 dependencies = [
  "async-trait",
  "chrono",

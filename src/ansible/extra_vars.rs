@@ -11,7 +11,7 @@ use std::collections::HashMap;
 const NODE_S3_BUCKET_URL: &str = "https://sn-node.s3.eu-west-2.amazonaws.com";
 const NODE_MANAGER_S3_BUCKET_URL: &str = "https://sn-node-manager.s3.eu-west-2.amazonaws.com";
 const RPC_CLIENT_BUCKET_URL: &str = "https://sn-node-rpc-client.s3.eu-west-2.amazonaws.com";
-const SAFE_S3_BUCKET_URL: &str = "https://autonomi-cli.s3.eu-west-2.amazonaws.com";
+const AUTONOMI_S3_BUCKET_URL: &str = "https://autonomi-cli.s3.eu-west-2.amazonaws.com";
 
 #[derive(Default)]
 pub struct ExtraVarsDocBuilder {
@@ -116,37 +116,6 @@ impl ExtraVarsDocBuilder {
         }
     }
 
-    pub fn add_faucet_url_or_version(
-        &mut self,
-        deployment_name: &str,
-        binary_option: &BinaryOption,
-    ) -> Result<()> {
-        match binary_option {
-            BinaryOption::BuildFromSource {
-                repo_owner, branch, ..
-            } => {
-                self.add_branch_url_variable(
-                    "faucet_archive_url",
-                    &format!(
-                        "{}/{}/{}/faucet-{}-x86_64-unknown-linux-musl.tar.gz",
-                        NODE_S3_BUCKET_URL, repo_owner, branch, deployment_name
-                    ),
-                    branch,
-                    repo_owner,
-                );
-                Ok(())
-            }
-            BinaryOption::Versioned { faucet_version, .. } => match faucet_version {
-                Some(version) => {
-                    self.variables
-                        .push(("version".to_string(), version.to_string()));
-                    Ok(())
-                }
-                None => Err(Error::NoFaucetError),
-            },
-        }
-    }
-
     pub fn add_node_url_or_version(&mut self, deployment_name: &str, binary_option: &BinaryOption) {
         match binary_option {
             BinaryOption::BuildFromSource {
@@ -245,7 +214,7 @@ impl ExtraVarsDocBuilder {
                 "autonomi_archive_url".to_string(),
                 format!(
                     "{}/autonomi-{}-x86_64-unknown-linux-musl.tar.gz",
-                    SAFE_S3_BUCKET_URL, version
+                    AUTONOMI_S3_BUCKET_URL, version
                 ),
             ));
             return Ok(());
@@ -272,7 +241,7 @@ impl ExtraVarsDocBuilder {
                         "autonomi_archive_url".to_string(),
                         format!(
                             "{}/autonomi-{}-x86_64-unknown-linux-musl.tar.gz",
-                            SAFE_S3_BUCKET_URL, version
+                            AUTONOMI_S3_BUCKET_URL, version
                         ),
                     ));
                     Ok(())
@@ -394,26 +363,6 @@ pub fn build_node_extra_vars_doc(
         extra_vars.add_variable("evm_data_payments_address", &evm_data.data_payments_address);
     }
 
-    Ok(extra_vars.build())
-}
-
-pub fn build_faucet_extra_vars_doc(
-    cloud_provider: &str,
-    options: &ProvisionOptions,
-    genesis_multiaddr: &str,
-    stop: bool,
-) -> Result<String> {
-    let mut extra_vars = ExtraVarsDocBuilder::default();
-    extra_vars.add_variable("provider", cloud_provider);
-    extra_vars.add_variable("testnet_name", &options.name);
-    extra_vars.add_variable("genesis_multiaddr", genesis_multiaddr);
-    if stop {
-        extra_vars.add_variable("action", "stop");
-    } else {
-        extra_vars.add_variable("action", "start");
-    }
-    extra_vars.add_node_manager_url(&options.name, &options.binary_option);
-    extra_vars.add_faucet_url_or_version(&options.name, &options.binary_option)?;
     Ok(extra_vars.build())
 }
 

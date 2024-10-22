@@ -2054,7 +2054,7 @@ async fn main() -> Result<()> {
                 provider,
                 safe_version,
             } => {
-                let version = get_version_from_option(safe_version, &ReleaseType::Safe).await?;
+                let version = get_version_from_option(safe_version, &ReleaseType::Autonomi).await?;
 
                 let testnet_deploy = TestnetDeployBuilder::default()
                     .environment_name(&name)
@@ -2239,15 +2239,13 @@ async fn get_binary_option(
     let binary_option = if use_versions {
         print_with_banner("Binaries will be supplied from pre-built versions");
 
-        let faucet_version = get_version_from_option(faucet_version, &ReleaseType::Faucet).await?;
-        let safe_version = get_version_from_option(safe_version, &ReleaseType::Safe).await?;
+        let safe_version = get_version_from_option(safe_version, &ReleaseType::Autonomi).await?;
         let safenode_version =
             get_version_from_option(safenode_version, &ReleaseType::Safenode).await?;
         let safenode_manager_version =
             get_version_from_option(safenode_manager_version, &ReleaseType::SafenodeManager)
                 .await?;
         BinaryOption::Versioned {
-            faucet_version: Some(faucet_version),
             safe_version: Some(safe_version),
             safenode_version,
             safenode_manager_version,
