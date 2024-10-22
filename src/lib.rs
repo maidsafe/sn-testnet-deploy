@@ -828,8 +828,8 @@ pub fn get_genesis_multiaddr(
         .run_command(
             &genesis_ip,
             "root",
-            // fetch the first multiaddr if genesis is true and which does not contain the localhost addr.
-            "jq -r '.nodes[] | select(.genesis == true) | .listen_addr[] | select(contains(\"127.0.0.1\") | not)' /var/safenode-manager/node_registry.json | head -n 1",
+            // fetch the first public multiaddr with quic-v1 protocol for the genesis node
+            "jq -r '.nodes[] | select(.genesis == true) | .listen_addr[] | select(contains(\"127.0.0.1\") | not) | select(contains(\"quic-v1\"))' /var/safenode-manager/node_registry.json | head -n 1",
             false,
         )?.first()
         .cloned()
@@ -1244,3 +1244,4 @@ pub async fn write_environment_details(
         .await?;
     Ok(())
 }
+
