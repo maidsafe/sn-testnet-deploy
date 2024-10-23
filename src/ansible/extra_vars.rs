@@ -3,9 +3,12 @@
 //
 // This SAFE Network Software is licensed under the BSD-3-Clause license.
 // Please see the LICENSE file for more details.
+
 use crate::NodeType;
 use crate::{ansible::provisioning::ProvisionOptions, CloudProvider, EvmNetwork};
 use crate::{BinaryOption, Error, EvmCustomTestnetData, Result};
+use alloy::signers::local::PrivateKeySigner;
+use serde_json::Value;
 use std::collections::HashMap;
 
 const NODE_S3_BUCKET_URL: &str = "https://sn-node.s3.eu-west-2.amazonaws.com";
@@ -15,8 +18,7 @@ const AUTONOMI_S3_BUCKET_URL: &str = "https://autonomi-cli.s3.eu-west-2.amazonaw
 
 #[derive(Default)]
 pub struct ExtraVarsDocBuilder {
-    variables: Vec<(String, String)>,
-    list_variables: HashMap<String, Vec<String>>,
+    map: serde_json::Map<String, Value>,
 }
 
 impl ExtraVarsDocBuilder {
@@ -25,17 +27,31 @@ impl ExtraVarsDocBuilder {
     }
 
     pub fn add_variable(&mut self, name: &str, value: &str) -> &mut Self {
-        self.variables.push((name.to_string(), value.to_string()));
+        self.map
+            .insert(name.to_owned(), Value::String(value.to_owned()));
         self
     }
 
     pub fn add_list_variable(&mut self, name: &str, values: Vec<String>) -> &mut Self {
-        if let Some(list) = self.list_variables.get_mut(name) {
-            list.extend(values);
+        if let Some(list) = self.map.get_mut(name) {
+            if let Value::Array(list) = list {
+                for val in values {
+                    list.push(Value::String(val));
+                }
+            }
         } else {
-            self.list_variables.insert(name.to_string(), values);
+            let json_list = values
+                .iter()
+                .map(|val| Value::String(val.to_owned()))
+                .collect();
+            self.map.insert(name.to_owned(), Value::Array(json_list));
         }
         self
+    }
+
+    /// Add a serde value to the extra vars map. This is useful if you have a complex type.
+    pub fn add_serde_value(&mut self, name: &str, value: Value) {
+        self.map.insert(name.to_owned(), value);
     }
 
     pub fn add_env_variable_list(
@@ -48,8 +64,7 @@ impl ExtraVarsDocBuilder {
             joined_env_vars.push(format!("{name}={val}"));
         }
         let joined_env_vars = joined_env_vars.join(",");
-        self.variables
-            .push((name.to_string(), joined_env_vars.to_string()));
+        self.add_variable(name, &joined_env_vars);
         self
     }
 
@@ -133,9 +148,9 @@ impl ExtraVarsDocBuilder {
             }
             BinaryOption::Versioned {
                 safenode_version, ..
-            } => self
-                .variables
-                .push(("version".to_string(), safenode_version.to_string())),
+            } => {
+                let _ = self.add_variable("version", &safenode_version.to_string());
+            }
         }
     }
 
@@ -158,13 +173,13 @@ impl ExtraVarsDocBuilder {
                 safenode_manager_version,
                 ..
             } => {
-                self.variables.push((
-                    "node_manager_archive_url".to_string(),
-                    format!(
+                self.add_variable(
+                    "node_manager_archive_url",
+                    &format!(
                         "{}/safenode-manager-{}-x86_64-unknown-linux-musl.tar.gz",
                         NODE_MANAGER_S3_BUCKET_URL, safenode_manager_version
                     ),
-                ));
+                );
             }
         }
     }
@@ -189,13 +204,13 @@ impl ExtraVarsDocBuilder {
                 );
             }
             _ => {
-                self.variables.push((
-                    "safenodemand_archive_url".to_string(),
-                    format!(
+                self.add_variable(
+                    "safenodemand_archive_url",
+                    &format!(
                         "{}/safenodemand-latest-x86_64-unknown-linux-musl.tar.gz",
                         NODE_MANAGER_S3_BUCKET_URL,
                     ),
-                ));
+                );
             }
         }
     }
@@ -210,13 +225,13 @@ impl ExtraVarsDocBuilder {
         // In that scenario, the safe version in the binary option is not set to the correct value
         // because it is not recorded in the inventory.
         if let Some(version) = safe_version {
-            self.variables.push((
-                "autonomi_archive_url".to_string(),
-                format!(
+            self.add_variable(
+                "autonomi_archive_url",
+                &format!(
                     "{}/autonomi-{}-x86_64-unknown-linux-musl.tar.gz",
                     AUTONOMI_S3_BUCKET_URL, version
                 ),
-            ));
+            );
             return Ok(());
         }
 
@@ -237,13 +252,13 @@ impl ExtraVarsDocBuilder {
             }
             BinaryOption::Versioned { safe_version, .. } => match safe_version {
                 Some(version) => {
-                    self.variables.push((
-                        "autonomi_archive_url".to_string(),
-                        format!(
+                    self.add_variable(
+                        "autonomi_archive_url",
+                        &format!(
                             "{}/autonomi-{}-x86_64-unknown-linux-musl.tar.gz",
                             AUTONOMI_S3_BUCKET_URL, version
                         ),
-                    ));
+                    );
                     Ok(())
                 }
                 None => Err(Error::NoUploadersError),
@@ -252,37 +267,13 @@ impl ExtraVarsDocBuilder {
     }
 
     pub fn build(&self) -> String {
-        if self.variables.is_empty() && self.list_variables.is_empty() {
-            return "{}".to_string();
-        }
-
-        let mut doc = String::new();
-        doc.push_str("{ ");
-
-        for (name, value) in self.variables.iter() {
-            doc.push_str(&format!("\"{name}\": \"{value}\", "));
-        }
-        for (name, list) in &self.list_variables {
-            doc.push_str(&format!("\"{name}\": ["));
-            for val in list.iter() {
-                doc.push_str(&format!("\"{val}\", "));
-            }
-            let mut temp_doc = doc.strip_suffix(", ").unwrap().to_string();
-            temp_doc.push_str("], ");
-            doc = temp_doc;
-        }
-
-        let mut doc = doc.strip_suffix(", ").unwrap().to_string();
-        doc.push_str(" }");
-        doc
+        Value::Object(self.map.clone()).to_string()
     }
 
     fn add_branch_url_variable(&mut self, name: &str, value: &str, branch: &str, repo_owner: &str) {
-        self.variables
-            .push(("branch".to_string(), branch.to_string()));
-        self.variables
-            .push(("org".to_string(), repo_owner.to_string()));
-        self.variables.push((name.to_string(), value.to_string()));
+        self.add_variable("branch", branch);
+        self.add_variable("org", repo_owner);
+        self.add_variable(name, value);
     }
 }
 
