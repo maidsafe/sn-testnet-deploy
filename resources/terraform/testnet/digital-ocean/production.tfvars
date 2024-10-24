@@ -1,4 +1,4 @@
-bootstrap_droplet_size = "c2-16vcpu-32gb"
+bootstrap_droplet_size = "s-8vcpu-16gb"
 bootstrap_node_vm_count = 50
 bootstrap_droplet_image_id = 157362431
 evm_node_vm_count = 0
@@ -10,6 +10,6 @@ node_vm_count = 79
 node_droplet_image_id = 157362431
 private_node_vm_count = 1
 setup_nat_gateway = true
-uploader_droplet_size = "s-8vcpu-16gb"
-uploader_vm_count = 5
+uploader_droplet_size = "c-16"
+uploader_vm_count = 2
 uploader_droplet_image_id = 157362431
