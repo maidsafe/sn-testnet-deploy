@@ -14,7 +14,7 @@ use crate::{
 };
 use alloy::{network::EthereumWallet, signers::local::PrivateKeySigner};
 use evmlib::{common::U256, wallet::Wallet, Network};
-use log::{debug, error};
+use log::{debug, error, warn};
 use std::collections::HashMap;
 use std::str::FromStr;
 
@@ -48,11 +48,12 @@ impl AnsibleProvisioner {
 
         for (vm, count) in uploaders_count {
             if count == 0 {
-                error!("No uploader instances found for {:?}", vm.name);
+                warn!("No uploader instances found for {:?}, ", vm.name);
+                uploader_secret_keys.insert(vm.clone(), Vec::new());
+            } else {
+                let sks = self.get_uploader_secret_key_per_vm(&vm, count)?;
+                uploader_secret_keys.insert(vm.clone(), sks);
             }
-
-            let sks = self.get_uploader_secret_key_per_vm(&vm, count)?;
-            uploader_secret_keys.insert(vm.clone(), sks);
         }
 
         Ok(uploader_secret_keys)
@@ -86,7 +87,9 @@ impl AnsibleProvisioner {
                         vm.name
                     );
                     for _ in 0..missing_keys_count {
-                        keys.push(PrivateKeySigner::random());
+                        let sk = PrivateKeySigner::random();
+                        debug!("Generated key with address: {}", sk.address());
+                        keys.push(sk);
                     }
                 }
             }
@@ -124,7 +127,7 @@ impl AnsibleProvisioner {
             let cmd = "systemctl list-units --type=service | grep autonomi_uploader_ | wc -l";
             let result = self
                 .ssh_client
-                .run_command(&vm.public_ip_addr, "root", cmd, false);
+                .run_command(&vm.public_ip_addr, "root", cmd, true);
             match result {
                 Ok(count) => {
                     debug!("Count found to be {count:?}, parsing");
@@ -172,9 +175,11 @@ impl AnsibleProvisioner {
         let mut sks_per_vm = Vec::new();
 
         debug!(
-            "Fetching uploader count for {} @ {}",
+            "Fetching uploader secret key for {} @ {}",
             vm.name, vm.public_ip_addr
         );
+        // Note: if this is gonna be parallelized, we need to make sure the secret keys are in order.
+        // the playbook expects them in order
         for count in 1..=instance_count {
             let cmd = format!(
                 "systemctl show autonomi_uploader_{count}.service --property=Environment | grep SECRET_KEY | cut -d= -f3 | awk '{{print $1}}'"
@@ -182,7 +187,7 @@ impl AnsibleProvisioner {
             debug!("Fetching secret key for {} instance {count}", vm.name);
             let result = self
                 .ssh_client
-                .run_command(&vm.public_ip_addr, "root", &cmd, false);
+                .run_command(&vm.public_ip_addr, "root", &cmd, true);
             match result {
                 Ok(secret_keys) => {
                     let sk_str = secret_keys

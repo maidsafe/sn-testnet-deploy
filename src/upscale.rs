@@ -241,6 +241,12 @@ impl TestnetDeployer {
         };
         debug!("Retrieved initial peer {initial_multiaddr}");
 
+        let evm_testnet_data = options
+            .current_inventory
+            .environment_details
+            .evm_testnet_data
+            .clone();
+
         let should_provision_private_nodes = desired_private_node_vm_count > 0;
         let mut n = 1;
         let mut total = if is_bootstrap_deploy { 3 } else { 4 };
@@ -262,7 +268,7 @@ impl TestnetDeployer {
                 &provision_options,
                 &initial_multiaddr,
                 NodeType::Bootstrap,
-                None,
+                evm_testnet_data.clone(),
             ) {
                 Ok(()) => {
                     println!("Provisioned bootstrap nodes");
@@ -285,7 +291,7 @@ impl TestnetDeployer {
             &provision_options,
             &initial_multiaddr,
             NodeType::Normal,
-            None,
+            evm_testnet_data.clone(),
         ) {
             Ok(()) => {
                 println!("Provisioned normal nodes");
@@ -352,7 +358,7 @@ impl TestnetDeployer {
             self.ansible_provisioner
                 .print_ansible_run_banner(n, total, "Provision Uploaders");
             self.ansible_provisioner
-                .provision_uploaders(&provision_options, &initial_multiaddr, None)
+                .provision_uploaders(&provision_options, &initial_multiaddr, evm_testnet_data)
                 .await
                 .map_err(|err| {
                     println!("Failed to provision uploaders {err:?}");
