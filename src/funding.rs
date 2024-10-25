@@ -32,31 +32,59 @@ pub struct FundingOptions {
 }
 
 impl AnsibleProvisioner {
+    /// Retrieve the uploader secret keys for all uploader VMs
+    pub fn get_uploader_secret_keys(
+        &self,
+    ) -> Result<HashMap<VirtualMachine, Vec<PrivateKeySigner>>> {
+        let uploaders_count = self.get_current_uploader_count()?;
+
+        debug!("Fetching uploader secret keys");
+        let mut uploader_secret_keys = HashMap::new();
+
+        if uploaders_count.is_empty() {
+            debug!("No uploaders VMs found");
+            return Err(Error::EmptyInventory(AnsibleInventoryType::Uploaders));
+        }
+
+        for (vm, count) in uploaders_count {
+            if count == 0 {
+                error!("No uploader instances found for {:?}", vm.name);
+            }
+
+            let sks = self.get_uploader_secret_key_per_vm(&vm, count)?;
+            uploader_secret_keys.insert(vm.clone(), sks);
+        }
+
+        Ok(uploader_secret_keys)
+    }
+
     /// Send funds from the funding_wallet_secret_key to the uploader wallets
     /// If FundingOptions::uploaders_count is provided, it will generate the missing secret keys.
     /// If not provided, we'll just fund the existing uploader wallets
     pub async fn fund_uploader_wallets(
         &self,
         options: &FundingOptions,
-    ) -> Result<HashMap<String, Vec<PrivateKeySigner>>> {
+    ) -> Result<HashMap<VirtualMachine, Vec<PrivateKeySigner>>> {
         debug!("Funding all the uploader wallets");
-        let uploader_instance_counts = self.get_current_uploader_count()?;
+        let mut uploader_secret_keys = self.get_uploader_secret_keys()?;
 
-        let mut uploader_secret_keys = self.get_uploader_secret_keys(uploader_instance_counts)?;
-
-        for (vm_name, keys) in uploader_secret_keys.iter_mut() {
+        for (vm, keys) in uploader_secret_keys.iter_mut() {
             if let Some(provided_count) = options.uploaders_count {
                 if provided_count < keys.len() as u16 {
-                    error!("Provided {provided_count} is less than the existing {} uploaders count for {vm_name}", keys.len());
+                    error!("Provided {provided_count} is less than the existing {} uploaders count for {}", keys.len(), vm.name);
                     return Err(Error::InvalidUpscaleDesiredUploaderCount);
                 }
                 let missing_keys_count = provided_count - keys.len() as u16;
                 debug!(
-                    "Found {} secret keys for {vm_name}, missing {missing_keys_count} keys",
-                    keys.len()
+                    "Found {} secret keys for {}, missing {missing_keys_count} keys",
+                    keys.len(),
+                    vm.name
                 );
                 if missing_keys_count > 0 {
-                    debug!("Generating {missing_keys_count} secret keys for {vm_name}",);
+                    debug!(
+                        "Generating {missing_keys_count} secret keys for {}",
+                        vm.name
+                    );
                     for _ in 0..missing_keys_count {
                         keys.push(PrivateKeySigner::random());
                     }
@@ -77,7 +105,7 @@ impl AnsibleProvisioner {
     }
 
     /// Return the (vm name, uploader count) for all uploader VMs
-    fn get_current_uploader_count(&self) -> Result<HashMap<String, usize>> {
+    fn get_current_uploader_count(&self) -> Result<HashMap<VirtualMachine, usize>> {
         let uploader_inventories = self
             .ansible_runner
             .get_inventory(AnsibleInventoryType::Uploaders, true)?;
@@ -109,7 +137,7 @@ impl AnsibleProvisioner {
                         .trim()
                         .parse()
                         .map_err(|_| Error::SecretKeyParseError)?;
-                    uploader_count.insert(vm.name, count);
+                    uploader_count.insert(vm.clone(), count);
                 }
                 Err(Error::ExternalCommandRunFailed {
                     binary,
@@ -117,7 +145,7 @@ impl AnsibleProvisioner {
                 }) => {
                     if let Some(1) = exit_status.code() {
                         debug!("No uploaders found for {:?}", vm.public_ip_addr);
-                        uploader_count.insert(vm.name, 0);
+                        uploader_count.insert(vm.clone(), 0);
                     } else {
                         debug!("Error while fetching uploader count with different exit code {exit_status:?}",);
                         return Err(Error::ExternalCommandRunFailed {
@@ -134,39 +162,6 @@ impl AnsibleProvisioner {
         }
 
         Ok(uploader_count)
-    }
-
-    /// Retrieve the (vm name, Vec<SECRET_KEY>)
-    fn get_uploader_secret_keys(
-        &self,
-        uploaders_count: HashMap<String, usize>,
-    ) -> Result<HashMap<String, Vec<PrivateKeySigner>>> {
-        debug!("Fetching uploader secret keys");
-        let mut uploader_secret_keys = HashMap::new();
-
-        let uploader_inventories = self
-            .ansible_runner
-            .get_inventory(AnsibleInventoryType::Uploaders, true)?;
-
-        if uploader_inventories.is_empty() {
-            debug!("No uploaders VMs found");
-            return Err(Error::EmptyInventory(AnsibleInventoryType::Uploaders));
-        }
-
-        for (vm_name, count) in uploaders_count {
-            if count == 0 {
-                error!("No uploader instances found for {vm_name:?}");
-            }
-            let vm = uploader_inventories
-                .iter()
-                .find(|vm| vm.name == vm_name)
-                .ok_or_else(|| Error::EnvironmentDetailsNotFound(vm_name.clone()))?;
-
-            let sks = self.get_uploader_secret_key_per_vm(vm, count)?;
-            uploader_secret_keys.insert(vm_name, sks);
-        }
-
-        Ok(uploader_secret_keys)
     }
 
     fn get_uploader_secret_key_per_vm(
@@ -217,7 +212,7 @@ impl AnsibleProvisioner {
     async fn transfer_funds(
         &self,
         funding_wallet_sk: Option<PrivateKeySigner>,
-        all_secret_keys: &HashMap<String, Vec<PrivateKeySigner>>,
+        all_secret_keys: &HashMap<VirtualMachine, Vec<PrivateKeySigner>>,
         options: &FundingOptions,
     ) -> Result<()> {
         if all_secret_keys.is_empty() {
@@ -286,12 +281,13 @@ impl AnsibleProvisioner {
         println!("Transferring {tokens_for_each_uploader} tokens and {gas_tokens_for_each_uploader} gas tokens to each uploader");
         debug!("Transferring {tokens_for_each_uploader} tokens and {gas_tokens_for_each_uploader} gas tokens to each uploader");
 
-        for (vm_name, sks_per_machine) in all_secret_keys.iter() {
-            debug!("Transferring funds for uploader vm: {vm_name}",);
+        for (vm, sks_per_machine) in all_secret_keys.iter() {
+            debug!("Transferring funds for uploader vm: {}", vm.name);
             for sk in sks_per_machine.iter() {
                 let to_wallet = Wallet::new(network.clone(), EthereumWallet::new(sk.clone()));
                 debug!(
-                    "Transferring funds for uploader vm: {vm_name} with public key: {}",
+                    "Transferring funds for uploader vm: {} with public key: {}",
+                    vm.name,
                     to_wallet.address()
                 );
 

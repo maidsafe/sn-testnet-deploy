@@ -4,6 +4,7 @@
 // This SAFE Network Software is licensed under the BSD-3-Clause license.
 // Please see the LICENSE file for more details.
 
+use crate::inventory::VirtualMachine;
 use crate::NodeType;
 use crate::{ansible::provisioning::ProvisionOptions, CloudProvider, EvmNetwork};
 use crate::{BinaryOption, Error, EvmCustomTestnetData, Result};
@@ -376,7 +377,7 @@ pub fn build_uploaders_extra_vars_doc(
     options: &ProvisionOptions,
     genesis_multiaddr: &str,
     evm_testnet_data: Option<EvmCustomTestnetData>,
-    sk_map: &HashMap<String, Vec<PrivateKeySigner>>,
+    sk_map: &HashMap<VirtualMachine, Vec<PrivateKeySigner>>,
 ) -> Result<String> {
     let mut extra_vars: ExtraVarsDocBuilder = ExtraVarsDocBuilder::default();
     extra_vars.add_variable("provider", cloud_provider);
@@ -415,7 +416,7 @@ pub fn build_uploaders_extra_vars_doc(
             .map(|sk| format!("{:?}", sk.to_bytes().encode_hex_with_prefix()))
             .collect::<Vec<String>>();
         let sks = Value::Array(sks.into_iter().map(Value::String).collect());
-        serde_map.insert(k.to_owned(), sks);
+        serde_map.insert(k.name.clone(), sks);
     }
     let serde_map = Value::Object(serde_map);
 

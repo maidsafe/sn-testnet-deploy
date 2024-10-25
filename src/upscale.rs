@@ -394,9 +394,12 @@ impl TestnetDeployer {
                 .map(|node_vm| &node_vm.vm)
                 .cloned()
                 .collect(),
-            AnsibleInventoryType::Uploaders => {
-                current_inventory.uploader_vms.iter().cloned().collect()
-            }
+            AnsibleInventoryType::Uploaders => current_inventory
+                .uploader_vms
+                .iter()
+                .map(|uploader_vm| &uploader_vm.vm)
+                .cloned()
+                .collect(),
             AnsibleInventoryType::NatGateway => {
                 current_inventory.nat_gateway_vm.iter().cloned().collect()
             }
