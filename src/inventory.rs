@@ -19,12 +19,13 @@ use crate::{
     terraform::TerraformRunner,
     BinaryOption, CloudProvider, DeploymentType, EnvironmentDetails, Error, TestnetDeployer,
 };
+use alloy::hex::ToHexExt;
 use color_eyre::{eyre::eyre, Result};
 use rand::seq::IteratorRandom;
 use serde::{Deserialize, Serialize};
 use sn_service_management::{NodeRegistry, ServiceStatus};
 use std::{
-    collections::{BTreeMap, BTreeSet},
+    collections::{HashMap, HashSet},
     convert::From,
     fs::File,
     io::Write,
@@ -183,9 +184,18 @@ impl DeploymentInventoryService {
             .ansible_runner
             .get_inventory(AnsibleInventoryType::BootstrapNodes, false)?;
 
-        let uploader_vms = self
-            .ansible_runner
-            .get_inventory(AnsibleInventoryType::Uploaders, false)?;
+        let uploader_and_sks = self.ansible_provisioner.get_uploader_secret_keys()?;
+        let uploader_vms = uploader_and_sks
+            .iter()
+            .map(|(vm, sks)| UploaderVirtualMachine {
+                vm: vm.clone(),
+                wallet_public_key: sks
+                    .iter()
+                    .enumerate()
+                    .map(|(user, sk)| (format!("safe{user}"), sk.address().encode_hex()))
+                    .collect(),
+            })
+            .collect::<Vec<_>>();
 
         println!("Retrieving node registries from all VMs...");
         let mut failed_node_registry_vms = Vec::new();
@@ -458,11 +468,21 @@ impl NodeVirtualMachine {
     }
 }
 
+/// The name of the OS user.
+pub type OsUser = String;
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct UploaderVirtualMachine {
+    pub vm: VirtualMachine,
+    /// The public key of the wallet for each OS user (1 uploader instance per OS user).
+    pub wallet_public_key: HashMap<OsUser, String>,
+}
+
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct NodeVirtualMachine {
     pub vm: VirtualMachine,
     pub node_multiaddr: Vec<String>,
-    pub rpc_endpoint: BTreeMap<String, SocketAddr>,
+    pub rpc_endpoint: HashMap<String, SocketAddr>,
     pub safenodemand_endpoint: Option<SocketAddr>,
 }
 
@@ -547,7 +567,7 @@ pub struct DeploymentInventory {
     pub ssh_user: String,
     pub ssh_private_key_path: PathBuf,
     pub uploaded_files: Vec<(String, String)>,
-    pub uploader_vms: Vec<VirtualMachine>,
+    pub uploader_vms: Vec<UploaderVirtualMachine>,
 }
 
 impl DeploymentInventory {
@@ -594,7 +614,11 @@ impl DeploymentInventory {
                 .iter()
                 .map(|node_vm| node_vm.vm.clone()),
         );
-        list.extend(self.uploader_vms.clone());
+        list.extend(
+            self.uploader_vms
+                .iter()
+                .map(|uploader_vm| uploader_vm.vm.clone()),
+        );
         list
     }
 
@@ -616,8 +640,8 @@ impl DeploymentInventory {
         list
     }
 
-    pub fn peers(&self) -> BTreeSet<String> {
-        let mut list = BTreeSet::new();
+    pub fn peers(&self) -> HashSet<String> {
+        let mut list = HashSet::new();
         list.extend(
             self.bootstrap_node_vms
                 .iter()
@@ -788,11 +812,19 @@ impl DeploymentInventory {
             println!("============");
             println!("Uploader VMs");
             println!("============");
-            for vm in self.uploader_vms.iter() {
-                println!("{}: {}", vm.name, vm.public_ip_addr);
+            for uploader_vm in self.uploader_vms.iter() {
+                println!("{}: {}", uploader_vm.vm.name, uploader_vm.vm.public_ip_addr);
             }
-            println!("SSH user: {}", self.ssh_user);
             println!();
+
+            println!("===========================");
+            println!("Uploader Wallet Public Keys");
+            println!("===========================");
+            for uploader_vm in self.uploader_vms.iter() {
+                for (user, key) in uploader_vm.wallet_public_key.iter() {
+                    println!("{}@{}: {}", uploader_vm.vm.name, user, key);
+                }
+            }
         }
 
         if !self.misc_vms.is_empty() || self.nat_gateway_vm.is_some() {

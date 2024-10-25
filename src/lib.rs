@@ -1156,6 +1156,7 @@ pub async fn get_environment_details(
         .await
     {
         Ok(_) => {
+            debug!("Downloaded the environment details file for {environment_name} from S3");
             let content = std::fs::read_to_string(temp_file.path())?;
             match serde_json::from_str(&content) {
                 Ok(environment_details) => Ok(environment_details),
@@ -1216,9 +1217,14 @@ pub async fn get_environment_details(
                 }
             }
         }
-        Err(_) => Err(Error::EnvironmentDetailsNotFound(
-            environment_name.to_string(),
-        )),
+        Err(err) => {
+            log::error!(
+                "Could not download the environment details file for {environment_name} from S3: {err:?}"
+            );
+            Err(Error::EnvironmentDetailsNotFound(
+                environment_name.to_string(),
+            ))
+        }
     }
 }
 
