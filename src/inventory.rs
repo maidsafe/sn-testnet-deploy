@@ -194,7 +194,7 @@ impl DeploymentInventoryService {
                 wallet_public_key: sks
                     .iter()
                     .enumerate()
-                    .map(|(user, sk)| (format!("safe{user}"), sk.address().encode_hex()))
+                    .map(|(user, sk)| (format!("safe{}", user + 1), sk.address().encode_hex()))
                     .collect(),
             })
             .collect::<Vec<_>>();

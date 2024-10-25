@@ -38,7 +38,7 @@ use crate::{
 };
 use flate2::read::GzDecoder;
 use indicatif::{ProgressBar, ProgressStyle};
-use log::debug;
+use log::{debug, trace};
 use semver::Version;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
@@ -1145,87 +1145,74 @@ pub fn get_progress_bar(length: u64) -> Result<ProgressBar> {
     progress_bar.enable_steady_tick(Duration::from_millis(100));
     Ok(progress_bar)
 }
-
 pub async fn get_environment_details(
     environment_name: &str,
     s3_repository: &S3Repository,
 ) -> Result<EnvironmentDetails> {
     let temp_file = tempfile::NamedTempFile::new()?;
-    match s3_repository
-        .download_object("sn-environment-type", environment_name, temp_file.path())
-        .await
-    {
-        Ok(_) => {
-            debug!("Downloaded the environment details file for {environment_name} from S3");
-            let content = std::fs::read_to_string(temp_file.path())?;
-            match serde_json::from_str(&content) {
-                Ok(environment_details) => Ok(environment_details),
-                Err(_) => {
-                    let lines: Vec<&str> = content.lines().collect();
 
-                    let environment_type = if lines.is_empty() {
-                        None
-                    } else {
-                        Some(lines[0].trim())
-                    };
-
-                    let deployment_type = lines.get(1).map(|s| s.trim());
-
-                    let environment_type = match environment_type.and_then(|s| s.parse().ok()) {
-                        Some(e) => {
-                            debug!("Parsed the environment type from the S3 file");
-                            e
+    let max_retries = 3;
+    let mut retries = 0;
+    let env_details = loop {
+        debug!("Downloading the environment details file for {environment_name} from S3");
+        match s3_repository
+            .download_object("sn-environment-type", environment_name, temp_file.path())
+            .await
+        {
+            Ok(_) => {
+                debug!("Downloaded the environment details file for {environment_name} from S3");
+                let content = match std::fs::read_to_string(temp_file.path()) {
+                    Ok(content) => content,
+                    Err(err) => {
+                        log::error!("Could not read the environment details file: {err:?}");
+                        if retries < max_retries {
+                            debug!("Retrying to read the environment details file");
+                            retries += 1;
+                            continue;
+                        } else {
+                            return Err(Error::EnvironmentDetailsNotFound(
+                                environment_name.to_string(),
+                            ));
                         }
-                        None => {
-                            debug!("Could not parse the environment type from the S3 file");
-                            debug!(
-                                "Falling back to using the environment name ({environment_name})"
-                            );
-                            if environment_name.starts_with("DEV") {
-                                debug!("Using Development as the environment type");
-                                EnvironmentType::Development
-                            } else if environment_name.starts_with("STG") {
-                                debug!("Using Staging as the environment type");
-                                EnvironmentType::Staging
-                            } else if environment_name.starts_with("PROD") {
-                                debug!("Using Production as the environment type");
-                                EnvironmentType::Production
-                            } else {
-                                return Err(Error::EnvironmentNameFromStringError(
-                                    environment_name.to_string(),
-                                ));
-                            }
-                        }
-                    };
+                    }
+                };
+                trace!("Content of the environment details file: {}", content);
 
-                    let deployment_type = match deployment_type.and_then(|s| s.parse().ok()) {
-                        Some(d) => d,
-                        None => {
-                            debug!("Could not parse the deployment type from the S3 file");
-                            debug!("Using New as the default");
-                            DeploymentType::New
+                match serde_json::from_str(&content) {
+                    Ok(environment_details) => break environment_details,
+                    Err(err) => {
+                        log::error!("Could not parse the environment details file: {err:?}");
+                        if retries < max_retries {
+                            debug!("Retrying to parse the environment details file");
+                            retries += 1;
+                            continue;
+                        } else {
+                            return Err(Error::EnvironmentDetailsNotFound(
+                                environment_name.to_string(),
+                            ));
                         }
-                    };
-
-                    Ok(EnvironmentDetails {
-                        environment_type,
-                        deployment_type,
-                        evm_network: EvmNetwork::ArbitrumOne,
-                        rewards_address: "".to_string(),
-                        evm_testnet_data: None,
-                    })
+                    }
+                }
+            }
+            Err(err) => {
+                log::error!(
+                    "Could not download the environment details file for {environment_name} from S3: {err:?}"
+                );
+                if retries < max_retries {
+                    retries += 1;
+                    continue;
+                } else {
+                    return Err(Error::EnvironmentDetailsNotFound(
+                        environment_name.to_string(),
+                    ));
                 }
             }
         }
-        Err(err) => {
-            log::error!(
-                "Could not download the environment details file for {environment_name} from S3: {err:?}"
-            );
-            Err(Error::EnvironmentDetailsNotFound(
-                environment_name.to_string(),
-            ))
-        }
-    }
+    };
+
+    debug!("Fetched environment details: {env_details:?}");
+
+    Ok(env_details)
 }
 
 pub async fn write_environment_details(
