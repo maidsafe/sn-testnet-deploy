@@ -36,6 +36,8 @@ use crate::{
     ssh::SshClient,
     terraform::TerraformRunner,
 };
+use alloy::primitives::Address;
+use evmlib::Network;
 use flate2::read::GzDecoder;
 use indicatif::{ProgressBar, ProgressStyle};
 use log::{debug, trace};
@@ -164,6 +166,7 @@ pub struct EnvironmentDetails {
     pub environment_type: EnvironmentType,
     pub evm_network: EvmNetwork,
     pub evm_testnet_data: Option<EvmCustomTestnetData>,
+    pub funding_wallet_address: Option<String>,
     pub rewards_address: String,
 }
 
@@ -718,11 +721,38 @@ impl TestnetDeployer {
     }
 
     pub async fn clean(&self) -> Result<()> {
-        let environment_type =
+        let environment_details =
             get_environment_details(&self.environment_name, &self.s3_repository).await?;
+
+        let evm_network = match environment_details.evm_network {
+            EvmNetwork::Custom => None,
+            EvmNetwork::ArbitrumOne => Some(Network::ArbitrumOne),
+            EvmNetwork::ArbitrumSepolia => Some(Network::ArbitrumSepolia),
+        };
+        if let (Some(network), Some(address)) =
+            (evm_network, environment_details.funding_wallet_address)
+        {
+            if let Err(err) = self
+                .ansible_provisioner
+                .drain_funds_from_uploaders(
+                    Address::from_str(&address).map_err(|err| {
+                        log::error!("Invalid funding wallet public key: {err:?}");
+                        Error::FailedToParseKey
+                    })?,
+                    network,
+                )
+                .await
+            {
+                log::error!("Failed to drain funds from uploaders: {err:?}");
+            }
+        } else {
+            println!("Custom network provided. Not draining funds.");
+            log::info!("Custom network provided. Not draining funds.");
+        }
+
         do_clean(
             &self.environment_name,
-            Some(environment_type.environment_type),
+            Some(environment_details.environment_type),
             self.working_directory_path.clone(),
             &self.terraform_runner,
             None,

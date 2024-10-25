@@ -55,6 +55,8 @@ pub enum Error {
         binary: String,
         exit_status: std::process::ExitStatus,
     },
+    #[error("Failed to parse key")]
+    FailedToParseKey,
     #[error("Failed to retrieve filename")]
     FilenameNotRetrieved,
     #[error(transparent)]
@@ -133,8 +135,6 @@ pub enum Error {
     SafeBinaryDownloadError,
     #[error("Error in byte stream when attempting to retrieve S3 object")]
     S3ByteStreamError,
-    #[error("Failed to parse secret key")]
-    SecretKeyParseError,
     #[error("The secret key was not found in the environment")]
     SecretKeyNotFound,
     #[error(transparent)]

@@ -3,13 +3,14 @@
 // This SAFE Network Software is licensed under the BSD-3-Clause license.
 // Please see the LICENSE file for more details.
 
-use alloy::primitives::U256;
+use alloy::primitives::{Address, U256};
 use clap::{Parser, Subcommand};
 use color_eyre::{
     eyre::{bail, eyre, OptionExt},
     Help, Result,
 };
 use dotenv::dotenv;
+use evmlib::Network;
 use semver::Version;
 use sn_releases::{ReleaseType, SafeReleaseRepoActions};
 use sn_testnet_deploy::{
@@ -18,6 +19,7 @@ use sn_testnet_deploy::{
     deploy::DeployOptions,
     error::Error,
     funding::FundingOptions,
+    get_environment_details,
     inventory::{
         get_data_directory, DeploymentInventory, DeploymentInventoryService, VirtualMachine,
     },
@@ -28,8 +30,8 @@ use sn_testnet_deploy::{
     BinaryOption, CloudProvider, EnvironmentType, EvmNetwork, LogFormat, TestnetDeployBuilder,
     UpgradeOptions,
 };
-use std::time::Duration;
 use std::{env, net::IpAddr};
+use std::{str::FromStr, time::Duration};
 
 #[derive(Parser, Debug)]
 #[clap(name = "sn-testnet-deploy", version = env!("CARGO_PKG_VERSION"))]
@@ -475,33 +477,9 @@ enum Commands {
     /// Manage the faucet for an environment
     #[clap(name = "faucet", subcommand)]
     Faucet(FaucetCommands),
-    /// Transfer funds from the funding wallet to all uploaders
-    Fund {
-        /// The EVM network type to use for the deployment.
-        ///
-        /// Possible values are 'arbitrum-one' or 'custom'.
-        ///
-        /// If not used, the default is 'arbitrum-one'.
-        #[clap(long, default_value = "arbitrum-one", value_parser = parse_evm_network)]
-        evm_network_type: EvmNetwork,
-        /// The secret key for the wallet that will fund all the uploaders.
-        ///
-        /// This argument only applies when Arbitrum or Sepolia networks are used.
-        #[clap(long)]
-        funding_wallet_secret_key: Option<String>,
-        /// The number of gas to transfer, in U256
-        #[arg(long)]
-        gas_to_transfer: U256,
-        /// The name of the environment.
-        #[arg(short = 'n', long)]
-        name: String,
-        /// The cloud provider for the environment.
-        #[clap(long, value_parser = parse_provider, verbatim_doc_comment, default_value_t = CloudProvider::DigitalOcean)]
-        provider: CloudProvider,
-        /// The number of tokens to transfer, in U256
-        #[arg(long)]
-        tokens_to_transfer: U256,
-    },
+    /// Manage the funds in the network
+    #[clap(name = "funds", subcommand)]
+    Funds(FundsCommand),
     Inventory {
         /// If set to true, the inventory will be regenerated.
         ///
@@ -1121,6 +1099,44 @@ enum FaucetCommands {
     },
 }
 
+#[derive(Subcommand, Debug)]
+enum FundsCommand {
+    /// Deposit tokens and gas from the provided funding wallet secret key to all the uploaders
+    Deposit {
+        /// The secret key for the wallet that will fund all the uploaders.
+        ///
+        /// This argument only applies when Arbitrum or Sepolia networks are used.
+        #[clap(long)]
+        funding_wallet_secret_key: Option<String>,
+        /// The number of gas to transfer, in U256
+        #[arg(long)]
+        gas_to_transfer: Option<U256>,
+        /// The name of the environment.
+        #[arg(short = 'n', long)]
+        name: String,
+        /// The cloud provider for the environment.
+        #[clap(long, value_parser = parse_provider, verbatim_doc_comment, default_value_t = CloudProvider::DigitalOcean)]
+        provider: CloudProvider,
+        /// The number of tokens to transfer, in U256
+        #[arg(long)]
+        tokens_to_transfer: Option<U256>,
+    },
+    /// Drain all the tokens and gas from the uploaders to the funding wallet.
+    Drain {
+        /// The name of the environment.
+        #[arg(short = 'n', long)]
+        name: String,
+        /// The cloud provider for the environment.
+        #[clap(long, value_parser = parse_provider, verbatim_doc_comment, default_value_t = CloudProvider::DigitalOcean)]
+        provider: CloudProvider,
+        /// The address of the wallet that will receive all the tokens and gas.
+        ///
+        /// This argument is optional, the funding wallet address from the S3 environment file will be used by default.
+        #[clap(long)]
+        to_address: Option<String>,
+    },
+}
+
 #[tokio::main]
 async fn main() -> Result<()> {
     color_eyre::install()?;
@@ -1305,6 +1321,11 @@ async fn main() -> Result<()> {
             if funding_wallet_secret_key.is_some() && evm_network_type == EvmNetwork::Custom {
                 return Err(eyre!(
                     "Wallet secret key only applies to Arbitrum or Sepolia networks"
+                ));
+            } else if funding_wallet_secret_key.is_none() && evm_network_type != EvmNetwork::Custom
+            {
+                return Err(eyre!(
+                    "Wallet secret key is required for Arbitrum or Sepolia networks"
                 ));
             }
 
@@ -1513,39 +1534,101 @@ async fn main() -> Result<()> {
                 Ok(())
             }
         },
-        Commands::Fund {
-            evm_network_type,
-            funding_wallet_secret_key,
-            gas_to_transfer,
-            name,
-            provider,
-            tokens_to_transfer,
-        } => {
-            if funding_wallet_secret_key.is_some() && evm_network_type == EvmNetwork::Custom {
-                return Err(eyre!(
-                    "Wallet secret key only applies to Arbitrum or Sepolia networks"
-                ));
-            }
-
-            let testnet_deployer = TestnetDeployBuilder::default()
-                .environment_name(&name)
-                .provider(provider)
-                .build()?;
-
-            let options = FundingOptions {
-                evm_network: evm_network_type,
+        Commands::Funds(funds_cmd) => match funds_cmd {
+            FundsCommand::Deposit {
                 funding_wallet_secret_key,
-                uploaders_count: None,
-                token_amount: Some(tokens_to_transfer),
-                gas_amount: Some(gas_to_transfer),
-            };
-            testnet_deployer
-                .ansible_provisioner
-                .fund_uploader_wallets(&options)
-                .await?;
+                gas_to_transfer,
+                name,
+                provider,
+                tokens_to_transfer,
+            } => {
+                let testnet_deployer = TestnetDeployBuilder::default()
+                    .environment_name(&name)
+                    .provider(provider)
+                    .build()?;
+                let inventory_services = DeploymentInventoryService::from(&testnet_deployer);
 
-            Ok(())
-        }
+                let environment_details =
+                    get_environment_details(&name, &inventory_services.s3_repository).await?;
+
+                if funding_wallet_secret_key.is_some()
+                    && environment_details.evm_network == EvmNetwork::Custom
+                {
+                    return Err(eyre!(
+                        "Wallet secret key only applies to Arbitrum or Sepolia networks"
+                    ));
+                }
+
+                if gas_to_transfer.is_none() && tokens_to_transfer.is_none() {
+                    return Err(eyre!(
+                        "At least one of 'gas-to-transfer' or 'tokens-to-transfer' must be provided"
+                    ));
+                }
+
+                let options = FundingOptions {
+                    custom_evm_testnet_data: environment_details.evm_testnet_data,
+                    evm_network: environment_details.evm_network,
+                    funding_wallet_secret_key,
+                    uploaders_count: None,
+                    token_amount: tokens_to_transfer,
+                    gas_amount: gas_to_transfer,
+                };
+                testnet_deployer
+                    .ansible_provisioner
+                    .deposit_funds_to_uploaders(&options)
+                    .await?;
+
+                Ok(())
+            }
+            FundsCommand::Drain {
+                name,
+                provider,
+                to_address,
+            } => {
+                let testnet_deployer = TestnetDeployBuilder::default()
+                    .environment_name(&name)
+                    .provider(provider)
+                    .build()?;
+
+                let inventory_services = DeploymentInventoryService::from(&testnet_deployer);
+
+                let environment_details =
+                    get_environment_details(&name, &inventory_services.s3_repository).await?;
+
+                let to_address = if let Some(to_address) = to_address {
+                    Address::from_str(&to_address)?
+                } else if let Some(to_address) = environment_details.funding_wallet_address {
+                    Address::from_str(&to_address)?
+                } else {
+                    return Err(eyre!(
+                        "No to-address was provided and no funding wallet address was found in the environment details"
+                    ));
+                };
+
+                let network = match environment_details.evm_network {
+                    EvmNetwork::ArbitrumOne => Network::ArbitrumOne,
+                    EvmNetwork::ArbitrumSepolia => Network::ArbitrumSepolia,
+                    EvmNetwork::Custom => {
+                        let custom_evm_details =
+                            environment_details.evm_testnet_data.ok_or_else(|| {
+                                eyre!("Custom EVM details not found in the environment details")
+                            })?;
+                        Network::new_custom(
+                            &custom_evm_details.rpc_url,
+                            &custom_evm_details.payment_token_address,
+                            &custom_evm_details.data_payments_address,
+                        )
+                    }
+                };
+
+                testnet_deployer
+                    .ansible_provisioner
+                    .drain_funds_from_uploaders(to_address, network)
+                    .await?;
+
+                Ok(())
+            }
+        },
         Commands::Inventory {
             force_regeneration,
             name,
