@@ -456,18 +456,6 @@ impl AnsibleProvisioner {
         evm_testnet_data: Option<EvmCustomTestnetData>,
     ) -> Result<()> {
         let start = Instant::now();
-        println!("Stopping the uploaders");
-        debug!("Stopping the uploaders");
-
-        self.ansible_runner.run_playbook(
-            AnsiblePlaybook::StopUploaders,
-            AnsibleInventoryType::Uploaders,
-            Some(extra_vars::build_start_or_stop_uploader_extra_vars_doc(
-                &self.cloud_provider.to_string(),
-                options,
-                true,
-            )),
-        )?;
 
         let sk_map = self
             .fund_uploader_wallets(&FundingOptions {
