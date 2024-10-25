@@ -21,7 +21,9 @@ use crate::{
 };
 use alloy::hex::ToHexExt;
 use color_eyre::{eyre::eyre, Result};
+use log::error;
 use rand::seq::IteratorRandom;
+use semver::Version;
 use serde::{Deserialize, Serialize};
 use sn_service_management::{NodeRegistry, ServiceStatus};
 use std::{
@@ -241,7 +243,7 @@ impl DeploymentInventoryService {
                     let (_, genesis_node_registry) = genesis_node_registry
                         .retrieved_registries
                         .iter()
-                        .find(|(_, reg)| reg.faucet.is_some())
+                        .find(|(vm_name, _)| vm_name.contains("genesis-bootstrap"))
                         .ok_or_else(|| eyre!("Unable to retrieve genesis node registry"))?;
                     genesis_node_registry
                         .nodes
@@ -259,6 +261,7 @@ impl DeploymentInventoryService {
                     .parse()?,
             };
 
+            let default_version: Version = "0.0.0".parse()?;
             // get the safenode manager version from a random generic node vm
             let safenode_manager_version = genesis_node_registry
                 .retrieved_registries
@@ -266,9 +269,19 @@ impl DeploymentInventoryService {
                 .find_map(|(_, reg)| reg.daemon.as_ref())
                 .ok_or_else(|| eyre!("Unable to obtain the daemon"))?
                 .version
-                .parse()?;
+                .clone();
+            // FIXME: the safenode manager version from the daemon is not written properly by safenode manager.
+            // Once fixed, error out instead of .unwrap_or(default_version.clone());
+            let safenode_manager_version = safenode_manager_version
+                .parse()
+                .inspect_err(|err| {
+                    error!(
+                    "Failed to parse safenode manager version: {safenode_manager_version:?} {err}"
+                );
+                })
+                .unwrap_or(default_version.clone());
             BinaryOption::Versioned {
-                safe_version: Some("0.0.1".parse()?), // todo: store safe version in the safenodeman registry?
+                safe_version: Some(default_version), // todo: store safe version in the safenodeman registry?
                 safenode_version,
                 safenode_manager_version,
             }
@@ -775,6 +788,9 @@ impl DeploymentInventory {
         println!("========");
         println!("Node VMs");
         println!("========");
+        if let Some(genesis_vm) = &self.genesis_vm {
+            println!("{}: {}", genesis_vm.vm.name, genesis_vm.vm.public_ip_addr);
+        }
         for node_vm in self.node_vms.iter() {
             println!("{}: {}", node_vm.vm.name, node_vm.vm.public_ip_addr);
         }
