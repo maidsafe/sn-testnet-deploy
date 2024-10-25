@@ -7,10 +7,12 @@
 use crate::{
     ansible::{inventory::AnsibleInventoryType, provisioning::ProvisionOptions},
     error::Result,
+    funding::get_address_from_sk,
     get_evm_testnet_data, get_genesis_multiaddr, write_environment_details, BinaryOption,
     DeploymentInventory, DeploymentType, EnvironmentDetails, EnvironmentType, EvmNetwork,
     InfraRunOptions, LogFormat, NodeType, TestnetDeployer,
 };
+use alloy::hex::ToHexExt;
 use colored::Colorize;
 use std::{net::SocketAddr, path::PathBuf};
 
@@ -104,8 +106,9 @@ impl TestnetDeployer {
                 deployment_type: DeploymentType::New,
                 environment_type: options.environment_type.clone(),
                 evm_network: options.evm_network.clone(),
-                rewards_address: options.rewards_address.clone(),
                 evm_testnet_data: None,
+                funding_wallet_address: None,
+                rewards_address: options.rewards_address.clone(),
             },
         )
         .await?;
@@ -133,6 +136,17 @@ impl TestnetDeployer {
             None
         };
 
+        let funding_wallet_address = if let Some(secret_key) = &options.funding_wallet_secret_key {
+            let address = get_address_from_sk(secret_key)?;
+            Some(address.encode_hex())
+        } else if let Some(emv_data) = &evm_testnet_data {
+            let address = get_address_from_sk(&emv_data.deployer_wallet_private_key)?;
+            Some(address.encode_hex())
+        } else {
+            log::error!("Funding wallet address not provided");
+            None
+        };
+
         write_environment_details(
             &self.s3_repository,
             &options.name,
@@ -141,6 +155,7 @@ impl TestnetDeployer {
                 environment_type: options.environment_type.clone(),
                 evm_network: options.evm_network.clone(),
                 evm_testnet_data: evm_testnet_data.clone(),
+                funding_wallet_address,
                 rewards_address: options.rewards_address.clone(),
             },
         )

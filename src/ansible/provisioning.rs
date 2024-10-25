@@ -458,7 +458,8 @@ impl AnsibleProvisioner {
         let start = Instant::now();
 
         let sk_map = self
-            .fund_uploader_wallets(&FundingOptions {
+            .deposit_funds_to_uploaders(&FundingOptions {
+                custom_evm_testnet_data: evm_testnet_data.clone(),
                 uploaders_count: options.uploaders_count,
                 evm_network: options.evm_network.clone(),
                 funding_wallet_secret_key: options.funding_wallet_secret_key.clone(),

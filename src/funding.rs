@@ -5,13 +5,14 @@
 // Please see the LICENSE file for more details.
 
 use crate::error::Result;
+use crate::EvmCustomTestnetData;
 use crate::{
     ansible::{inventory::AnsibleInventoryType, provisioning::AnsibleProvisioner},
     error::Error,
-    get_evm_testnet_data,
     inventory::VirtualMachine,
     EvmNetwork,
 };
+use alloy::primitives::Address;
 use alloy::{network::EthereumWallet, signers::local::PrivateKeySigner};
 use evmlib::{common::U256, wallet::Wallet, Network};
 use log::{debug, error, warn};
@@ -20,6 +21,7 @@ use std::str::FromStr;
 
 pub struct FundingOptions {
     pub evm_network: EvmNetwork,
+    pub custom_evm_testnet_data: Option<EvmCustomTestnetData>,
     pub funding_wallet_secret_key: Option<String>,
     /// Have to specify during upscale and deploy
     pub uploaders_count: Option<u16>,
@@ -59,10 +61,10 @@ impl AnsibleProvisioner {
         Ok(uploader_secret_keys)
     }
 
-    /// Send funds from the funding_wallet_secret_key to the uploader wallets
+    /// Deposit funds from the funding_wallet_secret_key to the uploader wallets
     /// If FundingOptions::uploaders_count is provided, it will generate the missing secret keys.
     /// If not provided, we'll just fund the existing uploader wallets
-    pub async fn fund_uploader_wallets(
+    pub async fn deposit_funds_to_uploaders(
         &self,
         options: &FundingOptions,
     ) -> Result<HashMap<VirtualMachine, Vec<PrivateKeySigner>>> {
@@ -96,15 +98,96 @@ impl AnsibleProvisioner {
         }
 
         let funding_wallet_sk = if let Some(sk) = &options.funding_wallet_secret_key {
-            Some(sk.parse().map_err(|_| Error::SecretKeyParseError)?)
+            Some(sk.parse().map_err(|_| Error::FailedToParseKey)?)
         } else {
             None
         };
 
-        self.transfer_funds(funding_wallet_sk, &uploader_secret_keys, options)
+        self.deposit_funds(funding_wallet_sk, &uploader_secret_keys, options)
             .await?;
 
         Ok(uploader_secret_keys)
+    }
+
+    /// Drain all the funds from the uploader wallets to the provided wallet
+    pub async fn drain_funds_from_uploaders(
+        &self,
+        to_address: Address,
+        evm_network: Network,
+    ) -> Result<()> {
+        debug!("Draining all the uploader wallets to {to_address:?}");
+        println!("Draining all the uploader wallets to {to_address:?}");
+        let uploader_secret_keys = self.get_uploader_secret_keys()?;
+
+        for (vm, keys) in uploader_secret_keys.iter() {
+            debug!(
+                "Draining funds for uploader vm: {} to {to_address:?}",
+                vm.name
+            );
+            for uploader_sk in keys.iter() {
+                debug!(
+                    "Draining funds for uploader vm: {} with key: {uploader_sk:?}",
+                    vm.name,
+                );
+
+                let from_wallet = Wallet::new(
+                    evm_network.clone(),
+                    EthereumWallet::new(uploader_sk.clone()),
+                );
+
+                let token_balance = from_wallet.balance_of_tokens().await.inspect_err(|err| {
+                    debug!(
+                        "Failed to get token balance for {} with err: {err:?}",
+                        from_wallet.address()
+                    )
+                })?;
+                let gas_balance = from_wallet
+                    .balance_of_gas_tokens()
+                    .await
+                    .inspect_err(|err| {
+                        debug!(
+                            "Failed to get gas token balance for {} with err: {err:?}",
+                            from_wallet.address()
+                        )
+                    })?;
+
+                println!("Draining {token_balance} tokens and {gas_balance} gas tokens from {} to {to_address:?}", from_wallet.address());
+                debug!("Draining {token_balance} tokens and {gas_balance} gas tokens from {} to {to_address:?}", from_wallet.address());
+
+                if token_balance.is_zero() {
+                    debug!(
+                        "No tokens to drain from wallet: {} with token balance",
+                        from_wallet.address()
+                    );
+                } else {
+                    from_wallet
+                        .transfer_tokens(to_address, token_balance)
+                        .await
+                        .inspect_err(|err| {
+                            debug!(
+                                "Failed to transfer {token_balance} tokens from {to_address} with err: {err:?}",
+                            )
+                        })?;
+                }
+
+                if gas_balance.is_zero() {
+                    debug!("No gas tokens to drain from wallet: {to_address}");
+                } else {
+                    from_wallet
+                    // 0.0001 gas
+                        .transfer_gas_tokens(to_address, gas_balance - U256::from_str("1_000_000_000_000").unwrap()).await
+                        .inspect_err(|err| {
+                            debug!(
+                                "Failed to transfer {gas_balance} gas tokens from {to_address} with err: {err:?}",
+                            )
+                        })?;
+                }
+            }
+        }
+        println!("All funds drained to {to_address:?} successfully");
+        debug!("All funds drained to {to_address:?} successfully");
+
+        Ok(())
     }
 
     /// Return the (vm name, uploader count) for all uploader VMs
@@ -139,7 +222,7 @@ impl AnsibleProvisioner {
                         })?
                         .trim()
                         .parse()
-                        .map_err(|_| Error::SecretKeyParseError)?;
+                        .map_err(|_| Error::FailedToParseKey)?;
                     uploader_count.insert(vm.clone(), count);
                 }
                 Err(Error::ExternalCommandRunFailed {
@@ -198,7 +281,7 @@ impl AnsibleProvisioner {
                         debug!("No secret key found for {}", vm.name);
                         Error::SecretKeyNotFound
                     })?;
-                    let sk = sk_str.parse().map_err(|_| Error::SecretKeyParseError)?;
+                    let sk = sk_str.parse().map_err(|_| Error::FailedToParseKey)?;
 
                     debug!("Secret keys found for {} instance {count}: {sk:?}", vm.name,);
 
@@ -214,7 +297,7 @@ impl AnsibleProvisioner {
         Ok(sks_per_vm)
     }
 
-    async fn transfer_funds(
+    async fn deposit_funds(
         &self,
         funding_wallet_sk: Option<PrivateKeySigner>,
         all_secret_keys: &HashMap<VirtualMachine, Vec<PrivateKeySigner>>,
@@ -227,10 +310,13 @@ impl AnsibleProvisioner {
 
         let _sk_count = all_secret_keys.values().map(|v| v.len()).sum::<usize>();
 
-        let (from_wallet, network) = match &options.evm_network {
+        let from_wallet = match &options.evm_network {
             EvmNetwork::Custom => {
                 let evm_testnet_data =
-                    get_evm_testnet_data(&self.ansible_runner, &self.ssh_client)?;
+                    options.custom_evm_testnet_data.as_ref().ok_or_else(|| {
+                        error!("Custom Evm testnet data not provided");
+                        Error::EvmTestnetDataNotFound
+                    })?;
                 let network = Network::new_custom(
                     &evm_testnet_data.rpc_url,
                     &evm_testnet_data.payment_token_address,
@@ -239,10 +325,9 @@ impl AnsibleProvisioner {
                 let deployer_wallet_sk: PrivateKeySigner = evm_testnet_data
                     .deployer_wallet_private_key
                     .parse()
-                    .map_err(|_| Error::SecretKeyParseError)?;
+                    .map_err(|_| Error::FailedToParseKey)?;
 
-                let wallet = Wallet::new(network.clone(), EthereumWallet::new(deployer_wallet_sk));
-                (wallet, network)
+                Wallet::new(network.clone(), EthereumWallet::new(deployer_wallet_sk))
             }
             EvmNetwork::ArbitrumOne => {
                 let funding_wallet_sk = funding_wallet_sk.ok_or_else(|| {
@@ -250,8 +335,7 @@ impl AnsibleProvisioner {
                     Error::SecretKeyNotFound
                 })?;
                 let network = Network::ArbitrumOne;
-                let wallet = Wallet::new(network.clone(), EthereumWallet::new(funding_wallet_sk));
-                (wallet, network)
+                Wallet::new(network.clone(), EthereumWallet::new(funding_wallet_sk))
             }
             EvmNetwork::ArbitrumSepolia => {
                 let funding_wallet_sk = funding_wallet_sk.ok_or_else(|| {
@@ -259,11 +343,10 @@ impl AnsibleProvisioner {
                     Error::SecretKeyNotFound
                 })?;
                 let network = Network::ArbitrumSepolia;
-                let wallet = Wallet::new(network.clone(), EthereumWallet::new(funding_wallet_sk));
-                (wallet, network)
+                Wallet::new(network.clone(), EthereumWallet::new(funding_wallet_sk))
             }
         };
-        debug!("Using emv network: {network:?}",);
+        debug!("Using emv network: {:?}", options.evm_network);
 
         let token_balance = from_wallet.balance_of_tokens().await?;
         let gas_balance = from_wallet.balance_of_gas_tokens().await?;
@@ -289,26 +372,26 @@ impl AnsibleProvisioner {
         for (vm, sks_per_machine) in all_secret_keys.iter() {
             debug!("Transferring funds for uploader vm: {}", vm.name);
             for sk in sks_per_machine.iter() {
-                let to_wallet = Wallet::new(network.clone(), EthereumWallet::new(sk.clone()));
+                sk.address();
                 debug!(
                     "Transferring funds for uploader vm: {} with public key: {}",
                     vm.name,
-                    to_wallet.address()
+                    sk.address()
                 );
 
                 from_wallet
-                    .transfer_tokens(to_wallet.address(), tokens_for_each_uploader)
+                    .transfer_tokens(sk.address(), tokens_for_each_uploader)
                     .await.inspect_err(|err| {
                         debug!(
-                            "Failed to transfer {tokens_for_each_uploader} tokens to {} with err: {err:?}", to_wallet.address()
+                            "Failed to transfer {tokens_for_each_uploader} tokens to {} with err: {err:?}", sk.address()
                         )
                     })?;
                 from_wallet
-                    .transfer_gas_tokens(to_wallet.address(), gas_tokens_for_each_uploader)
+                    .transfer_gas_tokens(sk.address(), gas_tokens_for_each_uploader)
                     .await
                     .inspect_err(|err| {
                         debug!(
-                            "Failed to transfer {gas_tokens_for_each_uploader} gas tokens to {} with err: {err:?}", to_wallet.address()
+                            "Failed to transfer {gas_tokens_for_each_uploader} gas tokens to {} with err: {err:?}", sk.address()
                         )
                     })
                     ?;
@@ -319,4 +402,10 @@ impl AnsibleProvisioner {
 
         Ok(())
     }
+}
+
+/// Get the Address of the funding wallet from the secret key string
+pub fn get_address_from_sk(secret_key: &str) -> Result<Address> {
+    let sk: PrivateKeySigner = secret_key.parse().map_err(|_| Error::FailedToParseKey)?;
+    Ok(sk.address())
 }
