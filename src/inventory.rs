@@ -21,8 +21,7 @@ use crate::{
 };
 use alloy::hex::ToHexExt;
 use color_eyre::{eyre::eyre, Result};
-use log::error;
-use rand::seq::IteratorRandom;
+use rand::seq::{IteratorRandom, SliceRandom};
 use semver::Version;
 use serde::{Deserialize, Serialize};
 use sn_service_management::{NodeRegistry, ServiceStatus};
@@ -261,27 +260,37 @@ impl DeploymentInventoryService {
                     .parse()?,
             };
 
-            let default_version: Version = "0.0.0".parse()?;
-            // get the safenode manager version from a random generic node vm
-            let safenode_manager_version = genesis_node_registry
-                .retrieved_registries
-                .iter()
-                .find_map(|(_, reg)| reg.daemon.as_ref())
-                .ok_or_else(|| eyre!("Unable to obtain the daemon"))?
-                .version
-                .clone();
-            // FIXME: the safenode manager version from the daemon is not written properly by safenode manager.
-            // Once fixed, error out instead of .unwrap_or(default_version.clone());
-            let safenode_manager_version = safenode_manager_version
-                .parse()
-                .inspect_err(|err| {
-                    error!(
-                    "Failed to parse safenode manager version: {safenode_manager_version:?} {err}"
-                );
-                })
-                .unwrap_or(default_version.clone());
+            let safenode_manager_version = {
+                let random_vm = generic_node_vms
+                    .choose(&mut rand::thread_rng())
+                    .ok_or_else(|| {
+                        eyre!("No VMs available to retrieve safenode-manager version")
+                    })?;
+                self.get_bin_version(
+                    &random_vm.vm,
+                    "safenode-manager --version",
+                    "Autonomi Node Manager v",
+                )?
+            };
+
+            let safe_version = {
+                let random_uploader_vm = uploader_vms
+                    .choose(&mut rand::thread_rng())
+                    .ok_or_else(|| eyre!("No uploader VMs available to retrieve safe version"))?;
+                self.get_bin_version(
+                    &random_uploader_vm.vm,
+                    "autonomi --version",
+                    "autonomi-cli ",
+                )?
+            };
+
+            println!("Retrieved binary versions from previous deployment:");
+            println!("  safenode: {}", safenode_version);
+            println!("  safenode-manager: {}", safenode_manager_version);
+            println!("  autonomi: {}", safe_version);
+
             BinaryOption::Versioned {
-                safe_version: Some(default_version), // todo: store safe version in the safenodeman registry?
+                safe_version: Some(safe_version),
                 safenode_version,
                 safenode_manager_version,
             }
@@ -410,6 +419,23 @@ impl DeploymentInventoryService {
             .await?;
 
         Ok(())
+    }
+
+    /// Connects to a VM with SSH and runs a command to retrieve the version of a binary.
+    fn get_bin_version(&self, vm: &VirtualMachine, command: &str, prefix: &str) -> Result<Version> {
+        let output = self.ssh_client.run_command(
+            &vm.public_ip_addr,
+            &self.cloud_provider.get_ssh_user(),
+            command,
+            true,
+        )?;
+        let version_line = output
+            .first()
+            .ok_or_else(|| eyre!("No output from {} command", command))?;
+        let version_str = version_line
+            .strip_prefix(prefix)
+            .ok_or_else(|| eyre!("Unexpected output format from {} command", command))?;
+        Version::parse(version_str).map_err(|e| eyre!("Failed to parse {} version: {}", command, e))
     }
 }
 
