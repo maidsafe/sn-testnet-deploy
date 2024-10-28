@@ -1109,6 +1109,8 @@ enum FundsCommand {
         #[clap(long)]
         funding_wallet_secret_key: Option<String>,
         /// The number of gas to transfer, in U256
+        ///
+        /// 1 ETH = 1_000_000_000_000_000_000. Defaults to 0.1 ETH
         #[arg(long)]
         gas_to_transfer: Option<U256>,
         /// The name of the environment.
@@ -1118,6 +1120,8 @@ enum FundsCommand {
         #[clap(long, value_parser = parse_provider, verbatim_doc_comment, default_value_t = CloudProvider::DigitalOcean)]
         provider: CloudProvider,
         /// The number of tokens to transfer, in U256
+        ///
+        /// 1 Token = 1_000_000_000_000_000_000. Defaults to 1 token.
         #[arg(long)]
         tokens_to_transfer: Option<U256>,
     },
@@ -1556,12 +1560,6 @@ async fn main() -> Result<()> {
                 {
                     return Err(eyre!(
                         "Wallet secret key only applies to Arbitrum or Sepolia networks"
-                    ));
-                }
-
-                if gas_to_transfer.is_none() && tokens_to_transfer.is_none() {
-                    return Err(eyre!(
-                        "At least one of 'gas-to-transfer' or 'tokens-to-transfer' must be provided"
                     ));
                 }
 

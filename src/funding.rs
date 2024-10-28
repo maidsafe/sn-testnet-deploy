@@ -174,8 +174,8 @@ impl AnsibleProvisioner {
                     debug!("No gas tokens to drain from wallet: {to_address}");
                 } else {
                     from_wallet
-                    // 0.0001 gas
-                        .transfer_gas_tokens(to_address, gas_balance - U256::from_str("1_000_000_000_000").unwrap()).await
+                    // 0.001 gas
+                        .transfer_gas_tokens(to_address, gas_balance - U256::from_str("10_000_000_000_000").unwrap()).await
                         .inspect_err(|err| {
                             debug!(
                                 "Failed to transfer {gas_balance} gas tokens from {to_address} with err: {err:?}",
@@ -354,47 +354,50 @@ impl AnsibleProvisioner {
         println!("Funding wallet gas balance: {gas_balance}");
         debug!("Funding wallet token balance: {token_balance:?} and gas balance {gas_balance}");
 
-        // let (tokens_for_each_uploader, _quotient) = token_balance.div_rem(U256::from(sk_count));
-
-        // // +1 to make sure we have enough gas
-        // let (gas_tokens_for_each_uploader, _quotient) =
-        //     gas_balance.div_rem(U256::from(sk_count + 1));
-
         let default_token_amount = U256::from_str("1_000_000_000_000_000_000").unwrap();
         let default_gas_amount = U256::from_str("100_000_000_000_000_000").unwrap();
 
         let tokens_for_each_uploader = options.token_amount.unwrap_or(default_token_amount);
-        let gas_tokens_for_each_uploader = options.gas_amount.unwrap_or(default_gas_amount);
+        let gas_for_each_uploader = options.gas_amount.unwrap_or(default_gas_amount);
 
-        println!("Transferring {tokens_for_each_uploader} tokens and {gas_tokens_for_each_uploader} gas tokens to each uploader");
-        debug!("Transferring {tokens_for_each_uploader} tokens and {gas_tokens_for_each_uploader} gas tokens to each uploader");
+        println!("Transferring {tokens_for_each_uploader} tokens and {gas_for_each_uploader} gas tokens to each uploader");
+        debug!("Transferring {tokens_for_each_uploader} tokens and {gas_for_each_uploader} gas tokens to each uploader");
 
         for (vm, sks_per_machine) in all_secret_keys.iter() {
             debug!("Transferring funds for uploader vm: {}", vm.name);
             for sk in sks_per_machine.iter() {
                 sk.address();
-                debug!(
-                    "Transferring funds for uploader vm: {} with public key: {}",
-                    vm.name,
-                    sk.address()
-                );
 
-                from_wallet
+                if !tokens_for_each_uploader.is_zero() {
+                    debug!(
+                        "Transferring {tokens_for_each_uploader} tokens for uploader vm: {} with public key: {}",
+                        vm.name,
+                        sk.address()
+                    );
+                    from_wallet
                     .transfer_tokens(sk.address(), tokens_for_each_uploader)
                     .await.inspect_err(|err| {
                         debug!(
                             "Failed to transfer {tokens_for_each_uploader} tokens to {} with err: {err:?}", sk.address()
                         )
                     })?;
-                from_wallet
-                    .transfer_gas_tokens(sk.address(), gas_tokens_for_each_uploader)
+                }
+                if !gas_for_each_uploader.is_zero() {
+                    debug!(
+                        "Transferring {gas_for_each_uploader} gas for uploader vm: {} with public key: {}",
+                        vm.name,
+                        sk.address()
+                    );
+                    from_wallet
+                    .transfer_gas_tokens(sk.address(), gas_for_each_uploader)
                     .await
                     .inspect_err(|err| {
                         debug!(
-                            "Failed to transfer {gas_tokens_for_each_uploader} gas tokens to {} with err: {err:?}", sk.address()
+                            "Failed to transfer {gas_for_each_uploader} gas tokens to {} with err: {err:?}", sk.address()
                         )
                     })
                     ?;
+                }
             }
         }
         println!("All Funds transferred successfully");
