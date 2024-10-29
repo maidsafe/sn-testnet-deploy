@@ -34,7 +34,7 @@ use std::{
     path::PathBuf,
 };
 
-const DEFAULT_CONTACTS_COUNT: usize = 25;
+const DEFAULT_CONTACTS_COUNT: usize = 100;
 const UNAVAILABLE_NODE: &str = "-";
 const TESTNET_BUCKET_NAME: &str = "sn-testnet";
 
