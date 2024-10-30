@@ -13,7 +13,7 @@ path="src/main.rs"
 name="testnet-deploy"
 
 [dependencies]
-alloy = { version = "0.4.2", default-features = false, features = ["signers"] }
+alloy = { version = "0.5.3", default-features = false, features = ["signers"] }
 async-recursion = "1.0.4"
 aws-config = "0.56.0"
 aws-sdk-s3 = "0.29.0"
@@ -24,11 +24,11 @@ colored = "2.0.4"
 dirs-next = "2.0.0"
 dotenv = "0.15.0"
 env_logger = "0.10.0"
-evmlib = "~0.1.1"
+evmlib = "~0.1.2"
 flate2 = "1.0"
 futures = "~0.3.13"
 fs_extra = "1.2.0"
-libp2p = { version = "0.53", features = [] }
+libp2p = { version = "0.54.1", features = [] }
 log = "0.4"
 indicatif = "0.17.3"
 inquire = "0.6.2"
