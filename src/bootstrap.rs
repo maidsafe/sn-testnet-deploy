@@ -10,7 +10,7 @@ use crate::{
     ansible::{inventory::AnsibleInventoryType, provisioning::ProvisionOptions},
     error::Result,
     write_environment_details, BinaryOption, DeploymentType, EnvironmentDetails, EnvironmentType,
-    EvmNetwork, InfraRunOptions, LogFormat, NodeType, TestnetDeployer,
+    EvmCustomTestnetData, EvmNetwork, InfraRunOptions, LogFormat, NodeType, TestnetDeployer,
 };
 use colored::Colorize;
 
@@ -18,9 +18,11 @@ use colored::Colorize;
 pub struct BootstrapOptions {
     pub binary_option: BinaryOption,
     pub bootstrap_peer: String,
+    pub chunk_size: Option<u64>,
     pub environment_type: EnvironmentType,
     pub env_variables: Option<Vec<(String, String)>>,
     pub evm_network: EvmNetwork,
+    pub evm_custom_testnet_data: Option<EvmCustomTestnetData>,
     pub log_format: Option<LogFormat>,
     pub max_archived_log_files: u16,
     pub max_log_files: u16,
@@ -31,6 +33,7 @@ pub struct BootstrapOptions {
     pub private_node_count: u16,
     pub private_node_vm_count: Option<u16>,
     pub rewards_address: String,
+    pub node_vm_size: Option<String>,
 }
 
 impl TestnetDeployer {
@@ -55,7 +58,7 @@ impl TestnetDeployer {
                 deployment_type: DeploymentType::Bootstrap,
                 environment_type: options.environment_type.clone(),
                 evm_network: options.evm_network.clone(),
-                evm_testnet_data: None,
+                evm_testnet_data: options.evm_custom_testnet_data.clone(),
                 funding_wallet_address: None,
                 rewards_address: options.rewards_address.clone(),
             },
@@ -63,18 +66,18 @@ impl TestnetDeployer {
         .await?;
 
         self.create_or_update_infra(&InfraRunOptions {
-            bootstrap_node_vm_count: None,
+            bootstrap_node_vm_count: Some(0),
             bootstrap_node_vm_size: None,
             enable_build_vm: build_custom_binaries,
-            evm_node_count: None,
+            evm_node_count: Some(0),
             evm_node_vm_size: None,
-            genesis_vm_count: None,
+            genesis_vm_count: Some(0),
             name: options.name.clone(),
             node_vm_count: options.node_vm_count,
-            node_vm_size: None,
+            node_vm_size: options.node_vm_size.clone(),
             private_node_vm_count: options.private_node_vm_count,
             tfvars_filename: options.environment_type.get_tfvars_filename().to_string(),
-            uploader_vm_count: None,
+            uploader_vm_count: Some(0),
             uploader_vm_size: None,
         })
         .map_err(|err| {
@@ -109,7 +112,7 @@ impl TestnetDeployer {
             &provision_options,
             &options.bootstrap_peer,
             NodeType::Normal,
-            None,
+            options.evm_custom_testnet_data.clone(),
         ) {
             Ok(()) => {
                 println!("Provisioned normal nodes");
@@ -147,7 +150,7 @@ impl TestnetDeployer {
             match self.ansible_provisioner.provision_private_nodes(
                 &mut provision_options,
                 &options.bootstrap_peer,
-                None,
+                options.evm_custom_testnet_data.clone(),
             ) {
                 Ok(()) => {
                     println!("Provisioned private nodes");

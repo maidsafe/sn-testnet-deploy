@@ -804,6 +804,7 @@ impl TestnetDeployer {
                 uploader_vm_count.to_string(),
             ));
         }
+
         args.push((
             "use_custom_bin".to_string(),
             options.enable_build_vm.to_string(),

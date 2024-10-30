@@ -185,18 +185,22 @@ impl DeploymentInventoryService {
             .ansible_runner
             .get_inventory(AnsibleInventoryType::BootstrapNodes, false)?;
 
-        let uploader_and_sks = self.ansible_provisioner.get_uploader_secret_keys()?;
-        let uploader_vms = uploader_and_sks
-            .iter()
-            .map(|(vm, sks)| UploaderVirtualMachine {
-                vm: vm.clone(),
-                wallet_public_key: sks
-                    .iter()
-                    .enumerate()
-                    .map(|(user, sk)| (format!("safe{}", user + 1), sk.address().encode_hex()))
-                    .collect(),
-            })
-            .collect::<Vec<_>>();
+        let uploader_vms = if environment_details.deployment_type != DeploymentType::Bootstrap {
+            let uploader_and_sks = self.ansible_provisioner.get_uploader_secret_keys()?;
+            uploader_and_sks
+                .iter()
+                .map(|(vm, sks)| UploaderVirtualMachine {
+                    vm: vm.clone(),
+                    wallet_public_key: sks
+                        .iter()
+                        .enumerate()
+                        .map(|(user, sk)| (format!("safe{}", user + 1), sk.address().encode_hex()))
+                        .collect(),
+                })
+                .collect()
+        } else {
+            Vec::new()
+        };
 
         println!("Retrieving node registries from all VMs...");
         let mut failed_node_registry_vms = Vec::new();
@@ -273,24 +277,28 @@ impl DeploymentInventoryService {
                 )?
             };
 
-            let safe_version = {
+            let safe_version = if environment_details.deployment_type != DeploymentType::Bootstrap {
                 let random_uploader_vm = uploader_vms
                     .choose(&mut rand::thread_rng())
                     .ok_or_else(|| eyre!("No uploader VMs available to retrieve safe version"))?;
-                self.get_bin_version(
+                Some(self.get_bin_version(
                     &random_uploader_vm.vm,
                     "autonomi --version",
                     "autonomi-cli ",
-                )?
+                )?)
+            } else {
+                None
             };
 
             println!("Retrieved binary versions from previous deployment:");
             println!("  safenode: {}", safenode_version);
             println!("  safenode-manager: {}", safenode_manager_version);
-            println!("  autonomi: {}", safe_version);
+            if let Some(version) = &safe_version {
+                println!("  autonomi: {}", version);
+            }
 
             BinaryOption::Versioned {
-                safe_version: Some(safe_version),
+                safe_version,
                 safenode_version,
                 safenode_manager_version,
             }
