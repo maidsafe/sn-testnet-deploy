@@ -1551,6 +1551,9 @@ async fn main() -> Result<()> {
                     .provider(provider)
                     .build()?;
                 let inventory_services = DeploymentInventoryService::from(&testnet_deployer);
+                inventory_services
+                    .generate_or_retrieve_inventory(&name, true, None)
+                    .await?;
 
                 let environment_details =
                     get_environment_details(&name, &inventory_services.s3_repository).await?;
@@ -1589,6 +1592,9 @@ async fn main() -> Result<()> {
                     .build()?;
 
                 let inventory_services = DeploymentInventoryService::from(&testnet_deployer);
+                inventory_services
+                    .generate_or_retrieve_inventory(&name, true, None)
+                    .await?;
 
                 let environment_details =
                     get_environment_details(&name, &inventory_services.s3_repository).await?;
