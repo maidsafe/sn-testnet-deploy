@@ -1092,6 +1092,58 @@ enum UploadersCommands {
         #[arg(long)]
         safe_version: Option<String>,
     },
+    /// Upscale uploaders for an existing network.
+    Upscale {
+        /// Supply a version number for the autonomi binary to be used for new uploader VMs.
+        ///
+        /// There should be no 'v' prefix.
+        #[arg(long, verbatim_doc_comment)]
+        autonomi_version: String,
+        /// The desired number of uploader VMs to be running after the scale.
+        ///
+        /// If there are currently 10 VMs running, and you want there to be 25, the value used
+        /// should be 25, rather than 15 as a delta to reach 25.
+        #[clap(long, verbatim_doc_comment)]
+        desired_uploader_vm_count: Option<u16>,
+        /// The desired number of uploaders to be running after the scale.
+        ///
+        /// If you want each uploader VM to run multiple uploader services, specify the total desired count.
+        #[clap(long, verbatim_doc_comment)]
+        desired_uploaders_count: Option<u16>,
+        /// If set to a non-zero value, the uploaders will also be accompanied by the specified
+        /// number of downloaders.
+        ///
+        /// This will be the number on each uploader VM. So if the value here is 2 and there are
+        /// 5 uploader VMs, there will be 10 downloaders across the 5 VMs.
+        #[clap(long, default_value_t = 0)]
+        downloaders_count: u16,
+        /// The secret key for the wallet that will fund all the uploaders.
+        ///
+        /// This argument only applies when Arbitrum or Sepolia networks are used.
+        #[clap(long)]
+        funding_wallet_secret_key: Option<String>,
+        /// Set to only use Terraform to upscale the VMs and not run Ansible.
+        #[clap(long, default_value_t = false)]
+        infra_only: bool,
+        /// The name of the environment
+        #[arg(short = 'n', long)]
+        name: String,
+        /// Set to only run the Terraform plan rather than applying the changes.
+        ///
+        /// Can be useful to preview the upscale to make sure everything is ok and that no other
+        /// changes slipped in.
+        ///
+        /// The plan will run and then the command will exit without doing anything else.
+        #[clap(long, default_value_t = false)]
+        plan: bool,
+        /// The cloud provider for the environment.
+        #[clap(long, value_parser = parse_provider, verbatim_doc_comment, default_value_t = CloudProvider::DigitalOcean)]
+        provider: CloudProvider,
+        /// The amount of gas tokens to transfer to each uploader.
+        /// Must be a decimal value between 0 and 1, e.g. "0.1"
+        #[clap(long)]
+        gas_amount: Option<String>,
+    },
 }
 
 #[derive(Subcommand, Debug)]
@@ -1483,6 +1535,7 @@ async fn main() -> Result<()> {
                     environment_type: environment_type.clone(),
                     env_variables,
                     evm_network: evm_network_type,
+                    evm_node_vm_size,
                     funding_wallet_secret_key,
                     log_format,
                     logstash_details,
@@ -1505,7 +1558,6 @@ async fn main() -> Result<()> {
                     node_vm_size,
                     bootstrap_node_vm_size,
                     uploader_vm_size,
-                    evm_node_vm_size,
                 })
                 .await?;
 
@@ -2303,6 +2355,102 @@ async fn main() -> Result<()> {
 
                 Ok(())
             }
+            UploadersCommands::Upscale {
+                autonomi_version,
+                desired_uploader_vm_count,
+                desired_uploaders_count,
+                downloaders_count,
+                funding_wallet_secret_key,
+                gas_amount,
+                infra_only,
+                name,
+                plan,
+                provider,
+            } => {
+                let gas_amount = if let Some(amount) = gas_amount {
+                    let amount: f64 = amount.parse().map_err(|_| {
+                        eyre!("Invalid gas amount format. Must be a decimal value, e.g. '0.1'")
+                    })?;
+                    if amount <= 0.0 || amount >= 1.0 {
+                        return Err(eyre!("Gas amount must be between 0 and 1"));
+                    }
+                    // Convert to wei (1 ETH = 1e18 wei)
+                    let wei_amount = (amount * 1e18) as u64;
+                    Some(U256::from(wei_amount))
+                } else {
+                    None
+                };
+
+                println!("Upscaling uploaders...");
+                let testnet_deployer = TestnetDeployBuilder::default()
+                    .environment_name(&name)
+                    .provider(provider)
+                    .build()?;
+                testnet_deployer.init().await?;
+
+                let inventory_service = DeploymentInventoryService::from(&testnet_deployer);
+                let inventory = inventory_service
+                    .generate_or_retrieve_inventory(&name, true, None)
+                    .await?;
+
+                testnet_deployer
+                    .upscale_uploaders(&UpscaleOptions {
+                        ansible_verbose: false,
+                        current_inventory: inventory,
+                        desired_auditor_vm_count: None,
+                        desired_bootstrap_node_count: None,
+                        desired_bootstrap_node_vm_count: None,
+                        desired_node_count: None,
+                        desired_node_vm_count: None,
+                        desired_private_node_count: None,
+                        desired_private_node_vm_count: None,
+                        desired_uploader_vm_count,
+                        desired_uploaders_count,
+                        downloaders_count,
+                        funding_wallet_secret_key,
+                        gas_amount,
+                        max_archived_log_files: 1,
+                        max_log_files: 1,
+                        infra_only,
+                        plan,
+                        public_rpc: false,
+                        safe_version: Some(autonomi_version),
+                    })
+                    .await?;
+
+                if plan {
+                    return Ok(());
+                }
+
+                println!("Generating new inventory after upscale...");
+                let max_retries = 3;
+                let mut retries = 0;
+                let inventory = loop {
+                    match inventory_service
+                        .generate_or_retrieve_inventory(&name, true, None)
+                        .await
+                    {
+                        Ok(inv) => break inv,
+                        Err(e) if retries < max_retries => {
+                            retries += 1;
+                            eprintln!("Failed to generate inventory on attempt {retries}: {:?}", e);
+                            eprintln!("Will retry up to {max_retries} times...");
+                        }
+                        Err(_) => {
+                            eprintln!("Failed to generate inventory after {max_retries} attempts");
+                            eprintln!(
+                                "Please try running the `inventory` command or workflow separately"
+                            );
+                            return Ok(());
+                        }
+                    }
+                };
+
+                inventory.print_report()?;
+                inventory.save()?;
+
+                Ok(())
+            }
         },
         Commands::Upscale {
             ansible_verbose,
@@ -2358,6 +2506,7 @@ async fn main() -> Result<()> {
                     desired_uploaders_count,
                     downloaders_count,
                     funding_wallet_secret_key,
+                    gas_amount: None,
                     max_archived_log_files,
                     max_log_files,
                     infra_only,
