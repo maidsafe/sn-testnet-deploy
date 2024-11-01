@@ -1,12 +1,12 @@
 bootstrap_droplet_size = "c-16"
-bootstrap_node_vm_count = 50
+bootstrap_node_vm_count = 79
 bootstrap_droplet_image_id = 157362431
 evm_node_vm_count = 0
 evm_node_droplet_size = "s-4vcpu-8gb"
 evm_node_droplet_image_id = 167317579
 nat_gateway_droplet_image_id = 166664184
 node_droplet_size = "c-16"
-node_vm_count = 79
+node_vm_count = 100
 node_droplet_image_id = 157362431
 private_node_vm_count = 1
 setup_nat_gateway = true
