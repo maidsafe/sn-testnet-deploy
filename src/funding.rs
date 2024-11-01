@@ -19,6 +19,11 @@ use log::{debug, error, warn};
 use std::collections::HashMap;
 use std::str::FromStr;
 
+/// 1 token (1e18)
+const DEFAULT_TOKEN_AMOUNT: &str = "1_000_000_000_000_000_000";
+/// 0.1 ETH (1e17)
+const DEFAULT_GAS_AMOUNT: &str = "100_000_000_000_000_000";
+
 pub struct FundingOptions {
     pub evm_network: EvmNetwork,
     pub custom_evm_testnet_data: Option<EvmCustomTestnetData>,
@@ -354,8 +359,8 @@ impl AnsibleProvisioner {
         println!("Funding wallet gas balance: {gas_balance}");
         debug!("Funding wallet token balance: {token_balance:?} and gas balance {gas_balance}");
 
-        let default_token_amount = U256::from_str("1_000_000_000_000_000_000").unwrap();
-        let default_gas_amount = U256::from_str("100_000_000_000_000_000").unwrap();
+        let default_token_amount = U256::from_str(DEFAULT_TOKEN_AMOUNT).unwrap();
+        let default_gas_amount = U256::from_str(DEFAULT_GAS_AMOUNT).unwrap();
 
         let tokens_for_each_uploader = options.token_amount.unwrap_or(default_token_amount);
         let gas_for_each_uploader = options.gas_amount.unwrap_or(default_gas_amount);

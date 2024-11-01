@@ -12,6 +12,7 @@ use crate::{
     InfraRunOptions, NodeType, TestnetDeployer,
 };
 use colored::Colorize;
+use evmlib::common::U256;
 use log::debug;
 use std::collections::HashSet;
 
@@ -30,6 +31,7 @@ pub struct UpscaleOptions {
     pub desired_uploaders_count: Option<u16>,
     pub downloaders_count: u16,
     pub funding_wallet_secret_key: Option<String>,
+    pub gas_amount: Option<U256>,
     pub infra_only: bool,
     pub max_archived_log_files: u16,
     pub max_log_files: u16,
@@ -222,6 +224,7 @@ impl TestnetDeployer {
                 .clone(),
             safe_version: options.safe_version.clone(),
             uploaders_count: options.desired_uploaders_count,
+            gas_amount: options.gas_amount,
         };
         let mut node_provision_failed = false;
 
@@ -374,6 +377,141 @@ impl TestnetDeployer {
             println!("However, most of the time the deployment will still be usable.");
             println!("See the output from Ansible to determine which VMs had failures.");
         }
+
+        Ok(())
+    }
+
+    pub async fn upscale_uploaders(&self, options: &UpscaleOptions) -> Result<()> {
+        let is_bootstrap_deploy = matches!(
+            options
+                .current_inventory
+                .environment_details
+                .deployment_type,
+            DeploymentType::Bootstrap
+        );
+
+        if is_bootstrap_deploy {
+            return Err(Error::InvalidUploaderUpscaleDeploymentType(
+                "bootstrap".to_string(),
+            ));
+        }
+
+        let desired_uploader_vm_count = options
+            .desired_uploader_vm_count
+            .unwrap_or(options.current_inventory.uploader_vms.len() as u16);
+        if desired_uploader_vm_count < options.current_inventory.uploader_vms.len() as u16 {
+            return Err(Error::InvalidUpscaleDesiredUploaderVmCount);
+        }
+        debug!("Using {desired_uploader_vm_count} for desired uploader VM count");
+
+        if options.plan {
+            let vars = vec![(
+                "uploader_vm_count".to_string(),
+                desired_uploader_vm_count.to_string(),
+            )];
+            self.plan(
+                Some(vars),
+                options
+                    .current_inventory
+                    .environment_details
+                    .environment_type
+                    .clone(),
+            )?;
+            return Ok(());
+        }
+
+        self.create_or_update_infra(&InfraRunOptions {
+            bootstrap_node_vm_count: None,
+            bootstrap_node_vm_size: None,
+            enable_build_vm: false,
+            evm_node_count: None,
+            evm_node_vm_size: None,
+            genesis_vm_count: None,
+            name: options.current_inventory.name.clone(),
+            node_vm_count: None,
+            node_vm_size: None,
+            private_node_vm_count: None,
+            tfvars_filename: options
+                .current_inventory
+                .environment_details
+                .environment_type
+                .get_tfvars_filename()
+                .to_string(),
+            uploader_vm_count: Some(desired_uploader_vm_count),
+            uploader_vm_size: None,
+        })
+        .map_err(|err| {
+            println!("Failed to create infra {err:?}");
+            err
+        })?;
+
+        if options.infra_only {
+            return Ok(());
+        }
+
+        let (initial_multiaddr, _) =
+            get_genesis_multiaddr(&self.ansible_provisioner.ansible_runner, &self.ssh_client)
+                .map_err(|err| {
+                    println!("Failed to get genesis multiaddr {err:?}");
+                    err
+                })?;
+        debug!("Retrieved initial peer {initial_multiaddr}");
+
+        let provision_options = ProvisionOptions {
+            binary_option: options.current_inventory.binary_option.clone(),
+            bootstrap_node_count: 0,
+            chunk_size: None,
+            downloaders_count: options.downloaders_count,
+            env_variables: None,
+            evm_network: options
+                .current_inventory
+                .environment_details
+                .evm_network
+                .clone(),
+            funding_wallet_secret_key: options.funding_wallet_secret_key.clone(),
+            log_format: None,
+            logstash_details: None,
+            name: options.current_inventory.name.clone(),
+            nat_gateway: None,
+            node_count: 0,
+            max_archived_log_files: options.max_archived_log_files,
+            max_log_files: options.max_log_files,
+            output_inventory_dir_path: self
+                .working_directory_path
+                .join("ansible")
+                .join("inventory"),
+            private_node_count: 0,
+            private_node_vms: Vec::new(),
+            public_rpc: options.public_rpc,
+            rewards_address: options
+                .current_inventory
+                .environment_details
+                .rewards_address
+                .clone(),
+            safe_version: options.safe_version.clone(),
+            uploaders_count: options.desired_uploaders_count,
+            gas_amount: options.gas_amount,
+        };
+
+        let evm_testnet_data = options
+            .current_inventory
+            .environment_details
+            .evm_testnet_data
+            .clone();
+
+        self.wait_for_ssh_availability_on_new_machines(
+            AnsibleInventoryType::Uploaders,
+            &options.current_inventory,
+        )?;
+        self.ansible_provisioner
+            .print_ansible_run_banner(1, 1, "Provision Uploaders");
+        self.ansible_provisioner
+            .provision_uploaders(&provision_options, &initial_multiaddr, evm_testnet_data)
+            .await
+            .map_err(|err| {
+                println!("Failed to provision uploaders {err:?}");
+                err
+            })?;
 
         Ok(())
     }

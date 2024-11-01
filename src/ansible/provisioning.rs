@@ -18,6 +18,7 @@ use crate::{
     print_duration, BinaryOption, CloudProvider, EvmCustomTestnetData, EvmNetwork, LogFormat,
     NodeType, SshClient, UpgradeOptions,
 };
+use evmlib::common::U256;
 use log::{debug, error, trace};
 use semver::Version;
 use sn_service_management::NodeRegistry;
@@ -38,6 +39,7 @@ pub struct ProvisionOptions {
     pub env_variables: Option<Vec<(String, String)>>,
     pub evm_network: EvmNetwork,
     pub funding_wallet_secret_key: Option<String>,
+    pub gas_amount: Option<U256>,
     pub log_format: Option<LogFormat>,
     pub logstash_details: Option<(String, Vec<SocketAddr>)>,
     pub name: String,
@@ -67,6 +69,7 @@ impl From<BootstrapOptions> for ProvisionOptions {
             env_variables: bootstrap_options.env_variables,
             evm_network: bootstrap_options.evm_network,
             funding_wallet_secret_key: None,
+            gas_amount: None,
             log_format: bootstrap_options.log_format,
             logstash_details: None,
             max_archived_log_files: bootstrap_options.max_archived_log_files,
@@ -95,6 +98,7 @@ impl From<DeployOptions> for ProvisionOptions {
             env_variables: deploy_options.env_variables,
             evm_network: deploy_options.evm_network,
             funding_wallet_secret_key: deploy_options.funding_wallet_secret_key,
+            gas_amount: None,
             log_format: deploy_options.log_format,
             logstash_details: deploy_options.logstash_details,
             name: deploy_options.name,
@@ -464,7 +468,7 @@ impl AnsibleProvisioner {
                 evm_network: options.evm_network.clone(),
                 funding_wallet_secret_key: options.funding_wallet_secret_key.clone(),
                 token_amount: None,
-                gas_amount: None,
+                gas_amount: options.gas_amount,
             })
             .await?;
 

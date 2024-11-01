@@ -69,6 +69,10 @@ pub enum Error {
     GetS3ObjectError(String, String),
     #[error(transparent)]
     InquireError(#[from] inquire::InquireError),
+    #[error(
+        "The '{0}' deployment type for the environment is not supported for upscaling uploaders"
+    )]
+    InvalidUploaderUpscaleDeploymentType(String),
     #[error("The desired auditor VM count is smaller than the current count. This is invalid for an upscale operation.")]
     InvalidUpscaleDesiredAuditorVmCount,
     #[error("The desired bootstrap VM count is smaller than the current count. This is invalid for an upscale operation.")]
