@@ -38,6 +38,7 @@ pub struct UpscaleOptions {
     pub plan: bool,
     pub public_rpc: bool,
     pub safe_version: Option<String>,
+    pub provision_only: bool,
 }
 
 impl TestnetDeployer {
@@ -420,30 +421,32 @@ impl TestnetDeployer {
             return Ok(());
         }
 
-        self.create_or_update_infra(&InfraRunOptions {
-            bootstrap_node_vm_count: None,
-            bootstrap_node_vm_size: None,
-            enable_build_vm: false,
-            evm_node_count: None,
-            evm_node_vm_size: None,
-            genesis_vm_count: None,
-            name: options.current_inventory.name.clone(),
-            node_vm_count: None,
-            node_vm_size: None,
-            private_node_vm_count: None,
-            tfvars_filename: options
-                .current_inventory
-                .environment_details
-                .environment_type
-                .get_tfvars_filename()
-                .to_string(),
-            uploader_vm_count: Some(desired_uploader_vm_count),
-            uploader_vm_size: None,
-        })
-        .map_err(|err| {
-            println!("Failed to create infra {err:?}");
-            err
-        })?;
+        if !options.provision_only {
+            self.create_or_update_infra(&InfraRunOptions {
+                bootstrap_node_vm_count: None,
+                bootstrap_node_vm_size: None,
+                enable_build_vm: false,
+                evm_node_count: None,
+                evm_node_vm_size: None,
+                genesis_vm_count: None,
+                name: options.current_inventory.name.clone(),
+                node_vm_count: None,
+                node_vm_size: None,
+                private_node_vm_count: None,
+                tfvars_filename: options
+                    .current_inventory
+                    .environment_details
+                    .environment_type
+                    .get_tfvars_filename()
+                    .to_string(),
+                uploader_vm_count: Some(desired_uploader_vm_count),
+                uploader_vm_size: None,
+            })
+            .map_err(|err| {
+                println!("Failed to create infra {err:?}");
+                err
+            })?;
+        }
 
         if options.infra_only {
             return Ok(());

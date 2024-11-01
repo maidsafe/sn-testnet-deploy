@@ -1122,6 +1122,10 @@ enum UploadersCommands {
         /// This argument only applies when Arbitrum or Sepolia networks are used.
         #[clap(long)]
         funding_wallet_secret_key: Option<String>,
+        /// The amount of gas tokens to transfer to each uploader.
+        /// Must be a decimal value between 0 and 1, e.g. "0.1"
+        #[clap(long)]
+        gas_amount: Option<String>,
         /// Set to only use Terraform to upscale the VMs and not run Ansible.
         #[clap(long, default_value_t = false)]
         infra_only: bool,
@@ -1136,13 +1140,12 @@ enum UploadersCommands {
         /// The plan will run and then the command will exit without doing anything else.
         #[clap(long, default_value_t = false)]
         plan: bool,
+        /// Set to skip the Terraform infrastructure run and only run the Ansible provisioning.
+        #[clap(long, default_value_t = false)]
+        provision_only: bool,
         /// The cloud provider for the environment.
         #[clap(long, value_parser = parse_provider, verbatim_doc_comment, default_value_t = CloudProvider::DigitalOcean)]
         provider: CloudProvider,
-        /// The amount of gas tokens to transfer to each uploader.
-        /// Must be a decimal value between 0 and 1, e.g. "0.1"
-        #[clap(long)]
-        gas_amount: Option<String>,
     },
 }
 
@@ -2365,6 +2368,7 @@ async fn main() -> Result<()> {
                 infra_only,
                 name,
                 plan,
+                provision_only,
                 provider,
             } => {
                 let gas_amount = if let Some(amount) = gas_amount {
@@ -2413,6 +2417,7 @@ async fn main() -> Result<()> {
                         max_log_files: 1,
                         infra_only,
                         plan,
+                        provision_only,
                         public_rpc: false,
                         safe_version: Some(autonomi_version),
                     })
@@ -2511,6 +2516,7 @@ async fn main() -> Result<()> {
                     max_log_files,
                     infra_only,
                     plan,
+                    provision_only: false,
                     public_rpc,
                     safe_version,
                 })
