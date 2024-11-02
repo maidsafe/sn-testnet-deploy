@@ -338,8 +338,6 @@ pub struct UpgradeOptions {
     pub ansible_verbose: bool,
     pub custom_inventory: Option<Vec<VirtualMachine>>,
     pub env_variables: Option<Vec<(String, String)>>,
-    pub faucet_version: Option<String>,
-    pub force_faucet: bool,
     pub force_safenode: bool,
     pub forks: usize,
     pub interval: Duration,
@@ -354,12 +352,6 @@ impl UpgradeOptions {
         extra_vars.add_variable("interval", &self.interval.as_millis().to_string());
         if let Some(env_variables) = &self.env_variables {
             extra_vars.add_env_variable_list("env_variables", env_variables.clone());
-        }
-        if self.force_faucet {
-            extra_vars.add_variable("force_faucet", &self.force_faucet.to_string());
-        }
-        if let Some(version) = &self.faucet_version {
-            extra_vars.add_variable("faucet_version", version);
         }
         if self.force_safenode {
             extra_vars.add_variable("force_safenode", &self.force_safenode.to_string());

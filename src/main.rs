@@ -646,19 +646,6 @@ enum Commands {
         /// Example: --env SN_LOG=all,RUST_LOG=libp2p=debug
         #[clap(name = "env", long, use_value_delimiter = true, value_parser = parse_environment_variables)]
         env_variables: Option<Vec<(String, String)>>,
-        /// Optionally supply a version for the faucet binary to be upgraded to.
-        ///
-        /// If not provided, the latest version will be used. A lower version number can be
-        /// specified to downgrade to a known good version.
-        ///
-        /// There should be no 'v' prefix.
-        #[arg(long)]
-        faucet_version: Option<String>,
-        /// Set to force the node manager to accept the faucet version provided.
-        ///
-        /// This can be used to downgrade the faucet to a known good version.
-        #[clap(long)]
-        force_faucet: bool,
         /// Set to force the node manager to accept the safenode version provided.
         ///
         /// This can be used to downgrade safenode to a known good version.
@@ -1403,27 +1390,31 @@ async fn main() -> Result<()> {
         }
         Commands::Deploy {
             ansible_verbose,
-            branch,
             bootstrap_node_count,
             bootstrap_node_vm_count,
+            bootstrap_node_vm_size,
+            branch,
             chunk_size,
             downloaders_count,
-            environment_type,
             env_variables,
+            environment_type,
             evm_network_type,
+            evm_node_vm_size,
             faucet_version,
             forks,
             foundation_pk,
+            funding_wallet_secret_key,
             genesis_pk,
             log_format,
             logstash_stack_name,
+            max_archived_log_files,
+            max_log_files,
             name,
             network_contacts_file_name,
             network_royalties_pk,
             node_count,
             node_vm_count,
-            max_archived_log_files,
-            max_log_files,
+            node_vm_size,
             payment_forward_pk,
             private_node_count,
             private_node_vm_count,
@@ -1434,15 +1425,11 @@ async fn main() -> Result<()> {
             rewards_address,
             safe_version,
             safenode_features,
-            safenode_version,
             safenode_manager_version,
-            uploaders_count,
+            safenode_version,
             uploader_vm_count,
-            funding_wallet_secret_key,
-            node_vm_size,
-            bootstrap_node_vm_size,
             uploader_vm_size,
-            evm_node_vm_size,
+            uploaders_count,
         } => {
             let network_keys = validate_and_get_pks(
                 foundation_pk,
@@ -2146,8 +2133,6 @@ async fn main() -> Result<()> {
             ansible_verbose,
             custom_inventory,
             env_variables,
-            faucet_version,
-            force_faucet,
             force_safenode,
             forks,
             interval,
@@ -2189,8 +2174,6 @@ async fn main() -> Result<()> {
                 ansible_verbose,
                 custom_inventory,
                 env_variables,
-                faucet_version,
-                force_faucet,
                 force_safenode,
                 forks,
                 interval,

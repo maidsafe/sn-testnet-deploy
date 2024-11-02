@@ -142,10 +142,6 @@ pub enum AnsiblePlaybook {
     StopTelegraf,
     /// This playbook will stop the uploaders on each machine.
     StopUploaders,
-    /// The upgrade faucet playbook will upgrade the faucet to the latest version.
-    ///
-    /// Use in combination with `AnsibleInventoryType::Genesis`.
-    UpgradeFaucet,
     /// The upgrade node manager playbook will upgrade the node manager to the latest version.
     ///
     /// Use in combination with `AnsibleInventoryType::Genesis` or `AnsibleInventoryType::Nodes`.
@@ -191,7 +187,6 @@ impl AnsiblePlaybook {
             AnsiblePlaybook::StopFaucet => "stop_faucet.yml".to_string(),
             AnsiblePlaybook::StopTelegraf => "stop_telegraf.yml".to_string(),
             AnsiblePlaybook::StopUploaders => "stop_uploaders.yml".to_string(),
-            AnsiblePlaybook::UpgradeFaucet => "upgrade_faucet.yml".to_string(),
             AnsiblePlaybook::UpgradeNodeManager => "upgrade_node_manager.yml".to_string(),
             AnsiblePlaybook::UpgradeNodes => "upgrade_nodes.yml".to_string(),
             AnsiblePlaybook::UpgradeNodeTelegrafConfig => {
