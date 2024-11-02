@@ -665,16 +665,6 @@ impl AnsibleProvisioner {
                 println!("WARNING: the genesis node may not have been upgraded or restarted");
             }
         }
-        match self.ansible_runner.run_playbook(
-            AnsiblePlaybook::UpgradeFaucet,
-            AnsibleInventoryType::Genesis,
-            Some(options.get_ansible_vars()),
-        ) {
-            Ok(()) => println!("The faucet was successfully upgraded"),
-            Err(_) => {
-                println!("WARNING: the faucet may not have been upgraded or restarted");
-            }
-        }
         Ok(())
     }
 
