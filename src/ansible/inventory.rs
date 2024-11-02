@@ -120,7 +120,6 @@ impl AnsibleInventoryType {
             Self::BootstrapNodes,
             Self::Nodes,
             Self::PrivateNodes,
-            Self::EvmNodes,
         ]
         .into_iter()
     }

@@ -338,7 +338,7 @@ pub struct UpgradeOptions {
     pub ansible_verbose: bool,
     pub custom_inventory: Option<Vec<VirtualMachine>>,
     pub env_variables: Option<Vec<(String, String)>>,
-    pub force_safenode: bool,
+    pub force: bool,
     pub forks: usize,
     pub interval: Duration,
     pub name: String,
@@ -353,8 +353,8 @@ impl UpgradeOptions {
         if let Some(env_variables) = &self.env_variables {
             extra_vars.add_env_variable_list("env_variables", env_variables.clone());
         }
-        if self.force_safenode {
-            extra_vars.add_variable("force_safenode", &self.force_safenode.to_string());
+        if self.force {
+            extra_vars.add_variable("force", &self.force.to_string());
         }
         if let Some(version) = &self.safenode_version {
             extra_vars.add_variable("safenode_version", version);
