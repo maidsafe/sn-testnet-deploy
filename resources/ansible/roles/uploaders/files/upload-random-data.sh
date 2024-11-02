@@ -61,7 +61,7 @@ prune_chunk_artifacts() {
 # Generate a 10MB file of random data and log its reference
 generate_random_data_file_and_upload() {
   tmpfile=$(mktemp)
-  dd if=/dev/urandom of="$tmpfile" bs=150M count=1 iflag=fullblock &> /dev/null
+  dd if=/dev/urandom of="$tmpfile" bs=15M count=1 iflag=fullblock &> /dev/null
 
   echo "Generated random data file at $tmpfile"
   file_size_kb=$(du -k "$tmpfile" | cut -f1)
