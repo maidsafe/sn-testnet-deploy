@@ -650,7 +650,7 @@ enum Commands {
         ///
         /// This can be used to downgrade safenode to a known good version.
         #[clap(long)]
-        force_safenode: bool,
+        force: bool,
         /// Maximum number of forks Ansible will use to execute tasks on target hosts.
         #[clap(long, default_value_t = 2)]
         forks: usize,
@@ -2133,7 +2133,7 @@ async fn main() -> Result<()> {
             ansible_verbose,
             custom_inventory,
             env_variables,
-            force_safenode,
+            force,
             forks,
             interval,
             name,
@@ -2174,7 +2174,7 @@ async fn main() -> Result<()> {
                 ansible_verbose,
                 custom_inventory,
                 env_variables,
-                force_safenode,
+                force,
                 forks,
                 interval,
                 name: name.clone(),
