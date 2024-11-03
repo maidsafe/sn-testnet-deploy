@@ -560,6 +560,11 @@ enum Commands {
     /// This can be useful if all nodes did not upgrade successfully.
     #[clap(name = "start")]
     Start {
+        /// Provide a list of VM names to use as a custom inventory.
+        ///
+        /// This will start nodes on a particular subset of VMs.
+        #[clap(name = "custom-inventory", long, use_value_delimiter = true)]
+        custom_inventory: Option<Vec<String>>,
         /// Maximum number of forks Ansible will use to execute tasks on target hosts.
         #[clap(long, default_value_t = 50)]
         forks: usize,
@@ -1978,6 +1983,7 @@ async fn main() -> Result<()> {
             Ok(())
         }
         Commands::Start {
+            custom_inventory,
             forks,
             interval,
             name,
@@ -2000,7 +2006,14 @@ async fn main() -> Result<()> {
                 return Err(eyre!("The {name} environment does not exist"));
             }
 
-            testnet_deployer.start(interval)?;
+            let custom_inventory = if let Some(custom_inventory) = custom_inventory {
+                let custom_vms = get_custom_inventory(&inventory, &custom_inventory)?;
+                Some(custom_vms)
+            } else {
+                None
+            };
+
+            testnet_deployer.start(interval, custom_inventory)?;
 
             Ok(())
         }
