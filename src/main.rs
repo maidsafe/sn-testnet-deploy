@@ -1077,7 +1077,7 @@ enum UploadersCommands {
         ///
         /// If not provided, the latest version will be used.
         #[arg(long)]
-        safe_version: Option<String>,
+        version: Option<String>,
     },
     /// Upscale uploaders for an existing network.
     Upscale {
@@ -2313,9 +2313,9 @@ async fn main() -> Result<()> {
             UploadersCommands::Upgrade {
                 name,
                 provider,
-                safe_version,
+                version,
             } => {
-                let version = get_version_from_option(safe_version, &ReleaseType::Autonomi).await?;
+                let version = get_version_from_option(version, &ReleaseType::Autonomi).await?;
 
                 let testnet_deploy = TestnetDeployBuilder::default()
                     .environment_name(&name)
@@ -2332,7 +2332,7 @@ async fn main() -> Result<()> {
 
                 let ansible_runner = testnet_deploy.ansible_provisioner.ansible_runner;
                 let mut extra_vars = ExtraVarsDocBuilder::default();
-                extra_vars.add_variable("safe_version", &version.to_string());
+                extra_vars.add_variable("autonomi_version", &version.to_string());
                 ansible_runner.run_playbook(
                     AnsiblePlaybook::UpgradeUploaders,
                     AnsibleInventoryType::Uploaders,

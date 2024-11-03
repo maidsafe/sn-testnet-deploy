@@ -3,39 +3,46 @@
   hosts: all
   become: True
   vars:
-    safe_version: "{{ safe_version }}"
-    safe_archive_url: "https://autonomi-cli.s3.eu-west-2.amazonaws.com/safe-{{ safe_version }}-x86_64-unknown-linux-musl.tar.gz"
+    autonomi_version: "{{ autonomi_version }}"
+    autonomi_archive_url: "https://autonomi-cli.s3.eu-west-2.amazonaws.com/autonomi-{{ autonomi_version }}-x86_64-unknown-linux-musl.tar.gz"
   tasks:
-    - name: stop the uploader service
+    - name: get list of safe users
+      ansible.builtin.shell: "getent passwd | grep '^safe[0-9]\\+:' | cut -d: -f1"
+      register: safe_users
+      changed_when: false
+
+    - name: stop all uploader services
       systemd:
-        name: safe_uploader
+        name: "autonomi_uploader_{{ item | regex_replace('safe([0-9]+)', '\\1') }}"
         state: stopped
+      loop: "{{ safe_users.stdout_lines }}"
 
     # It is safer to make sure both of these are removed, because Ansible may not re-download and
     # replace them if they already exist.
-    - name: remove existing safe binary
+    - name: remove existing autonomi binary
       ansible.builtin.file:
-        path: /usr/local/bin/safe
+        path: /usr/local/bin/autonomi
         state: absent
 
-    - name: remove existing safe archive
+    - name: remove existing autonomi archive
       ansible.builtin.file:
-        path: /tmp/safe-latest-x86_64-unknown-linux-musl.tar.gz
+        path: /tmp/autonomi-latest-x86_64-unknown-linux-musl.tar.gz
         state: absent
 
-    - name: download the new safe binary
+    - name: download the new autonomi binary
       ansible.builtin.get_url:
-        url: "{{ safe_archive_url }}"
-        dest: /tmp/safe-latest-x86_64-unknown-linux-musl.tar.gz
+        url: "{{ autonomi_archive_url }}"
+        dest: /tmp/autonomi-latest-x86_64-unknown-linux-musl.tar.gz
 
-    - name: extract the new safe binary
+    - name: extract the new autonomi binary
       ansible.builtin.unarchive:
-        src: /tmp/safe-latest-x86_64-unknown-linux-musl.tar.gz
+        src: /tmp/autonomi-latest-x86_64-unknown-linux-musl.tar.gz
         dest: /usr/local/bin
         remote_src: True
 
-    - name: start the uploader service
+    - name: start all uploader services
       systemd:
-        name: safe_uploader
+        name: "autonomi_uploader_{{ item | regex_replace('safe([0-9]+)', '\\1') }}"
         state: started
         enabled: true
+      loop: "{{ safe_users.stdout_lines }}"
