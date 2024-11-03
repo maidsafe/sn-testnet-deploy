@@ -343,7 +343,7 @@ pub struct UpgradeOptions {
     pub interval: Duration,
     pub name: String,
     pub provider: CloudProvider,
-    pub safenode_version: Option<String>,
+    pub version: Option<String>,
 }
 
 impl UpgradeOptions {
@@ -356,7 +356,7 @@ impl UpgradeOptions {
         if self.force {
             extra_vars.add_variable("force", &self.force.to_string());
         }
-        if let Some(version) = &self.safenode_version {
+        if let Some(version) = &self.version {
             extra_vars.add_variable("safenode_version", version);
         }
         extra_vars.build()
