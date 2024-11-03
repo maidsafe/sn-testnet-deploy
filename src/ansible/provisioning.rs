@@ -22,7 +22,11 @@ use evmlib::common::U256;
 use log::{debug, error, trace};
 use semver::Version;
 use sn_service_management::NodeRegistry;
-use std::{net::SocketAddr, path::PathBuf, time::{Instant, Duration}};
+use std::{
+    net::SocketAddr,
+    path::PathBuf,
+    time::{Duration, Instant},
+};
 use walkdir::WalkDir;
 
 use crate::ansible::extra_vars;
@@ -490,9 +494,30 @@ impl AnsibleProvisioner {
         Ok(())
     }
 
-    pub fn start_nodes(&self, interval: Duration) -> Result<()> {
+    pub fn start_nodes(
+        &self,
+        environment_name: &str,
+        interval: Duration,
+        custom_inventory: Option<Vec<VirtualMachine>>,
+    ) -> Result<()> {
         let mut extra_vars = ExtraVarsDocBuilder::default();
         extra_vars.add_variable("interval", &interval.as_millis().to_string());
+
+        if let Some(custom_inventory) = custom_inventory {
+            println!("Running the start telegraf playbook with a custom inventory");
+            generate_custom_environment_inventory(
+                &custom_inventory,
+                environment_name,
+                &self.ansible_runner.working_directory_path.join("inventory"),
+            )?;
+            self.ansible_runner.run_playbook(
+                AnsiblePlaybook::StartNodes,
+                AnsibleInventoryType::Custom,
+                Some(extra_vars.build()),
+            )?;
+            return Ok(());
+        }
+
         for node_inv_type in AnsibleInventoryType::iter_node_type() {
             self.ansible_runner.run_playbook(
                 AnsiblePlaybook::StartNodes,

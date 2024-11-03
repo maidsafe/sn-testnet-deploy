@@ -632,8 +632,13 @@ impl TestnetDeployer {
         Ok(())
     }
 
-    pub fn start(&self, interval: Duration) -> Result<()> {
-        self.ansible_provisioner.start_nodes(interval)?;
+    pub fn start(
+        &self,
+        interval: Duration,
+        custom_inventory: Option<Vec<VirtualMachine>>,
+    ) -> Result<()> {
+        self.ansible_provisioner
+            .start_nodes(&self.environment_name, interval, custom_inventory)?;
         Ok(())
     }
 
