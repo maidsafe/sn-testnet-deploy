@@ -632,8 +632,8 @@ impl TestnetDeployer {
         Ok(())
     }
 
-    pub fn start(&self) -> Result<()> {
-        self.ansible_provisioner.start_nodes()?;
+    pub fn start(&self, interval: Duration) -> Result<()> {
+        self.ansible_provisioner.start_nodes(interval)?;
         Ok(())
     }
 

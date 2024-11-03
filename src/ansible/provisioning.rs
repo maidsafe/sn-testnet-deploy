@@ -22,7 +22,7 @@ use evmlib::common::U256;
 use log::{debug, error, trace};
 use semver::Version;
 use sn_service_management::NodeRegistry;
-use std::{net::SocketAddr, path::PathBuf, time::Instant};
+use std::{net::SocketAddr, path::PathBuf, time::{Instant, Duration}};
 use walkdir::WalkDir;
 
 use crate::ansible::extra_vars;
@@ -490,12 +490,16 @@ impl AnsibleProvisioner {
         Ok(())
     }
 
-    pub fn start_nodes(&self) -> Result<()> {
+    pub fn start_nodes(&self, interval: Duration) -> Result<()> {
+        let mut extra_vars = ExtraVarsDocBuilder::default();
+        extra_vars.add_variable("interval", &interval.as_millis().to_string());
         for node_inv_type in AnsibleInventoryType::iter_node_type() {
-            self.ansible_runner
-                .run_playbook(AnsiblePlaybook::StartNodes, node_inv_type, None)?;
+            self.ansible_runner.run_playbook(
+                AnsiblePlaybook::StartNodes,
+                node_inv_type,
+                Some(extra_vars.build()),
+            )?;
         }
-
         Ok(())
     }
 
