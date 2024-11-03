@@ -563,6 +563,9 @@ enum Commands {
         /// Maximum number of forks Ansible will use to execute tasks on target hosts.
         #[clap(long, default_value_t = 50)]
         forks: usize,
+        /// The interval between each node start in milliseconds.
+        #[clap(long, value_parser = |t: &str| -> Result<Duration> { Ok(t.parse().map(Duration::from_millis)?)}, default_value = "2000")]
+        interval: Duration,
         /// The name of the environment.
         #[arg(short = 'n', long)]
         name: String,
@@ -1976,6 +1979,7 @@ async fn main() -> Result<()> {
         }
         Commands::Start {
             forks,
+            interval,
             name,
             provider,
         } => {
@@ -1996,7 +2000,7 @@ async fn main() -> Result<()> {
                 return Err(eyre!("The {name} environment does not exist"));
             }
 
-            testnet_deployer.start()?;
+            testnet_deployer.start(interval)?;
 
             Ok(())
         }
