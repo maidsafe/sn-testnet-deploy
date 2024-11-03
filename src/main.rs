@@ -672,7 +672,7 @@ enum Commands {
         /// specified to downgrade to a known good version.
         ///
         /// There should be no 'v' prefix.
-        safenode_version: Option<String>,
+        version: Option<String>,
     },
     /// Upgrade the safenode-manager binaries to a particular version.
     ///
@@ -2138,7 +2138,7 @@ async fn main() -> Result<()> {
             interval,
             name,
             provider,
-            safenode_version,
+            version,
         } => {
             // The upgrade intentionally uses a small value for `forks`, but this is far too slow
             // for retrieving the inventory from a large deployment. Therefore, we will use 50
@@ -2179,7 +2179,7 @@ async fn main() -> Result<()> {
                 interval,
                 name: name.clone(),
                 provider,
-                safenode_version,
+                version,
             })?;
 
             // Recreate the deployer with an increased number of forks for retrieving the status.
