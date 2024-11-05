@@ -137,6 +137,22 @@ impl TestnetDeployer {
                     "uploader_vm_count".to_string(),
                     desired_uploader_vm_count.to_string(),
                 ),
+                (
+                    "genesis_vm_count".to_string(),
+                    match options
+                        .current_inventory
+                        .environment_details
+                        .deployment_type
+                    {
+                        DeploymentType::New => "1",
+                        DeploymentType::Bootstrap => "0",
+                    }
+                    .to_string(),
+                ),
+                (
+                    "setup_nat_gateway".to_string(),
+                    (desired_private_node_vm_count > 0).to_string(),
+                ),
             ];
             self.plan(
                 Some(vars),
