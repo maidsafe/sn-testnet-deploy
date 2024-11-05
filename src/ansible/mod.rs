@@ -135,6 +135,11 @@ pub enum AnsiblePlaybook {
     StartUploaders,
     /// This playbook will stop the faucet for the environment.
     StopFaucet,
+    /// The stop nodes playbook will use the node manager to stop any node services on any
+    /// machines it runs against.
+    ///
+    /// Use in combination with `AnsibleInventoryType::Genesis` or `AnsibleInventoryType::Nodes`.
+    StopNodes,
     /// This playbook will stop the Telegraf service running on each machine.
     ///
     /// It can be necessary for running upgrades, since Telegraf will run `safenode-manager
@@ -185,6 +190,7 @@ impl AnsiblePlaybook {
             AnsiblePlaybook::StartUploaders => "start_uploaders.yml".to_string(),
             AnsiblePlaybook::Status => "node_status.yml".to_string(),
             AnsiblePlaybook::StopFaucet => "stop_faucet.yml".to_string(),
+            AnsiblePlaybook::StopNodes => "stop_nodes.yml".to_string(),
             AnsiblePlaybook::StopTelegraf => "stop_telegraf.yml".to_string(),
             AnsiblePlaybook::StopUploaders => "stop_uploaders.yml".to_string(),
             AnsiblePlaybook::UpgradeNodeManager => "upgrade_node_manager.yml".to_string(),

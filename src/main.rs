@@ -611,6 +611,27 @@ enum Commands {
         #[clap(long, value_parser = parse_provider, verbatim_doc_comment, default_value_t = CloudProvider::DigitalOcean)]
         provider: CloudProvider,
     },
+    /// Stop all nodes in an environment.
+    #[clap(name = "stop")]
+    Stop {
+        /// Provide a list of VM names to use as a custom inventory.
+        ///
+        /// This will stop nodes on a particular subset of VMs.
+        #[clap(name = "custom-inventory", long, use_value_delimiter = true)]
+        custom_inventory: Option<Vec<String>>,
+        /// Maximum number of forks Ansible will use to execute tasks on target hosts.
+        #[clap(long, default_value_t = 50)]
+        forks: usize,
+        /// The interval between each node stop in milliseconds.
+        #[clap(long, value_parser = |t: &str| -> Result<Duration> { Ok(t.parse().map(Duration::from_millis)?)}, default_value = "2000")]
+        interval: Duration,
+        /// The name of the environment.
+        #[arg(short = 'n', long)]
+        name: String,
+        /// The cloud provider for the environment.
+        #[clap(long, value_parser = parse_provider, verbatim_doc_comment, default_value_t = CloudProvider::DigitalOcean)]
+        provider: CloudProvider,
+    },
     /// Stop the Telegraf service on all machines in the environment.
     ///
     /// This may be necessary for performing upgrades.
@@ -2074,6 +2095,38 @@ async fn main() -> Result<()> {
             }
 
             testnet_deployer.status()?;
+            Ok(())
+        }
+        Commands::Stop {
+            custom_inventory,
+            forks,
+            interval,
+            name,
+            provider,
+        } => {
+            let testnet_deployer = TestnetDeployBuilder::default()
+                .ansible_forks(forks)
+                .environment_name(&name)
+                .provider(provider)
+                .build()?;
+
+            let inventory_service = DeploymentInventoryService::from(&testnet_deployer);
+            let inventory = inventory_service
+                .generate_or_retrieve_inventory(&name, true, None)
+                .await?;
+            if inventory.is_empty() {
+                return Err(eyre!("The {name} environment does not exist"));
+            }
+
+            let custom_inventory = if let Some(custom_inventory) = custom_inventory {
+                let custom_vms = get_custom_inventory(&inventory, &custom_inventory)?;
+                Some(custom_vms)
+            } else {
+                None
+            };
+
+            testnet_deployer.stop(interval, custom_inventory)?;
+
             Ok(())
         }
         Commands::StopTelegraf {

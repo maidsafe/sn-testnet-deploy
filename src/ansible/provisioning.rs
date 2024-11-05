@@ -504,7 +504,7 @@ impl AnsibleProvisioner {
         extra_vars.add_variable("interval", &interval.as_millis().to_string());
 
         if let Some(custom_inventory) = custom_inventory {
-            println!("Running the start telegraf playbook with a custom inventory");
+            println!("Running the start nodes playbook with a custom inventory");
             generate_custom_environment_inventory(
                 &custom_inventory,
                 environment_name,
@@ -561,6 +561,41 @@ impl AnsibleProvisioner {
                 AnsiblePlaybook::StartTelegraf,
                 node_inv_type,
                 None,
+            )?;
+        }
+
+        Ok(())
+    }
+
+    pub fn stop_nodes(
+        &self,
+        environment_name: &str,
+        interval: Duration,
+        custom_inventory: Option<Vec<VirtualMachine>>,
+    ) -> Result<()> {
+        let mut extra_vars = ExtraVarsDocBuilder::default();
+        extra_vars.add_variable("interval", &interval.as_millis().to_string());
+
+        if let Some(custom_inventory) = custom_inventory {
+            println!("Running the stop nodes playbook with a custom inventory");
+            generate_custom_environment_inventory(
+                &custom_inventory,
+                environment_name,
+                &self.ansible_runner.working_directory_path.join("inventory"),
+            )?;
+            self.ansible_runner.run_playbook(
+                AnsiblePlaybook::StopNodes,
+                AnsibleInventoryType::Custom,
+                Some(extra_vars.build()),
+            )?;
+            return Ok(());
+        }
+
+        for node_inv_type in AnsibleInventoryType::iter_node_type() {
+            self.ansible_runner.run_playbook(
+                AnsiblePlaybook::StopNodes,
+                node_inv_type,
+                Some(extra_vars.build()),
             )?;
         }
 
