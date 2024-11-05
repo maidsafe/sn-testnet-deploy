@@ -713,6 +713,12 @@ enum Commands {
         /// The name of the environment
         #[arg(short = 'n', long)]
         name: String,
+        /// Specify the type of node VM to upgrade the safenode services on. If not provided, the safenode services on
+        /// all the node VMs will be upgraded. This is mutually exclusive with the '--custom-inventory' argument.
+        ///
+        /// Valid values are "bootstrap", "genesis", "generic" and "private".
+        #[arg(long, conflicts_with = "custom-inventory")]
+        node_type: Option<NodeType>,
         /// The cloud provider to deploy to.
         ///
         /// Valid values are "aws" or "digital-ocean".
@@ -740,6 +746,13 @@ enum Commands {
         /// The name of the environment
         #[arg(short = 'n', long)]
         name: String,
+        /// Specify the type of node VM to upgrade the safenode-manager services on. If not provided, the
+        /// safenode-manager on all the node VMs will be upgraded.
+        /// This is mutually exclusive with the '--custom-inventory' argument.
+        ///
+        /// Valid values are "bootstrap", "genesis", "generic" and "private".
+        #[arg(long, conflicts_with = "custom-inventory")]
+        node_type: Option<NodeType>,
         #[arg(long)]
         /// The cloud provider of the environment.
         ///
@@ -2235,6 +2248,7 @@ async fn main() -> Result<()> {
             forks,
             interval,
             name,
+            node_type,
             provider,
             version,
         } => {
@@ -2276,6 +2290,7 @@ async fn main() -> Result<()> {
                 forks,
                 interval,
                 name: name.clone(),
+                node_type,
                 provider,
                 version,
             })?;
@@ -2293,6 +2308,7 @@ async fn main() -> Result<()> {
         Commands::UpgradeNodeManager {
             custom_inventory,
             name,
+            node_type,
             provider,
             version,
         } => {
@@ -2316,7 +2332,7 @@ async fn main() -> Result<()> {
                 None
             };
 
-            testnet_deployer.upgrade_node_manager(version.parse()?, custom_inventory)?;
+            testnet_deployer.upgrade_node_manager(version.parse()?, node_type, custom_inventory)?;
             Ok(())
         }
         Commands::UpgradeNodeTelegrafConfig {

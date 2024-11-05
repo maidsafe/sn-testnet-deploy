@@ -111,7 +111,7 @@ impl TestnetDeployer {
         match self.ansible_provisioner.provision_nodes(
             &provision_options,
             &options.bootstrap_peer,
-            NodeType::Normal,
+            NodeType::Generic,
             options.evm_custom_testnet_data.clone(),
         ) {
             Ok(()) => {
