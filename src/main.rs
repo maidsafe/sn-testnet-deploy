@@ -725,6 +725,11 @@ enum Commands {
         /// Valid values are "bootstrap", "genesis", "generic" and "private".
         #[arg(long, conflicts_with = "custom-inventory")]
         node_type: Option<NodeType>,
+        /// Delay before an upgrade starts.
+        ///
+        /// Useful for upgrading bootstrap nodes when there is one node per machine.
+        #[clap(long)]
+        pre_upgrade_delay: Option<u64>,
         /// The cloud provider to deploy to.
         ///
         /// Valid values are "aws" or "digital-ocean".
@@ -2263,6 +2268,7 @@ async fn main() -> Result<()> {
             name,
             node_type,
             provider,
+            pre_upgrade_delay,
             version,
         } => {
             // The upgrade intentionally uses a small value for `forks`, but this is far too slow
@@ -2305,6 +2311,7 @@ async fn main() -> Result<()> {
                 name: name.clone(),
                 node_type,
                 provider,
+                pre_upgrade_delay,
                 version,
             })?;
 

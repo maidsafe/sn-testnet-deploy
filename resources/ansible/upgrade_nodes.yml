@@ -2,15 +2,23 @@
 - name: upgrade node binaries using the node manager
   hosts: all
   tasks:
-    - name: upgrade
-      ansible.builtin.command:
-        # The `omit` filter removes arguments without values
-        argv: "{{ command_args | reject('equalto', omit) | list }}"
-      vars:
-        command_args:
-          - safenode-manager
-          - upgrade
-          - --interval={{ interval }}
-          - "{{ '--force' if force_safenode is defined else omit }}"
-          - "{{ ('--env=' + env_variables) if env_variables is defined else omit }}"
-          - "{{ ('--version=' + safenode_version) if safenode_version is defined else omit }}"
+    # There is an optional delay that can be applied before the upgrade starts.
+    # This is useful for when there is one node per machine.
+    - name: upgrade nodes
+      ansible.builtin.shell: |
+        {% if pre_upgrade_delay is defined %}
+        sleep {{ pre_upgrade_delay | default(0) }}
+        {% endif %}
+        cmd="safenode-manager upgrade --interval={{ interval }}"
+        {% if force_safenode is defined %}
+        cmd="$cmd --force"
+        {% endif %}
+        {% if env_variables is defined %}
+        cmd="$cmd --env={{ env_variables }}"
+        {% endif %}
+        {% if safenode_version is defined %}
+        cmd="$cmd --version={{ safenode_version }}"
+        {% endif %}
+        eval "$cmd"
+      args:
+        executable: /bin/bash
