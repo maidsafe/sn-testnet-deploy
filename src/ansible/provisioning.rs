@@ -293,7 +293,7 @@ impl AnsibleProvisioner {
             Some(extra_vars::build_node_extra_vars_doc(
                 &self.cloud_provider.to_string(),
                 options,
-                NodeType::Bootstrap,
+                NodeType::Genesis,
                 None,
                 1,
                 options.evm_network.clone(),
@@ -344,16 +344,18 @@ impl AnsibleProvisioner {
         evm_testnet_data: Option<EvmCustomTestnetData>,
     ) -> Result<()> {
         let start = Instant::now();
-        let (inventory_type, node_count) = match node_type {
+        let (inventory_type, node_count) = match &node_type {
             NodeType::Bootstrap => (
-                AnsibleInventoryType::BootstrapNodes,
+                node_type.to_ansible_inventory_type(),
                 options.bootstrap_node_count,
             ),
-            NodeType::Normal => (AnsibleInventoryType::Nodes, options.node_count),
+            NodeType::Normal => (node_type.to_ansible_inventory_type(), options.node_count),
             NodeType::Private => (
-                AnsibleInventoryType::PrivateNodes,
+                node_type.to_ansible_inventory_type(),
                 options.private_node_count,
             ),
+            // use provision_genesis_node fn
+            NodeType::Genesis => return Err(Error::InvalidNodeType(node_type)),
         };
 
         // For a new deployment, it's quite probable that SSH is available, because this part occurs
@@ -498,10 +500,21 @@ impl AnsibleProvisioner {
         &self,
         environment_name: &str,
         interval: Duration,
+        node_type: Option<NodeType>,
         custom_inventory: Option<Vec<VirtualMachine>>,
     ) -> Result<()> {
         let mut extra_vars = ExtraVarsDocBuilder::default();
         extra_vars.add_variable("interval", &interval.as_millis().to_string());
+
+        if let Some(node_type) = node_type {
+            println!("Running the start nodes playbook for {node_type:?} nodes");
+            self.ansible_runner.run_playbook(
+                AnsiblePlaybook::StartNodes,
+                node_type.to_ansible_inventory_type(),
+                Some(extra_vars.build()),
+            )?;
+            return Ok(());
+        }
 
         if let Some(custom_inventory) = custom_inventory {
             println!("Running the start nodes playbook with a custom inventory");
@@ -518,6 +531,7 @@ impl AnsibleProvisioner {
             return Ok(());
         }
 
+        println!("Running the start nodes playbook for all node types");
         for node_inv_type in AnsibleInventoryType::iter_node_type() {
             self.ansible_runner.run_playbook(
                 AnsiblePlaybook::StartNodes,
@@ -539,8 +553,19 @@ impl AnsibleProvisioner {
     pub fn start_telegraf(
         &self,
         environment_name: &str,
+        node_type: Option<NodeType>,
         custom_inventory: Option<Vec<VirtualMachine>>,
     ) -> Result<()> {
+        if let Some(node_type) = node_type {
+            println!("Running the start telegraf playbook for {node_type:?} nodes");
+            self.ansible_runner.run_playbook(
+                AnsiblePlaybook::StartTelegraf,
+                node_type.to_ansible_inventory_type(),
+                None,
+            )?;
+            return Ok(());
+        }
+
         if let Some(custom_inventory) = custom_inventory {
             println!("Running the start telegraf playbook with a custom inventory");
             generate_custom_environment_inventory(
@@ -556,6 +581,7 @@ impl AnsibleProvisioner {
             return Ok(());
         }
 
+        println!("Running the start telegraf playbook for all node types");
         for node_inv_type in AnsibleInventoryType::iter_node_type() {
             self.ansible_runner.run_playbook(
                 AnsiblePlaybook::StartTelegraf,
@@ -571,10 +597,21 @@ impl AnsibleProvisioner {
         &self,
         environment_name: &str,
         interval: Duration,
+        node_type: Option<NodeType>,
         custom_inventory: Option<Vec<VirtualMachine>>,
     ) -> Result<()> {
         let mut extra_vars = ExtraVarsDocBuilder::default();
         extra_vars.add_variable("interval", &interval.as_millis().to_string());
+
+        if let Some(node_type) = node_type {
+            println!("Running the stop nodes playbook for {node_type:?} nodes");
+            self.ansible_runner.run_playbook(
+                AnsiblePlaybook::StopNodes,
+                node_type.to_ansible_inventory_type(),
+                Some(extra_vars.build()),
+            )?;
+            return Ok(());
+        }
 
         if let Some(custom_inventory) = custom_inventory {
             println!("Running the stop nodes playbook with a custom inventory");
@@ -591,6 +628,7 @@ impl AnsibleProvisioner {
             return Ok(());
         }
 
+        println!("Running the stop nodes playbook for all node types");
         for node_inv_type in AnsibleInventoryType::iter_node_type() {
             self.ansible_runner.run_playbook(
                 AnsiblePlaybook::StopNodes,
@@ -605,8 +643,19 @@ impl AnsibleProvisioner {
     pub fn stop_telegraf(
         &self,
         environment_name: &str,
+        node_type: Option<NodeType>,
         custom_inventory: Option<Vec<VirtualMachine>>,
     ) -> Result<()> {
+        if let Some(node_type) = node_type {
+            println!("Running the stop telegraf playbook for {node_type:?} nodes");
+            self.ansible_runner.run_playbook(
+                AnsiblePlaybook::StopTelegraf,
+                node_type.to_ansible_inventory_type(),
+                None,
+            )?;
+            return Ok(());
+        }
+
         if let Some(custom_inventory) = custom_inventory {
             println!("Running the stop telegraf playbook with a custom inventory");
             generate_custom_environment_inventory(
@@ -622,6 +671,7 @@ impl AnsibleProvisioner {
             return Ok(());
         }
 
+        println!("Running the stop telegraf playbook for all node types");
         for node_inv_type in AnsibleInventoryType::iter_node_type() {
             self.ansible_runner
                 .run_playbook(AnsiblePlaybook::StopTelegraf, node_inv_type, None)?;

@@ -4,7 +4,7 @@
 // This SAFE Network Software is licensed under the BSD-3-Clause license.
 // Please see the LICENSE file for more details.
 
-use crate::ansible::inventory::AnsibleInventoryType;
+use crate::{ansible::inventory::AnsibleInventoryType, NodeType};
 use evmlib::contract::network_token;
 use thiserror::Error;
 use tokio::task::JoinError;
@@ -69,6 +69,8 @@ pub enum Error {
     GetS3ObjectError(String, String),
     #[error(transparent)]
     InquireError(#[from] inquire::InquireError),
+    #[error("The node type '{0:?}' is not supported")]
+    InvalidNodeType(NodeType),
     #[error(
         "The '{0}' deployment type for the environment is not supported for upscaling uploaders"
     )]

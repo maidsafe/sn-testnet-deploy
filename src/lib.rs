@@ -112,19 +112,45 @@ impl std::str::FromStr for DeploymentType {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum NodeType {
     Bootstrap,
+    Genesis,
     Normal,
     Private,
+}
+
+impl std::str::FromStr for NodeType {
+    type Err = String;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s.to_lowercase().as_str() {
+            "bootstrap" => Ok(NodeType::Bootstrap),
+            "genesis" => Ok(NodeType::Genesis),
+            "normal" => Ok(NodeType::Normal),
+            "private" => Ok(NodeType::Private),
+            _ => Err(format!("Invalid node type: {}", s)),
+        }
+    }
 }
 
 impl NodeType {
     pub fn telegraph_role(&self) -> &'static str {
         match self {
             NodeType::Bootstrap => "BOOTSTRAP_NODE",
+            // Genesis node should be marked as a bootstrap node for telegraf
+            NodeType::Genesis => "BOOTSTRAP_NODE",
             NodeType::Normal => "GENERIC_NODE",
             NodeType::Private => "NAT_RANDOMIZED_NODE",
+        }
+    }
+
+    pub fn to_ansible_inventory_type(&self) -> AnsibleInventoryType {
+        match self {
+            NodeType::Bootstrap => AnsibleInventoryType::BootstrapNodes,
+            NodeType::Genesis => AnsibleInventoryType::Genesis,
+            NodeType::Normal => AnsibleInventoryType::Nodes,
+            NodeType::Private => AnsibleInventoryType::PrivateNodes,
         }
     }
 }
@@ -635,10 +661,15 @@ impl TestnetDeployer {
     pub fn start(
         &self,
         interval: Duration,
+        node_type: Option<NodeType>,
         custom_inventory: Option<Vec<VirtualMachine>>,
     ) -> Result<()> {
-        self.ansible_provisioner
-            .start_nodes(&self.environment_name, interval, custom_inventory)?;
+        self.ansible_provisioner.start_nodes(
+            &self.environment_name,
+            interval,
+            node_type,
+            custom_inventory,
+        )?;
         Ok(())
     }
 
@@ -677,25 +708,44 @@ impl TestnetDeployer {
         Ok(())
     }
 
-    pub fn start_telegraf(&self, custom_inventory: Option<Vec<VirtualMachine>>) -> Result<()> {
-        self.ansible_provisioner
-            .start_telegraf(&self.environment_name, custom_inventory)?;
+    pub fn start_telegraf(
+        &self,
+        node_type: Option<NodeType>,
+        custom_inventory: Option<Vec<VirtualMachine>>,
+    ) -> Result<()> {
+        self.ansible_provisioner.start_telegraf(
+            &self.environment_name,
+            node_type,
+            custom_inventory,
+        )?;
         Ok(())
     }
 
     pub fn stop(
         &self,
         interval: Duration,
+        node_type: Option<NodeType>,
         custom_inventory: Option<Vec<VirtualMachine>>,
     ) -> Result<()> {
-        self.ansible_provisioner
-            .stop_nodes(&self.environment_name, interval, custom_inventory)?;
+        self.ansible_provisioner.stop_nodes(
+            &self.environment_name,
+            interval,
+            node_type,
+            custom_inventory,
+        )?;
         Ok(())
     }
 
-    pub fn stop_telegraf(&self, custom_inventory: Option<Vec<VirtualMachine>>) -> Result<()> {
-        self.ansible_provisioner
-            .stop_telegraf(&self.environment_name, custom_inventory)?;
+    pub fn stop_telegraf(
+        &self,
+        node_type: Option<NodeType>,
+        custom_inventory: Option<Vec<VirtualMachine>>,
+    ) -> Result<()> {
+        self.ansible_provisioner.stop_telegraf(
+            &self.environment_name,
+            node_type,
+            custom_inventory,
+        )?;
         Ok(())
     }
 
