@@ -533,6 +533,12 @@ pub struct NodeVirtualMachine {
     pub safenodemand_endpoint: Option<SocketAddr>,
 }
 
+impl NodeVirtualMachine {
+    pub fn node_count(&self) -> usize {
+        self.node_multiaddr.len()
+    }
+}
+
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq, Hash)]
 pub struct VirtualMachine {
     pub id: u64,
@@ -669,20 +675,12 @@ impl DeploymentInventory {
         list
     }
 
-    pub fn node_vm_list(&self) -> Vec<VirtualMachine> {
+    pub fn node_vm_list(&self) -> Vec<NodeVirtualMachine> {
         let mut list = Vec::new();
-        list.extend(
-            self.bootstrap_node_vms
-                .iter()
-                .map(|node_vm| node_vm.vm.clone()),
-        );
-        list.extend(self.genesis_vm.iter().map(|node_vm| node_vm.vm.clone()));
-        list.extend(self.node_vms.iter().map(|node_vm| node_vm.vm.clone()));
-        list.extend(
-            self.private_node_vms
-                .iter()
-                .map(|node_vm| node_vm.vm.clone()),
-        );
+        list.extend(self.bootstrap_node_vms.iter().cloned());
+        list.extend(self.genesis_vm.iter().cloned());
+        list.extend(self.node_vms.iter().cloned());
+        list.extend(self.private_node_vms.iter().cloned());
 
         list
     }
@@ -737,7 +735,7 @@ impl DeploymentInventory {
 
     pub fn bootstrap_node_count(&self) -> usize {
         if let Some(first_vm) = self.bootstrap_node_vms.first() {
-            first_vm.node_multiaddr.len()
+            first_vm.node_count()
         } else {
             0
         }
@@ -745,7 +743,7 @@ impl DeploymentInventory {
 
     pub fn genesis_node_count(&self) -> usize {
         if let Some(genesis_vm) = &self.genesis_vm {
-            genesis_vm.node_multiaddr.len()
+            genesis_vm.node_count()
         } else {
             0
         }
@@ -753,7 +751,7 @@ impl DeploymentInventory {
 
     pub fn node_count(&self) -> usize {
         if let Some(first_vm) = self.node_vms.first() {
-            first_vm.node_multiaddr.len()
+            first_vm.node_count()
         } else {
             0
         }
@@ -761,7 +759,7 @@ impl DeploymentInventory {
 
     pub fn private_node_count(&self) -> usize {
         if let Some(first_vm) = self.private_node_vms.first() {
-            first_vm.node_multiaddr.len()
+            first_vm.node_count()
         } else {
             0
         }

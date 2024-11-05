@@ -125,6 +125,8 @@ pub enum Error {
     NoFaucetError,
     #[error("This deployment does not have any uploaders. It may be a bootstrap deployment.")]
     NoUploadersError,
+    #[error("The node count for the provided custom vms are not equal")]
+    NodeCountMismatch,
     #[error("Could not obtain a multiaddr from the node inventory")]
     NodeAddressNotFound,
     #[error("Failed to upload {0} to S3 bucket {1}")]

@@ -683,6 +683,16 @@ impl TestnetDeployer {
         Ok(())
     }
 
+    pub fn stop(
+        &self,
+        interval: Duration,
+        custom_inventory: Option<Vec<VirtualMachine>>,
+    ) -> Result<()> {
+        self.ansible_provisioner
+            .stop_nodes(&self.environment_name, interval, custom_inventory)?;
+        Ok(())
+    }
+
     pub fn stop_telegraf(&self, custom_inventory: Option<Vec<VirtualMachine>>) -> Result<()> {
         self.ansible_provisioner
             .stop_telegraf(&self.environment_name, custom_inventory)?;
