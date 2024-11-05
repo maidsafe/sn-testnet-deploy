@@ -294,7 +294,7 @@ impl TestnetDeployer {
         match self.ansible_provisioner.provision_nodes(
             &provision_options,
             &initial_multiaddr,
-            NodeType::Normal,
+            NodeType::Generic,
             evm_testnet_data.clone(),
         ) {
             Ok(()) => {

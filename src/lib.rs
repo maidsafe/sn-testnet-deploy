@@ -115,8 +115,8 @@ impl std::str::FromStr for DeploymentType {
 #[derive(Debug, Clone)]
 pub enum NodeType {
     Bootstrap,
+    Generic,
     Genesis,
-    Normal,
     Private,
 }
 
@@ -126,8 +126,8 @@ impl std::str::FromStr for NodeType {
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         match s.to_lowercase().as_str() {
             "bootstrap" => Ok(NodeType::Bootstrap),
+            "generic" => Ok(NodeType::Generic),
             "genesis" => Ok(NodeType::Genesis),
-            "normal" => Ok(NodeType::Normal),
             "private" => Ok(NodeType::Private),
             _ => Err(format!("Invalid node type: {}", s)),
         }
@@ -138,9 +138,9 @@ impl NodeType {
     pub fn telegraph_role(&self) -> &'static str {
         match self {
             NodeType::Bootstrap => "BOOTSTRAP_NODE",
+            NodeType::Generic => "GENERIC_NODE",
             // Genesis node should be marked as a bootstrap node for telegraf
             NodeType::Genesis => "BOOTSTRAP_NODE",
-            NodeType::Normal => "GENERIC_NODE",
             NodeType::Private => "NAT_RANDOMIZED_NODE",
         }
     }
@@ -148,8 +148,8 @@ impl NodeType {
     pub fn to_ansible_inventory_type(&self) -> AnsibleInventoryType {
         match self {
             NodeType::Bootstrap => AnsibleInventoryType::BootstrapNodes,
+            NodeType::Generic => AnsibleInventoryType::Nodes,
             NodeType::Genesis => AnsibleInventoryType::Genesis,
-            NodeType::Normal => AnsibleInventoryType::Nodes,
             NodeType::Private => AnsibleInventoryType::PrivateNodes,
         }
     }
@@ -368,6 +368,7 @@ pub struct UpgradeOptions {
     pub forks: usize,
     pub interval: Duration,
     pub name: String,
+    pub node_type: Option<NodeType>,
     pub provider: CloudProvider,
     pub version: Option<String>,
 }
@@ -757,11 +758,13 @@ impl TestnetDeployer {
     pub fn upgrade_node_manager(
         &self,
         version: Version,
+        node_type: Option<NodeType>,
         custom_inventory: Option<Vec<VirtualMachine>>,
     ) -> Result<()> {
         self.ansible_provisioner.upgrade_node_manager(
             &self.environment_name,
             &version,
+            node_type,
             custom_inventory,
         )?;
         Ok(())

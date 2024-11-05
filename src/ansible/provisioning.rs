@@ -349,7 +349,7 @@ impl AnsibleProvisioner {
                 node_type.to_ansible_inventory_type(),
                 options.bootstrap_node_count,
             ),
-            NodeType::Normal => (node_type.to_ansible_inventory_type(), options.node_count),
+            NodeType::Generic => (node_type.to_ansible_inventory_type(), options.node_count),
             NodeType::Private => (
                 node_type.to_ansible_inventory_type(),
                 options.private_node_count,
@@ -694,7 +694,7 @@ impl AnsibleProvisioner {
             AnsibleInventoryType::Nodes,
             Some(extra_vars::build_node_telegraf_upgrade(
                 name,
-                &NodeType::Normal,
+                &NodeType::Generic,
             )?),
         )?;
 
@@ -720,7 +720,7 @@ impl AnsibleProvisioner {
 
     pub fn upgrade_nodes(&self, options: &UpgradeOptions) -> Result<()> {
         if let Some(custom_inventory) = &options.custom_inventory {
-            println!("Running the upgrade with a custom inventory");
+            println!("Running the UpgradeNodes with a custom inventory");
             generate_custom_environment_inventory(
                 custom_inventory,
                 &options.name,
@@ -738,6 +738,25 @@ impl AnsibleProvisioner {
             }
             return Ok(());
         }
+
+        if let Some(node_type) = &options.node_type {
+            println!("Running the UpgradeNodes playbook for {node_type:?} nodes");
+            match self.ansible_runner.run_playbook(
+                AnsiblePlaybook::UpgradeNodes,
+                node_type.to_ansible_inventory_type(),
+                Some(options.get_ansible_vars()),
+            ) {
+                Ok(()) => println!("All {node_type:?} nodes were successfully upgraded"),
+                Err(_) => {
+                    println!(
+                        "WARNING: some {node_type:?} nodes may not have been upgraded or restarted"
+                    );
+                }
+            }
+            return Ok(());
+        }
+
+        println!("Running the UpgradeNodes playbook for all node types");
 
         match self.ansible_runner.run_playbook(
             AnsiblePlaybook::UpgradeNodes,
@@ -769,6 +788,7 @@ impl AnsibleProvisioner {
                 println!("WARNING: some nodes may not have been upgraded or restarted");
             }
         }
+        // Don't use AnsibleInventoryType::iter_node_type() here, because the genesis node should be upgraded last
         match self.ansible_runner.run_playbook(
             AnsiblePlaybook::UpgradeNodes,
             AnsibleInventoryType::Genesis,
@@ -786,13 +806,24 @@ impl AnsibleProvisioner {
         &self,
         environment_name: &str,
         version: &Version,
+        node_type: Option<NodeType>,
         custom_inventory: Option<Vec<VirtualMachine>>,
     ) -> Result<()> {
         let mut extra_vars = ExtraVarsDocBuilder::default();
         extra_vars.add_variable("version", &version.to_string());
 
+        if let Some(node_type) = node_type {
+            println!("Running the upgrade safenode-manager playbook for {node_type:?} nodes");
+            self.ansible_runner.run_playbook(
+                AnsiblePlaybook::UpgradeNodeManager,
+                node_type.to_ansible_inventory_type(),
+                Some(extra_vars.build()),
+            )?;
+            return Ok(());
+        }
+
         if let Some(custom_inventory) = custom_inventory {
-            println!("Running the upgrade node manager playbook with a custom inventory");
+            println!("Running the upgrade safenode-manager playbook with a custom inventory");
             generate_custom_environment_inventory(
                 &custom_inventory,
                 environment_name,
@@ -806,6 +837,7 @@ impl AnsibleProvisioner {
             return Ok(());
         }
 
+        println!("Running the upgrade safenode-manager playbook for all node types");
         for node_inv_type in AnsibleInventoryType::iter_node_type() {
             self.ansible_runner.run_playbook(
                 AnsiblePlaybook::UpgradeNodeManager,
