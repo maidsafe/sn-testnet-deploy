@@ -28,7 +28,7 @@ use sn_testnet_deploy::{
     setup::setup_dotenv_file,
     upscale::UpscaleOptions,
     BinaryOption, CloudProvider, EnvironmentType, EvmCustomTestnetData, EvmNetwork, LogFormat,
-    TestnetDeployBuilder, UpgradeOptions,
+    NodeType, TestnetDeployBuilder, UpgradeOptions,
 };
 use std::{env, net::IpAddr};
 use std::{str::FromStr, time::Duration};
@@ -574,6 +574,12 @@ enum Commands {
         /// The name of the environment.
         #[arg(short = 'n', long)]
         name: String,
+        /// Specify the type of node VM to start the safenode services on. If not provided, the safenode services on
+        /// all the node VMs will be started. This is mutually exclusive with the '--custom-inventory' argument.
+        ///
+        /// Valid values are "bootstrap", "genesis", "generic" and "private".
+        #[arg(long, conflicts_with = "custom-inventory")]
+        node_type: Option<NodeType>,
         /// The cloud provider for the environment.
         #[clap(long, value_parser = parse_provider, verbatim_doc_comment, default_value_t = CloudProvider::DigitalOcean)]
         provider: CloudProvider,
@@ -607,6 +613,12 @@ enum Commands {
         /// The name of the environment.
         #[arg(short = 'n', long)]
         name: String,
+        /// Specify the type of node VM to start the telegraf services on. If not provided, the telegraf services on
+        /// all the node VMs will be started. This is mutually exclusive with the '--custom-inventory' argument.
+        ///
+        /// Valid values are "bootstrap", "genesis", "generic" and "private".
+        #[arg(long, conflicts_with = "custom-inventory")]
+        node_type: Option<NodeType>,
         /// The cloud provider for the environment.
         #[clap(long, value_parser = parse_provider, verbatim_doc_comment, default_value_t = CloudProvider::DigitalOcean)]
         provider: CloudProvider,
@@ -628,6 +640,12 @@ enum Commands {
         /// The name of the environment.
         #[arg(short = 'n', long)]
         name: String,
+        /// Specify the type of node VM to stop the safenode services on. If not provided, the safenode services on
+        /// all the node VMs will be stopped. This is mutually exclusive with the '--custom-inventory' argument.
+        ///
+        /// Valid values are "bootstrap", "genesis", "generic" and "private".
+        #[arg(long, conflicts_with = "custom-inventory")]
+        node_type: Option<NodeType>,
         /// The cloud provider for the environment.
         #[clap(long, value_parser = parse_provider, verbatim_doc_comment, default_value_t = CloudProvider::DigitalOcean)]
         provider: CloudProvider,
@@ -648,6 +666,12 @@ enum Commands {
         /// The name of the environment.
         #[arg(short = 'n', long)]
         name: String,
+        /// Specify the type of node VM to stop the telegraf services on. If not provided, the telegraf services on
+        /// all the node VMs will be stopped. This is mutually exclusive with the '--custom-inventory' argument.
+        ///
+        /// Valid values are "bootstrap", "genesis", "generic" and "private".
+        #[arg(long, conflicts_with = "custom-inventory")]
+        node_type: Option<NodeType>,
         /// The cloud provider for the environment.
         #[clap(long, value_parser = parse_provider, verbatim_doc_comment, default_value_t = CloudProvider::DigitalOcean)]
         provider: CloudProvider,
@@ -2008,6 +2032,7 @@ async fn main() -> Result<()> {
             forks,
             interval,
             name,
+            node_type,
             provider,
         } => {
             let testnet_deployer = TestnetDeployBuilder::default()
@@ -2034,7 +2059,7 @@ async fn main() -> Result<()> {
                 None
             };
 
-            testnet_deployer.start(interval, custom_inventory)?;
+            testnet_deployer.start(interval, node_type, custom_inventory)?;
 
             Ok(())
         }
@@ -2042,6 +2067,7 @@ async fn main() -> Result<()> {
             custom_inventory,
             forks,
             name,
+            node_type,
             provider,
         } => {
             let testnet_deployer = TestnetDeployBuilder::default()
@@ -2068,7 +2094,7 @@ async fn main() -> Result<()> {
                 None
             };
 
-            testnet_deployer.start_telegraf(custom_inventory)?;
+            testnet_deployer.start_telegraf(node_type, custom_inventory)?;
 
             Ok(())
         }
@@ -2102,6 +2128,7 @@ async fn main() -> Result<()> {
             forks,
             interval,
             name,
+            node_type,
             provider,
         } => {
             let testnet_deployer = TestnetDeployBuilder::default()
@@ -2125,7 +2152,7 @@ async fn main() -> Result<()> {
                 None
             };
 
-            testnet_deployer.stop(interval, custom_inventory)?;
+            testnet_deployer.stop(interval, node_type, custom_inventory)?;
 
             Ok(())
         }
@@ -2133,6 +2160,7 @@ async fn main() -> Result<()> {
             custom_inventory,
             forks,
             name,
+            node_type,
             provider,
         } => {
             let testnet_deployer = TestnetDeployBuilder::default()
@@ -2159,7 +2187,7 @@ async fn main() -> Result<()> {
                 None
             };
 
-            testnet_deployer.stop_telegraf(custom_inventory)?;
+            testnet_deployer.stop_telegraf(node_type, custom_inventory)?;
 
             Ok(())
         }
