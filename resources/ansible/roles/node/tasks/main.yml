@@ -99,4 +99,4 @@
 
 - name: start the node services
   become: True
-  command: safenode-manager -v start --interval 200
+  command: safenode-manager -v start --interval {{ interval}}

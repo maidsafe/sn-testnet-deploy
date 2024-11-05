@@ -14,7 +14,7 @@ use crate::{
 };
 use alloy::hex::ToHexExt;
 use colored::Colorize;
-use std::{net::SocketAddr, path::PathBuf};
+use std::{net::SocketAddr, path::PathBuf, time::Duration};
 
 #[derive(Clone)]
 pub struct DeployOptions {
@@ -30,6 +30,7 @@ pub struct DeployOptions {
     pub evm_network: EvmNetwork,
     pub evm_node_vm_size: Option<String>,
     pub funding_wallet_secret_key: Option<String>,
+    pub interval: Duration,
     pub log_format: Option<LogFormat>,
     pub logstash_details: Option<(String, Vec<SocketAddr>)>,
     pub max_archived_log_files: u16,

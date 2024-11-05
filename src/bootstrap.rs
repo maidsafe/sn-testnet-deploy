@@ -4,7 +4,7 @@
 // This SAFE Network Software is licensed under the BSD-3-Clause license.
 // Please see the LICENSE file for more details.
 
-use std::path::PathBuf;
+use std::{path::PathBuf, time::Duration};
 
 use crate::{
     ansible::{inventory::AnsibleInventoryType, provisioning::ProvisionOptions},
@@ -23,6 +23,7 @@ pub struct BootstrapOptions {
     pub env_variables: Option<Vec<(String, String)>>,
     pub evm_network: EvmNetwork,
     pub evm_custom_testnet_data: Option<EvmCustomTestnetData>,
+    pub interval: Duration,
     pub log_format: Option<LogFormat>,
     pub max_archived_log_files: u16,
     pub max_log_files: u16,
