@@ -369,6 +369,7 @@ pub struct UpgradeOptions {
     pub interval: Duration,
     pub name: String,
     pub node_type: Option<NodeType>,
+    pub pre_upgrade_delay: Option<u64>,
     pub provider: CloudProvider,
     pub version: Option<String>,
 }
@@ -385,6 +386,9 @@ impl UpgradeOptions {
         }
         if let Some(version) = &self.version {
             extra_vars.add_variable("safenode_version", version);
+        }
+        if let Some(pre_upgrade_delay) = &self.pre_upgrade_delay {
+            extra_vars.add_variable("pre_upgrade_delay", &pre_upgrade_delay.to_string());
         }
         extra_vars.build()
     }
