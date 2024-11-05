@@ -307,6 +307,7 @@ pub fn build_node_extra_vars_doc(
     }
 
     extra_vars.add_variable("node_instance_count", &node_instance_count.to_string());
+    extra_vars.add_variable("interval", &options.interval.as_millis().to_string());
     if let Some(log_format) = options.log_format {
         extra_vars.add_variable("log_format", log_format.as_str());
     }

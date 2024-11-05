@@ -129,6 +129,9 @@ enum Commands {
         /// If one of the new keys is supplied, all must be supplied.
         #[arg(long)]
         genesis_pk: Option<String>,
+        /// The interval between starting each node in milliseconds.
+        #[clap(long, value_parser = |t: &str| -> Result<Duration> { Ok(t.parse().map(Duration::from_millis)?)}, default_value = "2000")]
+        interval: Duration,
         /// Specify the logging format for the nodes.
         ///
         /// Valid values are "default" or "json".
@@ -361,6 +364,9 @@ enum Commands {
         /// If one of the new keys is supplied, all must be supplied.
         #[arg(long)]
         genesis_pk: Option<String>,
+        /// The interval between starting each node in milliseconds.
+        #[clap(long, value_parser = |t: &str| -> Result<Duration> { Ok(t.parse().map(Duration::from_millis)?)}, default_value = "2000")]
+        interval: Duration,
         /// Specify the logging format for the nodes.
         ///
         /// Valid values are "default" or "json".
@@ -708,7 +714,7 @@ enum Commands {
         #[clap(long, default_value_t = 2)]
         forks: usize,
         /// The interval between each node upgrade.
-        #[clap(long, value_parser = |t: &str| -> Result<Duration> { Ok(t.parse().map(Duration::from_millis)?)}, default_value = "200")]
+        #[clap(long, value_parser = |t: &str| -> Result<Duration> { Ok(t.parse().map(Duration::from_millis)?)}, default_value = "2000")]
         interval: Duration,
         /// The name of the environment
         #[arg(short = 'n', long)]
@@ -884,6 +890,9 @@ enum Commands {
         /// Set to only use Terraform to upscale the VMs and not run Ansible.
         #[clap(long, default_value_t = false)]
         infra_only: bool,
+        /// The interval between starting each node in milliseconds.
+        #[clap(long, value_parser = |t: &str| -> Result<Duration> { Ok(t.parse().map(Duration::from_millis)?)}, default_value = "2000")]
+        interval: Duration,
         /// The name of the existing network to upscale.
         #[arg(short = 'n', long, verbatim_doc_comment)]
         name: String,
@@ -1304,6 +1313,7 @@ async fn main() -> Result<()> {
             forks,
             foundation_pk,
             genesis_pk,
+            interval,
             log_format,
             name,
             network_royalties_pk,
@@ -1419,6 +1429,7 @@ async fn main() -> Result<()> {
                     env_variables,
                     evm_network: evm_network_type,
                     evm_custom_testnet_data,
+                    interval,
                     log_format,
                     name: name.clone(),
                     node_count: node_count.unwrap_or(environment_type.get_default_node_count()),
@@ -1471,6 +1482,7 @@ async fn main() -> Result<()> {
             foundation_pk,
             funding_wallet_secret_key,
             genesis_pk,
+            interval,
             log_format,
             logstash_stack_name,
             max_archived_log_files,
@@ -1593,6 +1605,7 @@ async fn main() -> Result<()> {
                     evm_network: evm_network_type,
                     evm_node_vm_size,
                     funding_wallet_secret_key,
+                    interval,
                     log_format,
                     logstash_details,
                     name: name.clone(),
@@ -2513,6 +2526,7 @@ async fn main() -> Result<()> {
                         max_archived_log_files: 1,
                         max_log_files: 1,
                         infra_only,
+                        interval: Duration::from_millis(2000),
                         plan,
                         provision_only,
                         public_rpc: false,
@@ -2568,6 +2582,7 @@ async fn main() -> Result<()> {
             downloaders_count,
             funding_wallet_secret_key,
             infra_only,
+            interval,
             name,
             max_archived_log_files,
             max_log_files,
@@ -2609,6 +2624,7 @@ async fn main() -> Result<()> {
                     downloaders_count,
                     funding_wallet_secret_key,
                     gas_amount: None,
+                    interval,
                     max_archived_log_files,
                     max_log_files,
                     infra_only,

@@ -14,7 +14,7 @@ use crate::{
 use colored::Colorize;
 use evmlib::common::U256;
 use log::debug;
-use std::collections::HashSet;
+use std::{collections::HashSet, time::Duration};
 
 #[derive(Clone)]
 pub struct UpscaleOptions {
@@ -32,6 +32,7 @@ pub struct UpscaleOptions {
     pub downloaders_count: u16,
     pub funding_wallet_secret_key: Option<String>,
     pub gas_amount: Option<U256>,
+    pub interval: Duration,
     pub infra_only: bool,
     pub max_archived_log_files: u16,
     pub max_log_files: u16,
@@ -204,6 +205,7 @@ impl TestnetDeployer {
                 .evm_network
                 .clone(),
             funding_wallet_secret_key: options.funding_wallet_secret_key.clone(),
+            interval: options.interval,
             log_format: None,
             logstash_details: None,
             name: options.current_inventory.name.clone(),
@@ -472,6 +474,7 @@ impl TestnetDeployer {
                 .evm_network
                 .clone(),
             funding_wallet_secret_key: options.funding_wallet_secret_key.clone(),
+            interval: options.interval,
             log_format: None,
             logstash_details: None,
             name: options.current_inventory.name.clone(),
