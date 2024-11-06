@@ -5578,7 +5578,7 @@ dependencies = [
 
 [[package]]
 name = "sn-testnet-deploy"
-version = "0.1.60"
+version = "0.1.61"
 dependencies = [
  "alloy",
  "async-recursion",
