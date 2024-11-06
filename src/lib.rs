@@ -992,7 +992,15 @@ pub fn get_multiaddr(
     ssh_client: &SshClient,
 ) -> Result<(String, IpAddr)> {
     let node_inventory = ansible_runner.get_inventory(AnsibleInventoryType::Nodes, true)?;
-    let node_ip = node_inventory[0].public_ip_addr;
+    // For upscaling a bootstrap deployment, we'd need to select one of the nodes that's already
+    // provisioned. So just try the first one.
+    let node_ip = node_inventory
+        .iter()
+        .find(|vm| vm.name.ends_with("-node-1"))
+        .ok_or_else(|| Error::NodeAddressNotFound)?
+        .public_ip_addr;
+
+    debug!("Getting multiaddr from node {node_ip}");
 
     let multiaddr =
         ssh_client
