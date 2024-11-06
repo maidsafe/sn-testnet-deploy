@@ -931,6 +931,20 @@ enum Commands {
         /// This argument is required when the uploader count is supplied.
         #[arg(long, verbatim_doc_comment)]
         safe_version: Option<String>,
+        /// Supply a version number for the safenode-manager binary to be used for new uploader VMs.
+        ///
+        /// There should be no 'v' prefix.
+        ///
+        /// This argument is required when the uploader count is supplied.
+        #[arg(long, verbatim_doc_comment)]
+        safenode_manager_version: Option<String>,
+        /// Supply a version number for the safenode binary to be used for new uploader VMs.
+        ///
+        /// There should be no 'v' prefix.
+        ///
+        /// This argument is required when the uploader count is supplied.
+        #[arg(long, verbatim_doc_comment)]
+        safenode_version: Option<String>,
     },
 }
 
@@ -2597,6 +2611,8 @@ async fn main() -> Result<()> {
             provider,
             public_rpc,
             safe_version,
+            safenode_version,
+            safenode_manager_version,
         } => {
             if desired_uploader_vm_count.is_some() && safe_version.is_none() {
                 return Err(eyre!("The --safe-version argument is required when --desired-uploader-vm-count is used"));
@@ -2611,9 +2627,41 @@ async fn main() -> Result<()> {
             testnet_deployer.init().await?;
 
             let inventory_service = DeploymentInventoryService::from(&testnet_deployer);
-            let inventory = inventory_service
+            let mut inventory = inventory_service
                 .generate_or_retrieve_inventory(&name, true, None)
                 .await?;
+
+            if safenode_version.is_some() || safenode_manager_version.is_some() {
+                match &inventory.binary_option {
+                    BinaryOption::Versioned {
+                        safe_version: _,
+                        safenode_version: existing_safenode_version,
+                        safenode_manager_version: existing_safenode_manager_version,
+                    } => {
+                        let new_safenode_version = safenode_version
+                            .map(|v| v.parse().expect("Invalid safenode version"))
+                            .unwrap_or(existing_safenode_version.clone());
+                        let new_manager_version = safenode_manager_version
+                            .map(|v| v.parse().expect("Invalid safenode-manager version"))
+                            .unwrap_or(existing_safenode_manager_version.clone());
+
+                        println!("Using override binary versions:");
+                        println!("safenode: {}", new_safenode_version);
+                        println!("safenode-manager: {}", new_manager_version);
+
+                        inventory.binary_option = BinaryOption::Versioned {
+                            safe_version: None,
+                            safenode_version: new_safenode_version,
+                            safenode_manager_version: new_manager_version,
+                        };
+                    }
+                    BinaryOption::BuildFromSource { .. } => {
+                        return Err(eyre!(
+                            "Cannot override versions when the deployment uses BuildFromSource"
+                        ));
+                    }
+                }
+            }
 
             testnet_deployer
                 .upscale(&UpscaleOptions {
