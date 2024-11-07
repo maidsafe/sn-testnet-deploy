@@ -27,8 +27,8 @@ use sn_testnet_deploy::{
     network_commands, notify_slack,
     setup::setup_dotenv_file,
     upscale::UpscaleOptions,
-    BinaryOption, CloudProvider, EnvironmentType, EvmCustomTestnetData, EvmNetwork, LogFormat,
-    NodeType, TestnetDeployBuilder, UpgradeOptions,
+    BinaryOption, CloudProvider, EnvironmentType, EvmNetwork, LogFormat, NodeType,
+    TestnetDeployBuilder, UpgradeOptions,
 };
 use std::{env, net::IpAddr};
 use std::{str::FromStr, time::Duration};
@@ -87,14 +87,9 @@ enum Commands {
         env_variables: Option<Vec<(String, String)>>,
         /// The address of the data payments contract.
         ///
-        /// This argument only applies if the EVM network type is 'custom'.
+        /// This argument must match the same contract address used in the existing network.
         #[arg(long)]
         evm_data_payments_address: Option<String>,
-        /// The private key of the wallet that deployed the contracts.
-        ///
-        /// This argument only applies if the EVM network type is 'custom'.
-        #[arg(long)]
-        evm_deployer_wallet_private_key: Option<String>,
         /// The EVM network to use.
         ///
         /// Valid values are "arbitrum-one", "arbitrum-sepolia", or "custom".
@@ -102,7 +97,7 @@ enum Commands {
         evm_network_type: EvmNetwork,
         /// The address of the payment token contract.
         ///
-        /// This argument only applies if the EVM network type is 'custom'.
+        /// This argument must match the same contract address used in the existing network.
         #[arg(long)]
         evm_payment_token_address: Option<String>,
         /// The RPC URL for the EVM network.
@@ -322,6 +317,9 @@ enum Commands {
         /// Example: --env SN_LOG=all,RUST_LOG=libp2p=debug
         #[clap(name = "env", long, use_value_delimiter = true, value_parser = parse_environment_variables, verbatim_doc_comment)]
         env_variables: Option<Vec<(String, String)>>,
+        /// The address of the data payments contract.
+        #[arg(long)]
+        evm_data_payments_address: Option<String>,
         /// The EVM network type to use for the deployment.
         ///
         /// Possible values are 'arbitrum-one' or 'custom'.
@@ -329,6 +327,9 @@ enum Commands {
         /// If not used, the default is 'arbitrum-one'.
         #[clap(long, default_value = "arbitrum-one", value_parser = parse_evm_network)]
         evm_network_type: EvmNetwork,
+        /// The address of the payment token contract.
+        #[arg(long)]
+        evm_payment_token_address: Option<String>,
         /// Override the size of the EVM node VMs.
         #[clap(long)]
         evm_node_vm_size: Option<String>,
@@ -1336,7 +1337,6 @@ async fn main() -> Result<()> {
             environment_type,
             env_variables,
             evm_data_payments_address,
-            evm_deployer_wallet_private_key,
             evm_network_type,
             evm_payment_token_address,
             evm_rpc_url,
@@ -1363,37 +1363,21 @@ async fn main() -> Result<()> {
             safenode_manager_version,
             chunk_size,
         } => {
-            let evm_custom_testnet_data = match evm_network_type {
-                EvmNetwork::Custom => {
-                    if evm_data_payments_address.is_none()
-                        || evm_payment_token_address.is_none()
-                        || evm_rpc_url.is_none()
-                    {
-                        return Err(eyre!(
-                            "When using a custom EVM network, you must supply evm-data-payments-address, evm-payment-token-address, and evm-rpc-url"
-                        ));
-                    }
-                    Some(EvmCustomTestnetData {
-                        data_payments_address: evm_data_payments_address.unwrap(),
-                        deployer_wallet_private_key: evm_deployer_wallet_private_key
-                            .unwrap_or_default(),
-                        payment_token_address: evm_payment_token_address.unwrap(),
-                        rpc_url: evm_rpc_url.unwrap(),
-                    })
-                }
-                _ => {
-                    if evm_data_payments_address.is_some()
-                        || evm_payment_token_address.is_some()
-                        || evm_rpc_url.is_some()
-                        || evm_deployer_wallet_private_key.is_some()
-                    {
-                        return Err(eyre!(
-                            "EVM custom network parameters can only be used with evm-network-type=custom"
-                        ));
-                    }
-                    None
-                }
-            };
+            if evm_network_type == EvmNetwork::Custom
+                && (evm_data_payments_address.is_none()
+                    || evm_payment_token_address.is_none()
+                    || evm_rpc_url.is_none())
+            {
+                return Err(eyre!(
+                    "When using a custom EVM network, you must supply evm-data-payments-address, evm-payment-token-address, and evm-rpc-url"
+                ));
+            }
+
+            if evm_network_type != EvmNetwork::Custom && evm_rpc_url.is_some() {
+                return Err(eyre!(
+                    "EVM RPC URL can only be set for a custom EVM network"
+                ));
+            }
 
             let network_keys = validate_and_get_pks(
                 foundation_pk,
@@ -1457,8 +1441,10 @@ async fn main() -> Result<()> {
                     bootstrap_peer,
                     environment_type: environment_type.clone(),
                     env_variables,
+                    evm_data_payments_address,
                     evm_network: evm_network_type,
-                    evm_custom_testnet_data,
+                    evm_payment_token_address,
+                    evm_rpc_url,
                     interval,
                     log_format,
                     name: name.clone(),
@@ -1505,7 +1491,9 @@ async fn main() -> Result<()> {
             downloaders_count,
             env_variables,
             environment_type,
+            evm_data_payments_address,
             evm_network_type,
+            evm_payment_token_address,
             evm_node_vm_size,
             faucet_version,
             forks,
@@ -1545,6 +1533,14 @@ async fn main() -> Result<()> {
                 network_royalties_pk,
                 payment_forward_pk,
             )?;
+
+            if evm_network_type == EvmNetwork::Custom
+                && (evm_data_payments_address.is_some() || evm_payment_token_address.is_some())
+            {
+                return Err(eyre!(
+                    "EVM data payments address and payment token address cannot be set for a custom EVM network"
+                ));
+            }
 
             if funding_wallet_secret_key.is_some() && evm_network_type == EvmNetwork::Custom {
                 return Err(eyre!(
@@ -1632,7 +1628,10 @@ async fn main() -> Result<()> {
                     downloaders_count,
                     environment_type: environment_type.clone(),
                     env_variables,
+                    evm_data_payments_address,
                     evm_network: evm_network_type,
+                    evm_payment_token_address,
+                    evm_rpc_url: None,
                     evm_node_vm_size,
                     funding_wallet_secret_key,
                     interval,
@@ -1783,16 +1782,10 @@ async fn main() -> Result<()> {
                 let environment_details =
                     get_environment_details(&name, &inventory_services.s3_repository).await?;
 
-                if funding_wallet_secret_key.is_some()
-                    && environment_details.evm_network == EvmNetwork::Custom
-                {
-                    return Err(eyre!(
-                        "Wallet secret key only applies to Arbitrum or Sepolia networks"
-                    ));
-                }
-
                 let options = FundingOptions {
-                    custom_evm_testnet_data: environment_details.evm_testnet_data,
+                    evm_data_payments_address: environment_details.evm_data_payments_address,
+                    evm_payment_token_address: environment_details.evm_payment_token_address,
+                    evm_rpc_url: environment_details.evm_rpc_url,
                     evm_network: environment_details.evm_network,
                     funding_wallet_secret_key,
                     uploaders_count: None,
@@ -1838,15 +1831,25 @@ async fn main() -> Result<()> {
                     EvmNetwork::ArbitrumOne => Network::ArbitrumOne,
                     EvmNetwork::ArbitrumSepolia => Network::ArbitrumSepolia,
                     EvmNetwork::Custom => {
-                        let custom_evm_details =
-                            environment_details.evm_testnet_data.ok_or_else(|| {
-                                eyre!("Custom EVM details not found in the environment details")
-                            })?;
-                        Network::new_custom(
-                            &custom_evm_details.rpc_url,
-                            &custom_evm_details.payment_token_address,
-                            &custom_evm_details.data_payments_address,
-                        )
+                        if let (
+                            Some(emv_data_payments_address),
+                            Some(evm_payment_token_address),
+                            Some(evm_rpc_url),
+                        ) = (
+                            environment_details.evm_data_payments_address,
+                            environment_details.evm_payment_token_address,
+                            environment_details.evm_rpc_url,
+                        ) {
+                            Network::new_custom(
+                                &evm_rpc_url,
+                                &evm_payment_token_address,
+                                &emv_data_payments_address,
+                            )
+                        } else {
+                            return Err(eyre!(
+                                "Custom EVM details not found in the environment details"
+                            ));
+                        }
                     }
                 };
 

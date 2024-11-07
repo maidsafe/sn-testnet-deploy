@@ -84,7 +84,7 @@ pub enum DeploymentType {
 }
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
-pub struct EvmCustomTestnetData {
+pub struct LocalEvmNodeData {
     pub data_payments_address: String,
     pub deployer_wallet_private_key: String,
     pub payment_token_address: String,
@@ -191,7 +191,9 @@ pub struct EnvironmentDetails {
     pub deployment_type: DeploymentType,
     pub environment_type: EnvironmentType,
     pub evm_network: EvmNetwork,
-    pub evm_testnet_data: Option<EvmCustomTestnetData>,
+    pub evm_data_payments_address: Option<String>,
+    pub evm_payment_token_address: Option<String>,
+    pub evm_rpc_url: Option<String>,
     pub funding_wallet_address: Option<String>,
     pub rewards_address: String,
 }
@@ -937,10 +939,10 @@ pub fn get_genesis_multiaddr(
     Ok((multiaddr, genesis_ip))
 }
 
-pub fn get_evm_testnet_data(
+pub fn get_local_evm_node_data(
     ansible_runner: &AnsibleRunner,
     ssh_client: &SshClient,
-) -> Result<EvmCustomTestnetData> {
+) -> Result<LocalEvmNodeData> {
     let evm_inventory = ansible_runner.get_inventory(AnsibleInventoryType::EvmNodes, true)?;
     if evm_inventory.is_empty() {
         return Err(Error::EvmNodeNotFound);
@@ -963,7 +965,7 @@ pub fn get_evm_testnet_data(
                         ));
                     }
 
-                    let evm_testnet_data = EvmCustomTestnetData {
+                    let evm_testnet_data = LocalEvmNodeData {
                         rpc_url: parts[0].trim().to_string(),
                         payment_token_address: parts[1].trim().to_string(),
                         data_payments_address: parts[2].trim().to_string(),

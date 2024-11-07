@@ -973,19 +973,34 @@ impl DeploymentInventory {
             }
         }
 
-        if let Some(evm_testnet_data) = &self.environment_details.evm_testnet_data {
-            println!("==================");
-            println!("Custom EVM Details");
-            println!("==================");
+        if self.environment_details.evm_data_payments_address.is_some()
+            || self.environment_details.evm_payment_token_address.is_some()
+            || self.environment_details.evm_rpc_url.is_some()
+        {
+            println!("===========");
+            println!("EVM Details");
+            println!("===========");
             println!(
                 "EVM data payments address: {}",
-                evm_testnet_data.data_payments_address
+                self.environment_details
+                    .evm_data_payments_address
+                    .as_ref()
+                    .map_or("N/A", |addr| addr)
             );
             println!(
                 "EVM payment token address: {}",
-                evm_testnet_data.payment_token_address
+                self.environment_details
+                    .evm_payment_token_address
+                    .as_ref()
+                    .map_or("N/A", |addr| addr)
             );
-            println!("EVM RPC URL: {}", evm_testnet_data.rpc_url);
+            println!(
+                "EVM RPC URL: {}",
+                self.environment_details
+                    .evm_rpc_url
+                    .as_ref()
+                    .map_or("N/A", |addr| addr)
+            );
         }
 
         Ok(())

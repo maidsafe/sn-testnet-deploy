@@ -7,7 +7,7 @@
 use crate::inventory::VirtualMachine;
 use crate::NodeType;
 use crate::{ansible::provisioning::ProvisionOptions, CloudProvider, EvmNetwork};
-use crate::{BinaryOption, Error, EvmCustomTestnetData, Result};
+use crate::{BinaryOption, Error, Result};
 use alloy::hex::ToHexExt;
 use alloy::signers::local::PrivateKeySigner;
 use serde_json::Value;
@@ -293,7 +293,6 @@ pub fn build_node_extra_vars_doc(
     bootstrap_multiaddr: Option<String>,
     node_instance_count: u16,
     evm_network: EvmNetwork,
-    evm_testnet_data: Option<EvmCustomTestnetData>,
 ) -> Result<String> {
     let mut extra_vars = ExtraVarsDocBuilder::default();
     extra_vars.add_variable("provider", cloud_provider);
@@ -351,10 +350,14 @@ pub fn build_node_extra_vars_doc(
 
     extra_vars.add_variable("rewards_address", &options.rewards_address);
     extra_vars.add_variable("evm_network_type", &evm_network.to_string());
-    if let Some(evm_data) = evm_testnet_data {
-        extra_vars.add_variable("evm_rpc_url", &evm_data.rpc_url);
-        extra_vars.add_variable("evm_payment_token_address", &evm_data.payment_token_address);
-        extra_vars.add_variable("evm_data_payments_address", &evm_data.data_payments_address);
+    if let Some(evm_data_payment_token_address) = &options.evm_data_payments_address {
+        extra_vars.add_variable("evm_data_payments_address", evm_data_payment_token_address);
+    }
+    if let Some(evm_payment_token_address) = &options.evm_payment_token_address {
+        extra_vars.add_variable("evm_payment_token_address", evm_payment_token_address);
+    }
+    if let Some(evm_rpc_url) = &options.evm_rpc_url {
+        extra_vars.add_variable("evm_rpc_url", evm_rpc_url);
     }
 
     Ok(extra_vars.build())
@@ -377,7 +380,6 @@ pub fn build_uploaders_extra_vars_doc(
     cloud_provider: &str,
     options: &ProvisionOptions,
     genesis_multiaddr: &str,
-    evm_testnet_data: Option<EvmCustomTestnetData>,
     sk_map: &HashMap<VirtualMachine, Vec<PrivateKeySigner>>,
 ) -> Result<String> {
     let mut extra_vars: ExtraVarsDocBuilder = ExtraVarsDocBuilder::default();
@@ -398,16 +400,14 @@ pub fn build_uploaders_extra_vars_doc(
         &options.uploaders_count.unwrap_or(1).to_string(),
     );
     extra_vars.add_variable("evm_network_type", &options.evm_network.to_string());
-    if let Some(evm_testnet_data) = &evm_testnet_data {
-        extra_vars.add_variable("evm_rpc_url", &evm_testnet_data.rpc_url);
-        extra_vars.add_variable(
-            "evm_payment_token_address",
-            &evm_testnet_data.payment_token_address,
-        );
-        extra_vars.add_variable(
-            "evm_data_payments_address",
-            &evm_testnet_data.data_payments_address,
-        );
+    if let Some(evm_data_payment_token_address) = &options.evm_data_payments_address {
+        extra_vars.add_variable("evm_data_payments_address", evm_data_payment_token_address);
+    }
+    if let Some(evm_payment_token_address) = &options.evm_payment_token_address {
+        extra_vars.add_variable("evm_payment_token_address", evm_payment_token_address);
+    }
+    if let Some(evm_rpc_url) = &options.evm_rpc_url {
+        extra_vars.add_variable("evm_rpc_url", evm_rpc_url);
     }
 
     let mut serde_map = serde_json::Map::new();

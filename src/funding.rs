@@ -5,7 +5,6 @@
 // Please see the LICENSE file for more details.
 
 use crate::error::Result;
-use crate::EvmCustomTestnetData;
 use crate::{
     ansible::{inventory::AnsibleInventoryType, provisioning::AnsibleProvisioner},
     error::Error,
@@ -26,7 +25,12 @@ const DEFAULT_GAS_AMOUNT: &str = "100_000_000_000_000_000";
 
 pub struct FundingOptions {
     pub evm_network: EvmNetwork,
-    pub custom_evm_testnet_data: Option<EvmCustomTestnetData>,
+    /// For custom network
+    pub evm_data_payments_address: Option<String>,
+    /// For custom network
+    pub evm_payment_token_address: Option<String>,
+    /// For custom network
+    pub evm_rpc_url: Option<String>,
     pub funding_wallet_secret_key: Option<String>,
     /// Have to specify during upscale and deploy
     pub uploaders_count: Option<u16>,
@@ -317,18 +321,30 @@ impl AnsibleProvisioner {
 
         let from_wallet = match &options.evm_network {
             EvmNetwork::Custom => {
-                let evm_testnet_data =
-                    options.custom_evm_testnet_data.as_ref().ok_or_else(|| {
-                        error!("Custom Evm testnet data not provided");
-                        Error::EvmTestnetDataNotFound
-                    })?;
-                let network = Network::new_custom(
-                    &evm_testnet_data.rpc_url,
-                    &evm_testnet_data.payment_token_address,
-                    &evm_testnet_data.data_payments_address,
-                );
-                let deployer_wallet_sk: PrivateKeySigner = evm_testnet_data
-                    .deployer_wallet_private_key
+                let network = if let (
+                    Some(evm_data_payments_address),
+                    Some(evm_payment_token_address),
+                    Some(evm_rpc_url),
+                ) = (
+                    options.evm_data_payments_address.as_ref(),
+                    options.evm_payment_token_address.as_ref(),
+                    options.evm_rpc_url.as_ref(),
+                ) {
+                    Network::new_custom(
+                        evm_rpc_url,
+                        evm_payment_token_address,
+                        evm_data_payments_address,
+                    )
+                } else {
+                    error!("Custom evm network data not provided");
+                    return Err(Error::EvmTestnetDataNotFound);
+                };
+
+                let Some(deployer_wallet_sk) = &options.funding_wallet_secret_key else {
+                    error!("Deployer wallet secret key not provided");
+                    return Err(Error::SecretKeyNotFound);
+                };
+                let deployer_wallet_sk: PrivateKeySigner = deployer_wallet_sk
                     .parse()
                     .map_err(|_| Error::FailedToParseKey)?;
 
