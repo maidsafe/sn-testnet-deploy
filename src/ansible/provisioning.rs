@@ -15,8 +15,8 @@ use crate::{
     error::{Error, Result},
     funding::FundingOptions,
     inventory::{DeploymentNodeRegistries, VirtualMachine},
-    print_duration, BinaryOption, CloudProvider, EvmCustomTestnetData, EvmNetwork, LogFormat,
-    NodeType, SshClient, UpgradeOptions,
+    print_duration, BinaryOption, CloudProvider, EvmNetwork, LogFormat, NodeType, SshClient,
+    UpgradeOptions,
 };
 use evmlib::common::U256;
 use log::{debug, error, trace};
@@ -41,7 +41,11 @@ pub struct ProvisionOptions {
     pub chunk_size: Option<u64>,
     pub downloaders_count: u16,
     pub env_variables: Option<Vec<(String, String)>>,
+    pub evm_data_payments_address: Option<String>,
     pub evm_network: EvmNetwork,
+    pub evm_payment_token_address: Option<String>,
+    pub evm_rpc_url: Option<String>,
+    /// Used to fund the uploaders.
     pub funding_wallet_secret_key: Option<String>,
     pub gas_amount: Option<U256>,
     pub interval: Duration,
@@ -72,7 +76,10 @@ impl From<BootstrapOptions> for ProvisionOptions {
             chunk_size: bootstrap_options.chunk_size,
             downloaders_count: 0,
             env_variables: bootstrap_options.env_variables,
+            evm_data_payments_address: bootstrap_options.evm_data_payments_address,
             evm_network: bootstrap_options.evm_network,
+            evm_payment_token_address: bootstrap_options.evm_payment_token_address,
+            evm_rpc_url: bootstrap_options.evm_rpc_url,
             funding_wallet_secret_key: None,
             gas_amount: None,
             interval: bootstrap_options.interval,
@@ -102,7 +109,10 @@ impl From<DeployOptions> for ProvisionOptions {
             chunk_size: deploy_options.chunk_size,
             downloaders_count: deploy_options.downloaders_count,
             env_variables: deploy_options.env_variables,
+            evm_data_payments_address: deploy_options.evm_data_payments_address,
             evm_network: deploy_options.evm_network,
+            evm_payment_token_address: deploy_options.evm_payment_token_address,
+            evm_rpc_url: deploy_options.evm_rpc_url,
             funding_wallet_secret_key: deploy_options.funding_wallet_secret_key,
             gas_amount: None,
             interval: deploy_options.interval,
@@ -278,11 +288,7 @@ impl AnsibleProvisioner {
         Ok(())
     }
 
-    pub fn provision_genesis_node(
-        &self,
-        options: &ProvisionOptions,
-        evm_testnet_data: Option<EvmCustomTestnetData>,
-    ) -> Result<()> {
+    pub fn provision_genesis_node(&self, options: &ProvisionOptions) -> Result<()> {
         let start = Instant::now();
         let genesis_inventory = self
             .ansible_runner
@@ -300,7 +306,6 @@ impl AnsibleProvisioner {
                 None,
                 1,
                 options.evm_network.clone(),
-                evm_testnet_data,
             )?),
         )?;
         print_duration(start.elapsed());
@@ -344,7 +349,6 @@ impl AnsibleProvisioner {
         options: &ProvisionOptions,
         initial_contact_peer: &str,
         node_type: NodeType,
-        evm_testnet_data: Option<EvmCustomTestnetData>,
     ) -> Result<()> {
         let start = Instant::now();
         let (inventory_type, node_count) = match &node_type {
@@ -393,7 +397,6 @@ impl AnsibleProvisioner {
                 Some(initial_contact_peer.to_string()),
                 node_count,
                 options.evm_network.clone(),
-                evm_testnet_data,
             )?),
         )?;
         print_duration(start.elapsed());
@@ -404,7 +407,6 @@ impl AnsibleProvisioner {
         &self,
         options: &mut ProvisionOptions,
         initial_contact_peer: &str,
-        evm_testnet_data: Option<EvmCustomTestnetData>,
     ) -> Result<()> {
         let start = Instant::now();
 
@@ -431,12 +433,7 @@ impl AnsibleProvisioner {
             error!("Failed to generate private node static inv with err: {err:?}")
         })?;
 
-        self.provision_nodes(
-            options,
-            initial_contact_peer,
-            NodeType::Private,
-            evm_testnet_data,
-        )?;
+        self.provision_nodes(options, initial_contact_peer, NodeType::Private)?;
 
         print_duration(start.elapsed());
         Ok(())
@@ -466,13 +463,14 @@ impl AnsibleProvisioner {
         &self,
         options: &ProvisionOptions,
         genesis_multiaddr: &str,
-        evm_testnet_data: Option<EvmCustomTestnetData>,
     ) -> Result<()> {
         let start = Instant::now();
 
         let sk_map = self
             .deposit_funds_to_uploaders(&FundingOptions {
-                custom_evm_testnet_data: evm_testnet_data.clone(),
+                evm_data_payments_address: options.evm_data_payments_address.clone(),
+                evm_payment_token_address: options.evm_payment_token_address.clone(),
+                evm_rpc_url: options.evm_rpc_url.clone(),
                 uploaders_count: options.uploaders_count,
                 evm_network: options.evm_network.clone(),
                 funding_wallet_secret_key: options.funding_wallet_secret_key.clone(),
@@ -491,7 +489,6 @@ impl AnsibleProvisioner {
                 &self.cloud_provider.to_string(),
                 options,
                 genesis_multiaddr,
-                evm_testnet_data,
                 &sk_map,
             )?),
         )?;

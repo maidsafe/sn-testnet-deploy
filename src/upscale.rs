@@ -5,8 +5,7 @@
 // Please see the LICENSE file for more details.
 
 use crate::{
-    ansible::inventory::AnsibleInventoryType,
-    ansible::provisioning::ProvisionOptions,
+    ansible::{inventory::AnsibleInventoryType, provisioning::ProvisionOptions},
     error::{Error, Result},
     get_genesis_multiaddr, get_multiaddr, DeploymentInventory, DeploymentType, EvmNetwork,
     InfraRunOptions, NodeType, TestnetDeployer,
@@ -220,6 +219,21 @@ impl TestnetDeployer {
                 .environment_details
                 .evm_network
                 .clone(),
+            evm_data_payments_address: options
+                .current_inventory
+                .environment_details
+                .evm_data_payments_address
+                .clone(),
+            evm_payment_token_address: options
+                .current_inventory
+                .environment_details
+                .evm_payment_token_address
+                .clone(),
+            evm_rpc_url: options
+                .current_inventory
+                .environment_details
+                .evm_rpc_url
+                .clone(),
             funding_wallet_secret_key: options.funding_wallet_secret_key.clone(),
             interval: options.interval,
             log_format: None,
@@ -263,12 +277,6 @@ impl TestnetDeployer {
         };
         debug!("Retrieved initial peer {initial_multiaddr}");
 
-        let evm_testnet_data = options
-            .current_inventory
-            .environment_details
-            .evm_testnet_data
-            .clone();
-
         let should_provision_private_nodes = desired_private_node_vm_count > 0;
         let mut n = 1;
         let mut total = if is_bootstrap_deploy { 3 } else { 4 };
@@ -290,7 +298,6 @@ impl TestnetDeployer {
                 &provision_options,
                 &initial_multiaddr,
                 NodeType::Bootstrap,
-                evm_testnet_data.clone(),
             ) {
                 Ok(()) => {
                     println!("Provisioned bootstrap nodes");
@@ -313,7 +320,6 @@ impl TestnetDeployer {
             &provision_options,
             &initial_multiaddr,
             NodeType::Generic,
-            evm_testnet_data.clone(),
         ) {
             Ok(()) => {
                 println!("Provisioned normal nodes");
@@ -356,11 +362,10 @@ impl TestnetDeployer {
             )?;
             self.ansible_provisioner
                 .print_ansible_run_banner(n, total, "Provision Private Nodes");
-            match self.ansible_provisioner.provision_private_nodes(
-                &mut provision_options,
-                &initial_multiaddr,
-                None,
-            ) {
+            match self
+                .ansible_provisioner
+                .provision_private_nodes(&mut provision_options, &initial_multiaddr)
+            {
                 Ok(()) => {
                     println!("Provisioned private nodes");
                 }
@@ -380,7 +385,7 @@ impl TestnetDeployer {
             self.ansible_provisioner
                 .print_ansible_run_banner(n, total, "Provision Uploaders");
             self.ansible_provisioner
-                .provision_uploaders(&provision_options, &initial_multiaddr, evm_testnet_data)
+                .provision_uploaders(&provision_options, &initial_multiaddr)
                 .await
                 .map_err(|err| {
                     println!("Failed to provision uploaders {err:?}");
@@ -484,10 +489,25 @@ impl TestnetDeployer {
             chunk_size: None,
             downloaders_count: options.downloaders_count,
             env_variables: None,
+            evm_data_payments_address: options
+                .current_inventory
+                .environment_details
+                .evm_data_payments_address
+                .clone(),
             evm_network: options
                 .current_inventory
                 .environment_details
                 .evm_network
+                .clone(),
+            evm_payment_token_address: options
+                .current_inventory
+                .environment_details
+                .evm_payment_token_address
+                .clone(),
+            evm_rpc_url: options
+                .current_inventory
+                .environment_details
+                .evm_rpc_url
                 .clone(),
             funding_wallet_secret_key: options.funding_wallet_secret_key.clone(),
             interval: options.interval,
@@ -515,12 +535,6 @@ impl TestnetDeployer {
             gas_amount: options.gas_amount,
         };
 
-        let evm_testnet_data = options
-            .current_inventory
-            .environment_details
-            .evm_testnet_data
-            .clone();
-
         self.wait_for_ssh_availability_on_new_machines(
             AnsibleInventoryType::Uploaders,
             &options.current_inventory,
@@ -528,7 +542,7 @@ impl TestnetDeployer {
         self.ansible_provisioner
             .print_ansible_run_banner(1, 1, "Provision Uploaders");
         self.ansible_provisioner
-            .provision_uploaders(&provision_options, &initial_multiaddr, evm_testnet_data)
+            .provision_uploaders(&provision_options, &initial_multiaddr)
             .await
             .map_err(|err| {
                 println!("Failed to provision uploaders {err:?}");

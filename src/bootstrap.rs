@@ -10,7 +10,7 @@ use crate::{
     ansible::{inventory::AnsibleInventoryType, provisioning::ProvisionOptions},
     error::Result,
     write_environment_details, BinaryOption, DeploymentType, EnvironmentDetails, EnvironmentType,
-    EvmCustomTestnetData, EvmNetwork, InfraRunOptions, LogFormat, NodeType, TestnetDeployer,
+    EvmNetwork, InfraRunOptions, LogFormat, NodeType, TestnetDeployer,
 };
 use colored::Colorize;
 
@@ -21,8 +21,10 @@ pub struct BootstrapOptions {
     pub chunk_size: Option<u64>,
     pub environment_type: EnvironmentType,
     pub env_variables: Option<Vec<(String, String)>>,
+    pub evm_data_payments_address: Option<String>,
     pub evm_network: EvmNetwork,
-    pub evm_custom_testnet_data: Option<EvmCustomTestnetData>,
+    pub evm_payment_token_address: Option<String>,
+    pub evm_rpc_url: Option<String>,
     pub interval: Duration,
     pub log_format: Option<LogFormat>,
     pub max_archived_log_files: u16,
@@ -59,7 +61,9 @@ impl TestnetDeployer {
                 deployment_type: DeploymentType::Bootstrap,
                 environment_type: options.environment_type.clone(),
                 evm_network: options.evm_network.clone(),
-                evm_testnet_data: options.evm_custom_testnet_data.clone(),
+                evm_data_payments_address: options.evm_data_payments_address.clone(),
+                evm_payment_token_address: options.evm_payment_token_address.clone(),
+                evm_rpc_url: options.evm_rpc_url.clone(),
                 funding_wallet_address: None,
                 rewards_address: options.rewards_address.clone(),
             },
@@ -113,7 +117,6 @@ impl TestnetDeployer {
             &provision_options,
             &options.bootstrap_peer,
             NodeType::Generic,
-            options.evm_custom_testnet_data.clone(),
         ) {
             Ok(()) => {
                 println!("Provisioned normal nodes");
@@ -148,11 +151,10 @@ impl TestnetDeployer {
 
             self.ansible_provisioner
                 .print_ansible_run_banner(n, total, "Provision Private Nodes");
-            match self.ansible_provisioner.provision_private_nodes(
-                &mut provision_options,
-                &options.bootstrap_peer,
-                options.evm_custom_testnet_data.clone(),
-            ) {
+            match self
+                .ansible_provisioner
+                .provision_private_nodes(&mut provision_options, &options.bootstrap_peer)
+            {
                 Ok(()) => {
                     println!("Provisioned private nodes");
                 }
