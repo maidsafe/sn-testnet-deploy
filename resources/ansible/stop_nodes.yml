@@ -1,9 +1,15 @@
 ---
-- name: ensure all nodes are stopped using the node manager
+- name: stop nodes using the node manager
   hosts: all
   become: True
   vars:
     interval: "{{ interval }}"
   tasks:
-    - name: stop all nodes
-      ansible.builtin.command: safenode-manager stop --interval {{ interval }}
+    - name: stop nodes
+      ansible.builtin.shell: |
+        {% if delay is defined %}
+        sleep {{ delay | default(0) }}
+        {% endif %}
+        safenode-manager stop --interval {{ interval }}
+      args:
+        executable: /bin/bash
