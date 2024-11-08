@@ -394,7 +394,7 @@ impl DeploymentInventoryService {
         let bootstrap_peers = inventory
             .bootstrap_node_vms
             .iter()
-            .flat_map(|vm| vm.node_multiaddr.clone())
+            .flat_map(|vm| vm.get_quic_addresses())
             .collect::<Vec<_>>();
         let bootstrap_peers_len = bootstrap_peers.len();
         for peer in bootstrap_peers
@@ -410,7 +410,7 @@ impl DeploymentInventoryService {
             let node_peers = inventory
                 .node_vms
                 .iter()
-                .flat_map(|vm| vm.node_multiaddr.clone())
+                .flat_map(|vm| vm.get_quic_addresses())
                 .collect::<Vec<_>>();
             for peer in node_peers
                 .iter()
@@ -470,25 +470,18 @@ impl NodeVirtualMachine {
             };
 
             let node_vm = Self {
-                vm: vm.clone(),
-                node_multiaddr: node_registry
+                node_count: node_registry.nodes.len(),
+                node_listen_addresses: node_registry
                     .nodes
                     .iter()
                     .map(|node| {
                         if let Some(listen_addresses) = &node.listen_addr {
-                            // Find the public address with quic-v1 protocol
                             listen_addresses
                                 .iter()
-                                .find(|&addr| {
-                                    let addr_str = addr.to_string();
-                                    addr_str.contains("/quic-v1")
-                                        && !addr_str.starts_with("/ip4/127.0.0.1")
-                                        && !addr_str.starts_with("/ip4/10.")
-                                })
                                 .map(|addr| addr.to_string())
-                                .unwrap_or_else(|| UNAVAILABLE_NODE.to_string())
+                                .collect()
                         } else {
-                            UNAVAILABLE_NODE.to_string()
+                            vec![UNAVAILABLE_NODE.to_string()]
                         }
                     })
                     .collect(),
@@ -508,10 +501,28 @@ impl NodeVirtualMachine {
                     .daemon
                     .as_ref()
                     .and_then(|daemon| daemon.endpoint),
+                vm: vm.clone(),
             };
             node_vms.push(node_vm);
         }
         node_vms
+    }
+
+    pub fn get_quic_addresses(&self) -> Vec<String> {
+        self.node_listen_addresses
+            .iter()
+            .map(|addresses| {
+                addresses
+                    .iter()
+                    .find(|addr| {
+                        addr.contains("/quic-v1")
+                            && !addr.starts_with("/ip4/127.0.0.1")
+                            && !addr.starts_with("/ip4/10.")
+                    })
+                    .map(|s| s.to_string())
+                    .unwrap_or_else(|| UNAVAILABLE_NODE.to_string())
+            })
+            .collect()
     }
 }
 
@@ -528,15 +539,10 @@ pub struct UploaderVirtualMachine {
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct NodeVirtualMachine {
     pub vm: VirtualMachine,
-    pub node_multiaddr: Vec<String>,
+    pub node_count: usize,
+    pub node_listen_addresses: Vec<Vec<String>>,
     pub rpc_endpoint: HashMap<String, SocketAddr>,
     pub safenodemand_endpoint: Option<SocketAddr>,
-}
-
-impl NodeVirtualMachine {
-    pub fn node_count(&self) -> usize {
-        self.node_multiaddr.len()
-    }
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq, Hash)]
@@ -690,22 +696,22 @@ impl DeploymentInventory {
         list.extend(
             self.bootstrap_node_vms
                 .iter()
-                .flat_map(|node_vm| node_vm.node_multiaddr.clone()),
+                .flat_map(|node_vm| node_vm.get_quic_addresses()),
         );
         list.extend(
             self.genesis_vm
                 .iter()
-                .flat_map(|node_vm| node_vm.node_multiaddr.clone()),
+                .flat_map(|node_vm| node_vm.get_quic_addresses()),
         );
-        let iter = self
-            .node_vms
-            .iter()
-            .flat_map(|node_vm| node_vm.node_multiaddr.clone());
-        list.extend(iter);
+        list.extend(
+            self.node_vms
+                .iter()
+                .flat_map(|node_vm| node_vm.get_quic_addresses()),
+        );
         list.extend(
             self.private_node_vms
                 .iter()
-                .flat_map(|node_vm| node_vm.node_multiaddr.clone()),
+                .flat_map(|node_vm| node_vm.get_quic_addresses()),
         );
         list
     }
@@ -735,7 +741,7 @@ impl DeploymentInventory {
 
     pub fn bootstrap_node_count(&self) -> usize {
         if let Some(first_vm) = self.bootstrap_node_vms.first() {
-            first_vm.node_count()
+            first_vm.node_count
         } else {
             0
         }
@@ -743,7 +749,7 @@ impl DeploymentInventory {
 
     pub fn genesis_node_count(&self) -> usize {
         if let Some(genesis_vm) = &self.genesis_vm {
-            genesis_vm.node_count()
+            genesis_vm.node_count
         } else {
             0
         }
@@ -751,7 +757,7 @@ impl DeploymentInventory {
 
     pub fn node_count(&self) -> usize {
         if let Some(first_vm) = self.node_vms.first() {
-            first_vm.node_count()
+            first_vm.node_count
         } else {
             0
         }
@@ -759,13 +765,13 @@ impl DeploymentInventory {
 
     pub fn private_node_count(&self) -> usize {
         if let Some(first_vm) = self.private_node_vms.first() {
-            first_vm.node_count()
+            first_vm.node_count
         } else {
             0
         }
     }
 
-    pub fn print_report(&self) -> Result<()> {
+    pub fn print_report(&self, full: bool) -> Result<()> {
         println!("**************************************");
         println!("*                                    *");
         println!("*          Inventory Report          *");
@@ -893,12 +899,43 @@ impl DeploymentInventory {
         println!("SSH user: {}", self.ssh_user);
         println!();
 
-        // If there are no bootstrap nodes, it's a bootstrap deploy, and in that case, we're not
-        // really interested in available peers.
-        if !self.bootstrap_node_vms.is_empty() {
-            // Take the first peer from each VM. If you just take, say, the first 10 on the peer list,
-            // they will all be from the same machine. They will be unique peers, but they won't look
-            // very random.
+        if full {
+            println!("===============");
+            println!("Full Peer List");
+            println!("===============");
+            let mut quic_listeners = Vec::new();
+            let mut ws_listeners = Vec::new();
+
+            for node_vm in self.bootstrap_node_vms.iter().chain(self.node_vms.iter()) {
+                for addresses in &node_vm.node_listen_addresses {
+                    for addr in addresses {
+                        if !addr.starts_with("/ip4/127.0.0.1") && !addr.starts_with("/ip4/10.") {
+                            if addr.contains("/quic") {
+                                quic_listeners.push(addr.clone());
+                            } else if addr.contains("/ws") {
+                                ws_listeners.push(addr.clone());
+                            }
+                        }
+                    }
+                }
+            }
+
+            if !quic_listeners.is_empty() {
+                println!("QUIC:");
+                for addr in quic_listeners {
+                    println!("  {addr}");
+                }
+                println!();
+            }
+
+            if !ws_listeners.is_empty() {
+                println!("Websocket:");
+                for addr in ws_listeners {
+                    println!("  {addr}");
+                }
+                println!();
+            }
+        } else {
             println!("============");
             println!("Sample Peers");
             println!("============");
@@ -911,8 +948,8 @@ impl DeploymentInventory {
                         println!("{peer}");
                     }
                 });
-            println!();
         }
+        println!();
 
         println!(
             "Genesis: {}",

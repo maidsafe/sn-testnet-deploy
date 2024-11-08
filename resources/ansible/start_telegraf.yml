@@ -3,7 +3,7 @@
   hosts: all
   become: True
   tasks:
-    - name: stop telegraf service
+    - name: start telegraf service
       systemd:
         name: telegraf
         enabled: yes
