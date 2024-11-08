@@ -525,6 +525,9 @@ enum Commands {
         /// This is useful if the testnet was created on another machine.
         #[clap(long, default_value_t = false)]
         force_regeneration: bool,
+        /// If set to true, all non-local listener addresses will be printed for each peer.
+        #[clap(long, default_value_t = false)]
+        full: bool,
         /// The name of the environment
         #[arg(short = 'n', long)]
         name: String,
@@ -1472,7 +1475,7 @@ async fn main() -> Result<()> {
             let new_inventory = inventory_service
                 .generate_or_retrieve_inventory(&name, true, None)
                 .await?;
-            new_inventory.print_report()?;
+            new_inventory.print_report(false)?;
             new_inventory.save()?;
             Ok(())
         }
@@ -1672,7 +1675,7 @@ async fn main() -> Result<()> {
                 }
             };
 
-            inventory.print_report()?;
+            inventory.print_report(false)?;
             inventory.save()?;
 
             inventory_service
@@ -1849,6 +1852,7 @@ async fn main() -> Result<()> {
         },
         Commands::Inventory {
             force_regeneration,
+            full,
             name,
             network_contacts_file_name,
             provider,
@@ -1862,7 +1866,7 @@ async fn main() -> Result<()> {
             let inventory = inventory_service
                 .generate_or_retrieve_inventory(&name, force_regeneration, None)
                 .await?;
-            inventory.print_report()?;
+            inventory.print_report(full)?;
             inventory.save()?;
 
             inventory_service
@@ -2583,7 +2587,7 @@ async fn main() -> Result<()> {
                     }
                 };
 
-                inventory.print_report()?;
+                inventory.print_report(false)?;
                 inventory.save()?;
 
                 Ok(())
@@ -2718,7 +2722,7 @@ async fn main() -> Result<()> {
                 }
             };
 
-            inventory.print_report()?;
+            inventory.print_report(false)?;
             inventory.save()?;
 
             Ok(())
