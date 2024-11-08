@@ -996,6 +996,45 @@ impl DeploymentInventory {
             .find(|vm| vm.name.contains("genesis"))
             .map(|vm| vm.public_ip_addr)
     }
+
+    pub fn print_bootstrap_listeners(&self) {
+        println!("=======================");
+        println!("Bootstrap Node Listeners");
+        println!("=======================");
+
+        let mut quic_listeners = Vec::new();
+        let mut ws_listeners = Vec::new();
+
+        for node_vm in &self.bootstrap_node_vms {
+            for addresses in &node_vm.node_listen_addresses {
+                for addr in addresses {
+                    if !addr.starts_with("/ip4/127.0.0.1") && !addr.starts_with("/ip4/10.") {
+                        if addr.contains("/quic") {
+                            quic_listeners.push(addr.clone());
+                        } else if addr.contains("/ws") {
+                            ws_listeners.push(addr.clone());
+                        }
+                    }
+                }
+            }
+        }
+
+        if !quic_listeners.is_empty() {
+            println!("QUIC:");
+            for addr in quic_listeners {
+                println!("  {addr}");
+            }
+            println!();
+        }
+
+        if !ws_listeners.is_empty() {
+            println!("Websocket:");
+            for addr in ws_listeners {
+                println!("  {addr}");
+            }
+            println!();
+        }
+    }
 }
 
 pub fn get_data_directory() -> Result<PathBuf> {

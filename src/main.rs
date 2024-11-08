@@ -520,6 +520,9 @@ enum Commands {
     #[clap(name = "funds", subcommand)]
     Funds(FundsCommand),
     Inventory {
+        /// If set to true, only print the bootstrap listeners.
+        #[clap(long, default_value_t = false)]
+        bootstrap: bool,
         /// If set to true, the inventory will be regenerated.
         ///
         /// This is useful if the testnet was created on another machine.
@@ -1851,6 +1854,7 @@ async fn main() -> Result<()> {
             }
         },
         Commands::Inventory {
+            bootstrap,
             force_regeneration,
             full,
             name,
@@ -1866,7 +1870,13 @@ async fn main() -> Result<()> {
             let inventory = inventory_service
                 .generate_or_retrieve_inventory(&name, force_regeneration, None)
                 .await?;
-            inventory.print_report(full)?;
+
+            if bootstrap {
+                inventory.print_bootstrap_listeners();
+            } else {
+                inventory.print_report(full)?;
+            }
+
             inventory.save()?;
 
             inventory_service
