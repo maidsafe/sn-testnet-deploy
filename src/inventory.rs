@@ -21,6 +21,7 @@ use crate::{
 };
 use alloy::hex::ToHexExt;
 use color_eyre::{eyre::eyre, Result};
+use log::debug;
 use rand::seq::{IteratorRandom, SliceRandom};
 use semver::Version;
 use serde::{Deserialize, Serialize};
@@ -998,9 +999,9 @@ impl DeploymentInventory {
     }
 
     pub fn print_bootstrap_listeners(&self) {
-        println!("=======================");
+        println!("========================");
         println!("Bootstrap Node Listeners");
-        println!("=======================");
+        println!("========================");
 
         let mut quic_listeners = Vec::new();
         let mut ws_listeners = Vec::new();
@@ -1010,27 +1011,32 @@ impl DeploymentInventory {
                 for addr in addresses {
                     if !addr.starts_with("/ip4/127.0.0.1") && !addr.starts_with("/ip4/10.") {
                         if addr.contains("/quic") {
-                            quic_listeners.push(addr.clone());
+                            quic_listeners.push((node_vm.vm.name.clone(), addr.clone()));
                         } else if addr.contains("/ws") {
-                            ws_listeners.push(addr.clone());
+                            ws_listeners.push((node_vm.vm.name.clone(), addr.clone()));
                         }
                     }
                 }
             }
         }
 
+        quic_listeners.sort_by(|a, b| a.0.cmp(&b.0));
+        ws_listeners.sort_by(|a, b| a.0.cmp(&b.0));
+
         if !quic_listeners.is_empty() {
             println!("QUIC:");
-            for addr in quic_listeners {
+            for (vm_name, addr) in &quic_listeners {
                 println!("  {addr}");
+                debug!("  {vm_name}: {addr}");
             }
             println!();
         }
 
         if !ws_listeners.is_empty() {
             println!("Websocket:");
-            for addr in ws_listeners {
+            for (vm_name, addr) in &ws_listeners {
                 println!("  {addr}");
+                debug!("  {vm_name}: {addr}");
             }
             println!();
         }
