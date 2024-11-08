@@ -731,12 +731,14 @@ impl TestnetDeployer {
         interval: Duration,
         node_type: Option<NodeType>,
         custom_inventory: Option<Vec<VirtualMachine>>,
+        delay: Option<u64>,
     ) -> Result<()> {
         self.ansible_provisioner.stop_nodes(
             &self.environment_name,
             interval,
             node_type,
             custom_inventory,
+            delay,
         )?;
         Ok(())
     }

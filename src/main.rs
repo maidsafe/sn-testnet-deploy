@@ -643,6 +643,11 @@ enum Commands {
         /// This will stop nodes on a particular subset of VMs.
         #[clap(name = "custom-inventory", long, use_value_delimiter = true)]
         custom_inventory: Option<Vec<String>>,
+        /// Delay in seconds before stopping nodes.
+        ///
+        /// This can be useful when there is one node per machine.
+        #[clap(long)]
+        delay: Option<u64>,
         /// Maximum number of forks Ansible will use to execute tasks on target hosts.
         #[clap(long, default_value_t = 50)]
         forks: usize,
@@ -2184,18 +2189,21 @@ async fn main() -> Result<()> {
         }
         Commands::Stop {
             custom_inventory,
+            delay,
             forks,
             interval,
             name,
             node_type,
             provider,
         } => {
+            // Use a large number of forks for retrieving the inventory from a large deployment.
+            // Then if a smaller number of forks is specified, we will recreate the deployer
+            // with the smaller fork value.
             let testnet_deployer = TestnetDeployBuilder::default()
-                .ansible_forks(forks)
+                .ansible_forks(50)
                 .environment_name(&name)
                 .provider(provider)
                 .build()?;
-
             let inventory_service = DeploymentInventoryService::from(&testnet_deployer);
             let inventory = inventory_service
                 .generate_or_retrieve_inventory(&name, true, None)
@@ -2204,6 +2212,11 @@ async fn main() -> Result<()> {
                 return Err(eyre!("The {name} environment does not exist"));
             }
 
+            let testnet_deployer = TestnetDeployBuilder::default()
+                .ansible_forks(forks)
+                .environment_name(&name)
+                .provider(provider)
+                .build()?;
             let custom_inventory = if let Some(custom_inventory) = custom_inventory {
                 let custom_vms = get_custom_inventory(&inventory, &custom_inventory)?;
                 Some(custom_vms)
@@ -2211,7 +2224,7 @@ async fn main() -> Result<()> {
                 None
             };
 
-            testnet_deployer.stop(interval, node_type, custom_inventory)?;
+            testnet_deployer.stop(interval, node_type, custom_inventory, delay)?;
 
             Ok(())
         }

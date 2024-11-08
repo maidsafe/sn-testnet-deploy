@@ -602,16 +602,21 @@ impl AnsibleProvisioner {
         interval: Duration,
         node_type: Option<NodeType>,
         custom_inventory: Option<Vec<VirtualMachine>>,
+        delay: Option<u64>,
     ) -> Result<()> {
         let mut extra_vars = ExtraVarsDocBuilder::default();
         extra_vars.add_variable("interval", &interval.as_millis().to_string());
+        if let Some(delay) = delay {
+            extra_vars.add_variable("delay", &delay.to_string());
+        }
+        let extra_vars = extra_vars.build();
 
         if let Some(node_type) = node_type {
             println!("Running the stop nodes playbook for {node_type:?} nodes");
             self.ansible_runner.run_playbook(
                 AnsiblePlaybook::StopNodes,
                 node_type.to_ansible_inventory_type(),
-                Some(extra_vars.build()),
+                Some(extra_vars),
             )?;
             return Ok(());
         }
@@ -626,7 +631,7 @@ impl AnsibleProvisioner {
             self.ansible_runner.run_playbook(
                 AnsiblePlaybook::StopNodes,
                 AnsibleInventoryType::Custom,
-                Some(extra_vars.build()),
+                Some(extra_vars),
             )?;
             return Ok(());
         }
@@ -636,7 +641,7 @@ impl AnsibleProvisioner {
             self.ansible_runner.run_playbook(
                 AnsiblePlaybook::StopNodes,
                 node_inv_type,
-                Some(extra_vars.build()),
+                Some(extra_vars.clone()),
             )?;
         }
 
