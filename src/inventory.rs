@@ -266,11 +266,21 @@ impl DeploymentInventoryService {
             };
 
             let safenode_manager_version = {
-                let random_vm = generic_node_vms
-                    .choose(&mut rand::thread_rng())
-                    .ok_or_else(|| {
-                        eyre!("No VMs available to retrieve safenode-manager version")
-                    })?;
+                let mut random_vm = None;
+                if !generic_node_vms.is_empty() {
+                    random_vm = generic_node_vms.first().cloned();
+                } else if !bootstrap_node_vms.is_empty() {
+                    random_vm = bootstrap_node_vms.first().cloned();
+                } else if genesis_vm.is_some() {
+                    random_vm = genesis_vm.clone()
+                };
+
+                let Some(random_vm) = random_vm else {
+                    return Err(eyre!(
+                        "Unable to obtain a VM to retrieve the safenode-manager version"
+                    ));
+                };
+
                 self.get_bin_version(
                     &random_vm.vm,
                     "safenode-manager --version",
