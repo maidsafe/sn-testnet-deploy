@@ -1,0 +1,13 @@
+---
+- name: Update peer in node registry
+  hosts: all
+  become: true
+  vars:
+    peer: "{{ peer }}"
+
+  tasks:
+    - name: Update bootstrap peer in node registry
+      ansible.builtin.replace:
+        path: /var/safenode-manager/node_registry.json
+        regexp: '("bootstrap_peers":\s*\[")[^"]+(")'
+        replace: '\1{{ peer }}\2'

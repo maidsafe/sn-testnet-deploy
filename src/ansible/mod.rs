@@ -165,6 +165,8 @@ pub enum AnsiblePlaybook {
     ///
     /// Use in combination with `AnsibleInventoryType::Uploaders`.
     Uploaders,
+    /// The update peer playbook will update the peer multiaddr in all node service definitions.
+    UpdatePeer,
 }
 
 impl AnsiblePlaybook {
@@ -203,6 +205,7 @@ impl AnsiblePlaybook {
                 "upgrade_uploader_telegraf_config.yml".to_string()
             }
             AnsiblePlaybook::Uploaders => "uploaders.yml".to_string(),
+            AnsiblePlaybook::UpdatePeer => "update_peer.yml".to_string(),
         }
     }
 }

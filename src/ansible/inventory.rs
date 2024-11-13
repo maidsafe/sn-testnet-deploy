@@ -282,11 +282,13 @@ pub fn generate_custom_environment_inventory(
 ) -> Result<()> {
     let dest_path = output_inventory_dir_path
         .join(AnsibleInventoryType::Custom.get_inventory_path(environment_name, "digital_ocean"));
+    debug!("Creating custom inventory file at {dest_path:#?}");
     let file = File::create(&dest_path)?;
     let mut writer = BufWriter::new(file);
 
     writeln!(writer, "[custom]")?;
     for vm in vm_list.iter() {
+        debug!("Adding VM to custom inventory: {}", vm.public_ip_addr);
         writeln!(writer, "{}", vm.public_ip_addr)?;
     }
 
