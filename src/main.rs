@@ -11,10 +11,15 @@ use color_eyre::{
 };
 use dotenv::dotenv;
 use evmlib::Network;
+use log::debug;
 use semver::Version;
 use sn_releases::{ReleaseType, SafeReleaseRepoActions};
 use sn_testnet_deploy::{
-    ansible::{extra_vars::ExtraVarsDocBuilder, inventory::AnsibleInventoryType, AnsiblePlaybook},
+    ansible::{
+        extra_vars::ExtraVarsDocBuilder,
+        inventory::{generate_custom_environment_inventory, AnsibleInventoryType},
+        AnsiblePlaybook,
+    },
     bootstrap::BootstrapOptions,
     deploy::DeployOptions,
     error::Error,
@@ -957,6 +962,31 @@ enum Commands {
         /// This argument is required when the uploader count is supplied.
         #[arg(long, verbatim_doc_comment)]
         safenode_version: Option<String>,
+    },
+    /// Update the peer multiaddr in the node registry.
+    ///
+    /// This will then cause the service definitions to be updated when an upgrade is performed.
+    UpdatePeer {
+        /// Provide a list of VM names to use as a custom inventory.
+        ///
+        /// This will update the peer on a particular subset of VMs.
+        #[clap(name = "custom-inventory", long, use_value_delimiter = true)]
+        custom_inventory: Option<Vec<String>>,
+        /// The name of the environment.
+        #[arg(short = 'n', long)]
+        name: String,
+        /// Specify the type of node VM to update the peer on. If not provided, the peer will be updated on
+        /// all the node VMs. This is mutually exclusive with the '--custom-inventory' argument.
+        ///
+        /// Valid values are "bootstrap", "genesis", "generic" and "private".
+        #[arg(long, conflicts_with = "custom-inventory")]
+        node_type: Option<NodeType>,
+        /// The new peer multiaddr to use.
+        #[arg(long)]
+        peer: String,
+        /// The cloud provider for the environment.
+        #[clap(long, value_parser = parse_provider, verbatim_doc_comment, default_value_t = CloudProvider::DigitalOcean)]
+        provider: CloudProvider,
     },
 }
 
@@ -2753,6 +2783,72 @@ async fn main() -> Result<()> {
 
             Ok(())
         }
+        Commands::UpdatePeer {
+            custom_inventory,
+            name,
+            node_type,
+            peer,
+            provider,
+        } => {
+            if let Err(e) = libp2p::multiaddr::Multiaddr::from_str(&peer) {
+                return Err(eyre!("Invalid peer multiaddr: {}", e));
+            }
+
+            let testnet_deployer = TestnetDeployBuilder::default()
+                .environment_name(&name)
+                .provider(provider)
+                .build()?;
+
+            let inventory_service = DeploymentInventoryService::from(&testnet_deployer);
+            let inventory = inventory_service
+                .generate_or_retrieve_inventory(&name, true, None)
+                .await?;
+
+            let custom_inventory = if let Some(custom_inventory) = custom_inventory {
+                let custom_vms = get_custom_inventory(&inventory, &custom_inventory)?;
+                Some(custom_vms)
+            } else {
+                None
+            };
+
+            let mut extra_vars = ExtraVarsDocBuilder::default();
+            extra_vars.add_variable("peer", &peer);
+
+            let inventory_type = if let Some(custom_inventory) = custom_inventory {
+                println!("Updating peers against a custom inventory");
+                generate_custom_environment_inventory(
+                    &custom_inventory,
+                    &name,
+                    &testnet_deployer
+                        .ansible_provisioner
+                        .ansible_runner
+                        .working_directory_path
+                        .join("inventory"),
+                )?;
+                AnsibleInventoryType::Custom
+            } else {
+                let inventory_type = match node_type {
+                    Some(NodeType::Bootstrap) => AnsibleInventoryType::BootstrapNodes,
+                    Some(NodeType::Genesis) => AnsibleInventoryType::Genesis,
+                    Some(NodeType::Generic) => AnsibleInventoryType::Nodes,
+                    Some(NodeType::Private) => AnsibleInventoryType::PrivateNodes,
+                    None => AnsibleInventoryType::Nodes,
+                };
+                println!("Updating peers against {inventory_type:?}");
+                inventory_type
+            };
+
+            testnet_deployer
+                .ansible_provisioner
+                .ansible_runner
+                .run_playbook(
+                    AnsiblePlaybook::UpdatePeer,
+                    inventory_type,
+                    Some(extra_vars.build()),
+                )?;
+
+            Ok(())
+        }
     }
 }
 
@@ -2925,6 +3021,7 @@ fn get_custom_inventory(
     inventory: &DeploymentInventory,
     vm_list: &[String],
 ) -> Result<Vec<VirtualMachine>> {
+    debug!("Attempting to use a custom inventory: {vm_list:?}");
     let mut custom_vms = Vec::new();
     for vm_name in vm_list.iter() {
         let vm_list = inventory.vm_list();
@@ -2935,6 +3032,11 @@ fn get_custom_inventory(
                 "{vm_name} is not in the inventory for this environment",
             ))?;
         custom_vms.push(vm.clone());
+    }
+
+    debug!("Retrieved custom inventory:");
+    for vm in &custom_vms {
+        debug!("  {} - {}", vm.name, vm.public_ip_addr);
     }
     Ok(custom_vms)
 }
