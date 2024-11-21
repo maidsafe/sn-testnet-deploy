@@ -17,7 +17,8 @@ use crate::{
     s3::S3Repository,
     ssh::SshClient,
     terraform::TerraformRunner,
-    BinaryOption, CloudProvider, DeploymentType, EnvironmentDetails, Error, TestnetDeployer,
+    BinaryOption, CloudProvider, DeploymentType, EnvironmentDetails, EnvironmentType, Error,
+    TestnetDeployer,
 };
 use alloy::hex::ToHexExt;
 use color_eyre::{eyre::eyre, Result};
@@ -662,6 +663,18 @@ impl DeploymentInventory {
             uploaded_files: Vec::new(),
             uploader_vms: Vec::new(),
         }
+    }
+
+    pub fn get_tfvars_filename(&self) -> String {
+        let filename = if self.environment_details.environment_type == EnvironmentType::Production {
+            format!("{}.tfvars", self.name)
+        } else {
+            self.environment_details
+                .environment_type
+                .get_tfvars_filename()
+        };
+        debug!("Using tfvars file {}", filename);
+        filename
     }
 
     pub fn is_empty(&self) -> bool {

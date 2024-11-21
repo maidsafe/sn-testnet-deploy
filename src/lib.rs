@@ -198,7 +198,7 @@ pub struct EnvironmentDetails {
     pub rewards_address: String,
 }
 
-#[derive(Clone, Debug, Default, Serialize, Deserialize)]
+#[derive(Clone, Debug, Default, Eq, PartialEq, Serialize, Deserialize)]
 pub enum EnvironmentType {
     #[default]
     Development,
@@ -652,16 +652,12 @@ impl TestnetDeployer {
         Ok(())
     }
 
-    pub fn plan(
-        &self,
-        vars: Option<Vec<(String, String)>>,
-        environment_type: EnvironmentType,
-    ) -> Result<()> {
+    pub fn plan(&self, vars: Option<Vec<(String, String)>>, tfvars_filename: &str) -> Result<()> {
         println!("Selecting {} workspace...", self.environment_name);
         self.terraform_runner
             .workspace_select(&self.environment_name)?;
         self.terraform_runner
-            .plan(vars, Some(environment_type.get_tfvars_filename()))?;
+            .plan(vars, Some(tfvars_filename.to_string()))?;
         Ok(())
     }
 
