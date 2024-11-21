@@ -2117,7 +2117,7 @@ async fn main() -> Result<()> {
             }
 
             testnet_deployer.init().await?;
-            testnet_deployer.plan(None, inventory.environment_details.environment_type)?;
+            testnet_deployer.plan(None, &inventory.get_tfvars_filename())?;
             Ok(())
         }
         Commands::Setup {} => {

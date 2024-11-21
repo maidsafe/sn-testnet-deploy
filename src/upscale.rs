@@ -153,14 +153,7 @@ impl TestnetDeployer {
                     (desired_private_node_vm_count > 0).to_string(),
                 ),
             ];
-            self.plan(
-                Some(vars),
-                options
-                    .current_inventory
-                    .environment_details
-                    .environment_type
-                    .clone(),
-            )?;
+            self.plan(Some(vars), &options.current_inventory.get_tfvars_filename())?;
             return Ok(());
         }
 
@@ -190,12 +183,7 @@ impl TestnetDeployer {
             node_vm_count: Some(desired_node_vm_count),
             node_vm_size: None,
             private_node_vm_count: Some(desired_private_node_vm_count),
-            tfvars_filename: options
-                .current_inventory
-                .environment_details
-                .environment_type
-                .get_tfvars_filename()
-                .to_string(),
+            tfvars_filename: options.current_inventory.get_tfvars_filename(),
             uploader_vm_count: Some(desired_uploader_vm_count),
             uploader_vm_size: None,
         })
@@ -433,14 +421,7 @@ impl TestnetDeployer {
                 "uploader_vm_count".to_string(),
                 desired_uploader_vm_count.to_string(),
             )];
-            self.plan(
-                Some(vars),
-                options
-                    .current_inventory
-                    .environment_details
-                    .environment_type
-                    .clone(),
-            )?;
+            self.plan(Some(vars), &options.current_inventory.get_tfvars_filename())?;
             return Ok(());
         }
 
@@ -456,12 +437,7 @@ impl TestnetDeployer {
                 node_vm_count: None,
                 node_vm_size: None,
                 private_node_vm_count: None,
-                tfvars_filename: options
-                    .current_inventory
-                    .environment_details
-                    .environment_type
-                    .get_tfvars_filename()
-                    .to_string(),
+                tfvars_filename: options.current_inventory.get_tfvars_filename(),
                 uploader_vm_count: Some(desired_uploader_vm_count),
                 uploader_vm_size: None,
             })
