@@ -374,24 +374,24 @@ impl TestnetDeployer {
                     node_provision_failed = true;
                 }
             }
-            n += 1;
         }
 
-        if !is_bootstrap_deploy {
-            self.wait_for_ssh_availability_on_new_machines(
-                AnsibleInventoryType::Uploaders,
-                &options.current_inventory,
-            )?;
-            self.ansible_provisioner
-                .print_ansible_run_banner(n, total, "Provision Uploaders");
-            self.ansible_provisioner
-                .provision_uploaders(&provision_options, &initial_multiaddr)
-                .await
-                .map_err(|err| {
-                    println!("Failed to provision uploaders {err:?}");
-                    err
-                })?;
-        }
+        // TODO: Uncomment when EVM-based payments are supported for the uploader upscale.
+        // if !is_bootstrap_deploy {
+        //     self.wait_for_ssh_availability_on_new_machines(
+        //         AnsibleInventoryType::Uploaders,
+        //         &options.current_inventory,
+        //     )?;
+        //     self.ansible_provisioner
+        //         .print_ansible_run_banner(n, total, "Provision Uploaders");
+        //     self.ansible_provisioner
+        //         .provision_uploaders(&provision_options, &initial_multiaddr)
+        //         .await
+        //         .map_err(|err| {
+        //             println!("Failed to provision uploaders {err:?}");
+        //             err
+        //         })?;
+        // }
 
         if node_provision_failed {
             println!();
