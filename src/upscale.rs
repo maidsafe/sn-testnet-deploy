@@ -112,7 +112,7 @@ impl TestnetDeployer {
 
         let desired_private_node_count = options
             .desired_private_node_count
-            .unwrap_or(options.current_inventory.node_count() as u16);
+            .unwrap_or(options.current_inventory.private_node_count() as u16);
         if desired_private_node_count < options.current_inventory.private_node_count() as u16 {
             return Err(Error::InvalidUpscaleDesiredPrivateNodeCount);
         }
