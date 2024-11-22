@@ -2540,6 +2540,7 @@ async fn main() -> Result<()> {
 
                 let ansible_runner = testnet_deploy.ansible_provisioner.ansible_runner;
                 let mut extra_vars = ExtraVarsDocBuilder::default();
+                extra_vars.add_variable("testnet_name", &name);
                 extra_vars.add_variable("autonomi_version", &version.to_string());
                 ansible_runner.run_playbook(
                     AnsiblePlaybook::UpgradeUploaders,
