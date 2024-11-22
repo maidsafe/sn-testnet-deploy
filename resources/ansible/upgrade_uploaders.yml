@@ -40,6 +40,16 @@
         dest: /usr/local/bin
         remote_src: True
 
+    - name: copy upload-random-data.sh to remote for each safe user
+      ansible.builtin.template:
+        src: roles/uploaders/templates/upload-random-data.sh.j2
+        dest: "/home/safe{{ item | regex_replace('safe([0-9]+)', '\\1') }}/upload-random-data.sh"
+        owner: "safe{{ item | regex_replace('safe([0-9]+)', '\\1') }}"
+        group: "safe{{ item | regex_replace('safe([0-9]+)', '\\1') }}"
+        mode: '0744'
+      become_user: "safe{{ item | regex_replace('safe([0-9]+)', '\\1') }}"
+      loop: "{{ safe_users.stdout_lines }}"
+
     - name: start all uploader services
       systemd:
         name: "autonomi_uploader_{{ item | regex_replace('safe([0-9]+)', '\\1') }}"
