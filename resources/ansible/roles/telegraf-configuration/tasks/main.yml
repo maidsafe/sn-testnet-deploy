@@ -88,6 +88,31 @@
     dest: /etc/telegraf/telegraf.d/telegraf_safe_multi_node.conf
     remote_src: yes
 
+- name: create directory for telegraf configurationfile
+  file:
+    path: /etc/telegraf-elasticsearch
+    state: directory
+
+- name: copy telegraf elasticsearch config file from network dashboard repo
+  copy:
+    src: "{{ network_dashboard_repo_path }}/telegraf/ConfigurationFile/safenodes/telegraf_safe_multi_node_elasticsearch.conf"
+    dest: /etc/telegraf-elasticsearch/telegraf_safe_multi_node_elasticsearch.conf
+    remote_src: yes
+
+- name: copy telegraf elasticsearch system service file from network dashboard repo
+  copy:
+    src: "{{ network_dashboard_repo_path }}/telegraf/SystemServiceFile/telegraf-elasticsearch.service"
+    dest: /etc/systemd/system/telegraf-elasticsearch.service
+    remote_src: yes
+
+- name: reload the configuration files for systemctl daemon
+  become: True
+  command: systemctl daemon-reload
+
+- name: reload the configuration files for systemctl daemon
+  become: True
+  command: systemctl start telegraf-elasticsearch.service
+
 - name: start telegraf service
   systemd:
     name: telegraf
