@@ -2,7 +2,7 @@
 - name: upgrade the node telegraf configuration
   hosts: all
   roles:
-    - role: node-metrics
+    - role: telegraf-configuration
       become: True
   tasks:
     - name: restart telegraf service

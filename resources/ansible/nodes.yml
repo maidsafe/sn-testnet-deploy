@@ -39,7 +39,7 @@
         when: make_vm_private
       }
     - node
-    - role: node-metrics
+    - role: telegraf-configuration
       become: True
 
   tasks:
