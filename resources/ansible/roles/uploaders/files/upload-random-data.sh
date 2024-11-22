@@ -1,7 +1,5 @@
 #!/usr/bin/env bash
 
-# Target rate of 1.5mb/s
-
 CONTACT_PEER="${1:-}"
 
 CONTACT_PEER_ARG=""
@@ -18,8 +16,6 @@ if [ -z "$CONTACT_PEER" ]; then
   echo "No contact peer provided. Please provide the bootstrap peer."
   exit 1
 fi
-
-total_files=10000
 
 write_metrics_on_success() {
   local time=$1
@@ -44,21 +40,6 @@ metrics_header() {
   fi
 }
 
-prune_chunk_artifacts() {
-  echo "Pruning chunk artifacts more than 60 minutes old..."
-  rm -f old_chunk_artifacts.txt
-
-  start_time=$(date +%s)
-  find ~/.local/share/safe/client/chunk_artifacts -type d -mmin +60 > old_chunk_artifacts.txt
-  artifact_count=$(wc -l < old_chunk_artifacts.txt)
-  xargs -a old_chunk_artifacts.txt rm -rf
-  end_time=$(date +%s)
-
-  elapsed_time=$((end_time - start_time))
-  echo "Removed $artifact_count old chunk artifacts in $elapsed_time seconds"
-}
-
-# Generate a 10MB file of random data and log its reference
 generate_random_data_file_and_upload() {
   tmpfile=$(mktemp)
   dd if=/dev/urandom of="$tmpfile" bs=15M count=1 iflag=fullblock &> /dev/null
@@ -91,11 +72,10 @@ generate_random_data_file_and_upload() {
   rm "$tmpfile"
 }
 
-for i in $(seq 1 $total_files); do
+while true; do
   echo "$(date +"%A, %B %d, %Y %H:%M:%S")"
-  echo "Generating and uploading file $i of $total_files..."
+  echo "Generating and uploading file..."
   generate_random_data_file_and_upload
-  # prune_chunk_artifacts
   # TODO: re-enable when the new CLI has a `wallet balance` command
   # echo "$(autonomi $CONTACT_PEER_ARG wallet balance)"
 done
