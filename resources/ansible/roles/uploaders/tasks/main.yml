@@ -26,8 +26,8 @@
   loop: "{{ range(1, autonomi_uploader_instances | int + 1) | list }}"
 
 - name: copy upload-random-data.sh to remote for each safe user
-  ansible.builtin.copy:
-    src: upload-random-data.sh
+  ansible.builtin.template:
+    src: upload-random-data.sh.j2
     dest: "/home/safe{{ item }}/upload-random-data.sh"
     owner: "safe{{ item }}"
     group: "safe{{ item }}"

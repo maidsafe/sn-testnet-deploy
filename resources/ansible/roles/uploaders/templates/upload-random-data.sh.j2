@@ -2,18 +2,22 @@
 
 CONTACT_PEER="${1:-}"
 
+{% if not testnet_name.startswith('PROD-') %}
 CONTACT_PEER_ARG=""
 if [ -n "$CONTACT_PEER" ]; then
   CONTACT_PEER_ARG="--peer $CONTACT_PEER"
 fi
 
-if ! command -v autonomi &> /dev/null; then
-  echo "Error: 'autonomi' not found in PATH."
-  exit 1
-fi
-
 if [ -z "$CONTACT_PEER" ]; then
   echo "No contact peer provided. Please provide the bootstrap peer."
+  exit 1
+fi
+{% else %}
+CONTACT_PEER_ARG=""
+{% endif %}
+
+if ! command -v autonomi &> /dev/null; then
+  echo "Error: 'autonomi' not found in PATH."
   exit 1
 fi
 
@@ -54,7 +58,7 @@ generate_random_data_file_and_upload() {
   if [ $? -eq 0 ]; then
     echo "Successfully uploaded $tmpfile using SAFE CLI"
 
-    file_ref=$(echo "$stdout" | grep -oP 'Uploaded ".*" to address \K\S+')
+    file_ref=$(echo "$stdout" | grep -oP 'At address: \K\S+')
     if [ -z "$file_ref" ]; then
       echo "Error: Unable to extract file reference."
     else
