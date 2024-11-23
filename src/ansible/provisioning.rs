@@ -854,8 +854,8 @@ impl AnsibleProvisioner {
         Ok(())
     }
 
-    pub fn print_ansible_run_banner(&self, n: usize, total: usize, s: &str) {
-        let ansible_run_msg = format!("Ansible Run {} of {}: ", n, total);
+    pub fn print_ansible_run_banner(&self, s: &str) {
+        let ansible_run_msg = "Ansible Run: ";
         let line = "=".repeat(s.len() + ansible_run_msg.len());
         println!("{}\n{}{}\n{}", line, ansible_run_msg, s, line);
     }

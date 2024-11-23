@@ -304,6 +304,14 @@ enum Commands {
         /// 5 uploader VMs, there will be 10 downloaders across the 5 VMs.
         #[clap(long, default_value_t = 0)]
         downloaders_count: u16,
+        /// Provide environment variables for the safenode service.
+        ///
+        /// This is useful to set the safenode's log levels. Each variable should be comma
+        /// separated without any space.
+        ///
+        /// Example: --env SN_LOG=all,RUST_LOG=libp2p=debug
+        #[clap(name = "env", long, use_value_delimiter = true, value_parser = parse_environment_variables, verbatim_doc_comment)]
+        env_variables: Option<Vec<(String, String)>>,
         /// The type of deployment.
         ///
         /// Possible values are 'development', 'production' or 'staging'. The value used will
@@ -314,14 +322,6 @@ enum Commands {
         /// The default is 'development'.
         #[clap(long, default_value_t = EnvironmentType::Development, value_parser = parse_deployment_type, verbatim_doc_comment)]
         environment_type: EnvironmentType,
-        /// Provide environment variables for the safenode service.
-        ///
-        /// This is useful to set the safenode's log levels. Each variable should be comma
-        /// separated without any space.
-        ///
-        /// Example: --env SN_LOG=all,RUST_LOG=libp2p=debug
-        #[clap(name = "env", long, use_value_delimiter = true, value_parser = parse_environment_variables, verbatim_doc_comment)]
-        env_variables: Option<Vec<(String, String)>>,
         /// The address of the data payments contract.
         #[arg(long)]
         evm_data_payments_address: Option<String>,
@@ -338,6 +338,11 @@ enum Commands {
         /// Override the size of the EVM node VMs.
         #[clap(long)]
         evm_node_vm_size: Option<String>,
+        /// The RPC URL for the EVM network.
+        ///
+        /// This argument only applies if the EVM network type is 'custom'.
+        #[arg(long)]
+        evm_rpc_url: Option<String>,
         /// Supply a version number to be used for the faucet binary.
         ///
         /// There should be no 'v' prefix.
@@ -410,9 +415,6 @@ enum Commands {
         /// argument.
         #[clap(long)]
         node_count: Option<u16>,
-        /// Override the size of the node VMs.
-        #[clap(long)]
-        node_vm_size: Option<String>,
         /// The number of node VMs to create.
         ///
         /// Each VM will run many safenode services.
@@ -421,6 +423,9 @@ enum Commands {
         /// argument.
         #[clap(long)]
         node_vm_count: Option<u16>,
+        /// Override the size of the node VMs.
+        #[clap(long)]
+        node_vm_size: Option<String>,
         /// Optionally set the payment forward public key for a custom safenode binary.
         ///
         /// This argument only applies if the '--branch' and '--repo-owner' arguments are used.
@@ -1523,8 +1528,9 @@ async fn main() -> Result<()> {
             environment_type,
             evm_data_payments_address,
             evm_network_type,
-            evm_payment_token_address,
             evm_node_vm_size,
+            evm_payment_token_address,
+            evm_rpc_url,
             faucet_version,
             forks,
             foundation_pk,
@@ -1557,6 +1563,22 @@ async fn main() -> Result<()> {
             uploader_vm_size,
             uploaders_count,
         } => {
+            if evm_network_type == EvmNetwork::Custom {
+                if evm_data_payments_address.is_none() {
+                    return Err(eyre!(
+                        "Data payments address must be provided for custom EVM network"
+                    ));
+                }
+                if evm_payment_token_address.is_none() {
+                    return Err(eyre!(
+                        "Payment token address must be provided for custom EVM network"
+                    ));
+                }
+                if evm_rpc_url.is_none() {
+                    return Err(eyre!("RPC URL must be provided for custom EVM network"));
+                }
+            }
+
             let network_keys = validate_and_get_pks(
                 foundation_pk,
                 genesis_pk,
@@ -1564,20 +1586,7 @@ async fn main() -> Result<()> {
                 payment_forward_pk,
             )?;
 
-            if evm_network_type == EvmNetwork::Custom
-                && (evm_data_payments_address.is_some() || evm_payment_token_address.is_some())
-            {
-                return Err(eyre!(
-                    "EVM data payments address and payment token address cannot be set for a custom EVM network"
-                ));
-            }
-
-            if funding_wallet_secret_key.is_some() && evm_network_type == EvmNetwork::Custom {
-                return Err(eyre!(
-                    "Wallet secret key only applies to Arbitrum or Sepolia networks"
-                ));
-            } else if funding_wallet_secret_key.is_none() && evm_network_type != EvmNetwork::Custom
-            {
+            if funding_wallet_secret_key.is_none() && evm_network_type != EvmNetwork::Anvil {
                 return Err(eyre!(
                     "Wallet secret key is required for Arbitrum or Sepolia networks"
                 ));
@@ -1661,7 +1670,7 @@ async fn main() -> Result<()> {
                     evm_data_payments_address,
                     evm_network: evm_network_type,
                     evm_payment_token_address,
-                    evm_rpc_url: None,
+                    evm_rpc_url,
                     evm_node_vm_size,
                     funding_wallet_secret_key,
                     interval,
@@ -1792,105 +1801,110 @@ async fn main() -> Result<()> {
                 Ok(())
             }
         },
-        Commands::Funds(funds_cmd) => match funds_cmd {
-            FundsCommand::Deposit {
-                funding_wallet_secret_key,
-                gas_to_transfer,
-                name,
-                provider,
-                tokens_to_transfer,
-            } => {
-                let testnet_deployer = TestnetDeployBuilder::default()
-                    .environment_name(&name)
-                    .provider(provider)
-                    .build()?;
-                let inventory_services = DeploymentInventoryService::from(&testnet_deployer);
-                inventory_services
-                    .generate_or_retrieve_inventory(&name, true, None)
-                    .await?;
-
-                let environment_details =
-                    get_environment_details(&name, &inventory_services.s3_repository).await?;
-
-                let options = FundingOptions {
-                    evm_data_payments_address: environment_details.evm_data_payments_address,
-                    evm_payment_token_address: environment_details.evm_payment_token_address,
-                    evm_rpc_url: environment_details.evm_rpc_url,
-                    evm_network: environment_details.evm_network,
+        Commands::Funds(funds_cmd) => {
+            match funds_cmd {
+                FundsCommand::Deposit {
                     funding_wallet_secret_key,
-                    uploaders_count: None,
-                    token_amount: tokens_to_transfer,
-                    gas_amount: gas_to_transfer,
-                };
-                testnet_deployer
-                    .ansible_provisioner
-                    .deposit_funds_to_uploaders(&options)
-                    .await?;
+                    gas_to_transfer,
+                    name,
+                    provider,
+                    tokens_to_transfer,
+                } => {
+                    let testnet_deployer = TestnetDeployBuilder::default()
+                        .environment_name(&name)
+                        .provider(provider)
+                        .build()?;
+                    let inventory_services = DeploymentInventoryService::from(&testnet_deployer);
+                    inventory_services
+                        .generate_or_retrieve_inventory(&name, true, None)
+                        .await?;
 
-                Ok(())
-            }
-            FundsCommand::Drain {
-                name,
-                provider,
-                to_address,
-            } => {
-                let testnet_deployer = TestnetDeployBuilder::default()
-                    .environment_name(&name)
-                    .provider(provider)
-                    .build()?;
+                    let environment_details =
+                        get_environment_details(&name, &inventory_services.s3_repository).await?;
 
-                let inventory_services = DeploymentInventoryService::from(&testnet_deployer);
-                inventory_services
-                    .generate_or_retrieve_inventory(&name, true, None)
-                    .await?;
+                    let options = FundingOptions {
+                        evm_data_payments_address: environment_details.evm_data_payments_address,
+                        evm_payment_token_address: environment_details.evm_payment_token_address,
+                        evm_rpc_url: environment_details.evm_rpc_url,
+                        evm_network: environment_details.evm_network,
+                        funding_wallet_secret_key,
+                        uploaders_count: None,
+                        token_amount: tokens_to_transfer,
+                        gas_amount: gas_to_transfer,
+                    };
+                    testnet_deployer
+                        .ansible_provisioner
+                        .deposit_funds_to_uploaders(&options)
+                        .await?;
 
-                let environment_details =
-                    get_environment_details(&name, &inventory_services.s3_repository).await?;
+                    Ok(())
+                }
+                FundsCommand::Drain {
+                    name,
+                    provider,
+                    to_address,
+                } => {
+                    let testnet_deployer = TestnetDeployBuilder::default()
+                        .environment_name(&name)
+                        .provider(provider)
+                        .build()?;
 
-                let to_address = if let Some(to_address) = to_address {
-                    Address::from_str(&to_address)?
-                } else if let Some(to_address) = environment_details.funding_wallet_address {
-                    Address::from_str(&to_address)?
-                } else {
-                    return Err(eyre!(
+                    let inventory_services = DeploymentInventoryService::from(&testnet_deployer);
+                    inventory_services
+                        .generate_or_retrieve_inventory(&name, true, None)
+                        .await?;
+
+                    let environment_details =
+                        get_environment_details(&name, &inventory_services.s3_repository).await?;
+
+                    let to_address = if let Some(to_address) = to_address {
+                        Address::from_str(&to_address)?
+                    } else if let Some(to_address) = environment_details.funding_wallet_address {
+                        Address::from_str(&to_address)?
+                    } else {
+                        return Err(eyre!(
                         "No to-address was provided and no funding wallet address was found in the environment details"
                     ));
-                };
+                    };
 
-                let network = match environment_details.evm_network {
-                    EvmNetwork::ArbitrumOne => Network::ArbitrumOne,
-                    EvmNetwork::ArbitrumSepolia => Network::ArbitrumSepolia,
-                    EvmNetwork::Custom => {
-                        if let (
-                            Some(emv_data_payments_address),
-                            Some(evm_payment_token_address),
-                            Some(evm_rpc_url),
-                        ) = (
-                            environment_details.evm_data_payments_address,
-                            environment_details.evm_payment_token_address,
-                            environment_details.evm_rpc_url,
-                        ) {
-                            Network::new_custom(
-                                &evm_rpc_url,
-                                &evm_payment_token_address,
-                                &emv_data_payments_address,
-                            )
-                        } else {
-                            return Err(eyre!(
-                                "Custom EVM details not found in the environment details"
-                            ));
+                    let network = match environment_details.evm_network {
+                        EvmNetwork::Anvil => {
+                            return Err(eyre!("Draining funds from uploaders is not supported for an Anvil network"));
                         }
-                    }
-                };
+                        EvmNetwork::ArbitrumOne => Network::ArbitrumOne,
+                        EvmNetwork::ArbitrumSepolia => Network::ArbitrumSepolia,
+                        EvmNetwork::Custom => {
+                            if let (
+                                Some(emv_data_payments_address),
+                                Some(evm_payment_token_address),
+                                Some(evm_rpc_url),
+                            ) = (
+                                environment_details.evm_data_payments_address,
+                                environment_details.evm_payment_token_address,
+                                environment_details.evm_rpc_url,
+                            ) {
+                                Network::new_custom(
+                                    &evm_rpc_url,
+                                    &evm_payment_token_address,
+                                    &emv_data_payments_address,
+                                )
+                            } else {
+                                return Err(eyre!(
+                                    "Custom EVM details not found in the environment details"
+                                ));
+                            }
+                        }
+                    };
 
-                testnet_deployer
-                    .ansible_provisioner
-                    .drain_funds_from_uploaders(to_address, network)
-                    .await?;
+                    testnet_deployer
+                        .ansible_provisioner
+                        .drain_funds_from_uploaders(to_address, network)
+                        .await?;
 
-                Ok(())
+                    Ok(())
+                }
             }
-        },
+        }
         Commands::Inventory {
             bootstrap,
             force_regeneration,
@@ -3102,6 +3116,7 @@ fn validate_and_get_pks(
 
 fn parse_evm_network(s: &str) -> Result<EvmNetwork, String> {
     match s.to_lowercase().as_str() {
+        "anvil" => Ok(EvmNetwork::Anvil),
         "arbitrum-one" => Ok(EvmNetwork::ArbitrumOne),
         "arbitrum-sepolia" => Ok(EvmNetwork::ArbitrumSepolia),
         "custom" => Ok(EvmNetwork::Custom),
