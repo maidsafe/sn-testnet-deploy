@@ -163,7 +163,8 @@ impl TestnetDeployer {
             enable_build_vm: false,
             evm_node_count: Some(
                 match options.current_inventory.environment_details.evm_network {
-                    EvmNetwork::Custom => 1,
+                    EvmNetwork::Anvil => 1,
+                    EvmNetwork::Custom => 0,
                     EvmNetwork::ArbitrumOne => 0,
                     EvmNetwork::ArbitrumSepolia => 0,
                 },
@@ -266,22 +267,14 @@ impl TestnetDeployer {
         debug!("Retrieved initial peer {initial_multiaddr}");
 
         let should_provision_private_nodes = desired_private_node_vm_count > 0;
-        let mut n = 1;
-        let mut total = if is_bootstrap_deploy { 3 } else { 4 };
-        if should_provision_private_nodes {
-            total += 2;
-        }
 
         if !is_bootstrap_deploy {
             self.wait_for_ssh_availability_on_new_machines(
                 AnsibleInventoryType::BootstrapNodes,
                 &options.current_inventory,
             )?;
-            self.ansible_provisioner.print_ansible_run_banner(
-                n,
-                total,
-                "Provision Bootstrap Nodes",
-            );
+            self.ansible_provisioner
+                .print_ansible_run_banner("Provision Bootstrap Nodes");
             match self.ansible_provisioner.provision_nodes(
                 &provision_options,
                 &initial_multiaddr,
@@ -295,7 +288,6 @@ impl TestnetDeployer {
                     node_provision_failed = true;
                 }
             }
-            n += 1;
         }
 
         self.wait_for_ssh_availability_on_new_machines(
@@ -303,7 +295,7 @@ impl TestnetDeployer {
             &options.current_inventory,
         )?;
         self.ansible_provisioner
-            .print_ansible_run_banner(n, total, "Provision Normal Nodes");
+            .print_ansible_run_banner("Provision Normal Nodes");
         match self.ansible_provisioner.provision_nodes(
             &provision_options,
             &initial_multiaddr,
@@ -317,7 +309,6 @@ impl TestnetDeployer {
                 node_provision_failed = true;
             }
         }
-        n += 1;
 
         if should_provision_private_nodes {
             let private_nodes = self
@@ -335,21 +326,20 @@ impl TestnetDeployer {
                 &options.current_inventory,
             )?;
             self.ansible_provisioner
-                .print_ansible_run_banner(n, total, "Provision NAT Gateway");
+                .print_ansible_run_banner("Provision NAT Gateway");
             self.ansible_provisioner
                 .provision_nat_gateway(&provision_options)
                 .map_err(|err| {
                     println!("Failed to provision NAT gateway {err:?}");
                     err
                 })?;
-            n += 1;
 
             self.wait_for_ssh_availability_on_new_machines(
                 AnsibleInventoryType::PrivateNodes,
                 &options.current_inventory,
             )?;
             self.ansible_provisioner
-                .print_ansible_run_banner(n, total, "Provision Private Nodes");
+                .print_ansible_run_banner("Provision Private Nodes");
             match self
                 .ansible_provisioner
                 .provision_private_nodes(&mut provision_options, &initial_multiaddr)
@@ -516,7 +506,7 @@ impl TestnetDeployer {
             &options.current_inventory,
         )?;
         self.ansible_provisioner
-            .print_ansible_run_banner(1, 1, "Provision Uploaders");
+            .print_ansible_run_banner("Provision Uploaders");
         self.ansible_provisioner
             .provision_uploaders(&provision_options, &initial_multiaddr)
             .await

@@ -90,29 +90,22 @@ impl TestnetDeployer {
             err
         })?;
 
-        let mut n = 1;
-        let mut total = if build_custom_binaries { 2 } else { 1 };
-        if should_provision_private_nodes {
-            total += 2;
-        }
-
         let mut provision_options = ProvisionOptions::from(options.clone());
         if build_custom_binaries {
             self.ansible_provisioner
-                .print_ansible_run_banner(n, total, "Build Custom Binaries");
+                .print_ansible_run_banner("Build Custom Binaries");
             self.ansible_provisioner
                 .build_safe_network_binaries(&provision_options)
                 .map_err(|err| {
                     println!("Failed to build safe network binaries {err:?}");
                     err
                 })?;
-            n += 1;
         }
 
         let mut failed_to_provision = false;
 
         self.ansible_provisioner
-            .print_ansible_run_banner(n, total, "Provision Normal Nodes");
+            .print_ansible_run_banner("Provision Normal Nodes");
         match self.ansible_provisioner.provision_nodes(
             &provision_options,
             &options.bootstrap_peer,
@@ -139,7 +132,7 @@ impl TestnetDeployer {
 
             provision_options.private_node_vms = private_nodes;
             self.ansible_provisioner
-                .print_ansible_run_banner(n, total, "Provision NAT Gateway");
+                .print_ansible_run_banner("Provision NAT Gateway");
             self.ansible_provisioner
                 .provision_nat_gateway(&provision_options)
                 .map_err(|err| {
@@ -147,10 +140,8 @@ impl TestnetDeployer {
                     err
                 })?;
 
-            n += 1;
-
             self.ansible_provisioner
-                .print_ansible_run_banner(n, total, "Provision Private Nodes");
+                .print_ansible_run_banner("Provision Private Nodes");
             match self
                 .ansible_provisioner
                 .provision_private_nodes(&mut provision_options, &options.bootstrap_peer)

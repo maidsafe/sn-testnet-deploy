@@ -320,7 +320,7 @@ impl AnsibleProvisioner {
         let _sk_count = all_secret_keys.values().map(|v| v.len()).sum::<usize>();
 
         let from_wallet = match &options.evm_network {
-            EvmNetwork::Custom => {
+            EvmNetwork::Anvil | EvmNetwork::Custom => {
                 let network = if let (
                     Some(evm_data_payments_address),
                     Some(evm_payment_token_address),

@@ -84,7 +84,7 @@ pub enum DeploymentType {
 }
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
-pub struct LocalEvmNodeData {
+pub struct AnvilNodeData {
     pub data_payments_address: String,
     pub deployer_wallet_private_key: String,
     pub payment_token_address: String,
@@ -158,6 +158,7 @@ impl NodeType {
 #[derive(Clone, Debug, Default, Eq, Serialize, Deserialize, PartialEq)]
 pub enum EvmNetwork {
     #[default]
+    Anvil,
     ArbitrumOne,
     ArbitrumSepolia,
     Custom,
@@ -166,9 +167,10 @@ pub enum EvmNetwork {
 impl std::fmt::Display for EvmNetwork {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
+            EvmNetwork::Anvil => write!(f, "evm-custom"),
             EvmNetwork::ArbitrumOne => write!(f, "evm-arbitrum-one"),
-            EvmNetwork::Custom => write!(f, "evm-custom"),
             EvmNetwork::ArbitrumSepolia => write!(f, "evm-arbitrum-sepolia"),
+            EvmNetwork::Custom => write!(f, "evm-custom"),
         }
     }
 }
@@ -178,9 +180,10 @@ impl std::str::FromStr for EvmNetwork {
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         match s.to_lowercase().as_str() {
+            "anvil" => Ok(EvmNetwork::Anvil),
             "arbitrum-one" => Ok(EvmNetwork::ArbitrumOne),
-            "custom" => Ok(EvmNetwork::Custom),
             "arbitrum-sepolia" => Ok(EvmNetwork::ArbitrumSepolia),
+            "custom" => Ok(EvmNetwork::Custom),
             _ => Err(format!("Invalid EVM network type: {}", s)),
         }
     }
@@ -789,7 +792,18 @@ impl TestnetDeployer {
             get_environment_details(&self.environment_name, &self.s3_repository).await?;
 
         let evm_network = match environment_details.evm_network {
-            EvmNetwork::Custom => None,
+            EvmNetwork::Anvil => None,
+            EvmNetwork::Custom => Some(Network::new_custom(
+                environment_details.evm_rpc_url.as_ref().unwrap(),
+                environment_details
+                    .evm_payment_token_address
+                    .as_ref()
+                    .unwrap(),
+                environment_details
+                    .evm_data_payments_address
+                    .as_ref()
+                    .unwrap(),
+            )),
             EvmNetwork::ArbitrumOne => Some(Network::ArbitrumOne),
             EvmNetwork::ArbitrumSepolia => Some(Network::ArbitrumSepolia),
         };
@@ -935,10 +949,10 @@ pub fn get_genesis_multiaddr(
     Ok((multiaddr, genesis_ip))
 }
 
-pub fn get_local_evm_node_data(
+pub fn get_anvil_node_data(
     ansible_runner: &AnsibleRunner,
     ssh_client: &SshClient,
-) -> Result<LocalEvmNodeData> {
+) -> Result<AnvilNodeData> {
     let evm_inventory = ansible_runner.get_inventory(AnsibleInventoryType::EvmNodes, true)?;
     if evm_inventory.is_empty() {
         return Err(Error::EvmNodeNotFound);
@@ -961,7 +975,7 @@ pub fn get_local_evm_node_data(
                         ));
                     }
 
-                    let evm_testnet_data = LocalEvmNodeData {
+                    let evm_testnet_data = AnvilNodeData {
                         rpc_url: parts[0].trim().to_string(),
                         payment_token_address: parts[1].trim().to_string(),
                         data_payments_address: parts[2].trim().to_string(),

@@ -8,7 +8,7 @@ use crate::{
     ansible::{inventory::AnsibleInventoryType, provisioning::ProvisionOptions},
     error::Result,
     funding::get_address_from_sk,
-    get_genesis_multiaddr, get_local_evm_node_data, write_environment_details, BinaryOption,
+    get_anvil_node_data, get_genesis_multiaddr, write_environment_details, BinaryOption,
     DeploymentInventory, DeploymentType, EnvironmentDetails, EnvironmentType, EvmNetwork,
     InfraRunOptions, LogFormat, NodeType, TestnetDeployer,
 };
@@ -29,9 +29,9 @@ pub struct DeployOptions {
     pub env_variables: Option<Vec<(String, String)>>,
     pub evm_data_payments_address: Option<String>,
     pub evm_network: EvmNetwork,
+    pub evm_node_vm_size: Option<String>,
     pub evm_payment_token_address: Option<String>,
     pub evm_rpc_url: Option<String>,
-    pub evm_node_vm_size: Option<String>,
     pub funding_wallet_secret_key: Option<String>,
     pub interval: Duration,
     pub log_format: Option<LogFormat>,
@@ -66,9 +66,10 @@ impl TestnetDeployer {
             bootstrap_node_vm_size: options.bootstrap_node_vm_size.clone(),
             enable_build_vm: build_custom_binaries,
             evm_node_count: match options.evm_network {
+                EvmNetwork::Anvil => Some(1),
                 EvmNetwork::ArbitrumOne => Some(0),
-                EvmNetwork::Custom => Some(1),
                 EvmNetwork::ArbitrumSepolia => Some(0),
+                EvmNetwork::Custom => Some(0),
             },
             evm_node_vm_size: options.evm_node_vm_size.clone(),
             genesis_vm_count: Some(1),
@@ -91,18 +92,6 @@ impl TestnetDeployer {
             .map(|count| count > 0)
             .unwrap_or(true);
 
-        let mut n = 1;
-        let mut total = if build_custom_binaries { 5 } else { 4 };
-        if should_provision_private_nodes {
-            total += 2;
-        }
-        if !options.current_inventory.is_empty() {
-            total -= 5;
-        }
-        if matches!(options.evm_network, EvmNetwork::Custom) {
-            total += 1;
-        }
-
         write_environment_details(
             &self.s3_repository,
             &options.name,
@@ -110,9 +99,9 @@ impl TestnetDeployer {
                 deployment_type: DeploymentType::New,
                 environment_type: options.environment_type.clone(),
                 evm_network: options.evm_network.clone(),
-                evm_data_payments_address: None,
-                evm_payment_token_address: None,
-                evm_rpc_url: None,
+                evm_data_payments_address: options.evm_data_payments_address.clone(),
+                evm_payment_token_address: options.evm_payment_token_address.clone(),
+                evm_rpc_url: options.evm_rpc_url.clone(),
                 funding_wallet_address: None,
                 rewards_address: options.rewards_address.clone(),
             },
@@ -120,19 +109,18 @@ impl TestnetDeployer {
         .await?;
 
         let mut provision_options = ProvisionOptions::from(options.clone());
-        let local_evm_node_data = if options.evm_network == EvmNetwork::Custom {
+        let anvil_node_data = if options.evm_network == EvmNetwork::Anvil {
             self.ansible_provisioner
-                .print_ansible_run_banner(n, total, "Provision EVM Node");
+                .print_ansible_run_banner("Provision Anvil Node");
             self.ansible_provisioner
                 .provision_evm_nodes(&provision_options)
                 .map_err(|err| {
                     println!("Failed to provision evm node {err:?}");
                     err
                 })?;
-            n += 1;
 
             Some(
-                get_local_evm_node_data(&self.ansible_provisioner.ansible_runner, &self.ssh_client)
+                get_anvil_node_data(&self.ansible_provisioner.ansible_runner, &self.ssh_client)
                     .map_err(|err| {
                         println!("Failed to get evm testnet data {err:?}");
                         err
@@ -145,7 +133,7 @@ impl TestnetDeployer {
         let funding_wallet_address = if let Some(secret_key) = &options.funding_wallet_secret_key {
             let address = get_address_from_sk(secret_key)?;
             Some(address.encode_hex())
-        } else if let Some(emv_data) = &local_evm_node_data {
+        } else if let Some(emv_data) = &anvil_node_data {
             let address = get_address_from_sk(&emv_data.deployer_wallet_private_key)?;
             Some(address.encode_hex())
         } else {
@@ -153,7 +141,7 @@ impl TestnetDeployer {
             None
         };
 
-        if let Some(custom_evm) = local_evm_node_data {
+        if let Some(custom_evm) = anvil_node_data {
             provision_options.evm_data_payments_address =
                 Some(custom_evm.data_payments_address.clone());
             provision_options.evm_payment_token_address =
@@ -181,25 +169,23 @@ impl TestnetDeployer {
 
         if build_custom_binaries {
             self.ansible_provisioner
-                .print_ansible_run_banner(n, total, "Build Custom Binaries");
+                .print_ansible_run_banner("Build Custom Binaries");
             self.ansible_provisioner
                 .build_safe_network_binaries(&provision_options)
                 .map_err(|err| {
                     println!("Failed to build safe network binaries {err:?}");
                     err
                 })?;
-            n += 1;
         }
 
         self.ansible_provisioner
-            .print_ansible_run_banner(n, total, "Provision Genesis Node");
+            .print_ansible_run_banner("Provision Genesis Node");
         self.ansible_provisioner
             .provision_genesis_node(&provision_options)
             .map_err(|err| {
                 println!("Failed to provision genesis node {err:?}");
                 err
             })?;
-        n += 1;
         let (genesis_multiaddr, _) =
             get_genesis_multiaddr(&self.ansible_provisioner.ansible_runner, &self.ssh_client)
                 .map_err(|err| {
@@ -210,7 +196,7 @@ impl TestnetDeployer {
 
         let mut node_provision_failed = false;
         self.ansible_provisioner
-            .print_ansible_run_banner(n, total, "Provision Bootstrap Nodes");
+            .print_ansible_run_banner("Provision Bootstrap Nodes");
         match self.ansible_provisioner.provision_nodes(
             &provision_options,
             &genesis_multiaddr,
@@ -224,10 +210,9 @@ impl TestnetDeployer {
                 node_provision_failed = true;
             }
         }
-        n += 1;
 
         self.ansible_provisioner
-            .print_ansible_run_banner(n, total, "Provision Normal Nodes");
+            .print_ansible_run_banner("Provision Normal Nodes");
         match self.ansible_provisioner.provision_nodes(
             &provision_options,
             &genesis_multiaddr,
@@ -241,7 +226,6 @@ impl TestnetDeployer {
                 node_provision_failed = true;
             }
         }
-        n += 1;
 
         if should_provision_private_nodes {
             let private_nodes = self
@@ -255,7 +239,7 @@ impl TestnetDeployer {
 
             provision_options.private_node_vms = private_nodes;
             self.ansible_provisioner
-                .print_ansible_run_banner(n, total, "Provision NAT Gateway");
+                .print_ansible_run_banner("Provision NAT Gateway");
             self.ansible_provisioner
                 .provision_nat_gateway(&provision_options)
                 .map_err(|err| {
@@ -263,10 +247,8 @@ impl TestnetDeployer {
                     err
                 })?;
 
-            n += 1;
-
             self.ansible_provisioner
-                .print_ansible_run_banner(n, total, "Provision Private Nodes");
+                .print_ansible_run_banner("Provision Private Nodes");
             match self
                 .ansible_provisioner
                 .provision_private_nodes(&mut provision_options, &genesis_multiaddr)
@@ -279,12 +261,11 @@ impl TestnetDeployer {
                     node_provision_failed = true;
                 }
             }
-            n += 1;
         }
 
         if options.current_inventory.is_empty() {
             self.ansible_provisioner
-                .print_ansible_run_banner(n, total, "Provision Uploaders");
+                .print_ansible_run_banner("Provision Uploaders");
             self.ansible_provisioner
                 .provision_uploaders(&provision_options, &genesis_multiaddr)
                 .await
