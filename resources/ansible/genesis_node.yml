@@ -18,6 +18,8 @@
   roles:
     - role: safe_user
       become: True
+    - role: attach_volume
+      become: True
     - {
         role: format_disk,
         become: True,

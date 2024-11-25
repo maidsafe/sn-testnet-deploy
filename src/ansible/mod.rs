@@ -76,6 +76,11 @@ pub enum AnsiblePlaybook {
     ///
     /// Use in combination with `AnsibleInventoryType::EvmNodes`.
     EvmNodes,
+    /// The extend volume size playbook will extend the logical volume size on the machines it is run against.
+    /// The physical volume sizes should be extended before running this playbook.
+    ///
+    /// Use in combination with `AnsibleInventoryType::iter_node_type()`.
+    ExtendVolumeSize,
     /// The faucet playbook will provision setup the faucet to run as a service. The faucet is
     /// typically running on the genesis node.
     ///
@@ -105,8 +110,7 @@ pub enum AnsiblePlaybook {
     /// The node playbook will setup any nodes except the genesis node. These nodes will bootstrap
     /// using genesis as a peer reference.
     ///
-    /// Use in combination with `AnsibleInventoryType::Genesis`, `AnsibleInventoryType::Nodes`,
-    /// `AnsibleInventoryType::PrivateNodes` or `AnsibleInventoryType::Bootstrap`.
+    /// Use in combination with `AnsibleInventoryType::iter_node_type()`.
     Nodes,
     /// The rpc client playbook will setup the `safenode_rpc_client` binary on the genesis node.
     ///
@@ -178,6 +182,7 @@ impl AnsiblePlaybook {
             AnsiblePlaybook::ConfigureSwapfile => "configure_swapfile.yml".to_string(),
             AnsiblePlaybook::CopyLogs => "copy_logs.yml".to_string(),
             AnsiblePlaybook::EvmNodes => "evm_nodes.yml".to_string(),
+            AnsiblePlaybook::ExtendVolumeSize => "extend_volume_size.yml".to_string(),
             AnsiblePlaybook::Faucet => "faucet.yml".to_string(),
             AnsiblePlaybook::FundUploaders => "fund_uploaders.yml".to_string(),
             AnsiblePlaybook::Genesis => "genesis_node.yml".to_string(),

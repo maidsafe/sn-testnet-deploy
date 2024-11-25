@@ -111,3 +111,29 @@ variable "evm_node_droplet_size" {
 variable "evm_node_droplet_image_id" {
   description = "The ID of the EVM node droplet image. Varies per environment type."
 }
+
+variable "volumes_per_node" {
+  description = "Number of volumes to attach to each node VM. This is set to the maximum number of volumes that can be attached to a droplet."
+  type        = number
+  default     = 7
+}
+
+variable "bootstrap_node_volume_size" {
+  description = "Size of each volume in GB for bootstrap nodes"
+  type        = number
+}
+
+variable "genesis_node_volume_size" {
+  description = "Size of each volume in GB for the genesis node"
+  type        = number
+}
+
+variable "node_volume_size" {
+  description = "Size of each volume in GB for generic nodes"
+  type        = number
+}
+
+variable "private_node_volume_size" {
+  description = "Size of each volume in GB for private nodes"
+  type        = number
+}

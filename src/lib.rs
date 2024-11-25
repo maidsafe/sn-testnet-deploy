@@ -61,14 +61,18 @@ const ANSIBLE_DEFAULT_FORKS: usize = 50;
 pub struct InfraRunOptions {
     pub bootstrap_node_vm_count: Option<u16>,
     pub bootstrap_node_vm_size: Option<String>,
+    pub bootstrap_node_volume_size: Option<u16>,
     pub enable_build_vm: bool,
     pub evm_node_count: Option<u16>,
     pub evm_node_vm_size: Option<String>,
     pub genesis_vm_count: Option<u16>,
+    pub genesis_node_volume_size: Option<u16>,
     pub name: String,
     pub node_vm_count: Option<u16>,
     pub node_vm_size: Option<String>,
+    pub node_volume_size: Option<u16>,
     pub private_node_vm_count: Option<u16>,
+    pub private_node_volume_size: Option<u16>,
     pub tfvars_filename: String,
     pub uploader_vm_count: Option<u16>,
     pub uploader_vm_size: Option<String>,
@@ -841,7 +845,7 @@ impl TestnetDeployer {
         Ok(())
     }
 
-    fn create_or_update_infra(&self, options: &InfraRunOptions) -> Result<()> {
+    pub fn create_or_update_infra(&self, options: &InfraRunOptions) -> Result<()> {
         let start = Instant::now();
         println!("Selecting {} workspace...", options.name);
         self.terraform_runner.workspace_select(&options.name)?;
@@ -910,6 +914,28 @@ impl TestnetDeployer {
             args.push((
                 "evm_node_droplet_size".to_string(),
                 evm_node_vm_size.clone(),
+            ));
+        }
+
+        if let Some(bootstrap_node_volume_size) = options.bootstrap_node_volume_size {
+            args.push((
+                "bootstrap_node_volume_size".to_string(),
+                bootstrap_node_volume_size.to_string(),
+            ));
+        }
+        if let Some(genesis_node_volume_size) = options.genesis_node_volume_size {
+            args.push((
+                "genesis_node_volume_size".to_string(),
+                genesis_node_volume_size.to_string(),
+            ));
+        }
+        if let Some(node_volume_size) = options.node_volume_size {
+            args.push(("node_volume_size".to_string(), node_volume_size.to_string()));
+        }
+        if let Some(private_node_volume_size) = options.private_node_volume_size {
+            args.push((
+                "private_node_volume_size".to_string(),
+                private_node_volume_size.to_string(),
             ));
         }
 

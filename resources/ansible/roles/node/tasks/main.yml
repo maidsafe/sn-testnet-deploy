@@ -75,6 +75,8 @@
       - "{{ binary_dir }}/safenode-manager"
       - -v
       - add
+      - --data-dir-path=/mnt/safenode-storage/data
+      - --log-dir-path=/mnt/safenode-storage/log
       - "--count={{ nodes_to_add }}"
       - "--owner=maidsafe"
       - "--peer={{ genesis_multiaddr }}"

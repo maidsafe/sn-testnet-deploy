@@ -1,8 +1,8 @@
 #!/bin/bash
 
-NODE_ROOT_DIR_PATH="/var/safenode-manager/services"
-NODE_LOG_DIR_PATH="/var/log/safenode"
-LOGFILE=/var/log/safenode/resource-usage.log
+NODE_ROOT_DIR_PATH="/mnt/safenode-storage/safenode-manager/services"
+NODE_LOG_DIR_PATH="/mnt/safenode-storage/log/safenode"
+LOGFILE=/mnt/safenode-storage/log/safenode/resource-usage.log
 
 exec > >(tee -a $LOGFILE) 2>&1
 

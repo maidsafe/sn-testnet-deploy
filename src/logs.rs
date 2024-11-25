@@ -133,7 +133,9 @@ impl TestnetDeployer {
         let vm_path = log_abs_dest.join(vm_name);
         let mut rsync_args_clone = rsync_args.to_vec();
 
-        rsync_args_clone.push(format!("safe@{ip_address}:/var/log/safenode/"));
+        rsync_args_clone.push(format!(
+            "safe@{ip_address}:/mnt/safenode-storage/log/safenode/"
+        ));
         rsync_args_clone.push(vm_path.to_string_lossy().to_string());
 
         debug!("Rsync logs to our machine for {vm_name:?} : {ip_address}");
@@ -155,7 +157,7 @@ impl TestnetDeployer {
         let all_node_inventory = self.get_all_node_inventory(name)?;
         let log_abs_dest = create_initial_log_dir_setup(&root_dir, name, &all_node_inventory)?;
 
-        let rg_cmd = format!("rg {rg_args} /var/log/safenode/");
+        let rg_cmd = format!("rg {rg_args} /mnt/safenode-storage/log/safenode/");
         println!("Running ripgrep with command: {rg_cmd}");
 
         // Get current date and time
