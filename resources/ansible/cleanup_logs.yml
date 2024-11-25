@@ -6,7 +6,7 @@
   tasks:
     - name: remove rotated logs
       shell: |
-        for file in $(find /var/log/safenode/ -name "*.gz"); do
+        for file in $(find /mnt/safenode-storage/log/safenode/ -name "*.gz"); do
           rm $file
         done
 
@@ -14,6 +14,6 @@
       ansible.builtin.cron:
         name: "cleanup_logs"
         minute: "*/10"
-        job: "find /var/log/safenode/ -name \"*.gz\" -exec rm {} \\;"
+        job: "find /mnt/safenode-storage/log/safenode/ -name \"*.gz\" -exec rm {} \\;"
         state: present
       when: setup_cron == "true"

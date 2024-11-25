@@ -7,4 +7,4 @@ branch: main
 safenode_rpc_client_archive_filename: safenode_rpc_client-latest-x86_64-unknown-linux-musl.tar.gz
 safenode_rpc_client_archive_url: https://sn-node-rpc-client.s3.eu-west-2.amazonaws.com/{{ safenode_rpc_client_archive_filename }}
 safenode_rpc_client_archive_dest_path: /usr/local/bin
-royalties_cash_notes_dir_path: /var/log/safenode/royalties-cash-notes
+royalties_cash_notes_dir_path: /mnt/safenode-storage/log/safenode/royalties-cash-notes

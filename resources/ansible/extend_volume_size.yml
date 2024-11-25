@@ -1,0 +1,20 @@
+---
+- name: extend the attached volume sizes
+  hosts: all
+  tasks:
+    - name: resize the physical volume
+      command: pvresize /dev/{{ item }}
+      loop:
+        - sda
+        - sdb
+        - sdc
+        - sdd
+        - sde
+        - sdf
+        - sdg
+
+    - name: extend the logical volume
+      command: lvextend -l +100%FREE /dev/lvm_vol_group/striped_logical_volume
+
+    - name: resize the filesystem
+      command: resize2fs /dev/lvm_vol_group/striped_logical_volume
