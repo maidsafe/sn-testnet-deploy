@@ -51,7 +51,7 @@ resource "digitalocean_droplet" "nat_gateway" {
 }
 
 resource "digitalocean_droplet" "node" {
-  count    = var.node_vm_count 
+  count    = var.node_vm_count
   image    = var.node_droplet_image_id
   name     = "${terraform.workspace}-node-${count.index + 1}"
   region   = var.region
@@ -88,4 +88,82 @@ resource "digitalocean_droplet" "evm_node" {
   size     = var.evm_node_droplet_size
   ssh_keys = var.droplet_ssh_keys
   tags     = ["environment:${terraform.workspace}", "type:evm_node"]
+}
+
+locals {
+  bootstrap_node_volume_keys = flatten([
+    for node_index in range(var.bootstrap_node_vm_count) : [
+      for volume_index in range(var.volumes_per_node) : "${node_index+1}-${volume_index+1}"
+    ]
+  ])
+
+  genesis_node_volume_keys = flatten([
+    for node_index in range(var.genesis_vm_count) : [
+      for volume_index in range(var.volumes_per_node) : "${node_index+1}-${volume_index+1}"
+    ]
+  ])
+
+  node_volume_keys = flatten([
+    for node_index in range(var.node_vm_count) : [
+      for volume_index in range(var.volumes_per_node) : "${node_index+1}-${volume_index+1}"
+    ]
+  ])
+
+  private_node_volume_keys = flatten([
+    for node_index in range(var.private_node_vm_count) : [
+      for volume_index in range(var.volumes_per_node) : "${node_index+1}-${volume_index+1}"
+    ]
+  ])
+}
+
+resource "digitalocean_volume" "bootstrap_node_attached_volume" {
+  for_each = { for key in local.bootstrap_node_volume_keys : key => key }
+  name        = lower("${terraform.workspace}-bootstrap-node-${split("-", each.key)[0]}-volume-${split("-", each.key)[1]}")
+  size        = var.bootstrap_node_volume_size
+  region      = var.region
+}
+
+resource "digitalocean_volume_attachment" "bootstrap_node_volume_attachment" {
+  for_each = { for key in local.bootstrap_node_volume_keys : key => key }
+  droplet_id = digitalocean_droplet.bootstrap_node[tonumber(split("-", each.key)[0]) -1 ].id
+  volume_id  = digitalocean_volume.bootstrap_node_attached_volume[each.key].id
+}
+
+resource "digitalocean_volume" "genesis_node_attached_volume" {
+  for_each = { for key in local.genesis_node_volume_keys : key => key }
+  name        = lower("${terraform.workspace}-genesis-bootstrap-${split("-", each.key)[0]}-volume-${split("-", each.key)[1]}")
+  size        = var.genesis_node_volume_size
+  region      = var.region
+}
+
+resource "digitalocean_volume_attachment" "genesis_node_volume_attachment" {
+  for_each = { for key in local.genesis_node_volume_keys : key => key }
+  droplet_id = digitalocean_droplet.genesis_bootstrap[tonumber(split("-", each.key)[0]) -1 ].id
+  volume_id  = digitalocean_volume.genesis_node_attached_volume[each.key].id
+}
+
+resource "digitalocean_volume" "node_attached_volume" {
+  for_each = { for key in local.node_volume_keys : key => key }
+  name        = lower("${terraform.workspace}-node-${split("-", each.key)[0]}-volume-${split("-", each.key)[1]}")
+  size        = var.node_volume_size
+  region      = var.region
+}
+
+resource "digitalocean_volume_attachment" "node_volume_attachment" {
+  for_each = { for key in local.node_volume_keys : key => key }
+  droplet_id = digitalocean_droplet.node[tonumber(split("-", each.key)[0]) -1 ].id
+  volume_id  = digitalocean_volume.node_attached_volume[each.key].id
+}
+
+resource "digitalocean_volume" "private_node_attached_volume" {
+  for_each = { for key in local.private_node_volume_keys : key => key }
+  name        = lower("${terraform.workspace}-private-node-${split("-", each.key)[0]}-volume-${split("-", each.key)[1]}")
+  size        = var.private_node_volume_size
+  region      = var.region
+}
+
+resource "digitalocean_volume_attachment" "private_node_volume_attachment" {
+  for_each = { for key in local.private_node_volume_keys : key => key }
+  droplet_id = digitalocean_droplet.private_node[tonumber(split("-", each.key)[0]) -1 ].id
+  volume_id  = digitalocean_volume.private_node_attached_volume[each.key].id
 }

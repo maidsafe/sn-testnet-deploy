@@ -30,6 +30,8 @@
       - -v
       - add
       - --first
+      - --data-dir-path=/mnt/safenode-storage/data
+      - --log-dir-path=/mnt/safenode-storage/log
       - "--rpc-address={{ node_rpc_ip }}"
       - "--rewards-address={{ rewards_address }}"
       - "--max-archived-log-files={{ max_archived_log_files }}"

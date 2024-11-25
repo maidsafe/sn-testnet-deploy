@@ -1,0 +1,94 @@
+- name: check fstab
+  command: cat /etc/fstab
+  register: fstab_output
+
+- name: set fact if volume is in fstab.
+  set_fact:
+    volume_in_fstab: "{{ '/dev/lvm_vol_group/striped_logical_volume' in fstab_output.stdout }}"
+
+# todo: use dynamic volume count
+- name: mark physical volume via lvm
+  command: pvcreate /dev/{{ item }}
+  loop:
+    - sda
+    - sdb
+    - sdc
+    - sdd
+    - sde
+    - sdf
+    - sdg
+  when: not volume_in_fstab
+
+- name: run pvs command
+  command: pvs
+  register: pvs_output
+  when: not volume_in_fstab
+
+- name: make sure physical volumes are registered via LVM
+  assert:
+    that:
+      - item in pvs_output.stdout
+    fail_msg: "Physical volume {{ item }} is registered via LVM"
+  loop:
+    - sda
+    - sdb
+    - sdc
+    - sdd
+    - sde
+    - sdf
+    - sdg
+  when: not volume_in_fstab
+
+- name: create a single volume group for sda
+  command: vgcreate lvm_vol_group /dev/sda
+  when: not volume_in_fstab
+
+- name: extend the volume group
+  command: vgextend lvm_vol_group /dev/{{ item }}
+  loop:
+    - sda
+    - sdb
+    - sdc
+    - sdd
+    - sde
+    - sdf
+    - sdg
+  ignore_errors: true
+  when: not volume_in_fstab
+
+- name: create a striped logical volume based off existing volume group
+  command: lvcreate --type striped -i 7 -l 100%FREE -n striped_logical_volume lvm_vol_group
+  when: not volume_in_fstab
+
+- name: format the logical volume
+  command: mkfs.ext4 /dev/lvm_vol_group/striped_logical_volume
+  when: not volume_in_fstab
+
+- name: create dir for mount point
+  command: mkdir -p /mnt/safenode-storage
+  when: not volume_in_fstab
+
+- name: create subdirs
+  command: mkdir -p /mnt/safenode-storage/{{ item }}
+  loop: 
+    - data
+    - log
+  when: not volume_in_fstab
+
+- name: mount the logical volume
+  command: mount -o discard,defaults,noatime /dev/lvm_vol_group/striped_logical_volume /mnt/safenode-storage
+  when: not volume_in_fstab
+
+- name: check fstab
+  command: cat /etc/fstab
+  register: fstab_output
+  when: not volume_in_fstab
+
+- name: set fact if volume is in fstab
+  set_fact:
+    volume_added_to_fstab: "{{ '/dev/lvm_vol_group/striped_logical_volume' in fstab_output.stdout }}"
+  when: not volume_in_fstab
+
+- name: change fstab so the volume will be mounted after a reboot
+  command: echo '/dev/lvm_vol_group/striped_logical_volume /mnt/safenode-storage ext4 defaults,nofail,discard 0 0' | sudo tee -a /etc/fstab
+  when: not volume_added_to_fstab and not volume_in_fstab

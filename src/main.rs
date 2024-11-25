@@ -32,8 +32,8 @@ use sn_testnet_deploy::{
     network_commands, notify_slack,
     setup::setup_dotenv_file,
     upscale::UpscaleOptions,
-    BinaryOption, CloudProvider, EnvironmentType, EvmNetwork, LogFormat, NodeType,
-    TestnetDeployBuilder, UpgradeOptions,
+    BinaryOption, CloudProvider, DeploymentType, EnvironmentType, EvmNetwork, InfraRunOptions,
+    LogFormat, NodeType, TestnetDeployBuilder, UpgradeOptions,
 };
 use std::{env, net::IpAddr};
 use std::{str::FromStr, time::Duration};
@@ -172,6 +172,13 @@ enum Commands {
         /// Override the size of the node VMs.
         #[clap(long)]
         node_vm_size: Option<String>,
+        /// The size of the volumes to attach to each node VM. This argument will set the size of all the 7 attached
+        /// volumes.
+        ///
+        /// If the argument is not used, the value will be determined by the 'environment-type'
+        /// argument.
+        #[clap(long)]
+        node_volume_size: Option<u16>,
         /// Optionally set the payment forward public key for a custom safenode binary.
         ///
         /// This argument only applies if the '--branch' and '--repo-owner' arguments are used.
@@ -192,6 +199,13 @@ enum Commands {
         /// If the argument is not used, the value will be determined by the 'environment-type'
         #[clap(long, verbatim_doc_comment)]
         private_node_vm_count: Option<u16>,
+        /// The size of the volumes to attach to each private node VM. This argument will set the size of all the
+        /// 7 attached volumes.
+        ///
+        /// If the argument is not used, the value will be determined by the 'environment-type'
+        /// argument.
+        #[clap(long)]
+        private_node_volume_size: Option<u16>,
         /// The cloud provider to deploy to.
         ///
         /// Valid values are "aws" or "digital-ocean".
@@ -292,6 +306,13 @@ enum Commands {
         /// Override the size of the bootstrap node VMs.
         #[clap(long)]
         bootstrap_node_vm_size: Option<String>,
+        /// The size of the volumes to attach to each bootstrap node VM. This argument will set the size of all the
+        /// 7 attached volumes.
+        ///
+        /// If the argument is not used, the value will be determined by the 'environment-type'
+        /// argument.
+        #[clap(long)]
+        bootstrap_node_volume_size: Option<u16>,
         /// Specify the chunk size for the custom binaries using a 64-bit integer.
         ///
         /// This option only applies if the --branch and --repo-owner arguments are used.
@@ -368,6 +389,13 @@ enum Commands {
         /// This argument only applies when Arbitrum or Sepolia networks are used.
         #[clap(long)]
         funding_wallet_secret_key: Option<String>,
+        /// The size of the volumes to attach to each genesis node VM. This argument will set the size of all the
+        /// 7 attached volumes.
+        ///
+        /// If the argument is not used, the value will be determined by the 'environment-type'
+        /// argument.
+        #[clap(long)]
+        genesis_node_volume_size: Option<u16>,
         /// Optionally set the genesis public key for a custom safenode binary.
         ///
         /// This argument only applies if the '--branch' and '--repo-owner' arguments are used.
@@ -426,6 +454,13 @@ enum Commands {
         /// Override the size of the node VMs.
         #[clap(long)]
         node_vm_size: Option<String>,
+        /// The size of the volumes to attach to each node VM. This argument will set the size of all the 7 attached
+        /// volumes.
+        ///
+        /// If the argument is not used, the value will be determined by the 'environment-type'
+        /// argument.
+        #[clap(long)]
+        node_volume_size: Option<u16>,
         /// Optionally set the payment forward public key for a custom safenode binary.
         ///
         /// This argument only applies if the '--branch' and '--repo-owner' arguments are used.
@@ -446,6 +481,13 @@ enum Commands {
         /// If the argument is not used, the value will be determined by the 'environment-type'
         #[clap(long, verbatim_doc_comment)]
         private_node_vm_count: Option<u16>,
+        /// The size of the volumes to attach to each private node VM. This argument will set the size of all the
+        /// 7 attached volumes.
+        ///
+        /// If the argument is not used, the value will be determined by the 'environment-type'
+        /// argument.
+        #[clap(long)]
+        private_node_volume_size: Option<u16>,
         /// Protocol version is used to partition the network and will not allow nodes with
         /// different protocol versions to join.
         ///
@@ -523,6 +565,45 @@ enum Commands {
         /// Override the size of the uploader VMs.
         #[clap(long)]
         uploader_vm_size: Option<String>,
+    },
+    ExtendVolumeSize {
+        /// Set to run Ansible with more verbose output.
+        #[arg(long)]
+        ansible_verbose: bool,
+        /// The new size of the volumes attached to each bootstrap node VM. This argument will scale up the size of all
+        /// the 7 attached volumes.
+        ///
+        /// If the argument is not used, the value will be determined by the 'environment-type'
+        /// argument.
+        #[clap(long)]
+        bootstrap_node_volume_size: Option<u16>,
+        /// The new size of the volumes attached to each genesis node VM. This argument will scale up the size of all
+        /// the 7 attached volumes.
+        ///
+        /// If the argument is not used, the value will be determined by the 'environment-type'
+        /// argument.
+        #[clap(long)]
+        genesis_node_volume_size: Option<u16>,
+        /// The name of the environment.
+        #[arg(short = 'n', long)]
+        name: String,
+        /// The new size of the volumes attached to each node VM. This argument will scale up the size of all
+        /// the 7 attached volumes.
+        ///
+        /// If the argument is not used, the value will be determined by the 'environment-type'
+        /// argument.
+        #[clap(long)]
+        node_volume_size: Option<u16>,
+        /// The new size of the volumes attached to each private node VM. This argument will scale up the size of all
+        /// the 7 attached volumes.
+        ///
+        /// If the argument is not used, the value will be determined by the 'environment-type'
+        /// argument.
+        #[clap(long)]
+        private_node_volume_size: Option<u16>,
+        /// The cloud provider for the environment.
+        #[clap(long, value_parser = parse_provider, verbatim_doc_comment, default_value_t = CloudProvider::DigitalOcean)]
+        provider: CloudProvider,
     },
     /// Manage the faucet for an environment
     #[clap(name = "faucet", subcommand)]
@@ -1384,12 +1465,14 @@ async fn main() -> Result<()> {
             network_royalties_pk,
             node_count,
             node_vm_count,
+            node_volume_size,
             node_vm_size,
             max_archived_log_files,
             max_log_files,
             payment_forward_pk,
             private_node_count,
             private_node_vm_count,
+            private_node_volume_size,
             provider,
             repo_owner,
             rewards_address,
@@ -1484,6 +1567,7 @@ async fn main() -> Result<()> {
                     log_format,
                     name: name.clone(),
                     node_count: node_count.unwrap_or(environment_type.get_default_node_count()),
+                    node_volume_size,
                     max_archived_log_files,
                     max_log_files,
                     node_vm_size,
@@ -1494,6 +1578,7 @@ async fn main() -> Result<()> {
                     private_node_vm_count,
                     private_node_count: private_node_count
                         .unwrap_or(environment_type.get_default_private_node_count()),
+                    private_node_volume_size,
                     node_vm_count,
                     rewards_address,
                     chunk_size,
@@ -1521,6 +1606,7 @@ async fn main() -> Result<()> {
             bootstrap_node_count,
             bootstrap_node_vm_count,
             bootstrap_node_vm_size,
+            bootstrap_node_volume_size,
             branch,
             chunk_size,
             downloaders_count,
@@ -1535,6 +1621,7 @@ async fn main() -> Result<()> {
             forks,
             foundation_pk,
             funding_wallet_secret_key,
+            genesis_node_volume_size,
             genesis_pk,
             interval,
             log_format,
@@ -1547,9 +1634,11 @@ async fn main() -> Result<()> {
             node_count,
             node_vm_count,
             node_vm_size,
+            node_volume_size,
             payment_forward_pk,
             private_node_count,
             private_node_vm_count,
+            private_node_volume_size,
             protocol_version,
             provider,
             public_rpc,
@@ -1662,6 +1751,7 @@ async fn main() -> Result<()> {
                     bootstrap_node_count: bootstrap_node_count
                         .unwrap_or(environment_type.get_default_bootstrap_node_count()),
                     bootstrap_node_vm_count,
+                    bootstrap_node_volume_size,
                     chunk_size,
                     current_inventory: inventory,
                     downloaders_count,
@@ -1673,12 +1763,14 @@ async fn main() -> Result<()> {
                     evm_rpc_url,
                     evm_node_vm_size,
                     funding_wallet_secret_key,
+                    genesis_node_volume_size,
                     interval,
                     log_format,
                     logstash_details,
                     name: name.clone(),
                     node_count: node_count.unwrap_or(environment_type.get_default_node_count()),
                     node_vm_count,
+                    node_volume_size,
                     max_archived_log_files,
                     max_log_files,
                     output_inventory_dir_path: inventory_service
@@ -1688,6 +1780,7 @@ async fn main() -> Result<()> {
                     private_node_vm_count,
                     private_node_count: private_node_count
                         .unwrap_or(environment_type.get_default_private_node_count()),
+                    private_node_volume_size,
                     public_rpc,
                     uploaders_count,
                     uploader_vm_count,
@@ -1727,6 +1820,92 @@ async fn main() -> Result<()> {
             inventory_service
                 .upload_network_contacts(&inventory, network_contacts_file_name)
                 .await?;
+
+            Ok(())
+        }
+        Commands::ExtendVolumeSize {
+            ansible_verbose,
+            bootstrap_node_volume_size,
+            genesis_node_volume_size,
+            node_volume_size,
+            name,
+            private_node_volume_size,
+            provider,
+        } => {
+            if bootstrap_node_volume_size.is_none()
+                && genesis_node_volume_size.is_none()
+                && node_volume_size.is_none()
+                && private_node_volume_size.is_none()
+            {
+                return Err(eyre!("At least one volume size must be provided"));
+            }
+
+            println!("Extending attached volume size...");
+            let testnet_deployer = TestnetDeployBuilder::default()
+                .ansible_verbose_mode(ansible_verbose)
+                .environment_name(&name)
+                .provider(provider)
+                .build()?;
+            testnet_deployer.init().await?;
+
+            let inventory_service = DeploymentInventoryService::from(&testnet_deployer);
+            let inventory = inventory_service
+                .generate_or_retrieve_inventory(&name, true, None)
+                .await?;
+
+            testnet_deployer
+                .create_or_update_infra(&InfraRunOptions {
+                    bootstrap_node_vm_count: Some(inventory.bootstrap_node_vms.len() as u16),
+                    bootstrap_node_vm_size: None,
+                    bootstrap_node_volume_size,
+                    enable_build_vm: false,
+                    evm_node_count: Some(match inventory.environment_details.evm_network {
+                        EvmNetwork::Anvil => 1,
+                        EvmNetwork::Custom => 0,
+                        EvmNetwork::ArbitrumOne => 0,
+                        EvmNetwork::ArbitrumSepolia => 0,
+                    }),
+                    evm_node_vm_size: None,
+                    genesis_vm_count: Some(match inventory.environment_details.deployment_type {
+                        DeploymentType::New => 1,
+                        DeploymentType::Bootstrap => 0,
+                    }),
+                    genesis_node_volume_size,
+                    name: inventory.name.clone(),
+                    node_vm_count: Some(inventory.node_vms.len() as u16),
+                    node_vm_size: None,
+                    node_volume_size,
+                    private_node_vm_count: Some(inventory.private_node_vms.len() as u16),
+                    private_node_volume_size,
+                    tfvars_filename: inventory.get_tfvars_filename(),
+                    uploader_vm_count: Some(inventory.uploader_vms.len() as u16),
+                    uploader_vm_size: None,
+                })
+                .map_err(|err| {
+                    println!("Failed to create infra {err:?}");
+                    err
+                })?;
+
+            let ansible_runner = testnet_deployer.ansible_provisioner.ansible_runner;
+
+            let mut node_types = Vec::new();
+            if bootstrap_node_volume_size.is_some() {
+                node_types.push(AnsibleInventoryType::BootstrapNodes);
+            }
+            if genesis_node_volume_size.is_some() {
+                node_types.push(AnsibleInventoryType::Genesis);
+            }
+            if node_volume_size.is_some() {
+                node_types.push(AnsibleInventoryType::Nodes);
+            }
+            if private_node_volume_size.is_some() {
+                node_types.push(AnsibleInventoryType::PrivateNodes);
+            }
+
+            for node_type in node_types {
+                println!("Extending volume size for {node_type} nodes...");
+                ansible_runner.run_playbook(AnsiblePlaybook::ExtendVolumeSize, node_type, None)?;
+            }
 
             Ok(())
         }
