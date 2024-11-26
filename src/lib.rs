@@ -78,6 +78,134 @@ pub struct InfraRunOptions {
     pub uploader_vm_size: Option<String>,
 }
 
+impl InfraRunOptions {
+    /// Generate the options for an existing deployment.
+    /// This does not set the vm_size fields, as they are obtained from the tfvars file.
+    pub fn generate_from_deployment(
+        inventory: &DeploymentInventory,
+        terraform_runner: &TerraformRunner,
+    ) -> Result<Self> {
+        let resources = terraform_runner.show(&inventory.name)?;
+        let get_value_for_a_resource = |resource_name: &str,
+                                        field_name: &str|
+         -> Result<serde_json::Value, Error> {
+            let vm_size = resources
+                .iter()
+                .filter(|r| r.resource_name == resource_name)
+                .try_fold(None, |vm_size: Option<serde_json::Value>, r| {
+                    let Some(size) = r.values.get(field_name) else {
+                        log::error!("Failed to obtain '{field_name}' value for {resource_name}");
+                        return Err(Error::TerraformResourceFieldMissing(field_name.to_string()));
+                    };
+                    match vm_size {
+                        Some(ref existing_size) if existing_size != size => {
+                            log::error!("Expected value: {existing_size}, got value: {size}");
+                            Err(Error::TerraformResourceValueMismatch {
+                                expected: existing_size.to_string(),
+                                actual: size.to_string(),
+                            })
+                        }
+                        _ => Ok(Some(size.clone())),
+                    }
+                })?;
+
+            vm_size.ok_or(Error::TerraformResourceFieldMissing(field_name.to_string()))
+        };
+
+        let enable_build_vm = resources.iter().any(|r| r.resource_name == "build");
+
+        let bootstrap_node_vm_count = inventory.bootstrap_node_vms.len() as u16;
+        let bootstrap_node_volume_size = if bootstrap_node_vm_count > 0 {
+            let volume_size = get_value_for_a_resource("bootstrap_node_attached_volume", "size")?
+                .as_u64()
+                .ok_or_else(|| {
+                    log::error!(
+                        "Failed to obtain u64 'size' value for bootstrap_node_attached_volume"
+                    );
+                    Error::TerraformResourceFieldMissing("size".to_string())
+                })?;
+            Some(volume_size as u16)
+        } else {
+            None
+        };
+
+        let genesis_vm_count = match inventory.environment_details.deployment_type {
+            DeploymentType::New => 1,
+            DeploymentType::Bootstrap => 0,
+        };
+        let genesis_node_volume_size = if genesis_vm_count > 0 {
+            let genesis_node_volume_size =
+                get_value_for_a_resource("genesis_node_attached_volume", "size")?
+                    .as_u64()
+                    .ok_or_else(|| {
+                        log::error!(
+                            "Failed to obtain u64 'size' value for genesis_node_attached_volume"
+                        );
+                        Error::TerraformResourceFieldMissing("size".to_string())
+                    })?;
+            Some(genesis_node_volume_size as u16)
+        } else {
+            None
+        };
+
+        let node_vm_count = inventory.node_vms.len() as u16;
+        let node_volume_size = if node_vm_count > 0 {
+            let node_volume_size = get_value_for_a_resource("node_attached_volume", "size")?
+                .as_u64()
+                .ok_or_else(|| {
+                    log::error!("Failed to obtain u64 'size' value for node_attached_volume");
+                    Error::TerraformResourceFieldMissing("size".to_string())
+                })?;
+            Some(node_volume_size as u16)
+        } else {
+            None
+        };
+
+        let private_node_vm_count = inventory.private_node_vms.len() as u16;
+        let private_node_volume_size = if private_node_vm_count > 0 {
+            let private_node_volume_size =
+                get_value_for_a_resource("private_node_attached_volume", "size")?
+                    .as_u64()
+                    .ok_or_else(|| {
+                        log::error!(
+                            "Failed to obtain u64 'size' value for private_node_attached_volume"
+                        );
+                        Error::TerraformResourceFieldMissing("size".to_string())
+                    })?;
+            Some(private_node_volume_size as u16)
+        } else {
+            None
+        };
+
+        let options = Self {
+            bootstrap_node_vm_count: Some(bootstrap_node_vm_count),
+            bootstrap_node_vm_size: None, // vm_size is obtained from the tfvars file
+            bootstrap_node_volume_size,
+            enable_build_vm,
+            evm_node_count: Some(match inventory.environment_details.evm_network {
+                EvmNetwork::Anvil => 1,
+                EvmNetwork::Custom => 0,
+                EvmNetwork::ArbitrumOne => 0,
+                EvmNetwork::ArbitrumSepolia => 0,
+            }),
+            evm_node_vm_size: None, // vm_size is obtained from the tfvars file
+            genesis_vm_count: Some(genesis_vm_count),
+            genesis_node_volume_size,
+            name: inventory.name.clone(),
+            node_vm_count: Some(node_vm_count),
+            node_vm_size: None, // vm_size is obtained from the tfvars file
+            node_volume_size,
+            private_node_vm_count: Some(private_node_vm_count),
+            private_node_volume_size,
+            tfvars_filename: inventory.get_tfvars_filename(),
+            uploader_vm_count: Some(inventory.uploader_vms.len() as u16),
+            uploader_vm_size: None, // vm_size is obtained from the tfvars file
+        };
+
+        Ok(options)
+    }
+}
+
 #[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
 pub enum DeploymentType {
     /// The deployment has been bootstrapped from an existing network.

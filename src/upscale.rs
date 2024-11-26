@@ -7,8 +7,8 @@
 use crate::{
     ansible::{inventory::AnsibleInventoryType, provisioning::ProvisionOptions},
     error::{Error, Result},
-    get_genesis_multiaddr, get_multiaddr, DeploymentInventory, DeploymentType, EvmNetwork,
-    InfraRunOptions, NodeType, TestnetDeployer,
+    get_genesis_multiaddr, get_multiaddr, DeploymentInventory, DeploymentType, InfraRunOptions,
+    NodeType, TestnetDeployer,
 };
 use colored::Colorize;
 use evmlib::common::U256;
@@ -157,45 +157,20 @@ impl TestnetDeployer {
             return Ok(());
         }
 
-        self.create_or_update_infra(&InfraRunOptions {
-            bootstrap_node_vm_count: Some(desired_bootstrap_node_vm_count),
-            bootstrap_node_vm_size: None,
-            bootstrap_node_volume_size: None,
-            enable_build_vm: false,
-            evm_node_count: Some(
-                match options.current_inventory.environment_details.evm_network {
-                    EvmNetwork::Anvil => 1,
-                    EvmNetwork::Custom => 0,
-                    EvmNetwork::ArbitrumOne => 0,
-                    EvmNetwork::ArbitrumSepolia => 0,
-                },
-            ),
-            evm_node_vm_size: None,
-            genesis_vm_count: Some(
-                match options
-                    .current_inventory
-                    .environment_details
-                    .deployment_type
-                {
-                    DeploymentType::New => 1,
-                    DeploymentType::Bootstrap => 0,
-                },
-            ),
-            genesis_node_volume_size: None,
-            name: options.current_inventory.name.clone(),
-            node_vm_count: Some(desired_node_vm_count),
-            node_vm_size: None,
-            node_volume_size: None,
-            private_node_vm_count: Some(desired_private_node_vm_count),
-            private_node_volume_size: None,
-            tfvars_filename: options.current_inventory.get_tfvars_filename(),
-            uploader_vm_count: Some(desired_uploader_vm_count),
-            uploader_vm_size: None,
-        })
-        .map_err(|err| {
-            println!("Failed to create infra {err:?}");
-            err
-        })?;
+        let mut infra_run_options = InfraRunOptions::generate_from_deployment(
+            &options.current_inventory,
+            &self.terraform_runner,
+        )?;
+        infra_run_options.bootstrap_node_vm_count = Some(desired_bootstrap_node_vm_count);
+        infra_run_options.node_vm_count = Some(desired_node_vm_count);
+        infra_run_options.private_node_vm_count = Some(desired_private_node_vm_count);
+        infra_run_options.uploader_vm_count = Some(desired_uploader_vm_count);
+
+        self.create_or_update_infra(&infra_run_options)
+            .map_err(|err| {
+                println!("Failed to create infra {err:?}");
+                err
+            })?;
 
         if options.infra_only {
             return Ok(());
@@ -420,29 +395,16 @@ impl TestnetDeployer {
         }
 
         if !options.provision_only {
-            self.create_or_update_infra(&InfraRunOptions {
-                bootstrap_node_vm_count: None,
-                bootstrap_node_vm_size: None,
-                bootstrap_node_volume_size: None,
-                enable_build_vm: false,
-                evm_node_count: None,
-                evm_node_vm_size: None,
-                genesis_vm_count: None,
-                genesis_node_volume_size: None,
-                name: options.current_inventory.name.clone(),
-                node_vm_count: None,
-                node_vm_size: None,
-                node_volume_size: None,
-                private_node_vm_count: None,
-                private_node_volume_size: None,
-                tfvars_filename: options.current_inventory.get_tfvars_filename(),
-                uploader_vm_count: Some(desired_uploader_vm_count),
-                uploader_vm_size: None,
-            })
-            .map_err(|err| {
-                println!("Failed to create infra {err:?}");
-                err
-            })?;
+            let mut infra_run_options = InfraRunOptions::generate_from_deployment(
+                &options.current_inventory,
+                &self.terraform_runner,
+            )?;
+            infra_run_options.uploader_vm_count = Some(desired_uploader_vm_count);
+            self.create_or_update_infra(&infra_run_options)
+                .map_err(|err| {
+                    println!("Failed to create infra {err:?}");
+                    err
+                })?;
         }
 
         if options.infra_only {

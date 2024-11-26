@@ -161,6 +161,14 @@ pub enum Error {
     StripPrefixError(#[from] std::path::StripPrefixError),
     #[error(transparent)]
     TemplateError(#[from] indicatif::style::TemplateError),
+    #[error("Terraform show failed")]
+    TerraformShowFailed,
+    #[error("Terraform resource not found {0}")]
+    TerraformResourceNotFound(String),
+    #[error("Missing terraform resource field {0}")]
+    TerraformResourceFieldMissing(String),
+    #[error("Mismatch of a terraform resource value {expected} != {actual}")]
+    TerraformResourceValueMismatch { expected: String, actual: String },
     #[error("The '{0}' binary was not found. It is required for the deploy process. Make sure it is installed.")]
     ToolBinaryNotFound(String),
     #[error("The {0} type is not yet supported for an upscaling provision")]

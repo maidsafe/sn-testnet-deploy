@@ -8,7 +8,8 @@ use crate::{
     error::{Error, Result},
     is_binary_on_path, run_external_command, CloudProvider,
 };
-use std::path::PathBuf;
+use serde::{Deserialize, Serialize};
+use std::{collections::HashMap, path::PathBuf};
 
 #[derive(Clone)]
 pub struct TerraformRunner {
@@ -120,6 +121,23 @@ impl TerraformRunner {
         Ok(())
     }
 
+    pub fn show(&self, name: &str) -> Result<Vec<TerraformResource>> {
+        self.workspace_select(name)?;
+
+        let output = run_external_command(
+            self.binary_path.clone(),
+            self.working_directory_path.clone(),
+            vec!["show".to_string(), "--json".to_string()],
+            true,
+            false,
+        )?;
+
+        let output = output.first().ok_or(Error::TerraformShowFailed)?;
+        let show_output: Output = serde_json::from_str(output)?;
+
+        Ok(show_output.values.root_module.resources)
+    }
+
     pub fn workspace_delete(&self, name: &str) -> Result<()> {
         run_external_command(
             self.binary_path.clone(),
@@ -176,4 +194,31 @@ impl TerraformRunner {
         )?;
         Ok(())
     }
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+struct Output {
+    values: Values,
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+struct Values {
+    root_module: Module,
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+struct Module {
+    resources: Vec<TerraformResource>,
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+pub struct TerraformResource {
+    pub address: String,
+    #[serde(rename = "type")]
+    pub resource_type: String,
+    #[serde(rename = "name")]
+    pub resource_name: String,
+    pub index: Option<serde_json::Value>,
+    pub values: HashMap<String, serde_json::Value>,
+    pub sensitive_values: HashMap<String, serde_json::Value>,
 }
