@@ -90,10 +90,20 @@ impl TerraformRunner {
         Ok(())
     }
 
-    pub fn destroy(&self, tfvars_filename: Option<String>) -> Result<()> {
+    pub fn destroy(
+        &self,
+        vars: Option<Vec<(String, String)>>,
+        tfvars_filename: Option<String>,
+    ) -> Result<()> {
         let mut args = vec!["destroy".to_string(), "-auto-approve".to_string()];
         if let Some(tfvars_filename) = tfvars_filename {
             args.push(format!("-var-file={}", tfvars_filename));
+        }
+        if let Some(vars) = vars {
+            for var in vars.iter() {
+                args.push("-var".to_string());
+                args.push(format!("{}={}", var.0, var.1));
+            }
         }
         run_external_command(
             self.binary_path.clone(),

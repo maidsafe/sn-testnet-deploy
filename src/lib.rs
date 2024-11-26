@@ -22,6 +22,8 @@ pub mod ssh;
 pub mod terraform;
 pub mod upscale;
 
+const STORAGE_REQUIRED_PER_NODE: u16 = 7;
+
 use crate::{
     ansible::{
         extra_vars::ExtraVarsDocBuilder,
@@ -919,7 +921,7 @@ impl TestnetDeployer {
         Ok(())
     }
 
-    pub async fn clean(&self) -> Result<()> {
+    pub async fn clean(&self, inventory: &DeploymentInventory) -> Result<()> {
         let environment_details =
             get_environment_details(&self.environment_name, &self.s3_repository).await?;
 
@@ -966,6 +968,7 @@ impl TestnetDeployer {
             self.working_directory_path.clone(),
             &self.terraform_runner,
             None,
+            Some(inventory),
         )?;
         self.s3_repository
             .delete_object("sn-environment-type", &self.environment_name)
@@ -1297,6 +1300,7 @@ pub fn do_clean(
     working_directory_path: PathBuf,
     terraform_runner: &TerraformRunner,
     inventory_types: Option<Vec<AnsibleInventoryType>>,
+    inventory: Option<&DeploymentInventory>,
 ) -> Result<()> {
     terraform_runner.init()?;
     let workspaces = terraform_runner.workspace_list()?;
@@ -1306,7 +1310,36 @@ pub fn do_clean(
     terraform_runner.workspace_select(name)?;
     println!("Selected {name} workspace");
 
-    terraform_runner.destroy(environment_type.map(|et| et.get_tfvars_filename()))?;
+    let args = if let Some(inventory) = inventory {
+        let options = InfraRunOptions::generate_from_deployment(inventory, terraform_runner)?;
+        let mut args = Vec::new();
+        if let Some(bootstrap_node_volume_size) = options.bootstrap_node_volume_size {
+            args.push((
+                "bootstrap_node_volume_size".to_string(),
+                bootstrap_node_volume_size.to_string(),
+            ));
+        }
+        if let Some(genesis_node_volume_size) = options.genesis_node_volume_size {
+            args.push((
+                "genesis_node_volume_size".to_string(),
+                genesis_node_volume_size.to_string(),
+            ));
+        }
+        if let Some(node_volume_size) = options.node_volume_size {
+            args.push(("node_volume_size".to_string(), node_volume_size.to_string()));
+        }
+        if let Some(private_node_volume_size) = options.private_node_volume_size {
+            args.push((
+                "private_node_volume_size".to_string(),
+                private_node_volume_size.to_string(),
+            ));
+        }
+        Some(args)
+    } else {
+        None
+    };
+
+    terraform_runner.destroy(args, environment_type.map(|et| et.get_tfvars_filename()))?;
 
     // The 'dev' workspace is one we always expect to exist, for admin purposes.
     // You can't delete a workspace while it is selected, so we select 'dev' before we delete
@@ -1500,4 +1533,14 @@ pub async fn write_environment_details(
         .upload_file("sn-environment-type", &path, true)
         .await?;
     Ok(())
+}
+
+pub fn calculate_size_per_attached_volume(node_count: u16) -> u16 {
+    if node_count == 0 {
+        return 0;
+    }
+    let total_volume_required = node_count * STORAGE_REQUIRED_PER_NODE;
+
+    // 7 attached volumes per VM
+    (total_volume_required as f64 / 7.0).ceil() as u16
 }

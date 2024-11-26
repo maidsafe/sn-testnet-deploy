@@ -21,6 +21,7 @@ use sn_testnet_deploy::{
         AnsiblePlaybook,
     },
     bootstrap::BootstrapOptions,
+    calculate_size_per_attached_volume,
     deploy::DeployOptions,
     error::Error,
     funding::FundingOptions,
@@ -1553,6 +1554,10 @@ async fn main() -> Result<()> {
                 }
             }
 
+            let node_count = node_count.unwrap_or(environment_type.get_default_node_count());
+            let private_node_count =
+                private_node_count.unwrap_or(environment_type.get_default_private_node_count());
+
             testnet_deployer
                 .bootstrap(&BootstrapOptions {
                     binary_option,
@@ -1566,20 +1571,21 @@ async fn main() -> Result<()> {
                     interval,
                     log_format,
                     name: name.clone(),
-                    node_count: node_count.unwrap_or(environment_type.get_default_node_count()),
-                    node_volume_size,
+                    node_count,
+                    node_vm_count,
+                    node_vm_size,
+                    node_volume_size: node_volume_size
+                        .or_else(|| Some(calculate_size_per_attached_volume(node_count))),
                     max_archived_log_files,
                     max_log_files,
-                    node_vm_size,
                     output_inventory_dir_path: inventory_service
                         .working_directory_path
                         .join("ansible")
                         .join("inventory"),
                     private_node_vm_count,
-                    private_node_count: private_node_count
-                        .unwrap_or(environment_type.get_default_private_node_count()),
-                    private_node_volume_size,
-                    node_vm_count,
+                    private_node_count,
+                    private_node_volume_size: private_node_volume_size
+                        .or_else(|| Some(calculate_size_per_attached_volume(private_node_count))),
                     rewards_address,
                     chunk_size,
                 })
@@ -1598,7 +1604,13 @@ async fn main() -> Result<()> {
                 .environment_name(&name)
                 .provider(provider)
                 .build()?;
-            testnet_deployer.clean().await?;
+
+            let inventory_service = DeploymentInventoryService::from(&testnet_deployer);
+            let inventory = inventory_service
+                .generate_or_retrieve_inventory(&name, true, None)
+                .await?;
+
+            testnet_deployer.clean(&inventory).await?;
             Ok(())
         }
         Commands::Deploy {
@@ -1745,13 +1757,19 @@ async fn main() -> Result<()> {
                 }
             };
 
+            let bootstrap_node_count =
+                bootstrap_node_count.unwrap_or(environment_type.get_default_bootstrap_node_count());
+            let node_count = node_count.unwrap_or(environment_type.get_default_node_count());
+            let private_node_count =
+                private_node_count.unwrap_or(environment_type.get_default_private_node_count());
+
             testnet_deployer
                 .deploy(&DeployOptions {
                     binary_option: binary_option.clone(),
-                    bootstrap_node_count: bootstrap_node_count
-                        .unwrap_or(environment_type.get_default_bootstrap_node_count()),
+                    bootstrap_node_count,
                     bootstrap_node_vm_count,
-                    bootstrap_node_volume_size,
+                    bootstrap_node_volume_size: bootstrap_node_volume_size
+                        .or_else(|| Some(calculate_size_per_attached_volume(bootstrap_node_count))),
                     chunk_size,
                     current_inventory: inventory,
                     downloaders_count,
@@ -1763,14 +1781,16 @@ async fn main() -> Result<()> {
                     evm_rpc_url,
                     evm_node_vm_size,
                     funding_wallet_secret_key,
-                    genesis_node_volume_size,
+                    genesis_node_volume_size: genesis_node_volume_size
+                        .or_else(|| Some(calculate_size_per_attached_volume(1))),
                     interval,
                     log_format,
                     logstash_details,
                     name: name.clone(),
-                    node_count: node_count.unwrap_or(environment_type.get_default_node_count()),
+                    node_count,
                     node_vm_count,
-                    node_volume_size,
+                    node_volume_size: node_volume_size
+                        .or_else(|| Some(calculate_size_per_attached_volume(node_count))),
                     max_archived_log_files,
                     max_log_files,
                     output_inventory_dir_path: inventory_service
@@ -1778,9 +1798,9 @@ async fn main() -> Result<()> {
                         .join("ansible")
                         .join("inventory"),
                     private_node_vm_count,
-                    private_node_count: private_node_count
-                        .unwrap_or(environment_type.get_default_private_node_count()),
-                    private_node_volume_size,
+                    private_node_count,
+                    private_node_volume_size: private_node_volume_size
+                        .or_else(|| Some(calculate_size_per_attached_volume(private_node_count))),
                     public_rpc,
                     uploaders_count,
                     uploader_vm_count,
