@@ -257,6 +257,7 @@ impl LogstashDeploy {
             self.working_directory_path.clone(),
             &self.terraform_runner,
             Some(vec![AnsibleInventoryType::Logstash]),
+            None,
         )
     }
 
