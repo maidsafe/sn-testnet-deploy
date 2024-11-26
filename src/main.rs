@@ -32,8 +32,8 @@ use sn_testnet_deploy::{
     network_commands, notify_slack,
     setup::setup_dotenv_file,
     upscale::UpscaleOptions,
-    BinaryOption, CloudProvider, DeploymentType, EnvironmentType, EvmNetwork, InfraRunOptions,
-    LogFormat, NodeType, TestnetDeployBuilder, UpgradeOptions,
+    BinaryOption, CloudProvider, EnvironmentType, EvmNetwork, InfraRunOptions, LogFormat, NodeType,
+    TestnetDeployBuilder, UpgradeOptions,
 };
 use std::{env, net::IpAddr};
 use std::{str::FromStr, time::Duration};
@@ -1853,58 +1853,44 @@ async fn main() -> Result<()> {
                 .generate_or_retrieve_inventory(&name, true, None)
                 .await?;
 
+            let mut infra_run_options = InfraRunOptions::generate_from_deployment(
+                &inventory,
+                &testnet_deployer.terraform_runner,
+            )?;
+            println!("Obtained infra run options from previous deployment {infra_run_options:?}");
+            let mut node_types = Vec::new();
+
+            if bootstrap_node_volume_size.is_some() {
+                infra_run_options.bootstrap_node_volume_size = bootstrap_node_volume_size;
+                node_types.push(AnsibleInventoryType::BootstrapNodes);
+            }
+            if genesis_node_volume_size.is_some() {
+                infra_run_options.genesis_node_volume_size = genesis_node_volume_size;
+                node_types.push(AnsibleInventoryType::Genesis);
+            }
+            if node_volume_size.is_some() {
+                infra_run_options.node_volume_size = node_volume_size;
+                node_types.push(AnsibleInventoryType::Nodes);
+            }
+            if private_node_volume_size.is_some() {
+                infra_run_options.private_node_volume_size = private_node_volume_size;
+                node_types.push(AnsibleInventoryType::PrivateNodes);
+            }
+
+            println!("Running infra update with new volume sizes: {infra_run_options:?}");
             testnet_deployer
-                .create_or_update_infra(&InfraRunOptions {
-                    bootstrap_node_vm_count: Some(inventory.bootstrap_node_vms.len() as u16),
-                    bootstrap_node_vm_size: None,
-                    bootstrap_node_volume_size,
-                    enable_build_vm: false,
-                    evm_node_count: Some(match inventory.environment_details.evm_network {
-                        EvmNetwork::Anvil => 1,
-                        EvmNetwork::Custom => 0,
-                        EvmNetwork::ArbitrumOne => 0,
-                        EvmNetwork::ArbitrumSepolia => 0,
-                    }),
-                    evm_node_vm_size: None,
-                    genesis_vm_count: Some(match inventory.environment_details.deployment_type {
-                        DeploymentType::New => 1,
-                        DeploymentType::Bootstrap => 0,
-                    }),
-                    genesis_node_volume_size,
-                    name: inventory.name.clone(),
-                    node_vm_count: Some(inventory.node_vms.len() as u16),
-                    node_vm_size: None,
-                    node_volume_size,
-                    private_node_vm_count: Some(inventory.private_node_vms.len() as u16),
-                    private_node_volume_size,
-                    tfvars_filename: inventory.get_tfvars_filename(),
-                    uploader_vm_count: Some(inventory.uploader_vms.len() as u16),
-                    uploader_vm_size: None,
-                })
+                .create_or_update_infra(&infra_run_options)
                 .map_err(|err| {
                     println!("Failed to create infra {err:?}");
                     err
                 })?;
 
-            let ansible_runner = testnet_deployer.ansible_provisioner.ansible_runner;
-
-            let mut node_types = Vec::new();
-            if bootstrap_node_volume_size.is_some() {
-                node_types.push(AnsibleInventoryType::BootstrapNodes);
-            }
-            if genesis_node_volume_size.is_some() {
-                node_types.push(AnsibleInventoryType::Genesis);
-            }
-            if node_volume_size.is_some() {
-                node_types.push(AnsibleInventoryType::Nodes);
-            }
-            if private_node_volume_size.is_some() {
-                node_types.push(AnsibleInventoryType::PrivateNodes);
-            }
-
             for node_type in node_types {
                 println!("Extending volume size for {node_type} nodes...");
-                ansible_runner.run_playbook(AnsiblePlaybook::ExtendVolumeSize, node_type, None)?;
+                testnet_deployer
+                    .ansible_provisioner
+                    .ansible_runner
+                    .run_playbook(AnsiblePlaybook::ExtendVolumeSize, node_type, None)?;
             }
 
             Ok(())
