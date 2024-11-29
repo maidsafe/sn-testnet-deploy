@@ -1078,9 +1078,9 @@ impl TestnetDeployer {
     }
 }
 
-///
-/// Shared Helpers
-///
+//
+// Shared Helpers
+//
 
 pub fn get_genesis_multiaddr(
     ansible_runner: &AnsibleRunner,
