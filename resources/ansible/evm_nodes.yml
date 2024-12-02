@@ -5,7 +5,7 @@
   max_fail_percentage: 10
   ignore_unreachable: yes
   roles:
-    - safe_user
+    - ant_user
     - evm_node
   tasks:
     # Something is wrong with the journal service on Ubuntu that causes no

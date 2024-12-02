@@ -50,6 +50,11 @@ impl AnsibleBinary {
 
 /// Represents the playbooks that apply to our own domain.
 pub enum AnsiblePlaybook {
+    /// The antctl inventory playbook will retrieve antctl's inventory from any machines it is run
+    /// against.
+    ///
+    /// Use in combination with `AnsibleInventoryType::Genesis` or `AnsibleInventoryType::Nodes`.
+    AntCtlInventory,
     /// The auditor playbook will provision setup the auditor to run as a service. The auditor is
     /// typically running on a separate auditor machine, but can be run from any machine.
     ///
@@ -102,11 +107,6 @@ pub enum AnsiblePlaybook {
     ///
     /// Use in combination with `AnsibleInventoryType::NatGateway`.
     NatGateway,
-    /// The node manager inventory playbook will retrieve the node manager's inventory from any
-    /// machines it is run against.
-    ///
-    /// Use in combination with `AnsibleInventoryType::Genesis` or `AnsibleInventoryType::Nodes`.
-    NodeManagerInventory,
     /// The node playbook will setup any nodes except the genesis node. These nodes will bootstrap
     /// using genesis as a peer reference.
     ///
@@ -176,6 +176,7 @@ pub enum AnsiblePlaybook {
 impl AnsiblePlaybook {
     pub fn get_playbook_name(&self) -> String {
         match self {
+            AnsiblePlaybook::AntCtlInventory => "antctl_inventory.yml".to_string(),
             AnsiblePlaybook::Auditor => "auditor.yml".to_string(),
             AnsiblePlaybook::Build => "build.yml".to_string(),
             AnsiblePlaybook::CleanupLogs => "cleanup_logs.yml".to_string(),
@@ -188,7 +189,6 @@ impl AnsiblePlaybook {
             AnsiblePlaybook::Genesis => "genesis_node.yml".to_string(),
             AnsiblePlaybook::Logstash => "logstash.yml".to_string(),
             AnsiblePlaybook::NatGateway => "nat_gateway.yml".to_string(),
-            AnsiblePlaybook::NodeManagerInventory => "node_manager_inventory.yml".to_string(),
             AnsiblePlaybook::Nodes => "nodes.yml".to_string(),
             AnsiblePlaybook::RpcClient => "safenode_rpc_client.yml".to_string(),
             AnsiblePlaybook::StartFaucet => "start_faucet.yml".to_string(),

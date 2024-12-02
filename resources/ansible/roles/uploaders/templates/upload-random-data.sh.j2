@@ -16,8 +16,8 @@ fi
 CONTACT_PEER_ARG=""
 {% endif %}
 
-if ! command -v autonomi &> /dev/null; then
-  echo "Error: 'autonomi' not found in PATH."
+if ! command -v ant &> /dev/null; then
+  echo "Error: 'ant' not found in PATH."
   exit 1
 fi
 
@@ -52,7 +52,7 @@ generate_random_data_file_and_upload() {
   file_size_kb=$(du -k "$tmpfile" | cut -f1)
 
   now=$(date +"%s")
-  stdout=$(autonomi $CONTACT_PEER_ARG file upload "$tmpfile" 2>&1)
+  stdout=$(ant $CONTACT_PEER_ARG file upload "$tmpfile" 2>&1)
   echo "$stdout"
 
   if [ $? -eq 0 ]; then
@@ -81,5 +81,5 @@ while true; do
   echo "Generating and uploading file..."
   generate_random_data_file_and_upload
   # TODO: re-enable when the new CLI has a `wallet balance` command
-  # echo "$(autonomi $CONTACT_PEER_ARG wallet balance)"
+  # echo "$(ant $CONTACT_PEER_ARG wallet balance)"
 done

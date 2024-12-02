@@ -16,7 +16,7 @@
   vars:
     is_genesis: True
   roles:
-    - role: safe_user
+    - role: ant_user
       become: True
     - role: attach_volume
       become: True
@@ -28,5 +28,5 @@
           { name: "{{ node_data_mount_path }}", owner: "root", group: "root", mode: 0755 },
         when: provider == "aws"
       }
-    - node-manager
+    - antctl
     - genesis-node

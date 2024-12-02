@@ -18,10 +18,10 @@ use crate::{
     print_duration, BinaryOption, CloudProvider, EvmNetwork, LogFormat, NodeType, SshClient,
     UpgradeOptions,
 };
+use ant_service_management::NodeRegistry;
 use evmlib::common::U256;
 use log::{debug, error, trace};
 use semver::Version;
-use sn_service_management::NodeRegistry;
 use std::{
     net::SocketAddr,
     path::PathBuf,
@@ -36,6 +36,10 @@ pub const DEFAULT_BETA_ENCRYPTION_KEY: &str =
 
 #[derive(Clone)]
 pub struct ProvisionOptions {
+    /// The safe version is also in the binary option, but only for an initial deployment.
+    /// For the upscale, it needs to be provided explicitly, because currently it is not
+    /// recorded in the inventory.
+    pub ant_version: Option<String>,
     pub binary_option: BinaryOption,
     pub bootstrap_node_count: u16,
     pub chunk_size: Option<u64>,
@@ -60,10 +64,6 @@ pub struct ProvisionOptions {
     pub private_node_count: u16,
     pub private_node_vms: Vec<VirtualMachine>,
     pub public_rpc: bool,
-    /// The safe version is also in the binary option, but only for an initial deployment.
-    /// For the upscale, it needs to be provided explicitly, because currently it is not
-    /// recorded in the inventory.
-    pub safe_version: Option<String>,
     pub uploaders_count: Option<u16>,
     pub rewards_address: String,
 }
@@ -95,7 +95,7 @@ impl From<BootstrapOptions> for ProvisionOptions {
             private_node_vms: Vec::new(),
             public_rpc: false,
             rewards_address: bootstrap_options.rewards_address,
-            safe_version: None,
+            ant_version: None,
             uploaders_count: None,
         }
     }
@@ -127,7 +127,7 @@ impl From<DeployOptions> for ProvisionOptions {
             public_rpc: deploy_options.public_rpc,
             private_node_count: deploy_options.private_node_count,
             private_node_vms: Vec::new(),
-            safe_version: None,
+            ant_version: None,
             uploaders_count: Some(deploy_options.uploaders_count),
             rewards_address: deploy_options.rewards_address,
         }
@@ -218,7 +218,7 @@ impl AnsibleProvisioner {
         let temp_dir_json = serde_json::to_string(&temp_dir_path)?;
 
         self.ansible_runner.run_playbook(
-            AnsiblePlaybook::NodeManagerInventory,
+            AnsiblePlaybook::AntCtlInventory,
             *inventory_type,
             Some(format!("{{ \"dest\": {temp_dir_json} }}")),
         )?;

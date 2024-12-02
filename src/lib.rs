@@ -434,18 +434,18 @@ pub struct DeployOptions {
 pub enum BinaryOption {
     /// Binaries will be built from source.
     BuildFromSource {
+        /// A comma-separated list that will be passed to the `--features` argument.
+        antnode_features: Option<String>,
         branch: String,
         network_keys: Option<(String, String, String, String)>,
         protocol_version: Option<String>,
         repo_owner: String,
-        /// A comma-separated list that will be passed to the `--features` argument.
-        safenode_features: Option<String>,
     },
     /// Pre-built, versioned binaries will be fetched from S3.
     Versioned {
-        safe_version: Option<Version>,
-        safenode_version: Version,
-        safenode_manager_version: Version,
+        ant_version: Option<Version>,
+        antctl_version: Version,
+        antnode_version: Version,
     },
 }
 
@@ -1095,7 +1095,7 @@ pub fn get_genesis_multiaddr(
             &genesis_ip,
             "root",
             // fetch the first public multiaddr with quic-v1 protocol for the genesis node
-            "jq -r '.nodes[] | select(.genesis == true) | .listen_addr[] | select(contains(\"127.0.0.1\") | not) | select(contains(\"quic-v1\"))' /var/safenode-manager/node_registry.json | head -n 1",
+            "jq -r '.nodes[] | select(.genesis == true) | .listen_addr[] | select(contains(\"127.0.0.1\") | not) | select(contains(\"quic-v1\"))' /var/antctl/node_registry.json | head -n 1",
             false,
         )?.first()
         .cloned()
@@ -1116,13 +1116,14 @@ pub fn get_anvil_node_data(
     }
 
     let evm_ip = evm_inventory[0].public_ip_addr;
-    let csv_file_path = "/home/safe/.local/share/safe/evm_testnet_data.csv";
+    debug!("Retrieved IP address for EVM node: {evm_ip}");
+    let csv_file_path = "/home/ant/.local/share/autonomi/evm_testnet_data.csv";
 
     const MAX_ATTEMPTS: u8 = 5;
     const RETRY_DELAY: Duration = Duration::from_secs(5);
 
     for attempt in 1..=MAX_ATTEMPTS {
-        match ssh_client.run_command(&evm_ip, "safe", &format!("cat {}", csv_file_path), false) {
+        match ssh_client.run_command(&evm_ip, "ant", &format!("cat {}", csv_file_path), false) {
             Ok(output) => {
                 if let Some(csv_contents) = output.first() {
                     let parts: Vec<&str> = csv_contents.split(',').collect();
@@ -1179,7 +1180,7 @@ pub fn get_multiaddr(
             &node_ip,
             "root",
             // fetch the first multiaddr which does not contain the localhost addr.
-            "jq -r '.nodes[] | .listen_addr[] | select(contains(\"127.0.0.1\") | not)' /var/safenode-manager/node_registry.json | head -n 1",
+            "jq -r '.nodes[] | .listen_addr[] | select(contains(\"127.0.0.1\") | not)' /var/antctl/node_registry.json | head -n 1",
             false,
         )?.first()
         .cloned()
@@ -1386,9 +1387,9 @@ pub async fn notify_slack(inventory: DeploymentInventory) -> Result<()> {
             message.push_str(&format!("Branch: {}\n", branch));
         }
         BinaryOption::Versioned {
-            ref safe_version,
-            ref safenode_version,
-            ref safenode_manager_version,
+            ant_version: ref safe_version,
+            antnode_version: ref safenode_version,
+            antctl_version: ref safenode_manager_version,
             ..
         } => {
             message.push_str("*Version Details*\n");

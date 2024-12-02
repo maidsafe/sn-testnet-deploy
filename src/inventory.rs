@@ -21,12 +21,12 @@ use crate::{
     TestnetDeployer,
 };
 use alloy::hex::ToHexExt;
+use ant_service_management::{NodeRegistry, ServiceStatus};
 use color_eyre::{eyre::eyre, Result};
 use log::debug;
 use rand::seq::{IteratorRandom, SliceRandom};
 use semver::Version;
 use serde::{Deserialize, Serialize};
-use sn_service_management::{NodeRegistry, ServiceStatus};
 use std::{
     collections::{HashMap, HashSet},
     convert::From,
@@ -243,7 +243,7 @@ impl DeploymentInventoryService {
         let binary_option = if let Some(binary_option) = binary_option {
             binary_option
         } else {
-            let safenode_version = match environment_details.deployment_type {
+            let antnode_version = match environment_details.deployment_type {
                 DeploymentType::New => {
                     let (_, genesis_node_registry) = genesis_node_registry
                         .retrieved_registries
@@ -266,7 +266,7 @@ impl DeploymentInventoryService {
                     .parse()?,
             };
 
-            let safenode_manager_version = {
+            let antctl_version = {
                 let mut random_vm = None;
                 if !generic_node_vms.is_empty() {
                     random_vm = generic_node_vms.first().cloned();
@@ -282,37 +282,29 @@ impl DeploymentInventoryService {
                     ));
                 };
 
-                self.get_bin_version(
-                    &random_vm.vm,
-                    "safenode-manager --version",
-                    "Autonomi Node Manager v",
-                )?
+                self.get_bin_version(&random_vm.vm, "antctl --version", "Autonomi Node Manager v")?
             };
 
-            let safe_version = if environment_details.deployment_type != DeploymentType::Bootstrap {
+            let ant_version = if environment_details.deployment_type != DeploymentType::Bootstrap {
                 let random_uploader_vm = uploader_vms
                     .choose(&mut rand::thread_rng())
-                    .ok_or_else(|| eyre!("No uploader VMs available to retrieve safe version"))?;
-                Some(self.get_bin_version(
-                    &random_uploader_vm.vm,
-                    "autonomi --version",
-                    "autonomi-cli ",
-                )?)
+                    .ok_or_else(|| eyre!("No uploader VMs available to retrieve ant version"))?;
+                Some(self.get_bin_version(&random_uploader_vm.vm, "ant --version", "ant-cli ")?)
             } else {
                 None
             };
 
             println!("Retrieved binary versions from previous deployment:");
-            println!("  safenode: {}", safenode_version);
-            println!("  safenode-manager: {}", safenode_manager_version);
-            if let Some(version) = &safe_version {
-                println!("  autonomi: {}", version);
+            println!("  antnode: {}", antnode_version);
+            println!("  antctl: {}", antctl_version);
+            if let Some(version) = &ant_version {
+                println!("  ant: {}", version);
             }
 
             BinaryOption::Versioned {
-                safe_version,
-                safenode_version,
-                safenode_manager_version,
+                ant_version,
+                antnode_version,
+                antctl_version,
             }
         };
 
@@ -816,9 +808,9 @@ impl DeploymentInventory {
                 println!();
             }
             BinaryOption::Versioned {
-                safe_version,
-                safenode_version,
-                safenode_manager_version,
+                ant_version: safe_version,
+                antnode_version: safenode_version,
+                antctl_version: safenode_manager_version,
             } => {
                 println!("===============");
                 println!("Version Details");

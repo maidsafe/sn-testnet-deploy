@@ -12,17 +12,15 @@
         mode: 0644
       when: logstash_stack_name is defined and logstash_stack_name | length > 0
 
-- name: deploy safenode to remaining nodes
+- name: deploy antnode to remaining nodes
   hosts: all
   become: False
   max_fail_percentage: 10
   ignore_unreachable: yes
   vars:
     is_genesis: False
-    safenode_rpc_client_archive_filename: safenode_rpc_client-latest-x86_64-unknown-linux-musl.tar.gz
-    safenode_rpc_client_archive_url: https://sn-node-rpc-client.s3.eu-west-2.amazonaws.com/{{ safenode_rpc_client_archive_filename }}
   roles:
-    - role: safe_user
+    - role: ant_user
       become: True
     - role: attach_volume
       become: True
@@ -34,7 +32,7 @@
           { name: "{{ node_data_mount_path }}", owner: "root", group: "root", mode: 0755 },
         when: provider == "aws"
       }
-    - node-manager
+    - antctl
     - {
         role: private_node,
         become: True,
@@ -54,17 +52,6 @@
         name: systemd-journald
         state: restarted
         enabled: yes
-    # The RPC client is setup on all nodes for use with the metrics solution
-    - name: get the latest version or a custom build of the RPC client
-      ansible.builtin.get_url:
-        url: "{{ safenode_rpc_client_archive_url }}"
-        dest: /tmp/{{ safenode_rpc_client_archive_filename }}
-    - name: extract the RPC client binary to /usr/local/bin
-      become: True
-      ansible.builtin.unarchive:
-        src: "/tmp/{{ safenode_rpc_client_archive_filename }}"
-        dest: /usr/local/bin
-        remote_src: True
     - name: restart telegraf
       become: True
       ansible.builtin.systemd:

@@ -65,18 +65,18 @@
   when: not volume_in_fstab
 
 - name: create dir for mount point
-  command: mkdir -p /mnt/safenode-storage
+  command: mkdir -p /mnt/antnode-storage
   when: not volume_in_fstab
 
 - name: create subdirs
-  command: mkdir -p /mnt/safenode-storage/{{ item }}
+  command: mkdir -p /mnt/antnode-storage/{{ item }}
   loop: 
     - data
     - log
   when: not volume_in_fstab
 
 - name: mount the logical volume
-  command: mount -o discard,defaults,noatime /dev/lvm_vol_group/striped_logical_volume /mnt/safenode-storage
+  command: mount -o discard,defaults,noatime /dev/lvm_vol_group/striped_logical_volume /mnt/antnode-storage
   when: not volume_in_fstab
 
 - name: check fstab
@@ -90,5 +90,5 @@
   when: not volume_in_fstab
 
 - name: change fstab so the volume will be mounted after a reboot
-  command: echo '/dev/lvm_vol_group/striped_logical_volume /mnt/safenode-storage ext4 defaults,nofail,discard 0 0' | sudo tee -a /etc/fstab
+  command: echo '/dev/lvm_vol_group/striped_logical_volume /mnt/antnode-storage ext4 defaults,nofail,discard 0 0' | sudo tee -a /etc/fstab
   when: not volume_added_to_fstab and not volume_in_fstab

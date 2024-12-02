@@ -13,10 +13,12 @@ use alloy::signers::local::PrivateKeySigner;
 use serde_json::Value;
 use std::collections::HashMap;
 
-const NODE_S3_BUCKET_URL: &str = "https://sn-node.s3.eu-west-2.amazonaws.com";
-const NODE_MANAGER_S3_BUCKET_URL: &str = "https://sn-node-manager.s3.eu-west-2.amazonaws.com";
-const RPC_CLIENT_BUCKET_URL: &str = "https://sn-node-rpc-client.s3.eu-west-2.amazonaws.com";
-const AUTONOMI_S3_BUCKET_URL: &str = "https://autonomi-cli.s3.eu-west-2.amazonaws.com";
+const ANT_S3_BUCKET_URL: &str = "https://autonomi-cli.s3.eu-west-2.amazonaws.com";
+const ANTCTL_S3_BUCKET_URL: &str = "https://antctl.s3.eu-west-2.amazonaws.com";
+// The old `sn-node` S3 bucket will continue to be used to store custom branch builds.
+// They are stored in here regardless of which binary they are.
+const BRANCH_S3_BUCKET_URL: &str = "https://sn-node.s3.eu-west-2.amazonaws.com";
+const RPC_CLIENT_BUCKET_URL: &str = "https://antnode-rpc-client.s3.eu-west-2.amazonaws.com";
 
 #[derive(Default, Clone)]
 pub struct ExtraVarsDocBuilder {
@@ -75,7 +77,7 @@ impl ExtraVarsDocBuilder {
             BinaryOption::BuildFromSource {
                 repo_owner,
                 branch,
-                safenode_features,
+                antnode_features,
                 protocol_version,
                 network_keys,
             } => {
@@ -83,8 +85,8 @@ impl ExtraVarsDocBuilder {
                 self.add_variable("testnet_name", deployment_name);
                 self.add_variable("org", repo_owner);
                 self.add_variable("branch", branch);
-                if let Some(features) = safenode_features {
-                    self.add_variable("safenode_features_list", features);
+                if let Some(features) = antnode_features {
+                    self.add_variable("antnode_features_list", features);
                 }
                 if let Some(protocol_version) = protocol_version {
                     self.add_variable("protocol_version", protocol_version);
@@ -112,10 +114,10 @@ impl ExtraVarsDocBuilder {
                 repo_owner, branch, ..
             } => {
                 self.add_branch_url_variable(
-                    "safenode_rpc_client_archive_url",
+                    "antnode_rpc_client_archive_url",
                     &format!(
-                        "{}/{}/{}/safenode_rpc_client-{}-x86_64-unknown-linux-musl.tar.gz",
-                        NODE_S3_BUCKET_URL, repo_owner, branch, deployment_name
+                        "{}/{}/{}/antnode_rpc_client-{}-x86_64-unknown-linux-musl.tar.gz",
+                        BRANCH_S3_BUCKET_URL, repo_owner, branch, deployment_name
                     ),
                     branch,
                     repo_owner,
@@ -123,9 +125,9 @@ impl ExtraVarsDocBuilder {
             }
             _ => {
                 self.add_variable(
-                    "safenode_rpc_client_archive_url",
+                    "antnode_rpc_client_archive_url",
                     &format!(
-                        "{}/safenode_rpc_client-latest-x86_64-unknown-linux-musl.tar.gz",
+                        "{}/antnode_rpc_client-latest-x86_64-unknown-linux-musl.tar.gz",
                         RPC_CLIENT_BUCKET_URL
                     ),
                 );
@@ -141,65 +143,58 @@ impl ExtraVarsDocBuilder {
                 self.add_branch_url_variable(
                     "node_archive_url",
                     &format!(
-                        "{}/{}/{}/safenode-{}-x86_64-unknown-linux-musl.tar.gz",
-                        NODE_S3_BUCKET_URL, repo_owner, branch, deployment_name
+                        "{}/{}/{}/antnode-{}-x86_64-unknown-linux-musl.tar.gz",
+                        BRANCH_S3_BUCKET_URL, repo_owner, branch, deployment_name
                     ),
                     branch,
                     repo_owner,
                 );
             }
             BinaryOption::Versioned {
-                safenode_version, ..
+                antnode_version, ..
             } => {
-                let _ = self.add_variable("version", &safenode_version.to_string());
+                let _ = self.add_variable("version", &antnode_version.to_string());
             }
         }
     }
 
-    pub fn add_node_manager_url(&mut self, deployment_name: &str, binary_option: &BinaryOption) {
+    pub fn add_antctl_url(&mut self, deployment_name: &str, binary_option: &BinaryOption) {
         match binary_option {
             BinaryOption::BuildFromSource {
                 repo_owner, branch, ..
             } => {
                 self.add_branch_url_variable(
-                    "node_manager_archive_url",
+                    "antctl_archive_url",
                     &format!(
-                        "{}/{}/{}/safenode-manager-{}-x86_64-unknown-linux-musl.tar.gz",
-                        NODE_S3_BUCKET_URL, repo_owner, branch, deployment_name
+                        "{}/{}/{}/antctl-{}-x86_64-unknown-linux-musl.tar.gz",
+                        BRANCH_S3_BUCKET_URL, repo_owner, branch, deployment_name
                     ),
                     branch,
                     repo_owner,
                 );
             }
-            BinaryOption::Versioned {
-                safenode_manager_version,
-                ..
-            } => {
+            BinaryOption::Versioned { antctl_version, .. } => {
                 self.add_variable(
-                    "node_manager_archive_url",
+                    "antctl_archive_url",
                     &format!(
-                        "{}/safenode-manager-{}-x86_64-unknown-linux-musl.tar.gz",
-                        NODE_MANAGER_S3_BUCKET_URL, safenode_manager_version
+                        "{}/antctl-{}-x86_64-unknown-linux-musl.tar.gz",
+                        ANTCTL_S3_BUCKET_URL, antctl_version
                     ),
                 );
             }
         }
     }
 
-    pub fn add_node_manager_daemon_url(
-        &mut self,
-        deployment_name: &str,
-        binary_option: &BinaryOption,
-    ) {
+    pub fn add_antctld_url(&mut self, deployment_name: &str, binary_option: &BinaryOption) {
         match binary_option {
             BinaryOption::BuildFromSource {
                 repo_owner, branch, ..
             } => {
                 self.add_branch_url_variable(
-                    "safenodemand_archive_url",
+                    "antctld_archive_url",
                     &format!(
-                        "{}/{}/{}/safenodemand-{}-x86_64-unknown-linux-musl.tar.gz",
-                        NODE_S3_BUCKET_URL, repo_owner, branch, deployment_name
+                        "{}/{}/{}/antctld-{}-x86_64-unknown-linux-musl.tar.gz",
+                        BRANCH_S3_BUCKET_URL, repo_owner, branch, deployment_name
                     ),
                     branch,
                     repo_owner,
@@ -207,31 +202,31 @@ impl ExtraVarsDocBuilder {
             }
             _ => {
                 self.add_variable(
-                    "safenodemand_archive_url",
+                    "antctld_archive_url",
                     &format!(
-                        "{}/safenodemand-latest-x86_64-unknown-linux-musl.tar.gz",
-                        NODE_MANAGER_S3_BUCKET_URL,
+                        "{}/antctld-latest-x86_64-unknown-linux-musl.tar.gz",
+                        ANTCTL_S3_BUCKET_URL,
                     ),
                 );
             }
         }
     }
 
-    pub fn add_autonomi_url_or_version(
+    pub fn add_ant_url_or_version(
         &mut self,
         deployment_name: &str,
         binary_option: &BinaryOption,
-        safe_version: Option<String>,
+        ant_version: Option<String>,
     ) -> Result<(), Error> {
         // This applies when upscaling the uploaders.
         // In that scenario, the safe version in the binary option is not set to the correct value
         // because it is not recorded in the inventory.
-        if let Some(version) = safe_version {
+        if let Some(version) = ant_version {
             self.add_variable(
-                "autonomi_archive_url",
+                "ant_archive_url",
                 &format!(
-                    "{}/autonomi-{}-x86_64-unknown-linux-musl.tar.gz",
-                    AUTONOMI_S3_BUCKET_URL, version
+                    "{}/ant-{}-x86_64-unknown-linux-musl.tar.gz",
+                    ANT_S3_BUCKET_URL, version
                 ),
             );
             return Ok(());
@@ -242,23 +237,23 @@ impl ExtraVarsDocBuilder {
                 repo_owner, branch, ..
             } => {
                 self.add_branch_url_variable(
-                    "autonomi_archive_url",
+                    "ant_archive_url",
                     &format!(
-                        "{}/{}/{}/autonomi-{}-x86_64-unknown-linux-musl.tar.gz",
-                        NODE_S3_BUCKET_URL, repo_owner, branch, deployment_name
+                        "{}/{}/{}/ant-{}-x86_64-unknown-linux-musl.tar.gz",
+                        BRANCH_S3_BUCKET_URL, repo_owner, branch, deployment_name
                     ),
                     branch,
                     repo_owner,
                 );
                 Ok(())
             }
-            BinaryOption::Versioned { safe_version, .. } => match safe_version {
+            BinaryOption::Versioned { ant_version, .. } => match ant_version {
                 Some(version) => {
                     self.add_variable(
-                        "autonomi_archive_url",
+                        "ant_archive_url",
                         &format!(
-                            "{}/autonomi-{}-x86_64-unknown-linux-musl.tar.gz",
-                            AUTONOMI_S3_BUCKET_URL, version
+                            "{}/ant-{}-x86_64-unknown-linux-musl.tar.gz",
+                            ANT_S3_BUCKET_URL, version
                         ),
                     );
                     Ok(())
@@ -333,8 +328,8 @@ pub fn build_node_extra_vars_doc(
     }
 
     extra_vars.add_node_url_or_version(&options.name, &options.binary_option);
-    extra_vars.add_node_manager_url(&options.name, &options.binary_option);
-    extra_vars.add_node_manager_daemon_url(&options.name, &options.binary_option);
+    extra_vars.add_antctl_url(&options.name, &options.binary_option);
+    extra_vars.add_antctld_url(&options.name, &options.binary_option);
 
     if let Some(env_vars) = &options.env_variables {
         extra_vars.add_env_variable_list("env_variables", env_vars.clone());
@@ -393,13 +388,13 @@ pub fn build_uploaders_extra_vars_doc(
         "safe_downloader_instances",
         &options.downloaders_count.to_string(),
     );
-    extra_vars.add_autonomi_url_or_version(
+    extra_vars.add_ant_url_or_version(
         &options.name,
         &options.binary_option,
-        options.safe_version.clone(),
+        options.ant_version.clone(),
     )?;
     extra_vars.add_variable(
-        "autonomi_uploader_instances",
+        "ant_uploader_instances",
         &options.uploaders_count.unwrap_or(1).to_string(),
     );
     extra_vars.add_variable("evm_network_type", &options.evm_network.to_string());
@@ -424,7 +419,7 @@ pub fn build_uploaders_extra_vars_doc(
     }
     let serde_map = Value::Object(serde_map);
 
-    extra_vars.add_serde_value("autonomi_secret_key_map", serde_map);
+    extra_vars.add_serde_value("ant_secret_key_map", serde_map);
 
     Ok(extra_vars.build())
 }
@@ -438,7 +433,7 @@ pub fn build_start_or_stop_uploader_extra_vars_doc(
     extra_vars.add_variable("provider", cloud_provider);
     extra_vars.add_variable("testnet_name", &options.name);
     extra_vars.add_variable(
-        "autonomi_uploader_instances",
+        "ant_uploader_instances",
         &options.uploaders_count.unwrap_or(1).to_string(),
     );
     extra_vars.add_variable("skip_err", &skip_err.to_string());
