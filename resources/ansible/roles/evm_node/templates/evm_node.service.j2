@@ -3,7 +3,7 @@ Description=EVM Node
 After=network.target
 
 [Service]
-User=safe
+User=ant
 Environment=ANVIL_IP_ADDR={{ ansible_default_ipv4.address }}
 ExecStart=/usr/local/bin/{{ bin_name }}
 Restart=always

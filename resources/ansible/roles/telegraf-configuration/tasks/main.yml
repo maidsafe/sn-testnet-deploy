@@ -113,8 +113,8 @@
   become: True
   command: systemctl start telegraf-elasticsearch.service
 
-- name: start telegraf service
-  systemd:
-    name: telegraf
-    enabled: yes
-    state: started
+# - name: start telegraf service
+#   systemd:
+#     name: telegraf
+#     enabled: yes
+#     state: started

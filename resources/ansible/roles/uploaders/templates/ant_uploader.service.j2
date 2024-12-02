@@ -13,14 +13,14 @@ Environment="EVM_NETWORK=arbitrum-sepolia"
 {% elif evm_network_type == "evm-arbitrum-one" %}
 Environment="EVM_NETWORK=arbitrum-one"
 {% endif %}
-User=safe{{ count }}
+User=ant{{ count }}
 {% if testnet_name.startswith('PROD-') %}
-ExecStart=/home/safe{{ count }}/upload-random-data.sh
+ExecStart=/home/ant{{ count }}/upload-random-data.sh
 {% else %}
-ExecStart=/home/safe{{ count }}/upload-random-data.sh {{ genesis_multiaddr }}
+ExecStart=/home/ant{{ count }}/upload-random-data.sh {{ genesis_multiaddr }}
 {% endif %}
 Restart=always
-WorkingDirectory=/home/safe{{ count }}
+WorkingDirectory=/home/ant{{ count }}
 
 [Install]
 WantedBy=multi-user.target

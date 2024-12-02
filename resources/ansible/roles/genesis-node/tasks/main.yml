@@ -12,7 +12,7 @@
 
 - name: check if genesis node is already set up
   become: True
-  ansible.builtin.command: safenode-manager status --json
+  ansible.builtin.command: antctl status --json
   register: genesis_status
 
 - name: parse genesis node status
@@ -26,12 +26,12 @@
     argv: "{{ command_args | reject('equalto', omit) | list }}"
   vars:
     command_args:
-      - "{{ binary_dir }}/safenode-manager"
+      - "{{ binary_dir }}/antctl"
       - -v
       - add
       - --first
-      - --data-dir-path=/mnt/safenode-storage/data
-      - --log-dir-path=/mnt/safenode-storage/log
+      - --data-dir-path=/mnt/antnode-storage/data
+      - --log-dir-path=/mnt/antnode-storage/log
       - "--rpc-address={{ node_rpc_ip }}"
       - "--rewards-address={{ rewards_address }}"
       - "--max-archived-log-files={{ max_archived_log_files }}"
@@ -47,4 +47,4 @@
 
 - name: start the genesis node service
   become: True
-  command: safenode-manager -v start --interval {{ interval }}
+  command: antctl -v start --interval {{ interval }}

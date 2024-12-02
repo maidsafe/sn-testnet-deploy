@@ -1,0 +1,52 @@
+---
+- name: check if antctl binary exists
+  ansible.builtin.stat:
+    path: "{{ binary_dir}}/antctl"
+  register: antctl_binary
+
+- name: get the private IP for the instance
+  set_fact:
+    node_rpc_ip: "{{ instance_facts.instances[0].network_interfaces[0].private_ip_address }}"
+  when: provider == "aws" and public_rpc and not antctl_binary.stat.exists
+
+- name: use the public IP as the RPC address on DO
+  set_fact:
+    node_rpc_ip: "{{ ansible_host }}"
+  when: provider == "digital-ocean" and public_rpc and not antctl_binary.stat.exists
+
+- name: download the antctl binary
+  ansible.builtin.get_url:
+    url: "{{ antctl_archive_url }}"
+    dest: /tmp/{{ antctl_archive_filename }}
+  when: not antctl_binary.stat.exists
+
+- name: extract the antctl binary to /usr/local/bin
+  become: True
+  ansible.builtin.unarchive:
+    src: "/tmp/{{ antctl_archive_filename }}"
+    dest: "{{ binary_dir }}"
+    remote_src: True
+  when: not antctl_binary.stat.exists
+
+- name: download the antctld binary
+  ansible.builtin.get_url:
+    url: "{{ antctld_archive_url }}"
+    dest: /tmp/{{ antctld_archive_filename }}
+  when: not antctl_binary.stat.exists
+
+- name: extract the antctld binary to /tmp/antctld
+  become: True
+  ansible.builtin.unarchive:
+    src: "/tmp/{{ antctld_archive_filename }}"
+    dest: /tmp/
+    remote_src: True
+  when: not antctl_binary.stat.exists
+
+- name: add antctld
+  become: true
+  command: antctl -v daemon add --address {{ node_rpc_ip }} --path /tmp/antctld
+  when: not antctl_binary.stat.exists
+
+- name: start antctld
+  become: true
+  command: antctl -v daemon start

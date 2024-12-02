@@ -1,31 +1,25 @@
 ---
-# We always build the faucet binary, but safenode only applies for using a custom branch.
 - name: build binaries
   hosts: all
   become: False
   roles:
     - {
         role: build_safe_network_binary,
-        bin_name: "autonomi",
+        bin_name: "ant",
         when: custom_bin == "true"
       }
     - {
         role: build_safe_network_binary,
-        bin_name: "safenode",
+        bin_name: "antnode",
         when: custom_bin == "true"
       }
     - {
         role: build_safe_network_binary,
-        bin_name: "safenode_rpc_client",
+        bin_name: "antctl",
         when: custom_bin == "true"
       }
     - {
         role: build_safe_network_binary,
-        bin_name: "safenode-manager",
-        when: custom_bin == "true"
-      }
-    - {
-        role: build_safe_network_binary,
-        bin_name: "safenodemand",
+        bin_name: "antctld",
         when: custom_bin == "true"
       }

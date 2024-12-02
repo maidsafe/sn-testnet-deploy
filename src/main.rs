@@ -4,6 +4,7 @@
 // Please see the LICENSE file for more details.
 
 use alloy::primitives::{Address, U256};
+use ant_releases::{ReleaseType, SafeReleaseRepoActions};
 use clap::{Parser, Subcommand};
 use color_eyre::{
     eyre::{bail, eyre, OptionExt},
@@ -13,7 +14,6 @@ use dotenv::dotenv;
 use evmlib::Network;
 use log::debug;
 use semver::Version;
-use sn_releases::{ReleaseType, SafeReleaseRepoActions};
 use sn_testnet_deploy::{
     ansible::{
         extra_vars::ExtraVarsDocBuilder,
@@ -51,6 +51,29 @@ struct Opt {
 enum Commands {
     /// Bootstrap a new network from an existing deployment.
     Bootstrap {
+        /// Supply a version number for the antctl binary.
+        ///
+        /// There should be no 'v' prefix.
+        ///
+        /// The version arguments are mutually exclusive with the --branch and --repo-owner
+        /// arguments. You can only supply version numbers or a custom branch, not both.
+        #[arg(long, verbatim_doc_comment)]
+        antctl_version: Option<String>,
+        /// The features to enable on the antnode binary.
+        ///
+        /// If not provided, the default feature set specified for the antnode binary are used.
+        ///
+        /// The features argument is mutually exclusive with the --antnode-version argument.
+        #[clap(long, verbatim_doc_comment)]
+        antnode_features: Option<Vec<String>>,
+        /// Supply a version number for the antnode binary.
+        ///
+        /// There should be no 'v' prefix.
+        ///
+        /// The version arguments are mutually exclusive with the --branch and --repo-owner
+        /// arguments. You can only supply version numbers or a custom branch, not both.
+        #[arg(long, verbatim_doc_comment)]
+        antnode_version: Option<String>,
         /// Set to run Ansible with more verbose output.
         #[arg(long)]
         ansible_verbose: bool,
@@ -83,9 +106,9 @@ enum Commands {
         /// The default is 'development'.
         #[clap(long, default_value_t = EnvironmentType::Development, value_parser = parse_deployment_type, verbatim_doc_comment)]
         environment_type: EnvironmentType,
-        /// Provide environment variables for the safenode service.
+        /// Provide environment variables for the antnode service.
         ///
-        /// This is useful to set the safenode's log levels. Each variable should be comma
+        /// This is useful to set the antnode's log levels. Each variable should be comma
         /// separated without any space.
         ///
         /// Example: --env SN_LOG=all,RUST_LOG=libp2p=debug
@@ -116,14 +139,14 @@ enum Commands {
         /// The default value from ansible.cfg is 50.
         #[clap(long)]
         forks: Option<usize>,
-        /// Optionally set the foundation public key for a custom safenode binary.
+        /// Optionally set the foundation public key for a custom antnode binary.
         ///
         /// This argument only applies if the '--branch' and '--repo-owner' arguments are used.
         ///
         /// If one of the new keys is supplied, all must be supplied.
         #[arg(long)]
         foundation_pk: Option<String>,
-        /// Optionally set the genesis public key for a custom safenode binary.
+        /// Optionally set the genesis public key for a custom antnode binary.
         ///
         /// This argument only applies if the '--branch' and '--repo-owner' arguments are used.
         ///
@@ -149,14 +172,14 @@ enum Commands {
         /// The name of the environment
         #[arg(short = 'n', long)]
         name: String,
-        /// Optionally set the network royalties public key for a custom safenode binary.
+        /// Optionally set the network royalties public key for a custom antnode binary.
         ///
         /// This argument only applies if the '--branch' and '--repo-owner' arguments are used.
         ///
         /// If one of the new keys is supplied, all must be supplied.
         #[arg(long)]
         network_royalties_pk: Option<String>,
-        /// The number of safenode services to run on each VM.
+        /// The number of antnode services to run on each VM.
         ///
         /// If the argument is not used, the value will be determined by the 'environment-type'
         /// argument.
@@ -164,7 +187,7 @@ enum Commands {
         node_count: Option<u16>,
         /// The number of node VMs to create.
         ///
-        /// Each VM will run many safenode services.
+        /// Each VM will run many antnode services.
         ///
         /// If the argument is not used, the value will be determined by the 'environment-type'
         /// argument.
@@ -180,14 +203,14 @@ enum Commands {
         /// argument.
         #[clap(long)]
         node_volume_size: Option<u16>,
-        /// Optionally set the payment forward public key for a custom safenode binary.
+        /// Optionally set the payment forward public key for a custom antnode binary.
         ///
         /// This argument only applies if the '--branch' and '--repo-owner' arguments are used.
         ///
         /// If one of the new keys is supplied, all must be supplied.
         #[arg(long)]
         payment_forward_pk: Option<String>,
-        /// The number of safenode services to be run behind a NAT on each private node VM.
+        /// The number of antnode services to be run behind a NAT on each private node VM.
         ///
         /// If the argument is not used, the value will be determined by the 'environment-type'
         /// argument.
@@ -195,7 +218,7 @@ enum Commands {
         private_node_count: Option<u16>,
         /// The number of private node VMs to create.
         ///
-        /// Each VM will run many safenode services.
+        /// Each VM will run many antnode services.
         ///
         /// If the argument is not used, the value will be determined by the 'environment-type'
         #[clap(long, verbatim_doc_comment)]
@@ -223,32 +246,9 @@ enum Commands {
         /// arguments. You can only supply version numbers or a custom branch, not both.
         #[arg(long, verbatim_doc_comment)]
         repo_owner: Option<String>,
-        /// The rewards address for each of the safenode services.
+        /// The rewards address for each of the antnode services.
         #[arg(long, required = true)]
         rewards_address: String,
-        /// The features to enable on the safenode binary.
-        ///
-        /// If not provided, the default feature set specified for the safenode binary are used.
-        ///
-        /// The features argument is mutually exclusive with the --safenode-version argument.
-        #[clap(long, verbatim_doc_comment)]
-        safenode_features: Option<Vec<String>>,
-        /// Supply a version number for the safenode binary.
-        ///
-        /// There should be no 'v' prefix.
-        ///
-        /// The version arguments are mutually exclusive with the --branch and --repo-owner
-        /// arguments. You can only supply version numbers or a custom branch, not both.
-        #[arg(long, verbatim_doc_comment)]
-        safenode_version: Option<String>,
-        /// Supply a version number for the safenode-manager binary.
-        ///
-        /// There should be no 'v' prefix.
-        ///
-        /// The version arguments are mutually exclusive with the --branch and --repo-owner
-        /// arguments. You can only supply version numbers or a custom branch, not both.
-        #[arg(long, verbatim_doc_comment)]
-        safenode_manager_version: Option<String>,
     },
     /// Clean a deployed testnet environment.
     Clean {
@@ -274,11 +274,42 @@ enum Commands {
         #[clap(long, value_parser = parse_provider, verbatim_doc_comment, default_value_t = CloudProvider::DigitalOcean)]
         provider: CloudProvider,
     },
-    /// Deploy a new testnet environment using the latest version of the safenode binary.
+    /// Deploy a new testnet environment using the latest version of the antnode binary.
     Deploy {
         /// Set to run Ansible with more verbose output.
         #[arg(long)]
         ansible_verbose: bool,
+        /// Supply a version number for the ant binary.
+        ///
+        /// There should be no 'v' prefix.
+        ///
+        /// The version arguments are mutually exclusive with the --branch and --repo-owner
+        /// arguments. You can only supply version numbers or a custom branch, not both.
+        #[arg(long, verbatim_doc_comment)]
+        ant_version: Option<String>,
+        /// Supply a version number for the antctl binary.
+        ///
+        /// There should be no 'v' prefix.
+        ///
+        /// The version arguments are mutually exclusive with the --branch and --repo-owner
+        /// arguments. You can only supply version numbers or a custom branch, not both.
+        #[arg(long, verbatim_doc_comment)]
+        antctl_version: Option<String>,
+        /// The features to enable on the antnode binary.
+        ///
+        /// If not provided, the default feature set specified for the antnode binary are used.
+        ///
+        /// The features argument is mutually exclusive with the --antnode-version argument.
+        #[clap(long, verbatim_doc_comment)]
+        antnode_features: Option<Vec<String>>,
+        /// Supply a version number for the antnode binary.
+        ///
+        /// There should be no 'v' prefix.
+        ///
+        /// The version arguments are mutually exclusive with the --branch and --repo-owner
+        /// arguments. You can only supply version numbers or a custom branch, not both.
+        #[arg(long, verbatim_doc_comment)]
+        antnode_version: Option<String>,
         /// The branch of the Github repository to build from.
         ///
         /// If used, all binaries will be built from this branch. It is typically used for testing
@@ -290,7 +321,7 @@ enum Commands {
         /// arguments. You can only supply version numbers or a custom branch, not both.
         #[arg(long, verbatim_doc_comment)]
         branch: Option<String>,
-        /// The number of safenode services to run on each bootstrap VM.
+        /// The number of antnode services to run on each bootstrap VM.
         ///
         /// If the argument is not used, the value will be determined by the 'environment-type'
         /// argument.
@@ -298,7 +329,7 @@ enum Commands {
         bootstrap_node_count: Option<u16>,
         /// The number of bootstrap node VMs to create.
         ///
-        /// Each VM will run many safenode services.
+        /// Each VM will run many antnode services.
         ///
         /// If the argument is not used, the value will be determined by the 'environment-type'
         /// argument.
@@ -326,9 +357,9 @@ enum Commands {
         /// 5 uploader VMs, there will be 10 downloaders across the 5 VMs.
         #[clap(long, default_value_t = 0)]
         downloaders_count: u16,
-        /// Provide environment variables for the safenode service.
+        /// Provide environment variables for the antnode service.
         ///
-        /// This is useful to set the safenode's log levels. Each variable should be comma
+        /// This is useful to set the antnode's log levels. Each variable should be comma
         /// separated without any space.
         ///
         /// Example: --env SN_LOG=all,RUST_LOG=libp2p=debug
@@ -365,20 +396,12 @@ enum Commands {
         /// This argument only applies if the EVM network type is 'custom'.
         #[arg(long)]
         evm_rpc_url: Option<String>,
-        /// Supply a version number to be used for the faucet binary.
-        ///
-        /// There should be no 'v' prefix.
-        ///
-        /// The version arguments are mutually exclusive with the --branch and --repo-owner arguments.
-        /// You can only supply version numbers or a custom branch, not both.
-        #[arg(long, verbatim_doc_comment)]
-        faucet_version: Option<String>,
         /// Override the maximum number of forks Ansible will use to execute tasks on target hosts.
         ///
         /// The default value from ansible.cfg is 50.
         #[clap(long)]
         forks: Option<usize>,
-        /// Optionally set the foundation public key for a custom safenode binary.
+        /// Optionally set the foundation public key for a custom antnode binary.
         ///
         /// This argument only applies if the '--branch' and '--repo-owner' arguments are used.
         ///
@@ -397,7 +420,7 @@ enum Commands {
         /// argument.
         #[clap(long)]
         genesis_node_volume_size: Option<u16>,
-        /// Optionally set the genesis public key for a custom safenode binary.
+        /// Optionally set the genesis public key for a custom antnode binary.
         ///
         /// This argument only applies if the '--branch' and '--repo-owner' arguments are used.
         ///
@@ -431,14 +454,14 @@ enum Commands {
         /// If not used, the contacts file will have the same name as the environment.
         #[arg(long)]
         network_contacts_file_name: Option<String>,
-        /// Optionally set the network royalties public key for a custom safenode binary.
+        /// Optionally set the network royalties public key for a custom antnode binary.
         ///
         /// This argument only applies if the '--branch' and '--repo-owner' arguments are used.
         ///
         /// If one of the new keys is supplied, all must be supplied.
         #[arg(long)]
         network_royalties_pk: Option<String>,
-        /// The number of safenode services to run on each VM.
+        /// The number of antnode services to run on each VM.
         ///
         /// If the argument is not used, the value will be determined by the 'environment-type'
         /// argument.
@@ -446,7 +469,7 @@ enum Commands {
         node_count: Option<u16>,
         /// The number of node VMs to create.
         ///
-        /// Each VM will run many safenode services.
+        /// Each VM will run many antnode services.
         ///
         /// If the argument is not used, the value will be determined by the 'environment-type'
         /// argument.
@@ -462,14 +485,14 @@ enum Commands {
         /// argument.
         #[clap(long)]
         node_volume_size: Option<u16>,
-        /// Optionally set the payment forward public key for a custom safenode binary.
+        /// Optionally set the payment forward public key for a custom antnode binary.
         ///
         /// This argument only applies if the '--branch' and '--repo-owner' arguments are used.
         ///
         /// If one of the new keys is supplied, all must be supplied.
         #[arg(long)]
         payment_forward_pk: Option<String>,
-        /// The number of safenode services to be run behind a NAT on each private node VM.
+        /// The number of antnode services to be run behind a NAT on each private node VM.
         ///
         /// If the argument is not used, the value will be determined by the 'environment-type'
         /// argument.
@@ -477,7 +500,7 @@ enum Commands {
         private_node_count: Option<u16>,
         /// The number of private node VMs to create.
         ///
-        /// Each VM will run many safenode services.
+        /// Each VM will run many antnode services.
         ///
         /// If the argument is not used, the value will be determined by the 'environment-type'
         #[clap(long, verbatim_doc_comment)]
@@ -495,7 +518,7 @@ enum Commands {
         /// If set to 'restricted', the branch name is used as the protocol version; otherwise the
         /// version is set to the value supplied.
         ///
-        /// This argument is mutually exclusive with the --safenode-version argument.
+        /// This argument is mutually exclusive with the --antnode-version argument.
         #[arg(long, verbatim_doc_comment)]
         protocol_version: Option<String>,
         /// The cloud provider to deploy to.
@@ -505,7 +528,7 @@ enum Commands {
         provider: CloudProvider,
         /// If set to true, the RPC of the node will be accessible remotely.
         ///
-        /// By default, the safenode RPC is only accessible via the 'localhost' and is not exposed for
+        /// By default, the antnode RPC is only accessible via the 'localhost' and is not exposed for
         /// security reasons.
         #[clap(long, default_value_t = false, verbatim_doc_comment)]
         public_rpc: bool,
@@ -520,40 +543,9 @@ enum Commands {
         /// arguments. You can only supply version numbers or a custom branch, not both.
         #[arg(long, verbatim_doc_comment)]
         repo_owner: Option<String>,
-        /// The rewards address for each of the safenode services.
+        /// The rewards address for each of the antnode services.
         #[arg(long, required = true)]
         rewards_address: String,
-        /// Supply a version number for the safe binary.
-        ///
-        /// There should be no 'v' prefix.
-        ///
-        /// The version arguments are mutually exclusive with the --branch and --repo-owner
-        /// arguments. You can only supply version numbers or a custom branch, not both.
-        #[arg(long, verbatim_doc_comment)]
-        safe_version: Option<String>,
-        /// The features to enable on the safenode binary.
-        ///
-        /// If not provided, the default feature set specified for the safenode binary are used.
-        ///
-        /// The features argument is mutually exclusive with the --safenode-version argument.
-        #[clap(long, verbatim_doc_comment)]
-        safenode_features: Option<Vec<String>>,
-        /// Supply a version number for the safenode-manager binary.
-        ///
-        /// There should be no 'v' prefix.
-        ///
-        /// The version arguments are mutually exclusive with the --branch and --repo-owner
-        /// arguments. You can only supply version numbers or a custom branch, not both.
-        #[arg(long, verbatim_doc_comment)]
-        safenode_manager_version: Option<String>,
-        /// Supply a version number for the safenode binary.
-        ///
-        /// There should be no 'v' prefix.
-        ///
-        /// The version arguments are mutually exclusive with the --branch and --repo-owner
-        /// arguments. You can only supply version numbers or a custom branch, not both.
-        #[arg(long, verbatim_doc_comment)]
-        safenode_version: Option<String>,
         /// The desired number of uploaders per VM.
         #[clap(long, default_value_t = 1)]
         uploaders_count: u16,
@@ -679,7 +671,7 @@ enum Commands {
         /// The name of the environment.
         #[arg(short = 'n', long)]
         name: String,
-        /// Specify the type of node VM to start the safenode services on. If not provided, the safenode services on
+        /// Specify the type of node VM to start the antnode services on. If not provided, the antnode services on
         /// all the node VMs will be started. This is mutually exclusive with the '--custom-inventory' argument.
         ///
         /// Valid values are "bootstrap", "genesis", "generic" and "private".
@@ -750,7 +742,7 @@ enum Commands {
         /// The name of the environment.
         #[arg(short = 'n', long)]
         name: String,
-        /// Specify the type of node VM to stop the safenode services on. If not provided, the safenode services on
+        /// Specify the type of node VM to stop the antnode services on. If not provided, the antnode services on
         /// all the node VMs will be stopped. This is mutually exclusive with the '--custom-inventory' argument.
         ///
         /// Valid values are "bootstrap", "genesis", "generic" and "private".
@@ -799,19 +791,19 @@ enum Commands {
         /// unreachable during the main run.
         #[clap(name = "custom-inventory", long, use_value_delimiter = true)]
         custom_inventory: Option<Vec<String>>,
-        /// Provide environment variables for the safenode service.
+        /// Provide environment variables for the antnode service.
         ///
         /// These will override the values provided initially.
         ///
-        /// This is useful to set safenode's log levels. Each variable should be comma separated
+        /// This is useful to set antnode's log levels. Each variable should be comma separated
         /// without any space.
         ///
         /// Example: --env SN_LOG=all,RUST_LOG=libp2p=debug
         #[clap(name = "env", long, use_value_delimiter = true, value_parser = parse_environment_variables)]
         env_variables: Option<Vec<(String, String)>>,
-        /// Set to force the node manager to accept the safenode version provided.
+        /// Set to force the node manager to accept the antnode version provided.
         ///
-        /// This can be used to downgrade safenode to a known good version.
+        /// This can be used to downgrade antnode to a known good version.
         #[clap(long)]
         force: bool,
         /// Maximum number of forks Ansible will use to execute tasks on target hosts.
@@ -823,7 +815,7 @@ enum Commands {
         /// The name of the environment
         #[arg(short = 'n', long)]
         name: String,
-        /// Specify the type of node VM to upgrade the safenode services on. If not provided, the safenode services on
+        /// Specify the type of node VM to upgrade the antnode services on. If not provided, the antnode services on
         /// all the node VMs will be upgraded. This is mutually exclusive with the '--custom-inventory' argument.
         ///
         /// Valid values are "bootstrap", "genesis", "generic" and "private".
@@ -840,7 +832,7 @@ enum Commands {
         #[clap(long, default_value_t = CloudProvider::DigitalOcean, value_parser = parse_provider, verbatim_doc_comment)]
         provider: CloudProvider,
         #[arg(long)]
-        /// Optionally supply a version number for the safenode binary to upgrade to.
+        /// Optionally supply a version number for the antnode binary to upgrade to.
         ///
         /// If not provided, the latest version will be used. A lower version number can be
         /// specified to downgrade to a known good version.
@@ -848,7 +840,7 @@ enum Commands {
         /// There should be no 'v' prefix.
         version: Option<String>,
     },
-    /// Upgrade the safenode-manager binaries to a particular version.
+    /// Upgrade the antctl binaries to a particular version.
     ///
     /// Simple mechanism that simply copies over the existing binary.
     #[clap(name = "upgrade-node-manager")]
@@ -861,8 +853,8 @@ enum Commands {
         /// The name of the environment
         #[arg(short = 'n', long)]
         name: String,
-        /// Specify the type of node VM to upgrade the safenode-manager services on. If not provided, the
-        /// safenode-manager on all the node VMs will be upgraded.
+        /// Specify the type of node VM to upgrade the antctl services on. If not provided, the
+        /// antctl on all the node VMs will be upgraded.
         /// This is mutually exclusive with the '--custom-inventory' argument.
         ///
         /// Valid values are "bootstrap", "genesis", "generic" and "private".
@@ -922,7 +914,7 @@ enum Commands {
         /// This option is not applicable to a bootstrap deployment.
         #[clap(long, verbatim_doc_comment)]
         desired_auditor_vm_count: Option<u16>,
-        /// The desired number of safenode services to be running on each bootstrap VM after the
+        /// The desired number of antnode services to be running on each bootstrap VM after the
         /// scale.
         ///
         /// If there are currently 10 services running on each VM, and you want there to be 25, the
@@ -942,7 +934,7 @@ enum Commands {
         /// This option is not applicable to a bootstrap deployment.
         #[clap(long, verbatim_doc_comment)]
         desired_bootstrap_node_vm_count: Option<u16>,
-        /// The desired number of safenode services to be running on each node VM after the scale.
+        /// The desired number of antnode services to be running on each node VM after the scale.
         ///
         /// If there are currently 10 services running on each VM, and you want there to be 25, the
         /// value used should be 25, rather than 15 as a delta to reach 25.
@@ -954,7 +946,7 @@ enum Commands {
         /// should be 25, rather than 15 as a delta to reach 25.
         #[clap(long, verbatim_doc_comment)]
         desired_node_vm_count: Option<u16>,
-        /// The desired number of safenode services to be running behind a NAT on each private node VM after the
+        /// The desired number of antnode services to be running behind a NAT on each private node VM after the
         /// scale.
         ///
         /// If there are currently 10 services running on each VM, and you want there to be 25, the
@@ -1024,7 +1016,7 @@ enum Commands {
         provider: CloudProvider,
         /// If set to true, for new VMs the RPC of the node will be accessible remotely.
         ///
-        /// By default, the safenode RPC is only accessible via the 'localhost' and is not exposed for
+        /// By default, the antnode RPC is only accessible via the 'localhost' and is not exposed for
         /// security reasons.
         #[clap(long, default_value_t = false, verbatim_doc_comment)]
         public_rpc: bool,
@@ -1035,20 +1027,20 @@ enum Commands {
         /// This argument is required when the uploader count is supplied.
         #[arg(long, verbatim_doc_comment)]
         safe_version: Option<String>,
-        /// Supply a version number for the safenode-manager binary to be used for new uploader VMs.
+        /// Supply a version number for the antctl binary to be used for new uploader VMs.
         ///
         /// There should be no 'v' prefix.
         ///
         /// This argument is required when the uploader count is supplied.
         #[arg(long, verbatim_doc_comment)]
-        safenode_manager_version: Option<String>,
-        /// Supply a version number for the safenode binary to be used for new uploader VMs.
+        antnode_manager_version: Option<String>,
+        /// Supply a version number for the antnode binary to be used for new uploader VMs.
         ///
         /// There should be no 'v' prefix.
         ///
         /// This argument is required when the uploader count is supplied.
         #[arg(long, verbatim_doc_comment)]
-        safenode_version: Option<String>,
+        antnode_version: Option<String>,
     },
     /// Update the peer multiaddr in the node registry.
     ///
@@ -1202,12 +1194,12 @@ enum NetworkCommands {
     /// Restart nodes in the testnet to simulate the churn of nodes.
     #[clap(name = "churn", subcommand)]
     ChurnCommands(ChurnCommands),
-    /// Modifies the log levels for all the safenode services through RPC requests.
+    /// Modifies the log levels for all the antnode services through RPC requests.
     UpdateNodeLogLevel {
         /// The number of nodes to update concurrently.
         #[clap(long, short = 'c', default_value_t = 10)]
         concurrent_updates: usize,
-        /// Change the log level of the safenode. This accepts a comma-separated list of log levels for different modules
+        /// Change the log level of the antnode. This accepts a comma-separated list of log levels for different modules
         /// or specific keywords like "all" or "v".
         ///
         /// Example: --level libp2p=DEBUG,tokio=INFO,all,sn_client=ERROR
@@ -1449,8 +1441,12 @@ async fn main() -> Result<()> {
     match opt.command {
         Commands::Bootstrap {
             ansible_verbose,
+            antctl_version,
+            antnode_features,
+            antnode_version,
             bootstrap_peer,
             branch,
+            chunk_size,
             environment_type,
             env_variables,
             evm_data_payments_address,
@@ -1477,10 +1473,6 @@ async fn main() -> Result<()> {
             provider,
             repo_owner,
             rewards_address,
-            safenode_features,
-            safenode_version,
-            safenode_manager_version,
-            chunk_size,
         } => {
             if evm_network_type == EvmNetwork::Custom
                 && (evm_data_payments_address.is_none()
@@ -1510,10 +1502,9 @@ async fn main() -> Result<()> {
                 None,
                 repo_owner,
                 None,
-                None,
-                safenode_version,
-                safenode_manager_version,
-                safenode_features,
+                antnode_version,
+                antctl_version,
+                antnode_features,
                 network_keys,
             )
             .await?;
@@ -1615,6 +1606,10 @@ async fn main() -> Result<()> {
         }
         Commands::Deploy {
             ansible_verbose,
+            ant_version,
+            antctl_version,
+            antnode_features,
+            antnode_version,
             bootstrap_node_count,
             bootstrap_node_vm_count,
             bootstrap_node_vm_size,
@@ -1629,7 +1624,6 @@ async fn main() -> Result<()> {
             evm_node_vm_size,
             evm_payment_token_address,
             evm_rpc_url,
-            faucet_version,
             forks,
             foundation_pk,
             funding_wallet_secret_key,
@@ -1656,10 +1650,6 @@ async fn main() -> Result<()> {
             public_rpc,
             repo_owner,
             rewards_address,
-            safe_version,
-            safenode_features,
-            safenode_manager_version,
-            safenode_version,
             uploader_vm_count,
             uploader_vm_size,
             uploaders_count,
@@ -1697,11 +1687,10 @@ async fn main() -> Result<()> {
                 branch,
                 protocol_version,
                 repo_owner,
-                faucet_version,
-                safe_version,
-                safenode_version,
-                safenode_manager_version,
-                safenode_features,
+                ant_version,
+                antnode_version,
+                antctl_version,
+                antnode_features,
                 network_keys,
             )
             .await?;
@@ -2871,8 +2860,8 @@ async fn main() -> Result<()> {
             provider,
             public_rpc,
             safe_version,
-            safenode_version,
-            safenode_manager_version,
+            antnode_version,
+            antnode_manager_version,
         } => {
             if desired_uploader_vm_count.is_some() && safe_version.is_none() {
                 return Err(eyre!("The --safe-version argument is required when --desired-uploader-vm-count is used"));
@@ -2891,28 +2880,28 @@ async fn main() -> Result<()> {
                 .generate_or_retrieve_inventory(&name, true, None)
                 .await?;
 
-            if safenode_version.is_some() || safenode_manager_version.is_some() {
+            if antnode_version.is_some() || antnode_manager_version.is_some() {
                 match &inventory.binary_option {
                     BinaryOption::Versioned {
-                        safe_version: _,
-                        safenode_version: existing_safenode_version,
-                        safenode_manager_version: existing_safenode_manager_version,
+                        ant_version: _,
+                        antnode_version: existing_antnode_version,
+                        antctl_version: existing_antnode_manager_version,
                     } => {
-                        let new_safenode_version = safenode_version
-                            .map(|v| v.parse().expect("Invalid safenode version"))
-                            .unwrap_or(existing_safenode_version.clone());
-                        let new_manager_version = safenode_manager_version
-                            .map(|v| v.parse().expect("Invalid safenode-manager version"))
-                            .unwrap_or(existing_safenode_manager_version.clone());
+                        let new_antnode_version = antnode_version
+                            .map(|v| v.parse().expect("Invalid antnode version"))
+                            .unwrap_or(existing_antnode_version.clone());
+                        let new_manager_version = antnode_manager_version
+                            .map(|v| v.parse().expect("Invalid antctl version"))
+                            .unwrap_or(existing_antnode_manager_version.clone());
 
                         println!("Using override binary versions:");
-                        println!("safenode: {}", new_safenode_version);
-                        println!("safenode-manager: {}", new_manager_version);
+                        println!("antnode: {}", new_antnode_version);
+                        println!("antctl: {}", new_manager_version);
 
                         inventory.binary_option = BinaryOption::Versioned {
-                            safe_version: None,
-                            safenode_version: new_safenode_version,
-                            safenode_manager_version: new_manager_version,
+                            ant_version: None,
+                            antnode_version: new_antnode_version,
+                            antctl_version: new_manager_version,
                         };
                     }
                     BinaryOption::BuildFromSource { .. } => {
@@ -3062,24 +3051,20 @@ async fn main() -> Result<()> {
 /// The second option is to build from source, which is useful for testing changes from forks.
 ///
 /// The usage of arguments are also validated here.
-#[allow(clippy::type_complexity, clippy::too_many_arguments)]
 async fn get_binary_option(
     branch: Option<String>,
     protocol_version: Option<String>,
     repo_owner: Option<String>,
-    faucet_version: Option<String>,
-    safe_version: Option<String>,
-    safenode_version: Option<String>,
-    safenode_manager_version: Option<String>,
-    safenode_features: Option<Vec<String>>,
+    ant_version: Option<String>,
+    antnode_version: Option<String>,
+    antctl_version: Option<String>,
+    antnode_features: Option<Vec<String>>,
     network_keys: Option<(String, String, String, String)>,
 ) -> Result<BinaryOption> {
     let mut use_versions = true;
 
     let branch_specified = branch.is_some() || repo_owner.is_some();
-    let versions_specified = faucet_version.is_some()
-        || safenode_version.is_some()
-        || safenode_manager_version.is_some();
+    let versions_specified = antnode_version.is_some() || antctl_version.is_some();
     if branch_specified && versions_specified {
         return Err(
             eyre!("Version numbers and branches cannot be supplied at the same time").suggestion(
@@ -3089,9 +3074,9 @@ async fn get_binary_option(
     }
 
     if versions_specified {
-        if safenode_features.is_some() {
+        if antnode_features.is_some() {
             return Err(eyre!(
-                "The --safenode-features argument only applies if we are building binaries"
+                "The --antnode-features argument only applies if we are building binaries"
             ));
         }
         if protocol_version.is_some() {
@@ -3113,16 +3098,14 @@ async fn get_binary_option(
     let binary_option = if use_versions {
         print_with_banner("Binaries will be supplied from pre-built versions");
 
-        let safe_version = get_version_from_option(safe_version, &ReleaseType::Autonomi).await?;
-        let safenode_version =
-            get_version_from_option(safenode_version, &ReleaseType::Safenode).await?;
-        let safenode_manager_version =
-            get_version_from_option(safenode_manager_version, &ReleaseType::SafenodeManager)
-                .await?;
+        let ant_version = get_version_from_option(ant_version, &ReleaseType::Autonomi).await?;
+        let antnode_version =
+            get_version_from_option(antnode_version, &ReleaseType::AntNode).await?;
+        let antctl_version = get_version_from_option(antctl_version, &ReleaseType::AntCtl).await?;
         BinaryOption::Versioned {
-            safe_version: Some(safe_version),
-            safenode_version,
-            safenode_manager_version,
+            ant_version: Some(ant_version),
+            antnode_version,
+            antctl_version,
         }
     } else {
         // Unwraps are justified here because it's already been asserted that both must have
@@ -3151,7 +3134,7 @@ async fn get_binary_option(
         BinaryOption::BuildFromSource {
             repo_owner,
             branch,
-            safenode_features: safenode_features.map(|list| list.join(",")),
+            antnode_features: antnode_features.map(|list| list.join(",")),
             protocol_version,
             network_keys,
         }

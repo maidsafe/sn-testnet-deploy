@@ -1,40 +1,40 @@
 - name: user for running node
   ansible.builtin.user:
-    name: safe
+    name: ant
     shell: /bin/bash
 
-- name: create .ssh directory for safe user
+- name: create .ssh directory for ant user
   ansible.builtin.file:
-    path: /home/safe/.ssh
-    owner: safe
-    group: safe
+    path: /home/ant/.ssh
+    owner: ant
+    group: ant
     state: directory
     mode: '0755'
 
 # This is necessary for the logstash service, which runs as the logstash user, to
-# read the log files under /home/safe/.local/share/safe/node.
+# read the log files under /home/ant/.local/share/ant/node.
 - name: make home directory accessible for logstash user
   ansible.builtin.file:
-    path: /home/safe
+    path: /home/ant
     mode: '0755'
 
-# This is a bit of a hack, but it allows the `safe` user to have SSH access using the same
+# This is a bit of a hack, but it allows the `ant` user to have SSH access using the same
 # authorized_keys, which is useful for running utility scripts.
-- name: create .ssh directory for safe user
+- name: create .ssh directory for ant user
   ansible.builtin.file:
-    path: /home/safe/.ssh
-    owner: safe
-    group: safe
+    path: /home/ant/.ssh
+    owner: ant
+    group: ant
     state: directory
     mode: '0755'
   when: provider == "digital-ocean"
 
-- name: copy authorized_keys to safe user
+- name: copy authorized_keys to ant user
   ansible.builtin.copy:
     src: /root/.ssh/authorized_keys
-    dest: /home/safe/.ssh/authorized_keys
-    owner: safe
-    group: safe
+    dest: /home/ant/.ssh/authorized_keys
+    owner: ant
+    group: ant
     remote_src: true
     mode: '0600'
   when: provider == "digital-ocean"
