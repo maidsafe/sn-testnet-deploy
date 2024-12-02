@@ -1,69 +1,69 @@
 ---
-- name: check if autonomi binary exists
+- name: check if ant binary exists
   ansible.builtin.stat:
-    path: "{{ binary_dir }}/autonomi"
-  register: autonomi_binary
+    path: "{{ binary_dir }}/ant"
+  register: ant_binary
 
-- name: download the autonomi binary
+- name: download the ant binary
   ansible.builtin.get_url:
-    url: "{{ autonomi_archive_url }}"
-    dest: "/tmp/{{ autonomi_archive_filename }}"
-  when: not autonomi_binary.stat.exists
+    url: "{{ ant_archive_url }}"
+    dest: "/tmp/{{ ant_archive_filename }}"
+  when: not ant_binary.stat.exists
 
-- name: extract the autonomi binary to /usr/local/bin
+- name: extract the ant binary to /usr/local/bin
   ansible.builtin.unarchive:
-    src: "/tmp/{{ autonomi_archive_filename }}"
+    src: "/tmp/{{ ant_archive_filename }}"
     dest: "{{ binary_dir }}"
     remote_src: true
   become: true
-  when: not autonomi_binary.stat.exists
+  when: not ant_binary.stat.exists
 
-- name: create safe users
+- name: create ant users
   ansible.builtin.user:
-    name: "safe{{ item }}"
+    name: "ant{{ item }}"
     shell: /bin/bash
     state: present
-  loop: "{{ range(1, autonomi_uploader_instances | int + 1) | list }}"
+  loop: "{{ range(1, ant_uploader_instances | int + 1) | list }}"
 
-- name: copy upload-random-data.sh to remote for each safe user
+- name: copy upload-random-data.sh to remote for each ant user
   ansible.builtin.template:
     src: upload-random-data.sh.j2
-    dest: "/home/safe{{ item }}/upload-random-data.sh"
-    owner: "safe{{ item }}"
-    group: "safe{{ item }}"
+    dest: "/home/ant{{ item }}/upload-random-data.sh"
+    owner: "ant{{ item }}"
+    group: "ant{{ item }}"
     mode: '0744'
   become: true
-  become_user: "safe{{ item }}"
-  loop: "{{ range(1, autonomi_uploader_instances | int + 1) | list }}"
+  become_user: "ant{{ item }}"
+  loop: "{{ range(1, ant_uploader_instances | int + 1) | list }}"
 
 - name: Check if systemd service file exists
   ansible.builtin.stat:
-    path: "/etc/systemd/system/autonomi_uploader_{{ item }}.service"
+    path: "/etc/systemd/system/ant_uploader_{{ item }}.service"
   register: service_file_stat
-  loop: "{{ range(1, autonomi_uploader_instances | int + 1) | list }}"
+  loop: "{{ range(1, ant_uploader_instances | int + 1) | list }}"
 
 - name: Retrieve secret keys
   set_fact:
-    secret_keys_per_machine: "{{ autonomi_secret_key_map[inventory_hostname] | regex_replace('\"', '') }}"
+    secret_keys_per_machine: "{{ ant_secret_key_map[inventory_hostname] | regex_replace('\"', '') }}"
 
 - name: create systemd service file
   ansible.builtin.template:
-    src: autonomi_uploader.service.j2
-    dest: "/etc/systemd/system/autonomi_uploader_{{ item.0 }}.service"
-    owner: "safe{{ item.0 }}"
-    group: "safe{{ item.0 }}"
+    src: ant_uploader.service.j2
+    dest: "/etc/systemd/system/ant_uploader_{{ item.0 }}.service"
+    owner: "ant{{ item.0 }}"
+    group: "ant{{ item.0 }}"
     mode: '0644'
   become: true
   when: not service_file_stat.results[item.0 - 1].stat.exists
-  loop: "{{ range(1, autonomi_uploader_instances | int + 1) | zip(secret_keys_per_machine) }}"
+  loop: "{{ range(1, ant_uploader_instances | int + 1) | zip(secret_keys_per_machine) }}"
   vars: 
     count: "{{ item.0 }}"
     secret_key: "{{ item.1 }}"
 
-- name: start and enable autonomi_uploader service for each uploader
+- name: start and enable ant_uploader service for each uploader
   ansible.builtin.systemd:
-    name: "autonomi_uploader_{{ item }}"
+    name: "ant_uploader_{{ item }}"
     state: started
     enabled: yes
   become: true
-  loop: "{{ range(1, autonomi_uploader_instances | int + 1) | list }}"
+  loop: "{{ range(1, ant_uploader_instances | int + 1) | list }}"

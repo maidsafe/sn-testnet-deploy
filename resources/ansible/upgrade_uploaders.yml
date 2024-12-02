@@ -3,56 +3,56 @@
   hosts: all
   become: True
   vars:
-    autonomi_version: "{{ autonomi_version }}"
-    autonomi_archive_url: "https://autonomi-cli.s3.eu-west-2.amazonaws.com/autonomi-{{ autonomi_version }}-x86_64-unknown-linux-musl.tar.gz"
+    ant_version: "{{ ant_version }}"
+    ant_archive_url: "https://autonomi-cli.s3.eu-west-2.amazonaws.com/ant-{{ ant_version }}-x86_64-unknown-linux-musl.tar.gz"
   tasks:
-    - name: get list of safe users
-      ansible.builtin.shell: "getent passwd | grep '^safe[0-9]\\+:' | cut -d: -f1"
-      register: safe_users
+    - name: get list of ant users
+      ansible.builtin.shell: "getent passwd | grep '^ant[0-9]\\+:' | cut -d: -f1"
+      register: ant_users
       changed_when: false
 
     - name: stop all uploader services
       systemd:
-        name: "autonomi_uploader_{{ item | regex_replace('safe([0-9]+)', '\\1') }}"
+        name: "ant_uploader_{{ item | regex_replace('ant([0-9]+)', '\\1') }}"
         state: stopped
-      loop: "{{ safe_users.stdout_lines }}"
+      loop: "{{ ant_users.stdout_lines }}"
 
-    # It is safer to make sure both of these are removed, because Ansible may not re-download and
+    # It is antr to make sure both of these are removed, because Ansible may not re-download and
     # replace them if they already exist.
-    - name: remove existing autonomi binary
+    - name: remove existing ant binary
       ansible.builtin.file:
-        path: /usr/local/bin/autonomi
+        path: /usr/local/bin/ant
         state: absent
 
-    - name: remove existing autonomi archive
+    - name: remove existing ant archive
       ansible.builtin.file:
-        path: /tmp/autonomi-latest-x86_64-unknown-linux-musl.tar.gz
+        path: /tmp/ant-latest-x86_64-unknown-linux-musl.tar.gz
         state: absent
 
-    - name: download the new autonomi binary
+    - name: download the new ant binary
       ansible.builtin.get_url:
-        url: "{{ autonomi_archive_url }}"
-        dest: /tmp/autonomi-latest-x86_64-unknown-linux-musl.tar.gz
+        url: "{{ ant_archive_url }}"
+        dest: /tmp/ant-latest-x86_64-unknown-linux-musl.tar.gz
 
-    - name: extract the new autonomi binary
+    - name: extract the new ant binary
       ansible.builtin.unarchive:
-        src: /tmp/autonomi-latest-x86_64-unknown-linux-musl.tar.gz
+        src: /tmp/ant-latest-x86_64-unknown-linux-musl.tar.gz
         dest: /usr/local/bin
         remote_src: True
 
-    - name: copy upload-random-data.sh to remote for each safe user
+    - name: copy upload-random-data.sh to remote for each ant user
       ansible.builtin.template:
         src: roles/uploaders/templates/upload-random-data.sh.j2
-        dest: "/home/safe{{ item | regex_replace('safe([0-9]+)', '\\1') }}/upload-random-data.sh"
-        owner: "safe{{ item | regex_replace('safe([0-9]+)', '\\1') }}"
-        group: "safe{{ item | regex_replace('safe([0-9]+)', '\\1') }}"
+        dest: "/home/ant{{ item | regex_replace('ant([0-9]+)', '\\1') }}/upload-random-data.sh"
+        owner: "ant{{ item | regex_replace('ant([0-9]+)', '\\1') }}"
+        group: "ant{{ item | regex_replace('ant([0-9]+)', '\\1') }}"
         mode: '0744'
-      become_user: "safe{{ item | regex_replace('safe([0-9]+)', '\\1') }}"
-      loop: "{{ safe_users.stdout_lines }}"
+      become_user: "ant{{ item | regex_replace('ant([0-9]+)', '\\1') }}"
+      loop: "{{ ant_users.stdout_lines }}"
 
     - name: start all uploader services
       systemd:
-        name: "autonomi_uploader_{{ item | regex_replace('safe([0-9]+)', '\\1') }}"
+        name: "ant_uploader_{{ item | regex_replace('ant([0-9]+)', '\\1') }}"
         state: started
         enabled: true
-      loop: "{{ safe_users.stdout_lines }}"
+      loop: "{{ ant_users.stdout_lines }}"

@@ -16,27 +16,27 @@
 
 - name: check if evm_testnet binary exists
   ansible.builtin.stat:
-    path: "/usr/local/bin/evm_testnet"
+    path: "/usr/local/bin/{{ bin_name }}"
   register: evm_testnet_binary
 
-- name: clone safe_network repo
+- name: clone autonomi repo
   ansible.builtin.git:
-    repo: https://github.com/{{ org }}/safe_network
+    repo: https://github.com/{{ org }}/autonomi
     version: "{{ branch }}"
-    dest: "{{ ansible_env.HOME }}/safe_network"
+    dest: "{{ ansible_env.HOME }}/autonomi"
 
 - name: "build {{ bin_name }} binary"
   ansible.builtin.shell: |
     source $HOME/.cargo/env
     cargo build --release --bin {{bin_name}}
   args:
-    chdir: "{{ ansible_env.HOME }}/safe_network"
-    creates: "{{ ansible_env.HOME }}/safe_network/target/release/{{bin_name}}"
+    chdir: "{{ ansible_env.HOME }}/autonomi"
+    creates: "{{ ansible_env.HOME }}/autonomi/target/release/{{bin_name}}"
     executable: /bin/bash
 
 - name: copy binary to /usr/local/bin
   ansible.builtin.command:
-    chdir: "{{ ansible_env.HOME }}/safe_network/target/release"
+    chdir: "{{ ansible_env.HOME }}/autonomi/target/release"
     cmd: cp {{bin_name}} /usr/local/bin
   when: not evm_testnet_binary.stat.exists
 

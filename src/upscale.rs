@@ -223,7 +223,7 @@ impl TestnetDeployer {
                 .environment_details
                 .rewards_address
                 .clone(),
-            safe_version: options.safe_version.clone(),
+            ant_version: options.safe_version.clone(),
             uploaders_count: options.desired_uploaders_count,
             gas_amount: options.gas_amount,
         };
@@ -466,7 +466,7 @@ impl TestnetDeployer {
                 .environment_details
                 .rewards_address
                 .clone(),
-            safe_version: options.safe_version.clone(),
+            ant_version: options.safe_version.clone(),
             uploaders_count: options.desired_uploaders_count,
             gas_amount: options.gas_amount,
         };

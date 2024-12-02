@@ -5,9 +5,9 @@
   tasks:
     - name: stop all autonomi uploader service
       ansible.builtin.systemd:
-        name: "autonomi_uploader_{{ item }}"
+        name: "ant_uploader_{{ item }}"
         state: stopped
         enabled: yes
       become: true
-      loop: "{{ range(1, autonomi_uploader_instances | int + 1) | list }}"
+      loop: "{{ range(1, ant_uploader_instances | int + 1) | list }}"
       ignore_errors: "{{ skip_err | default(false) }}"

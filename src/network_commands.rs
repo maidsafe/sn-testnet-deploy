@@ -5,6 +5,11 @@
 // Please see the LICENSE file for more details.
 
 use crate::DeploymentInventory;
+use ant_service_management::{
+    antctl_proto::{ant_ctl_client::AntCtlClient, GetStatusRequest, NodeServiceRestartRequest},
+    rpc::{RpcActions, RpcClient},
+    ServiceStatus,
+};
 use color_eyre::{
     eyre::{bail, eyre, Report},
     Result,
@@ -12,14 +17,6 @@ use color_eyre::{
 use futures::StreamExt;
 use libp2p::PeerId;
 use rand::Rng;
-use sn_service_management::{
-    rpc::{RpcActions, RpcClient},
-    safenode_manager_proto::{
-        safe_node_manager_client::SafeNodeManagerClient, GetStatusRequest,
-        NodeServiceRestartRequest,
-    },
-    ServiceStatus,
-};
 use std::{collections::BTreeSet, net::SocketAddr, time::Duration};
 use tonic::{transport::Channel, Request};
 
@@ -28,7 +25,7 @@ const MAX_CONCURRENT_RPC_REQUESTS: usize = 10;
 // Used internally for easier debugging
 struct DaemonRpcClient {
     addr: SocketAddr,
-    rpc: SafeNodeManagerClient<Channel>,
+    rpc: AntCtlClient<Channel>,
 }
 
 /// Perform fixed interval churn in the network by restarting nodes.
@@ -329,7 +326,7 @@ async fn get_safenode_manager_rpc_client(socket_addr: SocketAddr) -> Result<Daem
     let endpoint = format!("https://{socket_addr}");
     let mut attempts = 0;
     loop {
-        if let Ok(rpc_client) = SafeNodeManagerClient::connect(endpoint.clone()).await {
+        if let Ok(rpc_client) = AntCtlClient::connect(endpoint.clone()).await {
             let rpc_client = DaemonRpcClient {
                 addr: socket_addr,
                 rpc: rpc_client,

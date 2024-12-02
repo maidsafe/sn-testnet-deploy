@@ -3,11 +3,11 @@
   set_fact:
     aws_secret_key: "{{ lookup('file', 'files/s3_deploy_secret_access_key') }}"
 
-- name: clone safe_network repo
+- name: clone autonomi repo
   ansible.builtin.git:
-    repo: https://github.com/{{ org }}/safe_network
+    repo: https://github.com/{{ org }}/autonomi
     version: "{{ branch }}"
-    dest: "{{ ansible_env.HOME }}/safe_network"
+    dest: "{{ ansible_env.HOME }}/autonomi"
 
 # only enable safenode features
 - name: "build {{ bin_name }} binary"
@@ -34,21 +34,19 @@
     export PAYMENT_FORWARD_PK={{ payment_forward_pk }}
     {% endif %}
 
-    {% if bin_name == 'safenode' and safenode_features_list != "" %}
-    cargo build --target x86_64-unknown-linux-musl --release --bin {{bin_name}} --no-default-features --features={{safenode_features_list}}
-    {% elif bin_name == 'faucet' %}
-    cargo build --target x86_64-unknown-linux-musl --release --bin {{bin_name}} --features="distribution"
+    {% if bin_name == 'antnode' and antnode_features_list != "" %}
+    cargo build --target x86_64-unknown-linux-musl --release --bin {{bin_name}} --no-default-features --features={{antnode_features_list}}
     {% else %}
     cargo build --target x86_64-unknown-linux-musl --release --bin {{bin_name}}
     {% endif %}
   args:
-    chdir: "{{ ansible_env.HOME }}/safe_network"
-    creates: "{{ ansible_env.HOME }}/safe_network/target/x86_64-unknown-linux-musl/release/{{bin_name}}"
+    chdir: "{{ ansible_env.HOME }}/autonomi"
+    creates: "{{ ansible_env.HOME }}/autonomi/target/x86_64-unknown-linux-musl/release/{{bin_name}}"
     executable: /bin/bash
 
 - name: copy binary to tmp directory
   ansible.builtin.command:
-    chdir: "{{ ansible_env.HOME }}/safe_network/target/x86_64-unknown-linux-musl/release"
+    chdir: "{{ ansible_env.HOME }}/autonomi/target/x86_64-unknown-linux-musl/release"
     cmd: cp {{bin_name}} /tmp/
 
 - name: archive binary

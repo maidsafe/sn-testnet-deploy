@@ -15,7 +15,7 @@
 #
 - name: check current number of node services
   become: True
-  ansible.builtin.command: safenode-manager status --json
+  ansible.builtin.command: antctl status --json
   register: node_status
 
 - name: calculate current non-genesis node count
@@ -72,11 +72,11 @@
     argv: "{{ command_args | reject('equalto', omit) | list }}"
   vars:
     command_args:
-      - "{{ binary_dir }}/safenode-manager"
+      - "{{ binary_dir }}/antctl"
       - -v
       - add
-      - --data-dir-path=/mnt/safenode-storage/data
-      - --log-dir-path=/mnt/safenode-storage/log
+      - --data-dir-path=/mnt/antnode-storage/data
+      - --log-dir-path=/mnt/antnode-storage/log
       - "--count={{ nodes_to_add }}"
       - "--owner=maidsafe"
       - "--peer={{ genesis_multiaddr }}"
@@ -101,4 +101,4 @@
 
 - name: start the node services
   become: True
-  command: safenode-manager -v start --interval {{ interval}}
+  command: antctl -v start --interval {{ interval}}
