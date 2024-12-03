@@ -439,26 +439,6 @@ impl AnsibleProvisioner {
         Ok(())
     }
 
-    pub fn provision_safenode_rpc_client(
-        &self,
-        options: &ProvisionOptions,
-        genesis_multiaddr: &str,
-    ) -> Result<()> {
-        let start = Instant::now();
-        println!("Running ansible against genesis node to start safenode_rpc_client service...");
-        self.ansible_runner.run_playbook(
-            AnsiblePlaybook::RpcClient,
-            AnsibleInventoryType::Genesis,
-            Some(extra_vars::build_safenode_rpc_client_extra_vars_doc(
-                &self.cloud_provider.to_string(),
-                options,
-                genesis_multiaddr,
-            )?),
-        )?;
-        print_duration(start.elapsed());
-        Ok(())
-    }
-
     pub async fn provision_uploaders(
         &self,
         options: &ProvisionOptions,

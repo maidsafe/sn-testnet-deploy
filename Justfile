@@ -19,7 +19,7 @@ build-evm-node-image:
       build.pkr.hcl
   )
 
-build-staging-bootstrap-image:
+build-bootstrap-image:
   #!/usr/bin/env bash
   (
     cd resources/packer/node
@@ -27,7 +27,7 @@ build-staging-bootstrap-image:
     packer build -var 'size=s-1vcpu-2gb' node.pkr.hcl
   )
 
-build-staging-node-image:
+build-node-image:
   #!/usr/bin/env bash
   (
     cd resources/packer/node
@@ -35,7 +35,7 @@ build-staging-node-image:
     packer build -var 'size=s-2vcpu-4gb' node.pkr.hcl
   )
 
-build-staging-uploader-image:
+build-uploader-image:
   #!/usr/bin/env bash
   (
     cd resources/packer/node
@@ -43,7 +43,7 @@ build-staging-uploader-image:
     packer build -var 'size=s-2vcpu-4gb' node.pkr.hcl
   )
 
-build-prod-nat-gateway-image:
+build-nat-gateway-image:
   #!/usr/bin/env bash
   (
     cd resources/packer/node

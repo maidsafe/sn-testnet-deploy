@@ -361,19 +361,6 @@ pub fn build_node_extra_vars_doc(
     Ok(extra_vars.build())
 }
 
-pub fn build_safenode_rpc_client_extra_vars_doc(
-    cloud_provider: &str,
-    options: &ProvisionOptions,
-    genesis_multiaddr: &str,
-) -> Result<String> {
-    let mut extra_vars = ExtraVarsDocBuilder::default();
-    extra_vars.add_variable("provider", cloud_provider);
-    extra_vars.add_variable("testnet_name", &options.name);
-    extra_vars.add_variable("genesis_multiaddr", genesis_multiaddr);
-    extra_vars.add_rpc_client_url_or_version(&options.name, &options.binary_option);
-    Ok(extra_vars.build())
-}
-
 pub fn build_uploaders_extra_vars_doc(
     cloud_provider: &str,
     options: &ProvisionOptions,

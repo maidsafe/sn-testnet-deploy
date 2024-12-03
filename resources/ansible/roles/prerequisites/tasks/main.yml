@@ -3,24 +3,58 @@
   apt:
     update_cache: yes
 
-# The retries are for random lock failures.
+- name: prerequisites for adding telegraf repository
+  apt:
+    name: 
+      - curl
+      - gnupg
+    state: present
+
+- name: add influxdata gpg key
+  ansible.builtin.command: >
+    curl -fsSL https://repos.influxdata.com/influxdata-archive_compat.key
+    -o /etc/apt/keyrings/influxdata-archive_compat.key
+  args:
+    creates: /etc/apt/keyrings/influxdata-archive_compat.key
+
+- name: add influxdata repository
+  ansible.builtin.copy:
+    dest: /etc/apt/sources.list.d/influxdata.list
+    content: "deb [signed-by=/etc/apt/keyrings/influxdata-archive_compat.key] https://repos.influxdata.com/ubuntu stable main"
+    owner: root
+    group: root
+    mode: '0644'
+
+- name: update apt cache for new repository
+  apt:
+    update_cache: yes
+
+- name: install telegraf
+  apt:
+    name: telegraf
+    state: present
+  register: result
+  until: result is succeeded
+  retries: 20
+  delay: 10
+
+# Retry logic for other package installations
 - name: install packages
   ansible.builtin.package:
     name: "{{ item }}"
     state: present
   with_items:
-    - graphviz # for the sn_auditor
+    - graphviz
     - heaptrack
     - jq
     - python3
     - python3-pip
     - ripgrep
-    - telegraf
     - zip
   register: result
   until: result is succeeded
   retries: 20
   delay: 10
 
-- name: install boto3
+- name: Install boto3
   ansible.builtin.command: pip3 install boto3 --prefix /usr
