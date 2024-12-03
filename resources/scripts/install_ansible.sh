@@ -1,9 +1,11 @@
 #!/bin/bash
 
+cat /etc/os-release
+
 export DEBIAN_FRONTEND=noninteractive
 
-max_retries=10
-retry_delay=5
+max_retries=20
+retry_delay=10
 
 for i in $(seq 1 $max_retries); do
   echo "Update Apt index attempt $i of $max_retries..."
