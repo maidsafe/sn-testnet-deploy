@@ -1,9 +1,7 @@
 ---
 - name: build a custom node image
   hosts: all
-  become: False
+  become: True
   roles:
     - role: prerequisites
-      become: True
     - role: filebeat
-      become: True

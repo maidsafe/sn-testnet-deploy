@@ -41,7 +41,7 @@ variable "build_machine_size" {
 }
 
 variable "build_droplet_image_id" {
-  default = "165140612"
+  default = "172040819"
 }
 
 variable "bootstrap_droplet_image_id" {

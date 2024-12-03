@@ -17,7 +17,7 @@ variable "user_home" {
 
 variable "droplet_image" {
   type = string
-  default = "ubuntu-22-04-x64"
+  default = "ubuntu-24-04-x64"
 }
 
 variable "region" {
@@ -41,7 +41,7 @@ source "digitalocean" "build" {
   image         = var.droplet_image
   region        = var.region
   size          = var.size
-  snapshot_name = "safe_network-node-{{timestamp}}"
+  snapshot_name = "ant-node-{{timestamp}}"
   ssh_username  = var.ssh_username
 }
 
