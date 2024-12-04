@@ -5,3 +5,12 @@
   roles:
     - role: prerequisites
     - role: filebeat
+  # Right now we are in a situation where we don't want Telegraf to be started automatically because
+  # we don't want metrics with new names to be forwarded to the existing production infrastructure.
+  tasks:
+    - name: stop telegraf
+      become: True
+      ansible.builtin.systemd:
+        name: telegraf
+        state: stopped
+        enabled: no

@@ -43,31 +43,31 @@
     dest: /etc/default/telegraf
     remote_src: yes
 
-- name: replace SAFE_UPLOADER_TESTNET_NAME value
+- name: replace ANT_UPLOADER_TESTNET_NAME value
   replace:
     path: "/etc/default/telegraf"
-    regexp: 'SAFE_UPLOADER_TESTNET_NAME=UNDEFINED'
-    replace: 'SAFE_UPLOADER_TESTNET_NAME={{ testnet_name | upper }}'
+    regexp: 'ANT_UPLOADER_TESTNET_NAME=UNDEFINED'
+    replace: 'ANT_UPLOADER_TESTNET_NAME={{ testnet_name | upper }}'
 
-- name: replace SAFE_UPLOADER_HOST_ROLE value
+- name: replace ANT_UPLOADER_HOST_ROLE value
   replace:
     path: "/etc/default/telegraf"
-    regexp: 'SAFE_UPLOADER_HOST_ROLE=UNDEFINED'
-    replace: 'SAFE_UPLOADER_HOST_ROLE=UPLOADER_NODE'
+    regexp: 'ANT_UPLOADER_HOST_ROLE=UNDEFINED'
+    replace: 'ANT_UPLOADER_HOST_ROLE=UPLOADER_NODE'
 
 # The real branch name will be supplied later, when it is available in `safenode`.
-- name: replace SAFE_UPLOADER_BRANCH_NAME value
+- name: replace ANT_UPLOADER_BRANCH_NAME value
   replace:
     path: "/etc/default/telegraf"
-    regexp: "SAFE_UPLOADER_BRANCH_NAME=UNDEFINED"
-    replace: "SAFE_UPLOADER_BRANCH_NAME=STABLE"
+    regexp: "ANT_UPLOADER_BRANCH_NAME=UNDEFINED"
+    replace: "ANT_UPLOADER_BRANCH_NAME=STABLE"
 
 # The real commit hash will be supplied later, when it is available in `safenode`.
-- name: replace SAFE_UPLOADER_BRANCH_COMMIT value
+- name: replace ANT_UPLOADER_BRANCH_COMMIT value
   replace:
     path: "/etc/default/telegraf"
-    regexp: "SAFE_UPLOADER_BRANCH_COMMIT=UNDEFINED"
-    replace: "SAFE_UPLOADER_BRANCH_COMMIT=UNDEFINED"
+    regexp: "ANT_UPLOADER_BRANCH_COMMIT=UNDEFINED"
+    replace: "ANT_UPLOADER_BRANCH_COMMIT=UNDEFINED"
 
 - name: copy telegraf config file
   copy:

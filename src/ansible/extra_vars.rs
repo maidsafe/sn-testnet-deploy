@@ -200,12 +200,12 @@ impl ExtraVarsDocBuilder {
                     repo_owner,
                 );
             }
-            _ => {
+            BinaryOption::Versioned { antctl_version, .. } => {
                 self.add_variable(
                     "antctld_archive_url",
                     &format!(
-                        "{}/antctld-latest-x86_64-unknown-linux-musl.tar.gz",
-                        ANTCTL_S3_BUCKET_URL,
+                        "{}/antctld-{}-x86_64-unknown-linux-musl.tar.gz",
+                        ANTCTL_S3_BUCKET_URL, antctl_version
                     ),
                 );
             }
