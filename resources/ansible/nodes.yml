@@ -1,17 +1,4 @@
 ---
-- name: copy logstash certificate to nodes
-  hosts: all
-  become: False
-  max_fail_percentage: 10
-  ignore_unreachable: yes
-  tasks:
-    - name: copy public logstash certificate to node
-      copy:
-        src: logstash-{{ logstash_stack_name }}-public.crt
-        dest: /tmp/logstash-{{ logstash_stack_name }}-public.crt
-        mode: 0644
-      when: logstash_stack_name is defined and logstash_stack_name | length > 0
-
 - name: deploy antnode to remaining nodes
   hosts: all
   become: False
@@ -52,9 +39,15 @@
         name: systemd-journald
         state: restarted
         enabled: yes
-    - name: restart telegraf
+    # - name: restart telegraf
+    #   become: True
+    #   ansible.builtin.systemd:
+    #     name: telegraf
+    #     state: restarted
+    #     enabled: yes
+    - name: stop telegraf
       become: True
       ansible.builtin.systemd:
         name: telegraf
-        state: restarted
-        enabled: yes
+        state: stopped
+        enabled: no

@@ -22,10 +22,16 @@
         name: systemd-journald
         state: restarted
         enabled: yes
-    # The Telegraf service seems to need to be rebooted for metrics to start transmitting.
-    - name: restart telegraf
+    # # The Telegraf service seems to need to be rebooted for metrics to start transmitting.
+    # - name: restart telegraf
+    #   become: True
+    #   ansible.builtin.systemd:
+    #     name: telegraf
+    #     state: restarted
+    #     enabled: yes
+    - name: stop telegraf
       become: True
       ansible.builtin.systemd:
         name: telegraf
-        state: restarted
-        enabled: yes
+        state: stopped
+        enabled: no

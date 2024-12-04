@@ -3051,6 +3051,7 @@ async fn main() -> Result<()> {
 /// The second option is to build from source, which is useful for testing changes from forks.
 ///
 /// The usage of arguments are also validated here.
+#[allow(clippy::too_many_arguments)]
 async fn get_binary_option(
     branch: Option<String>,
     protocol_version: Option<String>,

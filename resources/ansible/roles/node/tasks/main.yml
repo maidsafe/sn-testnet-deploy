@@ -78,7 +78,6 @@
       - --data-dir-path=/mnt/antnode-storage/data
       - --log-dir-path=/mnt/antnode-storage/log
       - "--count={{ nodes_to_add }}"
-      - "--owner=maidsafe"
       - "--peer={{ genesis_multiaddr }}"
       - "--rpc-address={{ node_rpc_ip }}"
       - "--rewards-address={{ rewards_address }}"
