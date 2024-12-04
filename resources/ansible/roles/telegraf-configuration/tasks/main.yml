@@ -50,31 +50,31 @@
     dest: /etc/default/telegraf
     remote_src: yes
 
-- name: replace SAFENODE_TESTNET_NAME value
+- name: replace ANTNODE_TESTNET_NAME value
   replace:
     path: "/etc/default/telegraf"
-    regexp: 'SAFENODE_TESTNET_NAME=UNDEFINED'
-    replace: 'SAFENODE_TESTNET_NAME={{ testnet_name | upper }}'
+    regexp: 'ANTNODE_TESTNET_NAME=UNDEFINED'
+    replace: 'ANTNODE_TESTNET_NAME={{ testnet_name | upper }}'
 
-- name: replace SAFENODE_HOST_ROLE value
+- name: replace ANTNODE_HOST_ROLE value
   replace:
     path: "/etc/default/telegraf"
-    regexp: 'SAFENODE_HOST_ROLE=UNDEFINED'
-    replace: 'SAFENODE_HOST_ROLE={{ node_type | upper }}'
+    regexp: 'ANTNODE_HOST_ROLE=UNDEFINED'
+    replace: 'ANTNODE_HOST_ROLE={{ node_type | upper }}'
 
 # The real branch name will be supplied later, when it is available in `safenode`.
-- name: replace SAFENODE_BRANCH_NAME value
+- name: replace ANTNODE_BRANCH_NAME value
   replace:
     path: "/etc/default/telegraf"
-    regexp: "SAFENODE_BRANCH_NAME=UNDEFINED"
-    replace: "SAFENODE_BRANCH_NAME=STABLE"
+    regexp: "ANTNODE_BRANCH_NAME=UNDEFINED"
+    replace: "ANTNODE_BRANCH_NAME=STABLE"
 
 # The real commit hash will be supplied later, when it is available in `safenode`.
-- name: replace SAFENODE_BRANCH_COMMIT value
+- name: replace ANTNODE_BRANCH_COMMIT value
   replace:
     path: "/etc/default/telegraf"
-    regexp: "SAFENODE_BRANCH_COMMIT=UNDEFINED"
-    replace: "SAFENODE_BRANCH_COMMIT=UNDEFINED"
+    regexp: "ANTNODE_BRANCH_COMMIT=UNDEFINED"
+    replace: "ANTNODE_BRANCH_COMMIT=UNDEFINED"
 
 - name: copy telegraf config file
   copy:
@@ -109,9 +109,9 @@
   become: True
   command: systemctl daemon-reload
 
-- name: reload the configuration files for systemctl daemon
-  become: True
-  command: systemctl start telegraf-elasticsearch.service
+# - name: reload the configuration files for systemctl daemon
+#   become: True
+#   command: systemctl start telegraf-elasticsearch.service
 
 # - name: start telegraf service
 #   systemd:
