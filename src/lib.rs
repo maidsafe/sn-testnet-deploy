@@ -1394,16 +1394,13 @@ pub async fn notify_slack(inventory: DeploymentInventory) -> Result<()> {
         } => {
             message.push_str("*Version Details*\n");
             message.push_str(&format!(
-                "safe version: {}\n",
+                "ant version: {}\n",
                 safe_version
                     .as_ref()
                     .map_or("None".to_string(), |v| v.to_string())
             ));
             message.push_str(&format!("safenode version: {}\n", safenode_version));
-            message.push_str(&format!(
-                "safenode-manager version: {}\n",
-                safenode_manager_version
-            ));
+            message.push_str(&format!("antctl version: {}\n", safenode_manager_version));
         }
     }
 
