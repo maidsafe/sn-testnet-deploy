@@ -39,15 +39,9 @@
         name: systemd-journald
         state: restarted
         enabled: yes
-    # - name: restart telegraf
-    #   become: True
-    #   ansible.builtin.systemd:
-    #     name: telegraf
-    #     state: restarted
-    #     enabled: yes
-    - name: stop telegraf
+    - name: restart telegraf
       become: True
       ansible.builtin.systemd:
         name: telegraf
-        state: stopped
-        enabled: no
+        state: restarted
+        enabled: yes

@@ -41,12 +41,12 @@
   lineinfile:
     path: /etc/sudoers
     state: present
-    line: "_telegraf ALL=NOPASSWD: /usr/local/bin/safenode-manager"
+    line: "_telegraf ALL=NOPASSWD: /usr/local/bin/antctl"
     validate: "visudo -cf %s"
 
 - name: copy telegraf environment file
   copy:
-    src: "{{ network_dashboard_repo_path }}/telegraf/EnvironmentFile/safenodes/telegraf"
+    src: "{{ network_dashboard_repo_path }}/telegraf/EnvironmentFile/antnodes/telegraf"
     dest: /etc/default/telegraf
     remote_src: yes
 
@@ -78,14 +78,14 @@
 
 - name: copy telegraf config file
   copy:
-    src: "{{ network_dashboard_repo_path }}/telegraf/ConfigurationFile/safenodes/telegraf.conf"
+    src: "{{ network_dashboard_repo_path }}/telegraf/ConfigurationFile/antnodes/telegraf.conf"
     dest: /etc/telegraf/telegraf.conf
     remote_src: yes
 
 - name: copy telegraf multi node config file
   copy:
-    src: "{{ network_dashboard_repo_path }}/telegraf/ConfigurationFile/safenodes/telegraf_safe_multi_node.conf"
-    dest: /etc/telegraf/telegraf.d/telegraf_safe_multi_node.conf
+    src: "{{ network_dashboard_repo_path }}/telegraf/ConfigurationFile/antnodes/telegraf_ant_multi_node.conf"
+    dest: /etc/telegraf/telegraf.d/telegraf_ant_multi_node.conf
     remote_src: yes
 
 - name: create directory for telegraf configurationfile
@@ -95,8 +95,8 @@
 
 - name: copy telegraf elasticsearch config file from network dashboard repo
   copy:
-    src: "{{ network_dashboard_repo_path }}/telegraf/ConfigurationFile/safenodes/telegraf_safe_multi_node_elasticsearch.conf"
-    dest: /etc/telegraf-elasticsearch/telegraf_safe_multi_node_elasticsearch.conf
+    src: "{{ network_dashboard_repo_path }}/telegraf/ConfigurationFile/antnodes/telegraf_ant_multi_node_elasticsearch.conf"
+    dest: /etc/telegraf-elasticsearch/telegraf_ant_multi_node_elasticsearch.conf
     remote_src: yes
 
 - name: copy telegraf elasticsearch system service file from network dashboard repo
@@ -109,12 +109,12 @@
   become: True
   command: systemctl daemon-reload
 
-# - name: reload the configuration files for systemctl daemon
-#   become: True
-#   command: systemctl start telegraf-elasticsearch.service
+- name: reload the configuration files for systemctl daemon
+  become: True
+  command: systemctl start telegraf-elasticsearch.service
 
-# - name: start telegraf service
-#   systemd:
-#     name: telegraf
-#     enabled: yes
-#     state: started
+- name: start telegraf service
+  systemd:
+    name: telegraf
+    enabled: yes
+    state: started

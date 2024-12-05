@@ -77,14 +77,14 @@
 
 - name: copy telegraf uploader config file
   copy:
-    src: "{{ network_dashboard_repo_path }}/telegraf/ConfigurationFile/uploaders/telegraf_safe_uploader_node.conf"
-    dest: /etc/telegraf/telegraf.d/telegraf_safe_uploader_node.conf
+    src: "{{ network_dashboard_repo_path }}/telegraf/ConfigurationFile/uploaders/telegraf_ant_uploader_node.conf"
+    dest: /etc/telegraf/telegraf.d/telegraf_ant_uploader_node.conf
     remote_src: yes
 
 - name: add telegraf user to sudoers for safe command
   lineinfile:
     path: /etc/sudoers
-    line: '_telegraf ALL=(ALL) NOPASSWD: /usr/local/bin/safe'
+    line: '_telegraf ALL=(ALL) NOPASSWD: /usr/local/bin/ant'
     validate: '/usr/sbin/visudo -cf %s'
     state: present
 
