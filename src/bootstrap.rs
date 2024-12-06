@@ -87,7 +87,10 @@ impl TestnetDeployer {
             node_volume_size: options.node_volume_size,
             private_node_vm_count: options.private_node_vm_count,
             private_node_volume_size: options.private_node_volume_size,
-            tfvars_filename: options.environment_type.get_tfvars_filename().to_string(),
+            tfvars_filename: options
+                .environment_type
+                .get_tfvars_filename(&options.name)
+                .to_string(),
             uploader_vm_count: Some(0),
             uploader_vm_size: None,
         })
