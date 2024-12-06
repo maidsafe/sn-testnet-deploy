@@ -26,6 +26,7 @@ use sn_testnet_deploy::{
     error::Error,
     funding::FundingOptions,
     get_environment_details,
+    infra::InfraRunOptions,
     inventory::{
         get_data_directory, DeploymentInventory, DeploymentInventoryService, VirtualMachine,
     },
@@ -33,7 +34,7 @@ use sn_testnet_deploy::{
     network_commands, notify_slack,
     setup::setup_dotenv_file,
     upscale::UpscaleOptions,
-    BinaryOption, CloudProvider, EnvironmentType, EvmNetwork, InfraRunOptions, LogFormat, NodeType,
+    BinaryOption, CloudProvider, EnvironmentType, EvmNetwork, LogFormat, NodeType,
     TestnetDeployBuilder, UpgradeOptions,
 };
 use std::{env, net::IpAddr};
@@ -1596,12 +1597,7 @@ async fn main() -> Result<()> {
                 .provider(provider)
                 .build()?;
 
-            let inventory_service = DeploymentInventoryService::from(&testnet_deployer);
-            let inventory = inventory_service
-                .generate_or_retrieve_inventory(&name, true, None)
-                .await?;
-
-            testnet_deployer.clean(&inventory).await?;
+            testnet_deployer.clean().await?;
             Ok(())
         }
         Commands::Deploy {
@@ -1857,15 +1853,15 @@ async fn main() -> Result<()> {
                 .build()?;
             testnet_deployer.init().await?;
 
-            let inventory_service = DeploymentInventoryService::from(&testnet_deployer);
-            let inventory = inventory_service
-                .generate_or_retrieve_inventory(&name, true, None)
-                .await?;
+            let environemt_details =
+                get_environment_details(&name, &testnet_deployer.s3_repository).await?;
 
-            let mut infra_run_options = InfraRunOptions::generate_from_deployment(
-                &inventory,
+            let mut infra_run_options = InfraRunOptions::generate_existing(
+                &name,
                 &testnet_deployer.terraform_runner,
-            )?;
+                &environemt_details,
+            )
+            .await?;
             println!("Obtained infra run options from previous deployment {infra_run_options:?}");
             let mut node_types = Vec::new();
 
@@ -2196,7 +2192,7 @@ async fn main() -> Result<()> {
                 let logstash_deploy = LogstashDeployBuilder::default()
                     .provider(provider)
                     .build()?;
-                logstash_deploy.clean(&name)?;
+                logstash_deploy.clean(&name).await?;
                 Ok(())
             }
             LogstashCommands::Deploy {
