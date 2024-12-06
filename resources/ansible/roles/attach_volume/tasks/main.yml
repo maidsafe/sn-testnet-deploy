@@ -68,27 +68,21 @@
   command: mkdir -p /mnt/antnode-storage
   when: not volume_in_fstab
 
+- name: mount the logical volume
+  command: mount -o discard,defaults,noatime /dev/lvm_vol_group/striped_logical_volume /mnt/antnode-storage
+  when: not volume_in_fstab
+
+- name: change fstab so the volume will be mounted after a reboot
+  lineinfile:
+    path: /etc/fstab
+    line: '/dev/lvm_vol_group/striped_logical_volume /mnt/antnode-storage ext4 defaults,nofail,discard 0 0'
+    state: present
+    backup: yes
+  when: not volume_in_fstab
+
 - name: create subdirs
   command: mkdir -p /mnt/antnode-storage/{{ item }}
   loop: 
     - data
     - log
   when: not volume_in_fstab
-
-- name: mount the logical volume
-  command: mount -o discard,defaults,noatime /dev/lvm_vol_group/striped_logical_volume /mnt/antnode-storage
-  when: not volume_in_fstab
-
-- name: check fstab
-  command: cat /etc/fstab
-  register: fstab_output
-  when: not volume_in_fstab
-
-- name: set fact if volume is in fstab
-  set_fact:
-    volume_added_to_fstab: "{{ '/dev/lvm_vol_group/striped_logical_volume' in fstab_output.stdout }}"
-  when: not volume_in_fstab
-
-- name: change fstab so the volume will be mounted after a reboot
-  command: echo '/dev/lvm_vol_group/striped_logical_volume /mnt/antnode-storage ext4 defaults,nofail,discard 0 0' | sudo tee -a /etc/fstab
-  when: not volume_added_to_fstab and not volume_in_fstab
