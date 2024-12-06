@@ -3127,7 +3127,7 @@ async fn get_binary_option(
             println!("Payment Forward PK: {}", network_keys.3);
         }
 
-        let url = format!("https://github.com/{repo_owner}/safe_network/tree/{branch}",);
+        let url = format!("https://github.com/{repo_owner}/autonomi/tree/{branch}",);
         let response = reqwest::get(&url).await?;
         if !response.status().is_success() {
             bail!("The provided branch or owner does not exist: {url:?}");
