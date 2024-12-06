@@ -17,8 +17,7 @@ use crate::{
     s3::S3Repository,
     ssh::SshClient,
     terraform::TerraformRunner,
-    BinaryOption, CloudProvider, DeploymentType, EnvironmentDetails, EnvironmentType, Error,
-    TestnetDeployer,
+    BinaryOption, CloudProvider, DeploymentType, EnvironmentDetails, Error, TestnetDeployer,
 };
 use alloy::hex::ToHexExt;
 use ant_service_management::{NodeRegistry, ServiceStatus};
@@ -658,14 +657,11 @@ impl DeploymentInventory {
     }
 
     pub fn get_tfvars_filename(&self) -> String {
-        let filename = if self.environment_details.environment_type == EnvironmentType::Production {
-            format!("{}.tfvars", self.name)
-        } else {
-            self.environment_details
-                .environment_type
-                .get_tfvars_filename()
-        };
-        debug!("Using tfvars file {}", filename);
+        let filename = self
+            .environment_details
+            .environment_type
+            .get_tfvars_filename(&self.name);
+        debug!("Using tfvars file {filename}",);
         filename
     }
 
