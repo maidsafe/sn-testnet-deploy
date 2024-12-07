@@ -20,7 +20,7 @@
 
 - name: calculate current non-genesis node count
   set_fact:
-    current_node_count: "{{ (node_status.stdout | from_json).nodes | selectattr('genesis', 'equalto', false) | list | length }}"
+    current_node_count: "{{ (node_status.stdout | from_json).nodes | selectattr('peers_args.first', 'equalto', false) | list | length }}"
   when: node_status.stdout != ""
 
 - name: calculate number of nodes to add
@@ -78,7 +78,10 @@
       - --data-dir-path=/mnt/antnode-storage/data
       - --log-dir-path=/mnt/antnode-storage/log
       - "--count={{ nodes_to_add }}"
-      - "--peer={{ genesis_multiaddr }}"
+      - "{{ ('--peer=' + genesis_multiaddr) if genesis_multiaddr else omit }}"
+      - "{{ ('--network-contacts-url=' + network_contacts_url) if network_contacts_url else omit }}"
+      # to not fetch the mainnet contacts list. Should we disable this for `PROD-*`? 
+      - --testnet
       - "--rpc-address={{ node_rpc_ip }}"
       - "--rewards-address={{ rewards_address }}"
       - "--max-archived-log-files={{ max_archived_log_files }}"

@@ -89,9 +89,15 @@ enum Commands {
         /// arguments. You can only supply version numbers or a custom branch, not both.
         #[arg(long, verbatim_doc_comment)]
         branch: Option<String>,
+        /// The network contacts URL to bootstrap from.
+        ///
+        /// Either this or the `bootstrap-peer` argument must be provided.
+        bootstrap_network_contacts_url: Option<String>,
         /// The peer from an existing network that we can bootstrap from.
+        ///
+        /// Either this or the `bootstrap-network-contacts-url` argument must be provided.
         #[arg(long)]
-        bootstrap_peer: String,
+        bootstrap_peer: Option<String>,
         /// Specify the chunk size for the custom binaries using a 64-bit integer.
         ///
         /// This option only applies if the --branch and --repo-owner arguments are used.
@@ -1445,6 +1451,7 @@ async fn main() -> Result<()> {
             antctl_version,
             antnode_features,
             antnode_version,
+            bootstrap_network_contacts_url,
             bootstrap_peer,
             branch,
             chunk_size,
@@ -1475,6 +1482,12 @@ async fn main() -> Result<()> {
             repo_owner,
             rewards_address,
         } => {
+            if bootstrap_network_contacts_url.is_none() && bootstrap_peer.is_none() {
+                return Err(eyre!(
+                    "Either bootstrap-peer or bootstrap-network-contacts-url must be provided"
+                ));
+            }
+
             if evm_network_type == EvmNetwork::Custom
                 && (evm_data_payments_address.is_none()
                     || evm_payment_token_address.is_none()
@@ -1553,6 +1566,7 @@ async fn main() -> Result<()> {
             testnet_deployer
                 .bootstrap(&BootstrapOptions {
                     binary_option,
+                    bootstrap_network_contacts_url,
                     bootstrap_peer,
                     environment_type: environment_type.clone(),
                     env_variables,
