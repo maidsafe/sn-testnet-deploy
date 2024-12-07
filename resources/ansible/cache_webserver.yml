@@ -1,0 +1,6 @@
+---
+- name: serve bootstrap cache using nginx
+  hosts: all
+  become: yes
+  roles:
+    - cache_webserver
