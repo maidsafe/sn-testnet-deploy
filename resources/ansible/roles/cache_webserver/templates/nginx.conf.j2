@@ -1,0 +1,7 @@
+server {
+    listen 80;
+
+    location /bootstrap_cache {
+        alias {{ bootstrap_dir }}/{{ json_files.files[0].path | basename }};
+    }
+}

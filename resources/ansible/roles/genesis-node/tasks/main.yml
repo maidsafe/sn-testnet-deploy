@@ -17,7 +17,7 @@
 
 - name: parse genesis node status
   set_fact:
-    genesis_exists: "{{ (genesis_status.stdout | from_json).nodes | selectattr('genesis', 'equalto', true) | list | length > 0 }}"
+    genesis_exists: "{{ (genesis_status.stdout | from_json).nodes | selectattr('peers_args.first', 'equalto', true) | list | length > 0 }}"
   when: genesis_status.stdout != ""
 
 - name: add genesis node service

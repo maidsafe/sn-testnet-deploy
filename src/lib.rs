@@ -849,7 +849,7 @@ pub fn get_genesis_multiaddr(
             &genesis_ip,
             "root",
             // fetch the first public multiaddr with quic-v1 protocol for the genesis node
-            "jq -r '.nodes[] | select(.genesis == true) | .listen_addr[] | select(contains(\"127.0.0.1\") | not) | select(contains(\"quic-v1\"))' /var/antctl/node_registry.json | head -n 1",
+            "jq -r '.nodes[] | select(.peers_args.first == true) | .listen_addr[] | select(contains(\"127.0.0.1\") | not) | select(contains(\"quic-v1\"))' /var/antctl/node_registry.json | head -n 1",
             false,
         )?.first()
         .cloned()
@@ -1301,4 +1301,8 @@ pub fn calculate_size_per_attached_volume(node_count: u16) -> u16 {
 
     // 7 attached volumes per VM
     (total_volume_required as f64 / 7.0).ceil() as u16
+}
+
+pub fn get_bootstrap_cache_url(ip_addr: &IpAddr) -> String {
+    format!("http://{ip_addr}/bootstrap_cache")
 }

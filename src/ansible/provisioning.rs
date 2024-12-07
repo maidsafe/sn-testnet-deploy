@@ -304,11 +304,21 @@ impl AnsibleProvisioner {
                 options,
                 NodeType::Genesis,
                 None,
+                None,
                 1,
                 options.evm_network.clone(),
             )?),
         )?;
+
+        println!("Running the cache webserver playbook on genesis node..");
+        self.ansible_runner.run_playbook(
+            AnsiblePlaybook::CacheWebserver,
+            AnsibleInventoryType::Genesis,
+            None,
+        )?;
+
         print_duration(start.elapsed());
+
         Ok(())
     }
 
@@ -347,7 +357,8 @@ impl AnsibleProvisioner {
     pub fn provision_nodes(
         &self,
         options: &ProvisionOptions,
-        initial_contact_peer: &str,
+        initial_contact_peer: Option<String>,
+        initial_network_contacts_url: Option<String>,
         node_type: NodeType,
     ) -> Result<()> {
         let start = Instant::now();
@@ -393,12 +404,23 @@ impl AnsibleProvisioner {
             Some(extra_vars::build_node_extra_vars_doc(
                 &self.cloud_provider.to_string(),
                 options,
-                node_type,
-                Some(initial_contact_peer.to_string()),
+                node_type.clone(),
+                initial_contact_peer,
+                initial_network_contacts_url,
                 node_count,
                 options.evm_network.clone(),
             )?),
         )?;
+
+        if matches!(node_type, NodeType::Bootstrap) {
+            println!("Running the cache webserver playbook on {node_type:?} VMs..");
+            self.ansible_runner.run_playbook(
+                AnsiblePlaybook::CacheWebserver,
+                inventory_type,
+                None,
+            )?;
+        }
+
         print_duration(start.elapsed());
         Ok(())
     }
@@ -406,7 +428,8 @@ impl AnsibleProvisioner {
     pub fn provision_private_nodes(
         &self,
         options: &mut ProvisionOptions,
-        initial_contact_peer: &str,
+        initial_contact_peer: Option<String>,
+        initial_network_contacts_url: Option<String>,
     ) -> Result<()> {
         let start = Instant::now();
 
@@ -433,7 +456,12 @@ impl AnsibleProvisioner {
             error!("Failed to generate private node static inv with err: {err:?}")
         })?;
 
-        self.provision_nodes(options, initial_contact_peer, NodeType::Private)?;
+        self.provision_nodes(
+            options,
+            initial_contact_peer,
+            initial_network_contacts_url,
+            NodeType::Private,
+        )?;
 
         print_duration(start.elapsed());
         Ok(())
@@ -442,7 +470,8 @@ impl AnsibleProvisioner {
     pub async fn provision_uploaders(
         &self,
         options: &ProvisionOptions,
-        genesis_multiaddr: &str,
+        genesis_multiaddr: Option<String>,
+        genesis_network_contacts_url: Option<String>,
     ) -> Result<()> {
         let start = Instant::now();
 
@@ -469,6 +498,7 @@ impl AnsibleProvisioner {
                 &self.cloud_provider.to_string(),
                 options,
                 genesis_multiaddr,
+                genesis_network_contacts_url,
                 &sk_map,
             )?),
         )?;
