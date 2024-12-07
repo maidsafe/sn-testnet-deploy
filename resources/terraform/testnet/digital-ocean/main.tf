@@ -14,6 +14,7 @@ resource "digitalocean_droplet" "bootstrap_node" {
   count    = var.bootstrap_node_vm_count
   image    = var.bootstrap_droplet_image_id
   name     = "${terraform.workspace}-bootstrap-node-${count.index + 1}"
+#   region = var.multi_region[count.index % length(var.multi_region)]
   region   = var.region
   size     = var.bootstrap_droplet_size
   ssh_keys = var.droplet_ssh_keys

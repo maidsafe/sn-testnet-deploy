@@ -64,6 +64,10 @@ variable "region" {
   default = "lon1"
 }
 
+variable "multi_region" {
+  default = ["lon1", "nyc3", "sfo3"]
+}
+
 variable "genesis_vm_count" {
   default     = 1
   description = "Set to 1 or 0 to control whether there is a genesis node"

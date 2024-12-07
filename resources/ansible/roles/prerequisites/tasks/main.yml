@@ -44,6 +44,7 @@
     name: "{{ item }}"
     state: present
   with_items:
+    - nginx
     - graphviz
     - heaptrack
     - jq
