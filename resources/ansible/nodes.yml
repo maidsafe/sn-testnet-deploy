@@ -25,9 +25,9 @@
         become: True,
         when: make_vm_private
       }
-    - node
     - role: telegraf-configuration
       become: True
+    - node
 
   tasks:
     # Something is wrong with the journal service on Ubuntu that causes no
