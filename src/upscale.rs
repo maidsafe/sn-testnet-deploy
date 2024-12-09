@@ -7,8 +7,8 @@
 use crate::{
     ansible::{inventory::AnsibleInventoryType, provisioning::ProvisionOptions},
     error::{Error, Result},
-    get_genesis_multiaddr, get_multiaddr, DeploymentInventory, DeploymentType, InfraRunOptions,
-    NodeType, TestnetDeployer,
+    get_bootstrap_cache_url, get_genesis_multiaddr, get_multiaddr, DeploymentInventory,
+    DeploymentType, InfraRunOptions, NodeType, TestnetDeployer,
 };
 use colored::Colorize;
 use evmlib::common::U256;
@@ -157,10 +157,12 @@ impl TestnetDeployer {
             return Ok(());
         }
 
-        let mut infra_run_options = InfraRunOptions::generate_from_deployment(
-            &options.current_inventory,
+        let mut infra_run_options = InfraRunOptions::generate_existing(
+            &options.current_inventory.name,
             &self.terraform_runner,
-        )?;
+            &options.current_inventory.environment_details,
+        )
+        .await?;
         infra_run_options.bootstrap_node_vm_count = Some(desired_bootstrap_node_vm_count);
         infra_run_options.node_vm_count = Some(desired_node_vm_count);
         infra_run_options.private_node_vm_count = Some(desired_private_node_vm_count);
@@ -229,7 +231,7 @@ impl TestnetDeployer {
         };
         let mut node_provision_failed = false;
 
-        let (initial_multiaddr, _) = if is_bootstrap_deploy {
+        let (initial_multiaddr, initial_ip_addr) = if is_bootstrap_deploy {
             get_multiaddr(&self.ansible_provisioner.ansible_runner, &self.ssh_client).map_err(
                 |err| {
                     println!("Failed to get node multiaddr {err:?}");
@@ -243,7 +245,8 @@ impl TestnetDeployer {
                     err
                 })?
         };
-        debug!("Retrieved initial peer {initial_multiaddr}");
+        let initial_network_contacts_url = get_bootstrap_cache_url(&initial_ip_addr);
+        debug!("Retrieved initial peer {initial_multiaddr} and initial network contacts {initial_network_contacts_url}");
 
         let should_provision_private_nodes = desired_private_node_vm_count > 0;
 
@@ -256,7 +259,8 @@ impl TestnetDeployer {
                 .print_ansible_run_banner("Provision Bootstrap Nodes");
             match self.ansible_provisioner.provision_nodes(
                 &provision_options,
-                &initial_multiaddr,
+                Some(initial_multiaddr.clone()),
+                Some(initial_network_contacts_url.clone()),
                 NodeType::Bootstrap,
             ) {
                 Ok(()) => {
@@ -277,7 +281,8 @@ impl TestnetDeployer {
             .print_ansible_run_banner("Provision Normal Nodes");
         match self.ansible_provisioner.provision_nodes(
             &provision_options,
-            &initial_multiaddr,
+            Some(initial_multiaddr.clone()),
+            Some(initial_network_contacts_url.clone()),
             NodeType::Generic,
         ) {
             Ok(()) => {
@@ -319,10 +324,11 @@ impl TestnetDeployer {
             )?;
             self.ansible_provisioner
                 .print_ansible_run_banner("Provision Private Nodes");
-            match self
-                .ansible_provisioner
-                .provision_private_nodes(&mut provision_options, &initial_multiaddr)
-            {
+            match self.ansible_provisioner.provision_private_nodes(
+                &mut provision_options,
+                Some(initial_multiaddr),
+                Some(initial_network_contacts_url),
+            ) {
                 Ok(()) => {
                     println!("Provisioned private nodes");
                 }
@@ -395,10 +401,12 @@ impl TestnetDeployer {
         }
 
         if !options.provision_only {
-            let mut infra_run_options = InfraRunOptions::generate_from_deployment(
-                &options.current_inventory,
+            let mut infra_run_options = InfraRunOptions::generate_existing(
+                &options.current_inventory.name,
                 &self.terraform_runner,
-            )?;
+                &options.current_inventory.environment_details,
+            )
+            .await?;
             infra_run_options.uploader_vm_count = Some(desired_uploader_vm_count);
             self.create_or_update_infra(&infra_run_options)
                 .map_err(|err| {
@@ -411,13 +419,14 @@ impl TestnetDeployer {
             return Ok(());
         }
 
-        let (initial_multiaddr, _) =
+        let (initial_multiaddr, initial_ip_addr) =
             get_genesis_multiaddr(&self.ansible_provisioner.ansible_runner, &self.ssh_client)
                 .map_err(|err| {
                     println!("Failed to get genesis multiaddr {err:?}");
                     err
                 })?;
-        debug!("Retrieved initial peer {initial_multiaddr}");
+        let initial_network_contacts_url = get_bootstrap_cache_url(&initial_ip_addr);
+        debug!("Retrieved initial peer {initial_multiaddr} and initial network contacts {initial_network_contacts_url}");
 
         let provision_options = ProvisionOptions {
             binary_option: options.current_inventory.binary_option.clone(),
@@ -478,7 +487,11 @@ impl TestnetDeployer {
         self.ansible_provisioner
             .print_ansible_run_banner("Provision Uploaders");
         self.ansible_provisioner
-            .provision_uploaders(&provision_options, &initial_multiaddr)
+            .provision_uploaders(
+                &provision_options,
+                Some(initial_multiaddr),
+                Some(initial_network_contacts_url),
+            )
             .await
             .map_err(|err| {
                 println!("Failed to provision uploaders {err:?}");

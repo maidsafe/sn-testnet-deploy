@@ -250,15 +250,15 @@ impl LogstashDeploy {
         Ok(())
     }
 
-    pub fn clean(&self, name: &str) -> Result<()> {
+    pub async fn clean(&self, name: &str) -> Result<()> {
         do_clean(
             name,
             None,
             self.working_directory_path.clone(),
             &self.terraform_runner,
             Some(vec![AnsibleInventoryType::Logstash]),
-            None,
         )
+        .await
     }
 
     pub async fn get_stack_hosts(&self, name: &str) -> Result<Vec<SocketAddr>> {

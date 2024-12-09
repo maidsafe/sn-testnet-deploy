@@ -1,0 +1,37 @@
+---
+# todo remove after building a new image
+- name: install Nginx
+  apt:
+    name: nginx
+    state: present
+  retries: 10
+  delay: 5
+
+- name: start and enable nginx service
+  service:
+    name: nginx
+    state: started
+    enabled: yes
+
+- name: find the json file in the bootstrap directory
+  find:
+    paths: "{{ bootstrap_dir }}"
+    patterns: "*.json"
+  register: json_files
+
+- name: fail if no json file is found
+  fail:
+    msg: "No json file found in the bootstrap directory."
+  when: json_files.matched == 0
+
+- name: ensure nginx is serving the json file using a template
+  template:
+    src: nginx.conf.j2
+    dest: /etc/nginx/sites-available/default
+  when: json_files.matched > 0
+
+- name: reload nginx to apply changes
+  service:
+    name: nginx
+    state: reloaded
+  when: json_files.matched > 0
