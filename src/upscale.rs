@@ -157,10 +157,12 @@ impl TestnetDeployer {
             return Ok(());
         }
 
-        let mut infra_run_options = InfraRunOptions::generate_from_deployment(
-            &options.current_inventory,
+        let mut infra_run_options = InfraRunOptions::generate_existing(
+            &options.current_inventory.name,
             &self.terraform_runner,
-        )?;
+            &options.current_inventory.environment_details,
+        )
+        .await?;
         infra_run_options.bootstrap_node_vm_count = Some(desired_bootstrap_node_vm_count);
         infra_run_options.node_vm_count = Some(desired_node_vm_count);
         infra_run_options.private_node_vm_count = Some(desired_private_node_vm_count);
@@ -395,10 +397,12 @@ impl TestnetDeployer {
         }
 
         if !options.provision_only {
-            let mut infra_run_options = InfraRunOptions::generate_from_deployment(
-                &options.current_inventory,
+            let mut infra_run_options = InfraRunOptions::generate_existing(
+                &options.current_inventory.name,
                 &self.terraform_runner,
-            )?;
+                &options.current_inventory.environment_details,
+            )
+            .await?;
             infra_run_options.uploader_vm_count = Some(desired_uploader_vm_count);
             self.create_or_update_infra(&infra_run_options)
                 .map_err(|err| {

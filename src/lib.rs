@@ -10,6 +10,7 @@ pub mod deploy;
 pub mod digital_ocean;
 pub mod error;
 pub mod funding;
+pub mod infra;
 pub mod inventory;
 pub mod logs;
 pub mod logstash;
@@ -42,6 +43,7 @@ use alloy::primitives::Address;
 use evmlib::Network;
 use flate2::read::GzDecoder;
 use indicatif::{ProgressBar, ProgressStyle};
+use infra::InfraRunOptions;
 use log::{debug, trace};
 use semver::Version;
 use serde::{Deserialize, Serialize};
@@ -53,160 +55,11 @@ use std::{
     path::{Path, PathBuf},
     process::{Command, Stdio},
     str::FromStr,
-    time::{Duration, Instant},
+    time::Duration,
 };
 use tar::Archive;
 
 const ANSIBLE_DEFAULT_FORKS: usize = 50;
-
-#[derive(Clone, Debug)]
-pub struct InfraRunOptions {
-    pub bootstrap_node_vm_count: Option<u16>,
-    pub bootstrap_node_vm_size: Option<String>,
-    pub bootstrap_node_volume_size: Option<u16>,
-    pub enable_build_vm: bool,
-    pub evm_node_count: Option<u16>,
-    pub evm_node_vm_size: Option<String>,
-    pub genesis_vm_count: Option<u16>,
-    pub genesis_node_volume_size: Option<u16>,
-    pub name: String,
-    pub node_vm_count: Option<u16>,
-    pub node_vm_size: Option<String>,
-    pub node_volume_size: Option<u16>,
-    pub private_node_vm_count: Option<u16>,
-    pub private_node_volume_size: Option<u16>,
-    pub tfvars_filename: String,
-    pub uploader_vm_count: Option<u16>,
-    pub uploader_vm_size: Option<String>,
-}
-
-impl InfraRunOptions {
-    /// Generate the options for an existing deployment.
-    /// This does not set the vm_size fields, as they are obtained from the tfvars file.
-    pub fn generate_from_deployment(
-        inventory: &DeploymentInventory,
-        terraform_runner: &TerraformRunner,
-    ) -> Result<Self> {
-        let resources = terraform_runner.show(&inventory.name)?;
-        let get_value_for_a_resource = |resource_name: &str,
-                                        field_name: &str|
-         -> Result<serde_json::Value, Error> {
-            let vm_size = resources
-                .iter()
-                .filter(|r| r.resource_name == resource_name)
-                .try_fold(None, |vm_size: Option<serde_json::Value>, r| {
-                    let Some(size) = r.values.get(field_name) else {
-                        log::error!("Failed to obtain '{field_name}' value for {resource_name}");
-                        return Err(Error::TerraformResourceFieldMissing(field_name.to_string()));
-                    };
-                    match vm_size {
-                        Some(ref existing_size) if existing_size != size => {
-                            log::error!("Expected value: {existing_size}, got value: {size}");
-                            Err(Error::TerraformResourceValueMismatch {
-                                expected: existing_size.to_string(),
-                                actual: size.to_string(),
-                            })
-                        }
-                        _ => Ok(Some(size.clone())),
-                    }
-                })?;
-
-            vm_size.ok_or(Error::TerraformResourceFieldMissing(field_name.to_string()))
-        };
-
-        let enable_build_vm = resources.iter().any(|r| r.resource_name == "build");
-
-        let bootstrap_node_vm_count = inventory.bootstrap_node_vms.len() as u16;
-        let bootstrap_node_volume_size = if bootstrap_node_vm_count > 0 {
-            let volume_size = get_value_for_a_resource("bootstrap_node_attached_volume", "size")?
-                .as_u64()
-                .ok_or_else(|| {
-                    log::error!(
-                        "Failed to obtain u64 'size' value for bootstrap_node_attached_volume"
-                    );
-                    Error::TerraformResourceFieldMissing("size".to_string())
-                })?;
-            Some(volume_size as u16)
-        } else {
-            None
-        };
-
-        let genesis_vm_count = match inventory.environment_details.deployment_type {
-            DeploymentType::New => 1,
-            DeploymentType::Bootstrap => 0,
-        };
-        let genesis_node_volume_size = if genesis_vm_count > 0 {
-            let genesis_node_volume_size =
-                get_value_for_a_resource("genesis_node_attached_volume", "size")?
-                    .as_u64()
-                    .ok_or_else(|| {
-                        log::error!(
-                            "Failed to obtain u64 'size' value for genesis_node_attached_volume"
-                        );
-                        Error::TerraformResourceFieldMissing("size".to_string())
-                    })?;
-            Some(genesis_node_volume_size as u16)
-        } else {
-            None
-        };
-
-        let node_vm_count = inventory.node_vms.len() as u16;
-        let node_volume_size = if node_vm_count > 0 {
-            let node_volume_size = get_value_for_a_resource("node_attached_volume", "size")?
-                .as_u64()
-                .ok_or_else(|| {
-                    log::error!("Failed to obtain u64 'size' value for node_attached_volume");
-                    Error::TerraformResourceFieldMissing("size".to_string())
-                })?;
-            Some(node_volume_size as u16)
-        } else {
-            None
-        };
-
-        let private_node_vm_count = inventory.private_node_vms.len() as u16;
-        let private_node_volume_size = if private_node_vm_count > 0 {
-            let private_node_volume_size =
-                get_value_for_a_resource("private_node_attached_volume", "size")?
-                    .as_u64()
-                    .ok_or_else(|| {
-                        log::error!(
-                            "Failed to obtain u64 'size' value for private_node_attached_volume"
-                        );
-                        Error::TerraformResourceFieldMissing("size".to_string())
-                    })?;
-            Some(private_node_volume_size as u16)
-        } else {
-            None
-        };
-
-        let options = Self {
-            bootstrap_node_vm_count: Some(bootstrap_node_vm_count),
-            bootstrap_node_vm_size: None, // vm_size is obtained from the tfvars file
-            bootstrap_node_volume_size,
-            enable_build_vm,
-            evm_node_count: Some(match inventory.environment_details.evm_network {
-                EvmNetwork::Anvil => 1,
-                EvmNetwork::Custom => 0,
-                EvmNetwork::ArbitrumOne => 0,
-                EvmNetwork::ArbitrumSepolia => 0,
-            }),
-            evm_node_vm_size: None, // vm_size is obtained from the tfvars file
-            genesis_vm_count: Some(genesis_vm_count),
-            genesis_node_volume_size,
-            name: inventory.name.clone(),
-            node_vm_count: Some(node_vm_count),
-            node_vm_size: None, // vm_size is obtained from the tfvars file
-            node_volume_size,
-            private_node_vm_count: Some(private_node_vm_count),
-            private_node_volume_size,
-            tfvars_filename: inventory.get_tfvars_filename(),
-            uploader_vm_count: Some(inventory.uploader_vms.len() as u16),
-            uploader_vm_size: None, // vm_size is obtained from the tfvars file
-        };
-
-        Ok(options)
-    }
-}
 
 #[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
 pub enum DeploymentType {
@@ -344,11 +197,13 @@ pub enum EnvironmentType {
 }
 
 impl EnvironmentType {
-    pub fn get_tfvars_filename(&self) -> String {
+    pub fn get_tfvars_filename(&self, name: &str) -> String {
         match self {
             EnvironmentType::Development => "dev.tfvars".to_string(),
-            EnvironmentType::Production => "production.tfvars".to_string(),
             EnvironmentType::Staging => "staging.tfvars".to_string(),
+            EnvironmentType::Production => {
+                format!("{name}.tfvars",)
+            }
         }
     }
 
@@ -921,7 +776,7 @@ impl TestnetDeployer {
         Ok(())
     }
 
-    pub async fn clean(&self, inventory: &DeploymentInventory) -> Result<()> {
+    pub async fn clean(&self) -> Result<()> {
         let environment_details =
             get_environment_details(&self.environment_name, &self.s3_repository).await?;
 
@@ -942,12 +797,12 @@ impl TestnetDeployer {
             EvmNetwork::ArbitrumSepolia => Some(Network::ArbitrumSepolia),
         };
         if let (Some(network), Some(address)) =
-            (evm_network, environment_details.funding_wallet_address)
+            (evm_network, &environment_details.funding_wallet_address)
         {
             if let Err(err) = self
                 .ansible_provisioner
                 .drain_funds_from_uploaders(
-                    Address::from_str(&address).map_err(|err| {
+                    Address::from_str(address).map_err(|err| {
                         log::error!("Invalid funding wallet public key: {err:?}");
                         Error::FailedToParseKey
                     })?,
@@ -964,116 +819,15 @@ impl TestnetDeployer {
 
         do_clean(
             &self.environment_name,
-            Some(environment_details.environment_type),
+            Some(environment_details),
             self.working_directory_path.clone(),
             &self.terraform_runner,
             None,
-            Some(inventory),
-        )?;
+        )
+        .await?;
         self.s3_repository
             .delete_object("sn-environment-type", &self.environment_name)
             .await?;
-        Ok(())
-    }
-
-    pub fn create_or_update_infra(&self, options: &InfraRunOptions) -> Result<()> {
-        let start = Instant::now();
-        println!("Selecting {} workspace...", options.name);
-        self.terraform_runner.workspace_select(&options.name)?;
-
-        let mut args = Vec::new();
-
-        if let Some(genesis_vm_count) = options.genesis_vm_count {
-            args.push(("genesis_vm_count".to_string(), genesis_vm_count.to_string()));
-        }
-
-        if let Some(bootstrap_node_vm_count) = options.bootstrap_node_vm_count {
-            args.push((
-                "bootstrap_node_vm_count".to_string(),
-                bootstrap_node_vm_count.to_string(),
-            ));
-        }
-        if let Some(node_vm_count) = options.node_vm_count {
-            args.push(("node_vm_count".to_string(), node_vm_count.to_string()));
-        }
-        if let Some(private_node_vm_count) = options.private_node_vm_count {
-            args.push((
-                "private_node_vm_count".to_string(),
-                private_node_vm_count.to_string(),
-            ));
-            args.push((
-                "setup_nat_gateway".to_string(),
-                (private_node_vm_count > 0).to_string(),
-            ));
-        }
-
-        if let Some(evm_node_count) = options.evm_node_count {
-            args.push(("evm_node_vm_count".to_string(), evm_node_count.to_string()));
-        }
-
-        if let Some(uploader_vm_count) = options.uploader_vm_count {
-            args.push((
-                "uploader_vm_count".to_string(),
-                uploader_vm_count.to_string(),
-            ));
-        }
-
-        args.push((
-            "use_custom_bin".to_string(),
-            options.enable_build_vm.to_string(),
-        ));
-
-        if let Some(node_vm_size) = &options.node_vm_size {
-            args.push(("node_droplet_size".to_string(), node_vm_size.clone()));
-        }
-
-        if let Some(bootstrap_vm_size) = &options.bootstrap_node_vm_size {
-            args.push((
-                "bootstrap_droplet_size".to_string(),
-                bootstrap_vm_size.clone(),
-            ));
-        }
-
-        if let Some(uploader_vm_size) = &options.uploader_vm_size {
-            args.push((
-                "uploader_droplet_size".to_string(),
-                uploader_vm_size.clone(),
-            ));
-        }
-
-        if let Some(evm_node_vm_size) = &options.evm_node_vm_size {
-            args.push((
-                "evm_node_droplet_size".to_string(),
-                evm_node_vm_size.clone(),
-            ));
-        }
-
-        if let Some(bootstrap_node_volume_size) = options.bootstrap_node_volume_size {
-            args.push((
-                "bootstrap_node_volume_size".to_string(),
-                bootstrap_node_volume_size.to_string(),
-            ));
-        }
-        if let Some(genesis_node_volume_size) = options.genesis_node_volume_size {
-            args.push((
-                "genesis_node_volume_size".to_string(),
-                genesis_node_volume_size.to_string(),
-            ));
-        }
-        if let Some(node_volume_size) = options.node_volume_size {
-            args.push(("node_volume_size".to_string(), node_volume_size.to_string()));
-        }
-        if let Some(private_node_volume_size) = options.private_node_volume_size {
-            args.push((
-                "private_node_volume_size".to_string(),
-                private_node_volume_size.to_string(),
-            ));
-        }
-
-        println!("Running terraform apply...");
-        self.terraform_runner
-            .apply(args, Some(options.tfvars_filename.clone()))?;
-        print_duration(start.elapsed());
         Ok(())
     }
 }
@@ -1295,13 +1049,12 @@ pub fn is_binary_on_path(binary_name: &str) -> bool {
     false
 }
 
-pub fn do_clean(
+pub async fn do_clean(
     name: &str,
-    environment_type: Option<EnvironmentType>,
+    environment_details: Option<EnvironmentDetails>,
     working_directory_path: PathBuf,
     terraform_runner: &TerraformRunner,
     inventory_types: Option<Vec<AnsibleInventoryType>>,
-    inventory: Option<&DeploymentInventory>,
 ) -> Result<()> {
     terraform_runner.init()?;
     let workspaces = terraform_runner.workspace_list()?;
@@ -1311,36 +1064,43 @@ pub fn do_clean(
     terraform_runner.workspace_select(name)?;
     println!("Selected {name} workspace");
 
-    let args = if let Some(inventory) = inventory {
-        let options = InfraRunOptions::generate_from_deployment(inventory, terraform_runner)?;
-        let mut args = Vec::new();
-        if let Some(bootstrap_node_volume_size) = options.bootstrap_node_volume_size {
-            args.push((
-                "bootstrap_node_volume_size".to_string(),
-                bootstrap_node_volume_size.to_string(),
-            ));
-        }
-        if let Some(genesis_node_volume_size) = options.genesis_node_volume_size {
-            args.push((
-                "genesis_node_volume_size".to_string(),
-                genesis_node_volume_size.to_string(),
-            ));
-        }
-        if let Some(node_volume_size) = options.node_volume_size {
-            args.push(("node_volume_size".to_string(), node_volume_size.to_string()));
-        }
-        if let Some(private_node_volume_size) = options.private_node_volume_size {
-            args.push((
-                "private_node_volume_size".to_string(),
-                private_node_volume_size.to_string(),
-            ));
-        }
-        Some(args)
-    } else {
-        None
-    };
+    let environment_details = environment_details.ok_or(Error::EnvironmentDetailsNotFound(
+        "Should be provided during do_clean".to_string(),
+    ))?;
 
-    terraform_runner.destroy(args, environment_type.map(|et| et.get_tfvars_filename()))?;
+    let options =
+        InfraRunOptions::generate_existing(name, terraform_runner, &environment_details).await?;
+    let mut args = Vec::new();
+    if let Some(bootstrap_node_volume_size) = options.bootstrap_node_volume_size {
+        args.push((
+            "bootstrap_node_volume_size".to_string(),
+            bootstrap_node_volume_size.to_string(),
+        ));
+    }
+    if let Some(genesis_node_volume_size) = options.genesis_node_volume_size {
+        args.push((
+            "genesis_node_volume_size".to_string(),
+            genesis_node_volume_size.to_string(),
+        ));
+    }
+    if let Some(node_volume_size) = options.node_volume_size {
+        args.push(("node_volume_size".to_string(), node_volume_size.to_string()));
+    }
+    if let Some(private_node_volume_size) = options.private_node_volume_size {
+        args.push((
+            "private_node_volume_size".to_string(),
+            private_node_volume_size.to_string(),
+        ));
+    }
+
+    terraform_runner.destroy(
+        Some(args),
+        Some(
+            environment_details
+                .environment_type
+                .get_tfvars_filename(name),
+        ),
+    )?;
 
     // The 'dev' workspace is one we always expect to exist, for admin purposes.
     // You can't delete a workspace while it is selected, so we select 'dev' before we delete
