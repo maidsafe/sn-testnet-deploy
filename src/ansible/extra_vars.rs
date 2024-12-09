@@ -281,6 +281,7 @@ pub fn build_nat_gateway_extra_vars_doc(name: &str, private_ips: Vec<String>) ->
     extra_vars.build()
 }
 
+#[allow(clippy::too_many_arguments)]
 pub fn build_node_extra_vars_doc(
     cloud_provider: &str,
     options: &ProvisionOptions,
@@ -289,6 +290,7 @@ pub fn build_node_extra_vars_doc(
     network_contacts_url: Option<String>,
     node_instance_count: u16,
     evm_network: EvmNetwork,
+    enable_cache_webserver: bool,
 ) -> Result<String> {
     let mut extra_vars = ExtraVarsDocBuilder::default();
     extra_vars.add_variable("provider", cloud_provider);
@@ -327,6 +329,10 @@ pub fn build_node_extra_vars_doc(
     } else if matches!(node_type, NodeType::Private) {
         return Err(Error::NatGatewayNotSupplied);
     }
+    extra_vars.add_variable(
+        "enable_cache_webserver",
+        &enable_cache_webserver.to_string(),
+    );
 
     extra_vars.add_node_url_or_version(&options.name, &options.binary_option);
     extra_vars.add_antctl_url(&options.name, &options.binary_option);

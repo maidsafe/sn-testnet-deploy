@@ -65,10 +65,6 @@ pub enum AnsiblePlaybook {
     ///
     /// Use in combination with `AnsibleInventoryType::Build`.
     Build,
-    /// The cache webserver playbook will setup a ngnix webserver to server the bootstrap cache files.
-    ///
-    /// Use in combination with `AnsibleInventoryType::Bootstrap`.
-    CacheWebserver,
     /// The cleanup logs playbook will remove the rotated logs from the machines it is run against.
     ///
     /// Use in combination with the node machines.
@@ -183,7 +179,6 @@ impl AnsiblePlaybook {
             AnsiblePlaybook::AntCtlInventory => "antctl_inventory.yml".to_string(),
             AnsiblePlaybook::Auditor => "auditor.yml".to_string(),
             AnsiblePlaybook::Build => "build.yml".to_string(),
-            AnsiblePlaybook::CacheWebserver => "cache_webserver.yml".to_string(),
             AnsiblePlaybook::CleanupLogs => "cleanup_logs.yml".to_string(),
             AnsiblePlaybook::ConfigureSwapfile => "configure_swapfile.yml".to_string(),
             AnsiblePlaybook::CopyLogs => "copy_logs.yml".to_string(),

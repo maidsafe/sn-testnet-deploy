@@ -28,6 +28,11 @@
     - role: telegraf-configuration
       become: True
     - node
+    - {
+        role: cache_webserver,
+        become: True,
+        when: enable_cache_webserver
+      }
 
   tasks:
     # Something is wrong with the journal service on Ubuntu that causes no

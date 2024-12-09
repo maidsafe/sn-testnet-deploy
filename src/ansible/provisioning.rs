@@ -307,14 +307,8 @@ impl AnsibleProvisioner {
                 None,
                 1,
                 options.evm_network.clone(),
+                true,
             )?),
-        )?;
-
-        println!("Running the cache webserver playbook on genesis node..");
-        self.ansible_runner.run_playbook(
-            AnsiblePlaybook::CacheWebserver,
-            AnsibleInventoryType::Genesis,
-            None,
         )?;
 
         print_duration(start.elapsed());
@@ -409,17 +403,9 @@ impl AnsibleProvisioner {
                 initial_network_contacts_url,
                 node_count,
                 options.evm_network.clone(),
+                matches!(node_type, NodeType::Bootstrap),
             )?),
         )?;
-
-        if matches!(node_type, NodeType::Bootstrap) {
-            println!("Running the cache webserver playbook on {node_type:?} VMs..");
-            self.ansible_runner.run_playbook(
-                AnsiblePlaybook::CacheWebserver,
-                inventory_type,
-                None,
-            )?;
-        }
 
         print_duration(start.elapsed());
         Ok(())
