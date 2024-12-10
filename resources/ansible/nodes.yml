@@ -23,7 +23,7 @@
     - {
         role: private_node,
         become: True,
-        when: make_vm_private
+        when: make_vm_private | bool
       }
     - role: telegraf-configuration
       become: True
@@ -31,7 +31,7 @@
     - {
         role: cache_webserver,
         become: True,
-        when: enable_cache_webserver
+        when: enable_cache_webserver | bool
       }
 
   tasks:
