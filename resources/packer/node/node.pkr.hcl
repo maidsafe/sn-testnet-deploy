@@ -20,9 +20,9 @@ variable "droplet_image" {
   default = "ubuntu-24-04-x64"
 }
 
-variable "regions" {
-  type = list(string)
-  default = ["lon1", "nyc3", "sfo3"]
+variable "region" {
+  type = string
+  default = "lon1"
 }
 
 variable "size" {
