@@ -17,7 +17,8 @@ use colored::Colorize;
 #[derive(Clone)]
 pub struct BootstrapOptions {
     pub binary_option: BinaryOption,
-    pub bootstrap_peer: String,
+    pub bootstrap_network_contacts_url: Option<String>,
+    pub bootstrap_peer: Option<String>,
     pub chunk_size: Option<u64>,
     pub environment_type: EnvironmentType,
     pub env_variables: Option<Vec<(String, String)>>,
@@ -30,6 +31,7 @@ pub struct BootstrapOptions {
     pub max_archived_log_files: u16,
     pub max_log_files: u16,
     pub name: String,
+    pub network_id: Option<u8>,
     pub node_count: u16,
     pub node_vm_count: Option<u16>,
     pub node_volume_size: Option<u16>,
@@ -67,6 +69,7 @@ impl TestnetDeployer {
                 evm_payment_token_address: options.evm_payment_token_address.clone(),
                 evm_rpc_url: options.evm_rpc_url.clone(),
                 funding_wallet_address: None,
+                network_id: options.network_id,
                 rewards_address: options.rewards_address.clone(),
             },
         )
@@ -87,7 +90,10 @@ impl TestnetDeployer {
             node_volume_size: options.node_volume_size,
             private_node_vm_count: options.private_node_vm_count,
             private_node_volume_size: options.private_node_volume_size,
-            tfvars_filename: options.environment_type.get_tfvars_filename().to_string(),
+            tfvars_filename: options
+                .environment_type
+                .get_tfvars_filename(&options.name)
+                .to_string(),
             uploader_vm_count: Some(0),
             uploader_vm_size: None,
         })
@@ -114,7 +120,8 @@ impl TestnetDeployer {
             .print_ansible_run_banner("Provision Normal Nodes");
         match self.ansible_provisioner.provision_nodes(
             &provision_options,
-            &options.bootstrap_peer,
+            options.bootstrap_peer.clone(),
+            options.bootstrap_network_contacts_url.clone(),
             NodeType::Generic,
         ) {
             Ok(()) => {
@@ -148,10 +155,11 @@ impl TestnetDeployer {
 
             self.ansible_provisioner
                 .print_ansible_run_banner("Provision Private Nodes");
-            match self
-                .ansible_provisioner
-                .provision_private_nodes(&mut provision_options, &options.bootstrap_peer)
-            {
+            match self.ansible_provisioner.provision_private_nodes(
+                &mut provision_options,
+                options.bootstrap_peer.clone(),
+                options.bootstrap_network_contacts_url.clone(),
+            ) {
                 Ok(()) => {
                     println!("Provisioned private nodes");
                 }

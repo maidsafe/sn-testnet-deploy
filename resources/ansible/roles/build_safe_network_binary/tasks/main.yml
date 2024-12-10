@@ -13,9 +13,6 @@
 - name: "build {{ bin_name }} binary"
   ansible.builtin.shell: |
     source $HOME/.cargo/env
-    {% if protocol_version is defined and protocol_version != "" %}
-    export NETWORK_VERSION_MODE={{ protocol_version }}
-    {% endif %}
 
     {% if chunk_size is defined and chunk_size != "" %}
     export MAX_CHUNK_SIZE={{ chunk_size }}

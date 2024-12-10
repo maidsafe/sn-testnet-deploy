@@ -8,9 +8,9 @@ use crate::{
     ansible::{inventory::AnsibleInventoryType, provisioning::ProvisionOptions},
     error::Result,
     funding::get_address_from_sk,
-    get_anvil_node_data, get_genesis_multiaddr, write_environment_details, BinaryOption,
-    DeploymentInventory, DeploymentType, EnvironmentDetails, EnvironmentType, EvmNetwork,
-    InfraRunOptions, LogFormat, NodeType, TestnetDeployer,
+    get_anvil_node_data, get_bootstrap_cache_url, get_genesis_multiaddr, write_environment_details,
+    BinaryOption, DeploymentInventory, DeploymentType, EnvironmentDetails, EnvironmentType,
+    EvmNetwork, InfraRunOptions, LogFormat, NodeType, TestnetDeployer,
 };
 use alloy::hex::ToHexExt;
 use colored::Colorize;
@@ -41,6 +41,7 @@ pub struct DeployOptions {
     pub max_archived_log_files: u16,
     pub max_log_files: u16,
     pub name: String,
+    pub network_id: Option<u8>,
     pub node_count: u16,
     pub node_vm_count: Option<u16>,
     pub node_vm_size: Option<String>,
@@ -85,7 +86,7 @@ impl TestnetDeployer {
             node_volume_size: options.node_volume_size,
             private_node_vm_count: options.private_node_vm_count,
             private_node_volume_size: options.private_node_volume_size,
-            tfvars_filename: options.environment_type.get_tfvars_filename(),
+            tfvars_filename: options.environment_type.get_tfvars_filename(&options.name),
             uploader_vm_count: options.uploader_vm_count,
             uploader_vm_size: options.uploader_vm_size.clone(),
         })
@@ -111,6 +112,7 @@ impl TestnetDeployer {
                 evm_payment_token_address: options.evm_payment_token_address.clone(),
                 evm_rpc_url: options.evm_rpc_url.clone(),
                 funding_wallet_address: None,
+                network_id: options.network_id,
                 rewards_address: options.rewards_address.clone(),
             },
         )
@@ -170,6 +172,7 @@ impl TestnetDeployer {
                 evm_payment_token_address: provision_options.evm_payment_token_address.clone(),
                 evm_rpc_url: provision_options.evm_rpc_url.clone(),
                 funding_wallet_address,
+                network_id: options.network_id,
                 rewards_address: options.rewards_address.clone(),
             },
         )
@@ -194,20 +197,23 @@ impl TestnetDeployer {
                 println!("Failed to provision genesis node {err:?}");
                 err
             })?;
-        let (genesis_multiaddr, _) =
+        let (genesis_multiaddr, genesis_ip) =
             get_genesis_multiaddr(&self.ansible_provisioner.ansible_runner, &self.ssh_client)
                 .map_err(|err| {
                     println!("Failed to get genesis multiaddr {err:?}");
                     err
                 })?;
-        println!("Obtained multiaddr for genesis node: {genesis_multiaddr}");
+
+        let genesis_network_contacts = get_bootstrap_cache_url(&genesis_ip);
+        println!("Obtained multiaddr for genesis node: {genesis_multiaddr}, network contact: {genesis_network_contacts}");
 
         let mut node_provision_failed = false;
         self.ansible_provisioner
             .print_ansible_run_banner("Provision Bootstrap Nodes");
         match self.ansible_provisioner.provision_nodes(
             &provision_options,
-            &genesis_multiaddr,
+            Some(genesis_multiaddr.clone()),
+            Some(genesis_network_contacts.clone()),
             NodeType::Bootstrap,
         ) {
             Ok(()) => {
@@ -223,7 +229,8 @@ impl TestnetDeployer {
             .print_ansible_run_banner("Provision Normal Nodes");
         match self.ansible_provisioner.provision_nodes(
             &provision_options,
-            &genesis_multiaddr,
+            Some(genesis_multiaddr.clone()),
+            Some(genesis_network_contacts.clone()),
             NodeType::Generic,
         ) {
             Ok(()) => {
@@ -257,10 +264,11 @@ impl TestnetDeployer {
 
             self.ansible_provisioner
                 .print_ansible_run_banner("Provision Private Nodes");
-            match self
-                .ansible_provisioner
-                .provision_private_nodes(&mut provision_options, &genesis_multiaddr)
-            {
+            match self.ansible_provisioner.provision_private_nodes(
+                &mut provision_options,
+                Some(genesis_multiaddr.clone()),
+                Some(genesis_network_contacts.clone()),
+            ) {
                 Ok(()) => {
                     println!("Provisioned private nodes");
                 }
@@ -275,7 +283,11 @@ impl TestnetDeployer {
             self.ansible_provisioner
                 .print_ansible_run_banner("Provision Uploaders");
             self.ansible_provisioner
-                .provision_uploaders(&provision_options, &genesis_multiaddr)
+                .provision_uploaders(
+                    &provision_options,
+                    Some(genesis_multiaddr.clone()),
+                    Some(genesis_network_contacts.clone()),
+                )
                 .await
                 .map_err(|err| {
                     println!("Failed to provision uploaders {err:?}");

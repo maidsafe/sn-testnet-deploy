@@ -78,7 +78,6 @@ impl ExtraVarsDocBuilder {
                 repo_owner,
                 branch,
                 antnode_features,
-                protocol_version,
                 network_keys,
             } => {
                 self.add_variable("custom_bin", "true");
@@ -87,9 +86,6 @@ impl ExtraVarsDocBuilder {
                 self.add_variable("branch", branch);
                 if let Some(features) = antnode_features {
                     self.add_variable("antnode_features_list", features);
-                }
-                if let Some(protocol_version) = protocol_version {
-                    self.add_variable("protocol_version", protocol_version);
                 }
                 if let Some(network_keys) = network_keys {
                     self.add_variable("foundation_pk", &network_keys.0);
@@ -281,23 +277,26 @@ pub fn build_nat_gateway_extra_vars_doc(name: &str, private_ips: Vec<String>) ->
     extra_vars.build()
 }
 
+#[allow(clippy::too_many_arguments)]
 pub fn build_node_extra_vars_doc(
     cloud_provider: &str,
     options: &ProvisionOptions,
     node_type: NodeType,
     bootstrap_multiaddr: Option<String>,
+    network_contacts_url: Option<String>,
     node_instance_count: u16,
     evm_network: EvmNetwork,
+    enable_cache_webserver: bool,
 ) -> Result<String> {
     let mut extra_vars = ExtraVarsDocBuilder::default();
     extra_vars.add_variable("provider", cloud_provider);
     extra_vars.add_variable("testnet_name", &options.name);
     extra_vars.add_variable("node_type", node_type.telegraph_role());
-    if bootstrap_multiaddr.is_some() {
-        extra_vars.add_variable(
-            "genesis_multiaddr",
-            &bootstrap_multiaddr.ok_or_else(|| Error::GenesisMultiAddrNotSupplied)?,
-        );
+    if let Some(bootstrap_multiaddr) = bootstrap_multiaddr {
+        extra_vars.add_variable("genesis_multiaddr", &bootstrap_multiaddr);
+    }
+    if let Some(network_contacts_url) = network_contacts_url {
+        extra_vars.add_variable("network_contacts_url", &network_contacts_url);
     }
 
     extra_vars.add_variable("node_instance_count", &node_instance_count.to_string());
@@ -325,6 +324,13 @@ pub fn build_node_extra_vars_doc(
         extra_vars.add_variable("make_vm_private", "true");
     } else if matches!(node_type, NodeType::Private) {
         return Err(Error::NatGatewayNotSupplied);
+    }
+    extra_vars.add_variable(
+        "enable_cache_webserver",
+        &enable_cache_webserver.to_string(),
+    );
+    if let Some(network_id) = options.network_id {
+        extra_vars.add_variable("network_id", &network_id.to_string());
     }
 
     extra_vars.add_node_url_or_version(&options.name, &options.binary_option);
@@ -364,13 +370,20 @@ pub fn build_node_extra_vars_doc(
 pub fn build_uploaders_extra_vars_doc(
     cloud_provider: &str,
     options: &ProvisionOptions,
-    genesis_multiaddr: &str,
+    genesis_multiaddr: Option<String>,
+    genesis_network_contacts_url: Option<String>,
     sk_map: &HashMap<VirtualMachine, Vec<PrivateKeySigner>>,
 ) -> Result<String> {
     let mut extra_vars: ExtraVarsDocBuilder = ExtraVarsDocBuilder::default();
     extra_vars.add_variable("provider", cloud_provider);
     extra_vars.add_variable("testnet_name", &options.name);
-    extra_vars.add_variable("genesis_multiaddr", genesis_multiaddr);
+    if let Some(bootstrap_multiaddr) = genesis_multiaddr {
+        extra_vars.add_variable("genesis_multiaddr", &bootstrap_multiaddr);
+    }
+    if let Some(network_contacts_url) = genesis_network_contacts_url {
+        extra_vars.add_variable("network_contacts_url", &network_contacts_url);
+    }
+
     extra_vars.add_variable(
         "safe_downloader_instances",
         &options.downloaders_count.to_string(),
@@ -393,6 +406,9 @@ pub fn build_uploaders_extra_vars_doc(
     }
     if let Some(evm_rpc_url) = &options.evm_rpc_url {
         extra_vars.add_variable("evm_rpc_url", evm_rpc_url);
+    }
+    if let Some(network_id) = options.network_id {
+        extra_vars.add_variable("network_id", &network_id.to_string());
     }
 
     let mut serde_map = serde_json::Map::new();

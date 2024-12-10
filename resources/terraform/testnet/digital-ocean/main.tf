@@ -20,6 +20,12 @@ resource "digitalocean_droplet" "bootstrap_node" {
   tags     = ["environment:${terraform.workspace}", "type:bootstrap_node"]
 }
 
+resource "digitalocean_reserved_ip_assignment" "bootstrap_node_ip" {
+  count       = length(var.cache_webserver_reserved_ips) > 0 ? var.bootstrap_node_vm_count : 0
+  ip_address  = var.cache_webserver_reserved_ips[count.index]
+  droplet_id  = digitalocean_droplet.bootstrap_node[count.index].id
+}
+
 resource "digitalocean_droplet" "build" {
   count    = var.use_custom_bin ? 1 : 0
   image    = var.build_droplet_image_id

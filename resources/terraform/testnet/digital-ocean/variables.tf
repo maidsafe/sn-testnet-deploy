@@ -138,3 +138,9 @@ variable "private_node_volume_size" {
   description = "Size of each volume in GB for private nodes"
   type        = number
 }
+
+variable "cache_webserver_reserved_ips" {
+  type = list(string)
+  description = "List of reserved IPs for the bootstrap nodes"
+  default = []
+}

@@ -57,6 +57,7 @@ pub struct ProvisionOptions {
     pub logstash_details: Option<(String, Vec<SocketAddr>)>,
     pub name: String,
     pub nat_gateway: Option<VirtualMachine>,
+    pub network_id: Option<u8>,
     pub node_count: u16,
     pub max_archived_log_files: u16,
     pub max_log_files: u16,
@@ -89,6 +90,7 @@ impl From<BootstrapOptions> for ProvisionOptions {
             max_log_files: bootstrap_options.max_log_files,
             name: bootstrap_options.name,
             nat_gateway: None,
+            network_id: bootstrap_options.network_id,
             node_count: bootstrap_options.node_count,
             output_inventory_dir_path: bootstrap_options.output_inventory_dir_path,
             private_node_count: bootstrap_options.private_node_count,
@@ -120,6 +122,7 @@ impl From<DeployOptions> for ProvisionOptions {
             logstash_details: deploy_options.logstash_details,
             name: deploy_options.name,
             nat_gateway: None,
+            network_id: deploy_options.network_id,
             node_count: deploy_options.node_count,
             max_archived_log_files: deploy_options.max_archived_log_files,
             max_log_files: deploy_options.max_log_files,
@@ -304,11 +307,15 @@ impl AnsibleProvisioner {
                 options,
                 NodeType::Genesis,
                 None,
+                None,
                 1,
                 options.evm_network.clone(),
+                true,
             )?),
         )?;
+
         print_duration(start.elapsed());
+
         Ok(())
     }
 
@@ -347,7 +354,8 @@ impl AnsibleProvisioner {
     pub fn provision_nodes(
         &self,
         options: &ProvisionOptions,
-        initial_contact_peer: &str,
+        initial_contact_peer: Option<String>,
+        initial_network_contacts_url: Option<String>,
         node_type: NodeType,
     ) -> Result<()> {
         let start = Instant::now();
@@ -393,12 +401,15 @@ impl AnsibleProvisioner {
             Some(extra_vars::build_node_extra_vars_doc(
                 &self.cloud_provider.to_string(),
                 options,
-                node_type,
-                Some(initial_contact_peer.to_string()),
+                node_type.clone(),
+                initial_contact_peer,
+                initial_network_contacts_url,
                 node_count,
                 options.evm_network.clone(),
+                matches!(node_type, NodeType::Bootstrap),
             )?),
         )?;
+
         print_duration(start.elapsed());
         Ok(())
     }
@@ -406,7 +417,8 @@ impl AnsibleProvisioner {
     pub fn provision_private_nodes(
         &self,
         options: &mut ProvisionOptions,
-        initial_contact_peer: &str,
+        initial_contact_peer: Option<String>,
+        initial_network_contacts_url: Option<String>,
     ) -> Result<()> {
         let start = Instant::now();
 
@@ -433,7 +445,12 @@ impl AnsibleProvisioner {
             error!("Failed to generate private node static inv with err: {err:?}")
         })?;
 
-        self.provision_nodes(options, initial_contact_peer, NodeType::Private)?;
+        self.provision_nodes(
+            options,
+            initial_contact_peer,
+            initial_network_contacts_url,
+            NodeType::Private,
+        )?;
 
         print_duration(start.elapsed());
         Ok(())
@@ -442,7 +459,8 @@ impl AnsibleProvisioner {
     pub async fn provision_uploaders(
         &self,
         options: &ProvisionOptions,
-        genesis_multiaddr: &str,
+        genesis_multiaddr: Option<String>,
+        genesis_network_contacts_url: Option<String>,
     ) -> Result<()> {
         let start = Instant::now();
 
@@ -469,6 +487,7 @@ impl AnsibleProvisioner {
                 &self.cloud_provider.to_string(),
                 options,
                 genesis_multiaddr,
+                genesis_network_contacts_url,
                 &sk_map,
             )?),
         )?;

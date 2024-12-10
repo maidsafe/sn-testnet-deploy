@@ -1,14 +1,24 @@
 #!/usr/bin/env bash
 
 CONTACT_PEER="${1:-}"
+NETWORK_CONTACTS_URL="${2:-}"
+NETWORK_ID="${3:-}"
 
 CONTACT_PEER_ARG=""
 if [[ -n "$CONTACT_PEER" ]]; then
   CONTACT_PEER_ARG="--peer $CONTACT_PEER"
 fi
+NETWORK_CONTACTS_URL_ARG=""
+if [[ -n "$NETWORK_CONTACTS_URL" ]]; then
+  NETWORK_CONTACTS_URL_ARG="--network-contacts-url $NETWORK_CONTACTS_URL"
+fi
+NETWORK_ID_ARG=""
+if [[ -n "$NETWORK_ID" ]]; then
+  NETWORK_ID_ARG="--network-id $NETWORK_ID"
+fi
 
-if ! command -v safe &> /dev/null; then
-  echo "Error: 'safe' not found in PATH."
+if ! command -v ant &> /dev/null; then
+  echo "Error: 'ant' not found in PATH."
   exit 1
 fi
 
@@ -27,7 +37,7 @@ download_file() {
   (
     cd "$DOWNLOAD_DIR"
     echo "Downloading file: $file_ref"
-    safe $CONTACT_PEER_ARG files download "$output_path" "$file_ref"
+    ant $CONTACT_PEER_ARG $NETWORK_CONTACTS_URL_ARG $NETWORK_ID_ARG files download "$output_path" "$file_ref"
     if [[ $? -eq 0 ]]; then
       echo "Downloaded $file_ref to $output_path"
       # Keeping these files could cause the disk to become full quite quickly, so just delete them.
