@@ -17,7 +17,7 @@ User=ant{{ count }}
 {% if testnet_name.startswith('PROD-') %}
 ExecStart=/home/ant{{ count }}/upload-random-data.sh
 {% else %}
-ExecStart=/home/ant{{ count }}/upload-random-data.sh {{ genesis_multiaddr }} {{network_contacts_url}}
+ExecStart=/home/ant{{ count }}/upload-random-data.sh {{ genesis_multiaddr }} {{network_contacts_url}} {{network_id}}
 {% endif %}
 Restart=always
 WorkingDirectory=/home/ant{{ count }}

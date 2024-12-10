@@ -36,6 +36,7 @@
       - "--rewards-address={{ rewards_address }}"
       - "--max-archived-log-files={{ max_archived_log_files }}"
       - "--max-log-files={{ max_log_files }}"
+      - "{{ ('--network-id=' + network_id) if network_id else omit }}"
       - "{{ ('--log-format=' + log_format) if log_format is defined else omit }}"
       - "{{ ('--env=' + env_variables) if env_variables is defined else omit }}"
       - "{{ ('--version=' + version) if version is defined else ('--url=' + node_archive_url) }}"

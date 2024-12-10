@@ -2,16 +2,17 @@
 
 CONTACT_PEER="${1:-}"
 NETWORK_CONTACTS_URL="${2:-}"
+NETWORK_ID="${3:-}"
 
 {% if not testnet_name.startswith('PROD-') %}
 CONTACT_PEER_ARG=""
 if [ -n "$CONTACT_PEER" ]; then
   CONTACT_PEER_ARG="--peer $CONTACT_PEER"
 fi
+NETWORK_CONTACTS_URL_ARG=""
 if [ -n "$NETWORK_CONTACTS_URL" ]; then
-  NETWORK_CONTACTS_URL_ARG="$CONTACT_PEER_ARG --network-contacts-url $NETWORK_CONTACTS_URL"
+  NETWORK_CONTACTS_URL_ARG="--network-contacts-url $NETWORK_CONTACTS_URL"
 fi
-
 if [ -z "$CONTACT_PEER" ] && [ -z "$NETWORK_CONTACTS_URL" ]; then
   echo "No contact peer or network contacts URL provided. Please provide the bootstrap peer or network contacts URL."
   exit 1
@@ -22,6 +23,12 @@ CONTACT_PEER_ARG=""
 NETWORK_CONTACTS_URL_ARG=""
 TESTNET_ARG=""
 {% endif %}
+
+NETWORK_ID_ARG=""
+if [ -n "$NETWORK_ID" ]; then
+  echo "Setting network ID arg to $NETWORK_ID"
+  NETWORK_ID_ARG="--network-id $NETWORK_ID"
+fi
 
 if ! command -v ant &> /dev/null; then
   echo "Error: 'ant' not found in PATH."
@@ -59,7 +66,7 @@ generate_random_data_file_and_upload() {
   file_size_kb=$(du -k "$tmpfile" | cut -f1)
 
   now=$(date +"%s")
-  stdout=$(ant $CONTACT_PEER_ARG $NETWORK_CONTACTS_URL_ARG $TESTNET_ARG file upload "$tmpfile" 2>&1)
+  stdout=$(ant $CONTACT_PEER_ARG $NETWORK_CONTACTS_URL_ARG $TESTNET_ARG $NETWORK_ID_ARG file upload "$tmpfile" 2>&1)
   echo "$stdout"
 
   if [ $? -eq 0 ]; then
