@@ -15,6 +15,7 @@ pub mod inventory;
 pub mod logs;
 pub mod logstash;
 pub mod network_commands;
+pub mod reserved_ip;
 pub mod rpc_client;
 pub mod s3;
 pub mod safe;
@@ -1304,5 +1305,5 @@ pub fn calculate_size_per_attached_volume(node_count: u16) -> u16 {
 }
 
 pub fn get_bootstrap_cache_url(ip_addr: &IpAddr) -> String {
-    format!("http://{ip_addr}/bootstrap_cache")
+    format!("http://{ip_addr}/bootstrap_cache.json")
 }
