@@ -41,6 +41,7 @@ pub struct DeployOptions {
     pub max_archived_log_files: u16,
     pub max_log_files: u16,
     pub name: String,
+    pub network_id: Option<u8>,
     pub node_count: u16,
     pub node_vm_count: Option<u16>,
     pub node_vm_size: Option<String>,
@@ -111,6 +112,7 @@ impl TestnetDeployer {
                 evm_payment_token_address: options.evm_payment_token_address.clone(),
                 evm_rpc_url: options.evm_rpc_url.clone(),
                 funding_wallet_address: None,
+                network_id: options.network_id,
                 rewards_address: options.rewards_address.clone(),
             },
         )
@@ -170,6 +172,7 @@ impl TestnetDeployer {
                 evm_payment_token_address: provision_options.evm_payment_token_address.clone(),
                 evm_rpc_url: provision_options.evm_rpc_url.clone(),
                 funding_wallet_address,
+                network_id: options.network_id,
                 rewards_address: options.rewards_address.clone(),
             },
         )

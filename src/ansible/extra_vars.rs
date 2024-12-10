@@ -78,7 +78,6 @@ impl ExtraVarsDocBuilder {
                 repo_owner,
                 branch,
                 antnode_features,
-                protocol_version,
                 network_keys,
             } => {
                 self.add_variable("custom_bin", "true");
@@ -87,9 +86,6 @@ impl ExtraVarsDocBuilder {
                 self.add_variable("branch", branch);
                 if let Some(features) = antnode_features {
                     self.add_variable("antnode_features_list", features);
-                }
-                if let Some(protocol_version) = protocol_version {
-                    self.add_variable("protocol_version", protocol_version);
                 }
                 if let Some(network_keys) = network_keys {
                     self.add_variable("foundation_pk", &network_keys.0);
@@ -333,6 +329,9 @@ pub fn build_node_extra_vars_doc(
         "enable_cache_webserver",
         &enable_cache_webserver.to_string(),
     );
+    if let Some(network_id) = options.network_id {
+        extra_vars.add_variable("network_id", &network_id.to_string());
+    }
 
     extra_vars.add_node_url_or_version(&options.name, &options.binary_option);
     extra_vars.add_antctl_url(&options.name, &options.binary_option);
@@ -407,6 +406,9 @@ pub fn build_uploaders_extra_vars_doc(
     }
     if let Some(evm_rpc_url) = &options.evm_rpc_url {
         extra_vars.add_variable("evm_rpc_url", evm_rpc_url);
+    }
+    if let Some(network_id) = options.network_id {
+        extra_vars.add_variable("network_id", &network_id.to_string());
     }
 
     let mut serde_map = serde_json::Map::new();
