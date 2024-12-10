@@ -186,6 +186,7 @@ pub struct EnvironmentDetails {
     pub evm_payment_token_address: Option<String>,
     pub evm_rpc_url: Option<String>,
     pub funding_wallet_address: Option<String>,
+    pub network_id: Option<u8>,
     pub rewards_address: String,
 }
 
@@ -294,7 +295,6 @@ pub enum BinaryOption {
         antnode_features: Option<String>,
         branch: String,
         network_keys: Option<(String, String, String, String)>,
-        protocol_version: Option<String>,
         repo_owner: String,
     },
     /// Pre-built, versioned binaries will be fetched from S3.
