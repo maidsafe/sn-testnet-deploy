@@ -175,6 +175,10 @@ impl TestnetDeployer {
 
         let mut args = Vec::new();
 
+        if let Some(reserved_ips) = crate::reserved_ip::get_reserved_ips_args(&options.name) {
+            args.push(("cache_webserver_reserved_ips".to_string(), reserved_ips));
+        }
+
         if let Some(genesis_vm_count) = options.genesis_vm_count {
             args.push(("genesis_vm_count".to_string(), genesis_vm_count.to_string()));
         }

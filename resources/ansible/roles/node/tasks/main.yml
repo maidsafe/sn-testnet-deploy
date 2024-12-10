@@ -80,7 +80,6 @@
       - "--count={{ nodes_to_add }}"
       - "{{ ('--peer=' + genesis_multiaddr) if genesis_multiaddr else omit }}"
       - "{{ ('--network-contacts-url=' + network_contacts_url) if network_contacts_url else omit }}"
-      # to not fetch the mainnet contacts list. Should we disable this for `PROD-*`? 
       - --testnet
       - "--rpc-address={{ node_rpc_ip }}"
       - "--rewards-address={{ rewards_address }}"
