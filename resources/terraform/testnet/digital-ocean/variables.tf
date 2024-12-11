@@ -28,8 +28,8 @@ variable "node_droplet_size" {
   description = "The size of the droplet for generic nodes VMs"
 }
 
-variable "bootstrap_droplet_size" {
-  description = "The size of the droplet for bootstrap nodes VMs"
+variable "peer_cache_droplet_size" {
+  description = "The size of the droplet for Peer Cache nodes VMs"
 }
 
 variable "uploader_droplet_size" {
@@ -44,8 +44,8 @@ variable "build_droplet_image_id" {
   default = "172723670"
 }
 
-variable "bootstrap_droplet_image_id" {
-  description = "The ID of the bootstrap node droplet image. Varies per environment type."
+variable "peer_cache_droplet_image_id" {
+  description = "The ID of the Peer Cache node droplet image. Varies per environment type."
 }
 
 variable "nat_gateway_droplet_image_id" {
@@ -69,9 +69,9 @@ variable "genesis_vm_count" {
   description = "Set to 1 or 0 to control whether there is a genesis node"
 }
 
-variable "bootstrap_node_vm_count" {
+variable "peer_cache_node_vm_count" {
   default     = 2
-  description = "The number of droplets to launch for bootstrap nodes"
+  description = "The number of droplets to launch for Peer Cache nodes"
 }
 
 variable "node_vm_count" {
@@ -119,8 +119,8 @@ variable "volumes_per_node" {
   default     = 7
 }
 
-variable "bootstrap_node_volume_size" {
-  description = "Size of each volume in GB for bootstrap nodes"
+variable "peer_cache_node_volume_size" {
+  description = "Size of each volume in GB for peer cache nodes"
   type        = number
 }
 
@@ -139,8 +139,8 @@ variable "private_node_volume_size" {
   type        = number
 }
 
-variable "cache_webserver_reserved_ips" {
+variable "peer_cache_reserved_ips" {
   type = list(string)
-  description = "List of reserved IPs for the bootstrap nodes"
+  description = "List of reserved IPs for the peer nodes"
   default = []
 }

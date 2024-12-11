@@ -77,10 +77,10 @@ pub enum Error {
     InvalidUploaderUpscaleDeploymentType(String),
     #[error("The desired auditor VM count is smaller than the current count. This is invalid for an upscale operation.")]
     InvalidUpscaleDesiredAuditorVmCount,
-    #[error("The desired bootstrap VM count is smaller than the current count. This is invalid for an upscale operation.")]
-    InvalidUpscaleDesiredBootstrapVmCount,
-    #[error("The desired bootstrap node count is smaller than the current count. This is invalid for an upscale operation.")]
-    InvalidUpscaleDesiredBootstrapNodeCount,
+    #[error("The desired Peer Cache VM count is smaller than the current count. This is invalid for an upscale operation.")]
+    InvalidUpscaleDesiredPeerCacheVmCount,
+    #[error("The desired Peer Cache node count is smaller than the current count. This is invalid for an upscale operation.")]
+    InvalidUpscaleDesiredPeerCacheNodeCount,
     #[error("The desired node VM count is smaller than the current count. This is invalid for an upscale operation.")]
     InvalidUpscaleDesiredNodeVmCount,
     #[error("The desired node count is smaller than the current count. This is invalid for an upscale operation.")]
@@ -111,8 +111,8 @@ pub enum Error {
     LogsNotRetrievedError(String),
     #[error("The API response did not contain the expected '{0}' value")]
     MalformedDigitalOceanApiRespose(String),
-    #[error("Could not convert from DeployOptions to ProvisionOptions: bootstrap node count must have a value")]
-    MissingBootstrapNodeCount,
+    #[error("Could not convert from DeployOptions to ProvisionOptions: peer cache node count must have a value")]
+    MissingPeerCacheNodeCount,
     #[error(
         "Could not convert from DeployOptions to ProvisionOptions: node count must have a value"
     )]

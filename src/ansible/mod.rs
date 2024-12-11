@@ -71,7 +71,7 @@ pub enum AnsiblePlaybook {
     CleanupLogs,
     /// The configure swapfile playbook will configure the swapfile on the machines it is run against.
     ///
-    /// Use in combination with `AnsibleInventoryType::Nodes` or `AnsibleInventoryType::Bootstrap`.
+    /// Use in combination with `AnsibleInventoryType::Nodes` or `AnsibleInventoryType::PeerCache`.
     ConfigureSwapfile,
     /// The logs playbook will retrieve node logs from any machines it is run against.
     ///

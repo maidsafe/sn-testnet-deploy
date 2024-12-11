@@ -5,9 +5,9 @@
     state: started
     enabled: yes
 
-- name: find the json file in the bootstrap directory
+- name: find the json file in the bootstrap cache directory
   find:
-    paths: "{{ bootstrap_dir }}"
+    paths: "{{ bootstrap_cache_dir }}"
     patterns: "*.json"
   register: json_files
 

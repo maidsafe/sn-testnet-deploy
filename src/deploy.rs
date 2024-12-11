@@ -19,10 +19,6 @@ use std::{net::SocketAddr, path::PathBuf, time::Duration};
 #[derive(Clone)]
 pub struct DeployOptions {
     pub binary_option: BinaryOption,
-    pub bootstrap_node_count: u16,
-    pub bootstrap_node_vm_count: Option<u16>,
-    pub bootstrap_node_vm_size: Option<String>,
-    pub bootstrap_node_volume_size: Option<u16>,
     pub chunk_size: Option<u64>,
     pub current_inventory: DeploymentInventory,
     pub downloaders_count: u16,
@@ -47,6 +43,10 @@ pub struct DeployOptions {
     pub node_vm_size: Option<String>,
     pub node_volume_size: Option<u16>,
     pub output_inventory_dir_path: PathBuf,
+    pub peer_cache_node_count: u16,
+    pub peer_cache_node_vm_count: Option<u16>,
+    pub peer_cache_node_vm_size: Option<String>,
+    pub peer_cache_node_volume_size: Option<u16>,
     pub private_node_count: u16,
     pub private_node_vm_count: Option<u16>,
     pub private_node_volume_size: Option<u16>,
@@ -67,9 +67,6 @@ impl TestnetDeployer {
         };
 
         self.create_or_update_infra(&InfraRunOptions {
-            bootstrap_node_vm_count: options.bootstrap_node_vm_count,
-            bootstrap_node_vm_size: options.bootstrap_node_vm_size.clone(),
-            bootstrap_node_volume_size: options.bootstrap_node_volume_size,
             enable_build_vm: build_custom_binaries,
             evm_node_count: match options.evm_network {
                 EvmNetwork::Anvil => Some(1),
@@ -84,6 +81,9 @@ impl TestnetDeployer {
             node_vm_count: options.node_vm_count,
             node_vm_size: options.node_vm_size.clone(),
             node_volume_size: options.node_volume_size,
+            peer_cache_node_vm_count: options.peer_cache_node_vm_count,
+            peer_cache_node_vm_size: options.peer_cache_node_vm_size.clone(),
+            peer_cache_node_volume_size: options.peer_cache_node_volume_size,
             private_node_vm_count: options.private_node_vm_count,
             private_node_volume_size: options.private_node_volume_size,
             tfvars_filename: options.environment_type.get_tfvars_filename(&options.name),
@@ -209,18 +209,18 @@ impl TestnetDeployer {
 
         let mut node_provision_failed = false;
         self.ansible_provisioner
-            .print_ansible_run_banner("Provision Bootstrap Nodes");
+            .print_ansible_run_banner("Provision Peer Cache Nodes");
         match self.ansible_provisioner.provision_nodes(
             &provision_options,
             Some(genesis_multiaddr.clone()),
             Some(genesis_network_contacts.clone()),
-            NodeType::Bootstrap,
+            NodeType::PeerCache,
         ) {
             Ok(()) => {
-                println!("Provisioned bootstrap nodes");
+                println!("Provisioned Peer Cache nodes");
             }
             Err(err) => {
-                log::error!("Failed to provision bootstrap nodes: {err}");
+                log::error!("Failed to provision Peer Cache nodes: {err}");
                 node_provision_failed = true;
             }
         }

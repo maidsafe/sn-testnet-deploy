@@ -20,10 +20,10 @@ pub struct UpscaleOptions {
     pub ansible_verbose: bool,
     pub current_inventory: DeploymentInventory,
     pub desired_auditor_vm_count: Option<u16>,
-    pub desired_bootstrap_node_count: Option<u16>,
-    pub desired_bootstrap_node_vm_count: Option<u16>,
     pub desired_node_count: Option<u16>,
     pub desired_node_vm_count: Option<u16>,
+    pub desired_peer_cache_node_count: Option<u16>,
+    pub desired_peer_cache_node_vm_count: Option<u16>,
     pub desired_private_node_count: Option<u16>,
     pub desired_private_node_vm_count: Option<u16>,
     pub desired_uploader_vm_count: Option<u16>,
@@ -53,22 +53,22 @@ impl TestnetDeployer {
 
         if is_bootstrap_deploy
             && (options.desired_auditor_vm_count.is_some()
-                || options.desired_bootstrap_node_count.is_some()
-                || options.desired_bootstrap_node_vm_count.is_some()
+                || options.desired_peer_cache_node_count.is_some()
+                || options.desired_peer_cache_node_vm_count.is_some()
                 || options.desired_uploader_vm_count.is_some())
         {
             return Err(Error::InvalidUpscaleOptionsForBootstrapDeployment);
         }
 
-        let desired_bootstrap_node_vm_count = options
-            .desired_bootstrap_node_vm_count
-            .unwrap_or(options.current_inventory.bootstrap_node_vms.len() as u16);
-        if desired_bootstrap_node_vm_count
-            < options.current_inventory.bootstrap_node_vms.len() as u16
+        let desired_peer_cache_node_vm_count = options
+            .desired_peer_cache_node_vm_count
+            .unwrap_or(options.current_inventory.peer_cache_node_vms.len() as u16);
+        if desired_peer_cache_node_vm_count
+            < options.current_inventory.peer_cache_node_vms.len() as u16
         {
-            return Err(Error::InvalidUpscaleDesiredBootstrapVmCount);
+            return Err(Error::InvalidUpscaleDesiredPeerCacheVmCount);
         }
-        debug!("Using {desired_bootstrap_node_vm_count} for desired bootstrap node VM count");
+        debug!("Using {desired_peer_cache_node_vm_count} for desired Peer Cache node VM count");
 
         let desired_node_vm_count = options
             .desired_node_vm_count
@@ -94,13 +94,14 @@ impl TestnetDeployer {
         }
         debug!("Using {desired_uploader_vm_count} for desired uploader VM count");
 
-        let desired_bootstrap_node_count = options
-            .desired_bootstrap_node_count
-            .unwrap_or(options.current_inventory.bootstrap_node_count() as u16);
-        if desired_bootstrap_node_count < options.current_inventory.bootstrap_node_count() as u16 {
-            return Err(Error::InvalidUpscaleDesiredBootstrapNodeCount);
+        let desired_peer_cache_node_count = options
+            .desired_peer_cache_node_count
+            .unwrap_or(options.current_inventory.peer_cache_node_count() as u16);
+        if desired_peer_cache_node_count < options.current_inventory.peer_cache_node_count() as u16
+        {
+            return Err(Error::InvalidUpscaleDesiredPeerCacheNodeCount);
         }
-        debug!("Using {desired_bootstrap_node_count} for desired bootstrap node count");
+        debug!("Using {desired_peer_cache_node_count} for desired peer cache node count");
 
         let desired_node_count = options
             .desired_node_count
@@ -121,8 +122,8 @@ impl TestnetDeployer {
         if options.plan {
             let vars = vec![
                 (
-                    "bootstrap_node_vm_count".to_string(),
-                    desired_bootstrap_node_vm_count.to_string(),
+                    "peer_cache_node_vm_count".to_string(),
+                    desired_peer_cache_node_vm_count.to_string(),
                 ),
                 (
                     "node_vm_count".to_string(),
@@ -163,7 +164,7 @@ impl TestnetDeployer {
             &options.current_inventory.environment_details,
         )
         .await?;
-        infra_run_options.bootstrap_node_vm_count = Some(desired_bootstrap_node_vm_count);
+        infra_run_options.peer_cache_node_vm_count = Some(desired_peer_cache_node_vm_count);
         infra_run_options.node_vm_count = Some(desired_node_vm_count);
         infra_run_options.private_node_vm_count = Some(desired_private_node_vm_count);
         infra_run_options.uploader_vm_count = Some(desired_uploader_vm_count);
@@ -180,7 +181,6 @@ impl TestnetDeployer {
 
         let mut provision_options = ProvisionOptions {
             binary_option: options.current_inventory.binary_option.clone(),
-            bootstrap_node_count: desired_bootstrap_node_count,
             chunk_size: None,
             downloaders_count: options.downloaders_count,
             env_variables: None,
@@ -218,6 +218,7 @@ impl TestnetDeployer {
                 .working_directory_path
                 .join("ansible")
                 .join("inventory"),
+            peer_cache_node_count: desired_peer_cache_node_count,
             private_node_count: desired_private_node_count,
             private_node_vms: Vec::new(),
             public_rpc: options.public_rpc,
@@ -253,22 +254,22 @@ impl TestnetDeployer {
 
         if !is_bootstrap_deploy {
             self.wait_for_ssh_availability_on_new_machines(
-                AnsibleInventoryType::BootstrapNodes,
+                AnsibleInventoryType::PeerCacheNodes,
                 &options.current_inventory,
             )?;
             self.ansible_provisioner
-                .print_ansible_run_banner("Provision Bootstrap Nodes");
+                .print_ansible_run_banner("Provision Peer Cache Nodes");
             match self.ansible_provisioner.provision_nodes(
                 &provision_options,
                 Some(initial_multiaddr.clone()),
                 Some(initial_network_contacts_url.clone()),
-                NodeType::Bootstrap,
+                NodeType::PeerCache,
             ) {
                 Ok(()) => {
-                    println!("Provisioned bootstrap nodes");
+                    println!("Provisioned Peer Cache nodes");
                 }
                 Err(err) => {
-                    log::error!("Failed to provision bootstrap nodes: {err}");
+                    log::error!("Failed to provision Peer Cache nodes: {err}");
                     node_provision_failed = true;
                 }
             }
@@ -431,7 +432,6 @@ impl TestnetDeployer {
 
         let provision_options = ProvisionOptions {
             binary_option: options.current_inventory.binary_option.clone(),
-            bootstrap_node_count: 0,
             chunk_size: None,
             downloaders_count: options.downloaders_count,
             env_variables: None,
@@ -469,6 +469,7 @@ impl TestnetDeployer {
                 .working_directory_path
                 .join("ansible")
                 .join("inventory"),
+            peer_cache_node_count: 0,
             private_node_count: 0,
             private_node_vms: Vec::new(),
             public_rpc: options.public_rpc,
@@ -513,8 +514,8 @@ impl TestnetDeployer {
             .ansible_runner
             .get_inventory(inventory_type, true)?;
         let old_set: HashSet<_> = match inventory_type {
-            AnsibleInventoryType::BootstrapNodes => current_inventory
-                .bootstrap_node_vms
+            AnsibleInventoryType::PeerCacheNodes => current_inventory
+                .peer_cache_node_vms
                 .iter()
                 .map(|node_vm| &node_vm.vm)
                 .cloned()

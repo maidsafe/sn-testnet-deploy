@@ -76,9 +76,6 @@ impl TestnetDeployer {
         .await?;
 
         self.create_or_update_infra(&InfraRunOptions {
-            bootstrap_node_vm_count: Some(0),
-            bootstrap_node_vm_size: None,
-            bootstrap_node_volume_size: None,
             enable_build_vm: build_custom_binaries,
             evm_node_count: Some(0),
             evm_node_vm_size: None,
@@ -88,6 +85,9 @@ impl TestnetDeployer {
             node_vm_count: options.node_vm_count,
             node_vm_size: options.node_vm_size.clone(),
             node_volume_size: options.node_volume_size,
+            peer_cache_node_vm_count: Some(0),
+            peer_cache_node_vm_size: None,
+            peer_cache_node_volume_size: None,
             private_node_vm_count: options.private_node_vm_count,
             private_node_volume_size: options.private_node_volume_size,
             tfvars_filename: options
