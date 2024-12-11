@@ -210,11 +210,10 @@ impl TestnetDeployer {
         let mut node_provision_failed = false;
         self.ansible_provisioner
             .print_ansible_run_banner("Provision Peer Cache Nodes");
-        match self.ansible_provisioner.provision_nodes(
+        match self.ansible_provisioner.provision_peer_cache_nodes(
             &provision_options,
             Some(genesis_multiaddr.clone()),
             Some(genesis_network_contacts.clone()),
-            NodeType::PeerCache,
         ) {
             Ok(()) => {
                 println!("Provisioned Peer Cache nodes");

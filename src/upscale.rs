@@ -259,11 +259,10 @@ impl TestnetDeployer {
             )?;
             self.ansible_provisioner
                 .print_ansible_run_banner("Provision Peer Cache Nodes");
-            match self.ansible_provisioner.provision_nodes(
+            match self.ansible_provisioner.provision_peer_cache_nodes(
                 &provision_options,
                 Some(initial_multiaddr.clone()),
                 Some(initial_network_contacts_url.clone()),
-                NodeType::PeerCache,
             ) {
                 Ok(()) => {
                     println!("Provisioned Peer Cache nodes");
