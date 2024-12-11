@@ -15,9 +15,9 @@ Environment="EVM_NETWORK=arbitrum-one"
 {% endif %}
 User=ant{{ count }}
 {% if testnet_name.startswith('PROD-') %}
-ExecStart=/home/ant{{ count }}/upload-random-data.sh
+ExecStart=/home/ant{{ count }}/upload-random-data.sh {{ secret_key }}
 {% else %}
-ExecStart=/home/ant{{ count }}/upload-random-data.sh {{ genesis_multiaddr }}
+ExecStart=/home/ant{{ count }}/upload-random-data.sh {{ secret_key }} {{ genesis_multiaddr }}
 {% endif %}
 Restart=always
 WorkingDirectory=/home/ant{{ count }}

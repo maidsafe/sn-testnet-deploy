@@ -1,6 +1,15 @@
 #!/usr/bin/env bash
 
-CONTACT_PEER="${1:-}"
+# Check if SECRET_KEY is already set in .bashrc
+if ! grep -q "export SECRET_KEY=" ~/.bashrc; then
+  echo "export SECRET_KEY=${1}" >> ~/.bashrc
+fi
+
+# Reload .bashrc
+source ~/.bashrc
+
+
+CONTACT_PEER="${2:-}"
 
 {% if not testnet_name.startswith('PROD-') %}
 CONTACT_PEER_ARG=""
