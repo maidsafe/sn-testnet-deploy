@@ -1,5 +1,25 @@
 #!/usr/bin/env bash
 
+if [[ -n "${SECRET_KEY}" ]] && ! grep -q "export SECRET_KEY=" ~/.profile; then
+  echo "export SECRET_KEY=${SECRET_KEY}" >> ~/.profile
+fi
+
+if [[ -n "${RPC_URL}" ]] && ! grep -q "export RPC_URL=" ~/.profile; then
+  echo "export RPC_URL=${RPC_URL}" >> ~/.profile
+fi
+
+if [[ -n "${PAYMENT_TOKEN_ADDRESS}" ]] && ! grep -q "export PAYMENT_TOKEN_ADDRESS=" ~/.profile; then
+  echo "export PAYMENT_TOKEN_ADDRESS=${PAYMENT_TOKEN_ADDRESS}" >> ~/.profile
+fi
+
+if [[ -n "${DATA_PAYMENTS_ADDRESS}" ]] && ! grep -q "export DATA_PAYMENTS_ADDRESS=" ~/.profile; then
+  echo "export DATA_PAYMENTS_ADDRESS=${DATA_PAYMENTS_ADDRESS}" >> ~/.profile
+fi
+
+if [[ -n "${EVM_NETWORK}" ]] && ! grep -q "export EVM_NETWORK=" ~/.profile; then
+  echo "export EVM_NETWORK=${EVM_NETWORK}" >> ~/.profile
+fi
+
 CONTACT_PEER="${1:-}"
 NETWORK_CONTACTS_URL="${2:-}"
 NETWORK_ID="${3:-}"
