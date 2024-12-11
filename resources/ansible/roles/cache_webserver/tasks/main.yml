@@ -1,12 +1,4 @@
 ---
-# todo remove after building a new image
-- name: install Nginx
-  apt:
-    name: nginx
-    state: present
-  retries: 10
-  delay: 5
-
 - name: start and enable nginx service
   service:
     name: nginx
