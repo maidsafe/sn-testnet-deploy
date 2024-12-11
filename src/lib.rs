@@ -210,9 +210,9 @@ impl EnvironmentType {
 
     pub fn get_default_peer_cache_node_count(&self) -> u16 {
         match self {
-            EnvironmentType::Development => 1,
-            EnvironmentType::Production => 1,
-            EnvironmentType::Staging => 1,
+            EnvironmentType::Development => 5,
+            EnvironmentType::Production => 5,
+            EnvironmentType::Staging => 5,
         }
     }
 

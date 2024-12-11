@@ -57,7 +57,7 @@ pub enum AnsibleInventoryType {
 impl std::fmt::Display for AnsibleInventoryType {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let s = match self {
-            AnsibleInventoryType::PeerCacheNodes => "BootstrapNodes",
+            AnsibleInventoryType::PeerCacheNodes => "PeerCacheNodes",
             AnsibleInventoryType::Build => "Build",
             AnsibleInventoryType::Custom => "Custom",
             AnsibleInventoryType::EvmNodes => "EvmNodes",
@@ -77,7 +77,7 @@ impl AnsibleInventoryType {
     pub fn get_inventory_path(&self, name: &str, provider: &str) -> PathBuf {
         match &self {
             Self::PeerCacheNodes => {
-                PathBuf::from(format!(".{name}_bootstrap_node_inventory_{provider}.yml"))
+                PathBuf::from(format!(".{name}_peer_cache_node_inventory_{provider}.yml"))
             }
             Self::Build => PathBuf::from(format!(".{name}_build_inventory_{provider}.yml")),
             Self::Custom => PathBuf::from(format!(".{name}_custom_inventory_{provider}.ini")),
@@ -100,7 +100,7 @@ impl AnsibleInventoryType {
 
     pub fn tag(&self) -> &str {
         match self {
-            Self::PeerCacheNodes => "bootstrap_node",
+            Self::PeerCacheNodes => "peer_cache_node",
             Self::Build => "build",
             Self::Custom => "custom",
             Self::EvmNodes => "evm_node",

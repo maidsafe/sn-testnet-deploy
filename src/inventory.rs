@@ -833,6 +833,8 @@ impl DeploymentInventory {
             println!("Nodes per VM: {}", self.peer_cache_node_count());
             println!("SSH user: {}", self.ssh_user);
             println!();
+
+            self.print_peer_cache_webserver();
         }
 
         println!("========");
@@ -1031,7 +1033,7 @@ impl DeploymentInventory {
 
         for node_vm in &self.peer_cache_node_vms {
             let webserver = get_bootstrap_cache_url(&node_vm.vm.public_ip_addr);
-            println!("{webserver}");
+            println!("{}: {webserver}", node_vm.vm.name);
         }
     }
 }
