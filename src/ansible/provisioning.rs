@@ -443,7 +443,7 @@ impl AnsibleProvisioner {
         println!("SSH is available on peer cache nodes. Proceeding with provisioning...");
 
         self.ansible_runner.run_playbook(
-            AnsiblePlaybook::Nodes,
+            AnsiblePlaybook::PeerCacheNodes,
             node_type.to_ansible_inventory_type(),
             Some(extra_vars::build_node_extra_vars_doc(
                 &self.cloud_provider.to_string(),
