@@ -282,7 +282,7 @@ pub fn build_node_extra_vars_doc(
     cloud_provider: &str,
     options: &ProvisionOptions,
     node_type: NodeType,
-    bootstrap_multiaddr: Option<String>,
+    genesis_multiaddr: Option<String>,
     network_contacts_url: Option<String>,
     node_instance_count: u16,
     evm_network: EvmNetwork,
@@ -291,9 +291,9 @@ pub fn build_node_extra_vars_doc(
     let mut extra_vars = ExtraVarsDocBuilder::default();
     extra_vars.add_variable("provider", cloud_provider);
     extra_vars.add_variable("testnet_name", &options.name);
-    extra_vars.add_variable("node_type", node_type.telegraph_role());
-    if let Some(bootstrap_multiaddr) = bootstrap_multiaddr {
-        extra_vars.add_variable("genesis_multiaddr", &bootstrap_multiaddr);
+    extra_vars.add_variable("node_type", node_type.telegraf_role());
+    if let Some(genesis_multiaddr) = genesis_multiaddr {
+        extra_vars.add_variable("genesis_multiaddr", &genesis_multiaddr);
     }
     if let Some(network_contacts_url) = network_contacts_url {
         extra_vars.add_variable("network_contacts_url", &network_contacts_url);
@@ -377,8 +377,8 @@ pub fn build_uploaders_extra_vars_doc(
     let mut extra_vars: ExtraVarsDocBuilder = ExtraVarsDocBuilder::default();
     extra_vars.add_variable("provider", cloud_provider);
     extra_vars.add_variable("testnet_name", &options.name);
-    if let Some(bootstrap_multiaddr) = genesis_multiaddr {
-        extra_vars.add_variable("genesis_multiaddr", &bootstrap_multiaddr);
+    if let Some(genesis_multiaddr) = genesis_multiaddr {
+        extra_vars.add_variable("genesis_multiaddr", &genesis_multiaddr);
     }
     if let Some(network_contacts_url) = genesis_network_contacts_url {
         extra_vars.add_variable("network_contacts_url", &network_contacts_url);
@@ -455,7 +455,7 @@ pub fn build_binaries_extra_vars_doc(options: &ProvisionOptions) -> Result<Strin
 pub fn build_node_telegraf_upgrade(name: &str, node_type: &NodeType) -> Result<String> {
     let mut extra_vars: ExtraVarsDocBuilder = ExtraVarsDocBuilder::default();
     extra_vars.add_variable("testnet_name", name);
-    extra_vars.add_variable("node_type", node_type.telegraph_role());
+    extra_vars.add_variable("node_type", node_type.telegraf_role());
     Ok(extra_vars.build())
 }
 

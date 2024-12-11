@@ -10,20 +10,20 @@ terraform {
   }
 }
 
-resource "digitalocean_droplet" "bootstrap_node" {
-  count    = var.bootstrap_node_vm_count
-  image    = var.bootstrap_droplet_image_id
-  name     = "${terraform.workspace}-bootstrap-node-${count.index + 1}"
+resource "digitalocean_droplet" "peer_cache_node" {
+  count    = var.peer_cache_node_vm_count
+  image    = var.peer_cache_droplet_image_id
+  name     = "${terraform.workspace}-peer-cache-node-${count.index + 1}"
   region   = var.region
-  size     = var.bootstrap_droplet_size
+  size     = var.peer_cache_droplet_size
   ssh_keys = var.droplet_ssh_keys
-  tags     = ["environment:${terraform.workspace}", "type:bootstrap_node"]
+  tags     = ["environment:${terraform.workspace}", "type:peer_cache_node"]
 }
 
-resource "digitalocean_reserved_ip_assignment" "bootstrap_node_ip" {
-  count       = length(var.cache_webserver_reserved_ips) > 0 ? var.bootstrap_node_vm_count : 0
-  ip_address  = var.cache_webserver_reserved_ips[count.index]
-  droplet_id  = digitalocean_droplet.bootstrap_node[count.index].id
+resource "digitalocean_reserved_ip_assignment" "peer_cache_node_ip" {
+  count       = length(var.peer_cache_reserved_ips) > 0 ? var.peer_cache_node_vm_count : 0
+  ip_address  = var.peer_cache_reserved_ips[count.index]
+  droplet_id  = digitalocean_droplet.peer_cache_node[count.index].id
 }
 
 resource "digitalocean_droplet" "build" {
@@ -38,10 +38,10 @@ resource "digitalocean_droplet" "build" {
 
 resource "digitalocean_droplet" "genesis_bootstrap" {
   count    = var.genesis_vm_count
-  image    = var.bootstrap_droplet_image_id
+  image    = var.peer_cache_droplet_image_id
   name     = "${terraform.workspace}-genesis-bootstrap"
   region   = var.region
-  size     = var.bootstrap_droplet_size
+  size     = var.peer_cache_droplet_size
   ssh_keys = var.droplet_ssh_keys
   tags     = ["environment:${terraform.workspace}", "type:genesis"]
 }
@@ -97,8 +97,8 @@ resource "digitalocean_droplet" "evm_node" {
 }
 
 locals {
-  bootstrap_node_volume_keys = flatten([
-    for node_index in range(var.bootstrap_node_vm_count) : [
+  peer_cache_node_volume_keys = flatten([
+    for node_index in range(var.peer_cache_node_vm_count) : [
       for volume_index in range(var.volumes_per_node) : "${node_index+1}-${volume_index+1}"
     ]
   ])
@@ -122,17 +122,17 @@ locals {
   ])
 }
 
-resource "digitalocean_volume" "bootstrap_node_attached_volume" {
-  for_each = { for key in local.bootstrap_node_volume_keys : key => key }
-  name        = lower("${terraform.workspace}-bootstrap-node-${split("-", each.key)[0]}-volume-${split("-", each.key)[1]}")
-  size        = var.bootstrap_node_volume_size
+resource "digitalocean_volume" "peer_cache_node_attached_volume" {
+  for_each = { for key in local.peer_cache_node_volume_keys : key => key }
+  name        = lower("${terraform.workspace}-peer-cache-node-${split("-", each.key)[0]}-volume-${split("-", each.key)[1]}")
+  size        = var.peer_cache_node_volume_size
   region      = var.region
 }
 
-resource "digitalocean_volume_attachment" "bootstrap_node_volume_attachment" {
-  for_each = { for key in local.bootstrap_node_volume_keys : key => key }
-  droplet_id = digitalocean_droplet.bootstrap_node[tonumber(split("-", each.key)[0]) -1 ].id
-  volume_id  = digitalocean_volume.bootstrap_node_attached_volume[each.key].id
+resource "digitalocean_volume_attachment" "peer_cache_node_volume_attachment" {
+  for_each = { for key in local.peer_cache_node_volume_keys : key => key }
+  droplet_id = digitalocean_droplet.peer_cache_node[tonumber(split("-", each.key)[0]) -1 ].id
+  volume_id  = digitalocean_volume.peer_cache_node_attached_volume[each.key].id
 }
 
 resource "digitalocean_volume" "genesis_node_attached_volume" {

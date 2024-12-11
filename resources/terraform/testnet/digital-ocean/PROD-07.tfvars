@@ -1,6 +1,3 @@
-bootstrap_droplet_size = "c2-16vcpu-32gb"
-bootstrap_node_vm_count = 0
-bootstrap_droplet_image_id = 157362431
 evm_node_vm_count = 0
 evm_node_droplet_size = "s-4vcpu-8gb"
 evm_node_droplet_image_id = 167317579
@@ -9,6 +6,9 @@ node_droplet_size = "c2-16vcpu-32gb"
 node_vm_count = 17
 node_droplet_image_id = 157362431
 private_node_vm_count = 0
+peer_cache_droplet_size = "c2-16vcpu-32gb"
+peer_cache_node_vm_count = 0
+peer_cache_droplet_image_id = 157362431
 setup_nat_gateway = true
 uploader_droplet_size = "c-16"
 uploader_vm_count = 0

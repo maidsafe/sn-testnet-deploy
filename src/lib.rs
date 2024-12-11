@@ -102,9 +102,9 @@ impl std::str::FromStr for DeploymentType {
 
 #[derive(Debug, Clone)]
 pub enum NodeType {
-    Bootstrap,
     Generic,
     Genesis,
+    PeerCache,
     Private,
 }
 
@@ -113,7 +113,7 @@ impl std::str::FromStr for NodeType {
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         match s.to_lowercase().as_str() {
-            "bootstrap" => Ok(NodeType::Bootstrap),
+            "peer-cache" => Ok(NodeType::PeerCache),
             "generic" => Ok(NodeType::Generic),
             "genesis" => Ok(NodeType::Genesis),
             "private" => Ok(NodeType::Private),
@@ -123,19 +123,18 @@ impl std::str::FromStr for NodeType {
 }
 
 impl NodeType {
-    pub fn telegraph_role(&self) -> &'static str {
+    pub fn telegraf_role(&self) -> &'static str {
         match self {
-            NodeType::Bootstrap => "BOOTSTRAP_NODE",
+            NodeType::PeerCache => "PEER_CACHE_NODE",
             NodeType::Generic => "GENERIC_NODE",
-            // Genesis node should be marked as a bootstrap node for telegraf
-            NodeType::Genesis => "BOOTSTRAP_NODE",
+            NodeType::Genesis => "GENESIS_NODE",
             NodeType::Private => "NAT_RANDOMIZED_NODE",
         }
     }
 
     pub fn to_ansible_inventory_type(&self) -> AnsibleInventoryType {
         match self {
-            NodeType::Bootstrap => AnsibleInventoryType::BootstrapNodes,
+            NodeType::PeerCache => AnsibleInventoryType::PeerCacheNodes,
             NodeType::Generic => AnsibleInventoryType::Nodes,
             NodeType::Genesis => AnsibleInventoryType::Genesis,
             NodeType::Private => AnsibleInventoryType::PrivateNodes,
@@ -209,7 +208,7 @@ impl EnvironmentType {
         }
     }
 
-    pub fn get_default_bootstrap_node_count(&self) -> u16 {
+    pub fn get_default_peer_cache_node_count(&self) -> u16 {
         match self {
             EnvironmentType::Development => 1,
             EnvironmentType::Production => 1,
@@ -254,9 +253,6 @@ impl FromStr for EnvironmentType {
 }
 
 pub struct DeployOptions {
-    pub bootstrap_node_count: u16,
-    pub bootstrap_node_vm_count: Option<u16>,
-    pub bootstrap_node_vm_size: Option<String>,
     pub binary_option: BinaryOption,
     pub current_inventory: DeploymentInventory,
     pub env_variables: Option<Vec<(String, String)>>,
@@ -268,6 +264,9 @@ pub struct DeployOptions {
     pub node_count: u16,
     pub node_vm_count: Option<u16>,
     pub node_vm_size: Option<String>,
+    pub peer_cache_node_count: u16,
+    pub peer_cache_node_vm_count: Option<u16>,
+    pub peer_cache_node_vm_size: Option<String>,
     pub public_rpc: bool,
     pub rewards_address: String,
     pub uploader_vm_count: Option<u16>,
@@ -677,9 +676,9 @@ impl TestnetDeployer {
     pub fn status(&self) -> Result<()> {
         self.ansible_provisioner.status()?;
 
-        let bootstrap_node_registries = self
+        let peer_cache_node_registries = self
             .ansible_provisioner
-            .get_node_registries(&AnsibleInventoryType::BootstrapNodes)?;
+            .get_node_registries(&AnsibleInventoryType::PeerCacheNodes)?;
         let generic_node_registries = self
             .ansible_provisioner
             .get_node_registries(&AnsibleInventoryType::Nodes)?;
@@ -691,7 +690,7 @@ impl TestnetDeployer {
             .get_node_registries(&AnsibleInventoryType::Genesis)?
             .clone();
 
-        bootstrap_node_registries.print();
+        peer_cache_node_registries.print();
         generic_node_registries.print();
         private_node_registries.print();
         genesis_node_registry.print();
@@ -1072,10 +1071,10 @@ pub async fn do_clean(
     let options =
         InfraRunOptions::generate_existing(name, terraform_runner, &environment_details).await?;
     let mut args = Vec::new();
-    if let Some(bootstrap_node_volume_size) = options.bootstrap_node_volume_size {
+    if let Some(peer_cache_node_volume_size) = options.peer_cache_node_volume_size {
         args.push((
-            "bootstrap_node_volume_size".to_string(),
-            bootstrap_node_volume_size.to_string(),
+            "peer_cache_node_volume_size".to_string(),
+            peer_cache_node_volume_size.to_string(),
         ));
     }
     if let Some(genesis_node_volume_size) = options.genesis_node_volume_size {

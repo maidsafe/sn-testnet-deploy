@@ -22,8 +22,6 @@ use std::{
 /// Represents the inventory types that apply to our own domain.
 #[derive(Clone, Debug, Copy)]
 pub enum AnsibleInventoryType {
-    /// Use to run a playbook against all bootstrap nodes.
-    BootstrapNodes,
     /// Use to run a playbook against the build machine.
     ///
     /// This is a larger machine that is used for building binaries from source.
@@ -44,6 +42,8 @@ pub enum AnsibleInventoryType {
     NatGateway,
     /// Use to run a playbook against all nodes except the genesis node.
     Nodes,
+    /// Use to run a playbook against all Peer Cache nodes.
+    PeerCacheNodes,
     /// Use to run a inventory against the private nodes. This does not route the ssh connection through the NAT gateway
     /// and hence cannot run playbooks. Use PrivateNodesStatic for that.
     PrivateNodes,
@@ -57,7 +57,7 @@ pub enum AnsibleInventoryType {
 impl std::fmt::Display for AnsibleInventoryType {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let s = match self {
-            AnsibleInventoryType::BootstrapNodes => "BootstrapNodes",
+            AnsibleInventoryType::PeerCacheNodes => "BootstrapNodes",
             AnsibleInventoryType::Build => "Build",
             AnsibleInventoryType::Custom => "Custom",
             AnsibleInventoryType::EvmNodes => "EvmNodes",
@@ -76,7 +76,7 @@ impl std::fmt::Display for AnsibleInventoryType {
 impl AnsibleInventoryType {
     pub fn get_inventory_path(&self, name: &str, provider: &str) -> PathBuf {
         match &self {
-            Self::BootstrapNodes => {
+            Self::PeerCacheNodes => {
                 PathBuf::from(format!(".{name}_bootstrap_node_inventory_{provider}.yml"))
             }
             Self::Build => PathBuf::from(format!(".{name}_build_inventory_{provider}.yml")),
@@ -100,7 +100,7 @@ impl AnsibleInventoryType {
 
     pub fn tag(&self) -> &str {
         match self {
-            Self::BootstrapNodes => "bootstrap_node",
+            Self::PeerCacheNodes => "bootstrap_node",
             Self::Build => "build",
             Self::Custom => "custom",
             Self::EvmNodes => "evm_node",
@@ -117,7 +117,7 @@ impl AnsibleInventoryType {
     pub fn iter_node_type() -> impl Iterator<Item = Self> {
         [
             Self::Genesis,
-            Self::BootstrapNodes,
+            Self::PeerCacheNodes,
             Self::Nodes,
             Self::PrivateNodes,
         ]
@@ -211,7 +211,7 @@ pub fn generate_environment_inventory(
     output_inventory_dir_path: &Path,
 ) -> Result<()> {
     let inventory_types = [
-        AnsibleInventoryType::BootstrapNodes,
+        AnsibleInventoryType::PeerCacheNodes,
         AnsibleInventoryType::Build,
         AnsibleInventoryType::Genesis,
         AnsibleInventoryType::NatGateway,
@@ -248,7 +248,7 @@ pub fn cleanup_environment_inventory(
     inventory_types: Option<Vec<AnsibleInventoryType>>,
 ) -> Result<()> {
     let default_inventory_types = [
-        AnsibleInventoryType::BootstrapNodes,
+        AnsibleInventoryType::PeerCacheNodes,
         AnsibleInventoryType::Build,
         AnsibleInventoryType::Genesis,
         AnsibleInventoryType::NatGateway,

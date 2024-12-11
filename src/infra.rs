@@ -14,9 +14,6 @@ use std::time::Instant;
 
 #[derive(Clone, Debug)]
 pub struct InfraRunOptions {
-    pub bootstrap_node_vm_count: Option<u16>,
-    pub bootstrap_node_vm_size: Option<String>,
-    pub bootstrap_node_volume_size: Option<u16>,
     pub enable_build_vm: bool,
     pub evm_node_count: Option<u16>,
     pub evm_node_vm_size: Option<String>,
@@ -26,6 +23,9 @@ pub struct InfraRunOptions {
     pub node_vm_count: Option<u16>,
     pub node_vm_size: Option<String>,
     pub node_volume_size: Option<u16>,
+    pub peer_cache_node_vm_count: Option<u16>,
+    pub peer_cache_node_vm_size: Option<String>,
+    pub peer_cache_node_volume_size: Option<u16>,
     pub private_node_vm_count: Option<u16>,
     pub private_node_volume_size: Option<u16>,
     pub tfvars_filename: String,
@@ -75,13 +75,13 @@ impl InfraRunOptions {
                 .count() as u16
         };
 
-        let bootstrap_node_vm_count = resource_count("bootstrap_node");
-        let bootstrap_node_volume_size = if bootstrap_node_vm_count > 0 {
-            let volume_size = get_value_for_a_resource("bootstrap_node_attached_volume", "size")?
+        let peer_cache_node_vm_count = resource_count("peer_cache_node");
+        let peer_cache_node_volume_size = if peer_cache_node_vm_count > 0 {
+            let volume_size = get_value_for_a_resource("peer_cache_node_attached_volume", "size")?
                 .as_u64()
                 .ok_or_else(|| {
                     log::error!(
-                        "Failed to obtain u64 'size' value for bootstrap_node_attached_volume"
+                        "Failed to obtain u64 'size' value for peer_cache_node_attached_volume"
                     );
                     Error::TerraformResourceFieldMissing("size".to_string())
                 })?;
@@ -141,9 +141,6 @@ impl InfraRunOptions {
         let enable_build_vm = build_vm_count > 0;
 
         let options = Self {
-            bootstrap_node_vm_count: Some(bootstrap_node_vm_count),
-            bootstrap_node_vm_size: None, // vm_size is obtained from the tfvars file
-            bootstrap_node_volume_size,
             enable_build_vm,
             evm_node_count,
             evm_node_vm_size: None, // vm_size is obtained from the tfvars file
@@ -153,6 +150,9 @@ impl InfraRunOptions {
             node_vm_count: Some(node_vm_count),
             node_vm_size: None, // vm_size is obtained from the tfvars file
             node_volume_size,
+            peer_cache_node_vm_count: Some(peer_cache_node_vm_count),
+            peer_cache_node_vm_size: None, // vm_size is obtained from the tfvars file
+            peer_cache_node_volume_size,
             private_node_vm_count: Some(private_node_vm_count),
             private_node_volume_size,
             tfvars_filename: environment_details
@@ -176,17 +176,17 @@ impl TestnetDeployer {
         let mut args = Vec::new();
 
         if let Some(reserved_ips) = crate::reserved_ip::get_reserved_ips_args(&options.name) {
-            args.push(("cache_webserver_reserved_ips".to_string(), reserved_ips));
+            args.push(("peer_cache_reserved_ips".to_string(), reserved_ips));
         }
 
         if let Some(genesis_vm_count) = options.genesis_vm_count {
             args.push(("genesis_vm_count".to_string(), genesis_vm_count.to_string()));
         }
 
-        if let Some(bootstrap_node_vm_count) = options.bootstrap_node_vm_count {
+        if let Some(peer_cache_node_vm_count) = options.peer_cache_node_vm_count {
             args.push((
-                "bootstrap_node_vm_count".to_string(),
-                bootstrap_node_vm_count.to_string(),
+                "peer_cache_node_vm_count".to_string(),
+                peer_cache_node_vm_count.to_string(),
             ));
         }
         if let Some(node_vm_count) = options.node_vm_count {
@@ -223,10 +223,10 @@ impl TestnetDeployer {
             args.push(("node_droplet_size".to_string(), node_vm_size.clone()));
         }
 
-        if let Some(bootstrap_vm_size) = &options.bootstrap_node_vm_size {
+        if let Some(peer_cache_vm_size) = &options.peer_cache_node_vm_size {
             args.push((
-                "bootstrap_droplet_size".to_string(),
-                bootstrap_vm_size.clone(),
+                "peer_cache_droplet_size".to_string(),
+                peer_cache_vm_size.clone(),
             ));
         }
 
@@ -244,10 +244,10 @@ impl TestnetDeployer {
             ));
         }
 
-        if let Some(bootstrap_node_volume_size) = options.bootstrap_node_volume_size {
+        if let Some(peer_cache_node_volume_size) = options.peer_cache_node_volume_size {
             args.push((
-                "bootstrap_node_volume_size".to_string(),
-                bootstrap_node_volume_size.to_string(),
+                "peer_cache_node_volume_size".to_string(),
+                peer_cache_node_volume_size.to_string(),
             ));
         }
         if let Some(genesis_node_volume_size) = options.genesis_node_volume_size {

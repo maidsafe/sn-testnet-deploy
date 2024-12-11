@@ -41,7 +41,6 @@ pub struct ProvisionOptions {
     /// recorded in the inventory.
     pub ant_version: Option<String>,
     pub binary_option: BinaryOption,
-    pub bootstrap_node_count: u16,
     pub chunk_size: Option<u64>,
     pub downloaders_count: u16,
     pub env_variables: Option<Vec<(String, String)>>,
@@ -62,6 +61,7 @@ pub struct ProvisionOptions {
     pub max_archived_log_files: u16,
     pub max_log_files: u16,
     pub output_inventory_dir_path: PathBuf,
+    pub peer_cache_node_count: u16,
     pub private_node_count: u16,
     pub private_node_vms: Vec<VirtualMachine>,
     pub public_rpc: bool,
@@ -73,7 +73,6 @@ impl From<BootstrapOptions> for ProvisionOptions {
     fn from(bootstrap_options: BootstrapOptions) -> Self {
         ProvisionOptions {
             binary_option: bootstrap_options.binary_option,
-            bootstrap_node_count: 0,
             chunk_size: bootstrap_options.chunk_size,
             downloaders_count: 0,
             env_variables: bootstrap_options.env_variables,
@@ -93,6 +92,7 @@ impl From<BootstrapOptions> for ProvisionOptions {
             network_id: bootstrap_options.network_id,
             node_count: bootstrap_options.node_count,
             output_inventory_dir_path: bootstrap_options.output_inventory_dir_path,
+            peer_cache_node_count: 0,
             private_node_count: bootstrap_options.private_node_count,
             private_node_vms: Vec::new(),
             public_rpc: false,
@@ -107,7 +107,6 @@ impl From<DeployOptions> for ProvisionOptions {
     fn from(deploy_options: DeployOptions) -> Self {
         ProvisionOptions {
             binary_option: deploy_options.binary_option,
-            bootstrap_node_count: deploy_options.bootstrap_node_count,
             chunk_size: deploy_options.chunk_size,
             downloaders_count: deploy_options.downloaders_count,
             env_variables: deploy_options.env_variables,
@@ -127,6 +126,7 @@ impl From<DeployOptions> for ProvisionOptions {
             max_archived_log_files: deploy_options.max_archived_log_files,
             max_log_files: deploy_options.max_log_files,
             output_inventory_dir_path: deploy_options.output_inventory_dir_path,
+            peer_cache_node_count: deploy_options.peer_cache_node_count,
             public_rpc: deploy_options.public_rpc,
             private_node_count: deploy_options.private_node_count,
             private_node_vms: Vec::new(),
@@ -360,9 +360,9 @@ impl AnsibleProvisioner {
     ) -> Result<()> {
         let start = Instant::now();
         let (inventory_type, node_count) = match &node_type {
-            NodeType::Bootstrap => (
+            NodeType::PeerCache => (
                 node_type.to_ansible_inventory_type(),
-                options.bootstrap_node_count,
+                options.peer_cache_node_count,
             ),
             NodeType::Generic => (node_type.to_ansible_inventory_type(), options.node_count),
             NodeType::Private => (
@@ -406,7 +406,7 @@ impl AnsibleProvisioner {
                 initial_network_contacts_url,
                 node_count,
                 options.evm_network.clone(),
-                matches!(node_type, NodeType::Bootstrap),
+                matches!(node_type, NodeType::PeerCache),
             )?),
         )?;
 
@@ -687,10 +687,10 @@ impl AnsibleProvisioner {
     pub fn upgrade_node_telegraf(&self, name: &str) -> Result<()> {
         self.ansible_runner.run_playbook(
             AnsiblePlaybook::UpgradeNodeTelegrafConfig,
-            AnsibleInventoryType::BootstrapNodes,
+            AnsibleInventoryType::PeerCacheNodes,
             Some(extra_vars::build_node_telegraf_upgrade(
                 name,
-                &NodeType::Bootstrap,
+                &NodeType::PeerCache,
             )?),
         )?;
         self.ansible_runner.run_playbook(
@@ -764,12 +764,12 @@ impl AnsibleProvisioner {
 
         match self.ansible_runner.run_playbook(
             AnsiblePlaybook::UpgradeNodes,
-            AnsibleInventoryType::BootstrapNodes,
+            AnsibleInventoryType::PeerCacheNodes,
             Some(options.get_ansible_vars()),
         ) {
-            Ok(()) => println!("All bootstrap nodes were successfully upgraded"),
+            Ok(()) => println!("All Peer Cache nodes were successfully upgraded"),
             Err(_) => {
-                println!("WARNING: some bootstrap nodes may not have been upgraded or restarted");
+                println!("WARNING: some Peer Cacche nodes may not have been upgraded or restarted");
             }
         }
         match self.ansible_runner.run_playbook(
