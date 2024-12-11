@@ -310,7 +310,6 @@ impl AnsibleProvisioner {
                 None,
                 1,
                 options.evm_network.clone(),
-                true,
             )?),
         )?;
 
@@ -360,10 +359,7 @@ impl AnsibleProvisioner {
     ) -> Result<()> {
         let start = Instant::now();
         let (inventory_type, node_count) = match &node_type {
-            NodeType::PeerCache => (
-                node_type.to_ansible_inventory_type(),
-                options.peer_cache_node_count,
-            ),
+            NodeType::PeerCache => return Err(Error::InvalidNodeType(node_type)),
             NodeType::Generic => (node_type.to_ansible_inventory_type(), options.node_count),
             NodeType::Private => (
                 node_type.to_ansible_inventory_type(),
@@ -406,7 +402,57 @@ impl AnsibleProvisioner {
                 initial_network_contacts_url,
                 node_count,
                 options.evm_network.clone(),
-                matches!(node_type, NodeType::PeerCache),
+            )?),
+        )?;
+
+        print_duration(start.elapsed());
+        Ok(())
+    }
+
+    pub fn provision_peer_cache_nodes(
+        &self,
+        options: &ProvisionOptions,
+        initial_contact_peer: Option<String>,
+        initial_network_contacts_url: Option<String>,
+    ) -> Result<()> {
+        let start = Instant::now();
+        let node_type = NodeType::PeerCache;
+
+        // For a new deployment, it's quite probable that SSH is available, because this part occurs
+        // after the genesis node has been provisioned. However, for a bootstrap deploy, we need to
+        // check that SSH is available before proceeding.
+        println!("Obtaining IP addresses for peer cache nodes...");
+        let inventory = self
+            .ansible_runner
+            .get_inventory(node_type.to_ansible_inventory_type(), true)?;
+
+        println!("Waiting for SSH availability on {node_type:?} nodes...");
+        for vm in inventory.iter() {
+            println!(
+                "Checking SSH availability for {}: {}",
+                vm.name, vm.public_ip_addr
+            );
+            self.ssh_client
+                .wait_for_ssh_availability(&vm.public_ip_addr, &self.cloud_provider.get_ssh_user())
+                .map_err(|e| {
+                    println!("Failed to establish SSH connection to {}: {}", vm.name, e);
+                    e
+                })?;
+        }
+
+        println!("SSH is available on peer cache nodes. Proceeding with provisioning...");
+
+        self.ansible_runner.run_playbook(
+            AnsiblePlaybook::Nodes,
+            node_type.to_ansible_inventory_type(),
+            Some(extra_vars::build_node_extra_vars_doc(
+                &self.cloud_provider.to_string(),
+                options,
+                node_type.clone(),
+                initial_contact_peer,
+                initial_network_contacts_url,
+                options.peer_cache_node_count,
+                options.evm_network.clone(),
             )?),
         )?;
 

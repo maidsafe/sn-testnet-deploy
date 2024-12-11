@@ -286,7 +286,6 @@ pub fn build_node_extra_vars_doc(
     network_contacts_url: Option<String>,
     node_instance_count: u16,
     evm_network: EvmNetwork,
-    enable_cache_webserver: bool,
 ) -> Result<String> {
     let mut extra_vars = ExtraVarsDocBuilder::default();
     extra_vars.add_variable("provider", cloud_provider);
@@ -325,10 +324,6 @@ pub fn build_node_extra_vars_doc(
     } else if matches!(node_type, NodeType::Private) {
         return Err(Error::NatGatewayNotSupplied);
     }
-    extra_vars.add_variable(
-        "enable_cache_webserver",
-        &enable_cache_webserver.to_string(),
-    );
     if let Some(network_id) = options.network_id {
         extra_vars.add_variable("network_id", &network_id.to_string());
     }
