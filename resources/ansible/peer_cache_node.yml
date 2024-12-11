@@ -1,5 +1,5 @@
 ---
-- name: deploy antnode to remaining nodes
+- name: deploy antnode to peer cache nodes
   hosts: all
   become: False
   max_fail_percentage: 10
@@ -28,6 +28,8 @@
     - role: telegraf-configuration
       become: True
     - node
+    - role: cache_webserver
+      become: True
 
   tasks:
     # Something is wrong with the journal service on Ubuntu that causes no

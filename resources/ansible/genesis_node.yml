@@ -30,8 +30,5 @@
       }
     - antctl
     - genesis-node
-    - {
-        role: cache_webserver,
-        become: True,
-        when: enable_cache_webserver | bool
-      }
+    - role: cache_webserver
+      become: True

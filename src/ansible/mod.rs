@@ -112,6 +112,11 @@ pub enum AnsiblePlaybook {
     ///
     /// Use in combination with `AnsibleInventoryType::iter_node_type()`.
     Nodes,
+    /// The node playbook will setup the peer cache nodes. These nodes will bootstrap
+    /// using genesis as a peer reference.
+    ///
+    /// Use in combination with `AnsibleInventoryType::PeerCache`.
+    PeerCacheNodes,
     /// The rpc client playbook will setup the `safenode_rpc_client` binary on the genesis node.
     ///
     /// Use in combination with `AnsibleInventoryType::Genesis`.
@@ -190,6 +195,7 @@ impl AnsiblePlaybook {
             AnsiblePlaybook::Logstash => "logstash.yml".to_string(),
             AnsiblePlaybook::NatGateway => "nat_gateway.yml".to_string(),
             AnsiblePlaybook::Nodes => "nodes.yml".to_string(),
+            AnsiblePlaybook::PeerCacheNodes => "peer_cache_node.yml".to_string(),
             AnsiblePlaybook::RpcClient => "safenode_rpc_client.yml".to_string(),
             AnsiblePlaybook::StartFaucet => "start_faucet.yml".to_string(),
             AnsiblePlaybook::StartNodes => "start_nodes.yml".to_string(),
