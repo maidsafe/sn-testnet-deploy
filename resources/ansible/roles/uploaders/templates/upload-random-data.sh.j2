@@ -14,7 +14,7 @@ if [ -n "$NETWORK_CONTACTS_URL" ]; then
   NETWORK_CONTACTS_URL_ARG="--network-contacts-url $NETWORK_CONTACTS_URL"
 fi
 if [ -z "$CONTACT_PEER" ] && [ -z "$NETWORK_CONTACTS_URL" ]; then
-  echo "No contact peer or network contacts URL provided. Please provide the bootstrap peer or network contacts URL."
+  echo "No contact peer or network contacts URL provided. Please provide the initial contact peer or network contacts URL."
   exit 1
 fi
 TESTNET_ARG="--testnet"

@@ -6,14 +6,14 @@
 
 use crate::{
     ansible::{
-        inventory::AnsibleInventoryType,
         inventory::{
             generate_environment_inventory, generate_private_node_static_environment_inventory,
+            AnsibleInventoryType,
         },
         provisioning::AnsibleProvisioner,
         AnsibleRunner,
     },
-    get_environment_details, get_genesis_multiaddr,
+    get_bootstrap_cache_url, get_environment_details, get_genesis_multiaddr,
     s3::S3Repository,
     ssh::SshClient,
     terraform::TerraformRunner,
@@ -182,9 +182,9 @@ impl DeploymentInventoryService {
                 .set_routed_vms(private_node_vms.clone(), nat_gateway.public_ip_addr)?;
         }
 
-        let bootstrap_node_vms = self
+        let peer_cache_node_vms = self
             .ansible_runner
-            .get_inventory(AnsibleInventoryType::BootstrapNodes, false)?;
+            .get_inventory(AnsibleInventoryType::PeerCacheNodes, false)?;
 
         let uploader_vms = if environment_details.deployment_type != DeploymentType::Bootstrap {
             let uploader_and_sks = self.ansible_provisioner.get_uploader_secret_keys()?;
@@ -206,11 +206,11 @@ impl DeploymentInventoryService {
         println!("Retrieving node registries from all VMs...");
         let mut failed_node_registry_vms = Vec::new();
 
-        let bootstrap_node_registries = self
+        let peer_cache_node_registries = self
             .ansible_provisioner
-            .get_node_registries(&AnsibleInventoryType::BootstrapNodes)?;
-        let bootstrap_node_vms =
-            NodeVirtualMachine::from_list(&bootstrap_node_vms, &bootstrap_node_registries);
+            .get_node_registries(&AnsibleInventoryType::PeerCacheNodes)?;
+        let peer_cache_node_vms =
+            NodeVirtualMachine::from_list(&peer_cache_node_vms, &peer_cache_node_registries);
 
         let generic_node_registries = self
             .ansible_provisioner
@@ -234,7 +234,7 @@ impl DeploymentInventoryService {
             None
         };
 
-        failed_node_registry_vms.extend(bootstrap_node_registries.failed_vms);
+        failed_node_registry_vms.extend(peer_cache_node_registries.failed_vms);
         failed_node_registry_vms.extend(generic_node_registries.failed_vms);
         failed_node_registry_vms.extend(private_node_registries.failed_vms);
         failed_node_registry_vms.extend(genesis_node_registry.failed_vms);
@@ -269,8 +269,8 @@ impl DeploymentInventoryService {
                 let mut random_vm = None;
                 if !generic_node_vms.is_empty() {
                     random_vm = generic_node_vms.first().cloned();
-                } else if !bootstrap_node_vms.is_empty() {
-                    random_vm = bootstrap_node_vms.first().cloned();
+                } else if !peer_cache_node_vms.is_empty() {
+                    random_vm = peer_cache_node_vms.first().cloned();
                 } else if genesis_vm.is_some() {
                     random_vm = genesis_vm.clone()
                 };
@@ -317,7 +317,6 @@ impl DeploymentInventoryService {
         };
         let inventory = DeploymentInventory {
             binary_option,
-            bootstrap_node_vms,
             environment_details,
             failed_node_registry_vms,
             faucet_address: genesis_ip.map(|ip| format!("{ip}:8000")),
@@ -327,6 +326,7 @@ impl DeploymentInventoryService {
             misc_vms,
             nat_gateway_vm,
             node_vms: generic_node_vms,
+            peer_cache_node_vms,
             private_node_vms,
             ssh_user: self.cloud_provider.get_ssh_user(),
             ssh_private_key_path: self.ssh_client.private_key_path.clone(),
@@ -394,13 +394,13 @@ impl DeploymentInventoryService {
         let mut file = std::fs::File::create(&temp_file_path)?;
         let mut rng = rand::thread_rng();
 
-        let bootstrap_peers = inventory
-            .bootstrap_node_vms
+        let peer_cache_peers = inventory
+            .peer_cache_node_vms
             .iter()
             .flat_map(|vm| vm.get_quic_addresses())
             .collect::<Vec<_>>();
-        let bootstrap_peers_len = bootstrap_peers.len();
-        for peer in bootstrap_peers
+        let peer_cache_peers_len = peer_cache_peers.len();
+        for peer in peer_cache_peers
             .iter()
             .filter(|&peer| peer != UNAVAILABLE_NODE)
             .cloned()
@@ -409,7 +409,7 @@ impl DeploymentInventoryService {
             writeln!(file, "{peer}",)?;
         }
 
-        if DEFAULT_CONTACTS_COUNT > bootstrap_peers_len {
+        if DEFAULT_CONTACTS_COUNT > peer_cache_peers_len {
             let node_peers = inventory
                 .node_vms
                 .iter()
@@ -419,7 +419,7 @@ impl DeploymentInventoryService {
                 .iter()
                 .filter(|&peer| peer != UNAVAILABLE_NODE)
                 .cloned()
-                .choose_multiple(&mut rng, DEFAULT_CONTACTS_COUNT - bootstrap_peers_len)
+                .choose_multiple(&mut rng, DEFAULT_CONTACTS_COUNT - peer_cache_peers_len)
             {
                 writeln!(file, "{peer}",)?;
             }
@@ -615,7 +615,6 @@ impl DeploymentNodeRegistries {
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct DeploymentInventory {
     pub binary_option: BinaryOption,
-    pub bootstrap_node_vms: Vec<NodeVirtualMachine>,
     pub environment_details: EnvironmentDetails,
     pub failed_node_registry_vms: Vec<String>,
     pub faucet_address: Option<String>,
@@ -625,6 +624,7 @@ pub struct DeploymentInventory {
     pub name: String,
     pub nat_gateway_vm: Option<VirtualMachine>,
     pub node_vms: Vec<NodeVirtualMachine>,
+    pub peer_cache_node_vms: Vec<NodeVirtualMachine>,
     pub private_node_vms: Vec<NodeVirtualMachine>,
     pub ssh_user: String,
     pub ssh_private_key_path: PathBuf,
@@ -638,7 +638,6 @@ impl DeploymentInventory {
     pub fn empty(name: &str, binary_option: BinaryOption) -> DeploymentInventory {
         Self {
             binary_option,
-            bootstrap_node_vms: Vec::new(),
             environment_details: EnvironmentDetails::default(),
             genesis_vm: None,
             genesis_multiaddr: None,
@@ -648,6 +647,7 @@ impl DeploymentInventory {
             name: name.to_string(),
             nat_gateway_vm: None,
             node_vms: Vec::new(),
+            peer_cache_node_vms: Vec::new(),
             private_node_vms: Vec::new(),
             ssh_user: "root".to_string(),
             ssh_private_key_path: PathBuf::new(),
@@ -666,14 +666,14 @@ impl DeploymentInventory {
     }
 
     pub fn is_empty(&self) -> bool {
-        self.bootstrap_node_vms.is_empty() && self.node_vms.is_empty()
+        self.peer_cache_node_vms.is_empty() && self.node_vms.is_empty()
     }
 
     pub fn vm_list(&self) -> Vec<VirtualMachine> {
         let mut list = Vec::new();
         list.extend(self.nat_gateway_vm.clone());
         list.extend(
-            self.bootstrap_node_vms
+            self.peer_cache_node_vms
                 .iter()
                 .map(|node_vm| node_vm.vm.clone()),
         );
@@ -695,7 +695,7 @@ impl DeploymentInventory {
 
     pub fn node_vm_list(&self) -> Vec<NodeVirtualMachine> {
         let mut list = Vec::new();
-        list.extend(self.bootstrap_node_vms.iter().cloned());
+        list.extend(self.peer_cache_node_vms.iter().cloned());
         list.extend(self.genesis_vm.iter().cloned());
         list.extend(self.node_vms.iter().cloned());
         list.extend(self.private_node_vms.iter().cloned());
@@ -706,7 +706,7 @@ impl DeploymentInventory {
     pub fn peers(&self) -> HashSet<String> {
         let mut list = HashSet::new();
         list.extend(
-            self.bootstrap_node_vms
+            self.peer_cache_node_vms
                 .iter()
                 .flat_map(|node_vm| node_vm.get_quic_addresses()),
         );
@@ -751,8 +751,8 @@ impl DeploymentInventory {
         self.peers().into_iter().choose(&mut rng)
     }
 
-    pub fn bootstrap_node_count(&self) -> usize {
-        if let Some(first_vm) = self.bootstrap_node_vms.first() {
+    pub fn peer_cache_node_count(&self) -> usize {
+        if let Some(first_vm) = self.peer_cache_node_vms.first() {
             first_vm.node_count
         } else {
             0
@@ -823,14 +823,14 @@ impl DeploymentInventory {
             }
         }
 
-        if !self.bootstrap_node_vms.is_empty() {
-            println!("=============");
-            println!("Bootstrap VMs");
-            println!("=============");
-            for node_vm in self.bootstrap_node_vms.iter() {
+        if !self.peer_cache_node_vms.is_empty() {
+            println!("==============");
+            println!("Peer Cache VMs");
+            println!("==============");
+            for node_vm in self.peer_cache_node_vms.iter() {
                 println!("{}: {}", node_vm.vm.name, node_vm.vm.public_ip_addr);
             }
-            println!("Nodes per VM: {}", self.bootstrap_node_count());
+            println!("Nodes per VM: {}", self.peer_cache_node_count());
             println!("SSH user: {}", self.ssh_user);
             println!();
         }
@@ -918,7 +918,7 @@ impl DeploymentInventory {
             let mut quic_listeners = Vec::new();
             let mut ws_listeners = Vec::new();
 
-            for node_vm in self.bootstrap_node_vms.iter().chain(self.node_vms.iter()) {
+            for node_vm in self.peer_cache_node_vms.iter().chain(self.node_vms.iter()) {
                 for addresses in &node_vm.node_listen_addresses {
                     for addr in addresses {
                         if !addr.starts_with("/ip4/127.0.0.1") && !addr.starts_with("/ip4/10.") {
@@ -951,7 +951,7 @@ impl DeploymentInventory {
             println!("============");
             println!("Sample Peers");
             println!("============");
-            self.bootstrap_node_vms
+            self.peer_cache_node_vms
                 .iter()
                 .chain(self.node_vms.iter())
                 .map(|node_vm| node_vm.vm.public_ip_addr.to_string())
@@ -1024,47 +1024,14 @@ impl DeploymentInventory {
             .map(|vm| vm.public_ip_addr)
     }
 
-    pub fn print_bootstrap_listeners(&self) {
-        println!("========================");
-        println!("Bootstrap Node Listeners");
-        println!("========================");
+    pub fn print_peer_cache_webserver(&self) {
+        println!("=====================");
+        println!("Peer Cache Webservers");
+        println!("=====================");
 
-        let mut quic_listeners = Vec::new();
-        let mut ws_listeners = Vec::new();
-
-        for node_vm in &self.bootstrap_node_vms {
-            for addresses in &node_vm.node_listen_addresses {
-                for addr in addresses {
-                    if !addr.starts_with("/ip4/127.0.0.1") && !addr.starts_with("/ip4/10.") {
-                        if addr.contains("/quic") {
-                            quic_listeners.push((node_vm.vm.name.clone(), addr.clone()));
-                        } else if addr.contains("/ws") {
-                            ws_listeners.push((node_vm.vm.name.clone(), addr.clone()));
-                        }
-                    }
-                }
-            }
-        }
-
-        quic_listeners.sort_by(|a, b| a.0.cmp(&b.0));
-        ws_listeners.sort_by(|a, b| a.0.cmp(&b.0));
-
-        if !quic_listeners.is_empty() {
-            println!("QUIC:");
-            for (vm_name, addr) in &quic_listeners {
-                println!("  {addr}");
-                debug!("  {vm_name}: {addr}");
-            }
-            println!();
-        }
-
-        if !ws_listeners.is_empty() {
-            println!("Websocket:");
-            for (vm_name, addr) in &ws_listeners {
-                println!("  {addr}");
-                debug!("  {vm_name}: {addr}");
-            }
-            println!();
+        for node_vm in &self.peer_cache_node_vms {
+            let webserver = get_bootstrap_cache_url(&node_vm.vm.public_ip_addr);
+            println!("{webserver}");
         }
     }
 }

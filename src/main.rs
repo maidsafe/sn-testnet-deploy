@@ -274,15 +274,15 @@ enum Commands {
     },
     /// Configure a swapfile on all nodes in the environment.
     ConfigureSwapfile {
-        /// Set to also configure swapfile on the bootstrap nodes.
-        #[arg(long)]
-        bootstrap: bool,
         /// The name of the environment.
         #[arg(short = 'n', long)]
         name: String,
         /// The size of the swapfile in GB.
         #[arg(short = 's', long)]
         size: u16,
+        /// Set to also configure swapfile on the PeerCache nodes.
+        #[arg(long)]
+        peer_cache: bool,
         /// The cloud provider for the environment.
         #[clap(long, value_parser = parse_provider, verbatim_doc_comment, default_value_t = CloudProvider::DigitalOcean)]
         provider: CloudProvider,
@@ -334,30 +334,30 @@ enum Commands {
         /// arguments. You can only supply version numbers or a custom branch, not both.
         #[arg(long, verbatim_doc_comment)]
         branch: Option<String>,
-        /// The number of antnode services to run on each bootstrap VM.
+        /// The number of antnode services to run on each Peer Cache VM.
         ///
         /// If the argument is not used, the value will be determined by the 'environment-type'
         /// argument.
         #[clap(long)]
-        bootstrap_node_count: Option<u16>,
-        /// The number of bootstrap node VMs to create.
+        peer_cache_node_count: Option<u16>,
+        /// The number of Peer Cache node VMs to create.
         ///
         /// Each VM will run many antnode services.
         ///
         /// If the argument is not used, the value will be determined by the 'environment-type'
         /// argument.
         #[clap(long)]
-        bootstrap_node_vm_count: Option<u16>,
-        /// Override the size of the bootstrap node VMs.
+        peer_cache_node_vm_count: Option<u16>,
+        /// Override the size of the Peer Cache node VMs.
         #[clap(long)]
-        bootstrap_node_vm_size: Option<String>,
-        /// The size of the volumes to attach to each bootstrap node VM. This argument will set the size of all the
+        peer_cache_node_vm_size: Option<String>,
+        /// The size of the volumes to attach to each Peer Cache node VM. This argument will set the size of all the
         /// 7 attached volumes.
         ///
         /// If the argument is not used, the value will be determined by the 'environment-type'
         /// argument.
         #[clap(long)]
-        bootstrap_node_volume_size: Option<u16>,
+        peer_cache_node_volume_size: Option<u16>,
         /// Specify the chunk size for the custom binaries using a 64-bit integer.
         ///
         /// This option only applies if the --branch and --repo-owner arguments are used.
@@ -573,13 +573,13 @@ enum Commands {
         /// Set to run Ansible with more verbose output.
         #[arg(long)]
         ansible_verbose: bool,
-        /// The new size of the volumes attached to each bootstrap node VM. This argument will scale up the size of all
+        /// The new size of the volumes attached to each Peer Cache node VM. This argument will scale up the size of all
         /// the 7 attached volumes.
         ///
         /// If the argument is not used, the value will be determined by the 'environment-type'
         /// argument.
         #[clap(long)]
-        bootstrap_node_volume_size: Option<u16>,
+        peer_cache_node_volume_size: Option<u16>,
         /// The new size of the volumes attached to each genesis node VM. This argument will scale up the size of all
         /// the 7 attached volumes.
         ///
@@ -615,9 +615,6 @@ enum Commands {
     #[clap(name = "funds", subcommand)]
     Funds(FundsCommand),
     Inventory {
-        /// If set to true, only print the bootstrap listeners.
-        #[clap(long, default_value_t = false)]
-        bootstrap: bool,
         /// If set to true, the inventory will be regenerated.
         ///
         /// This is useful if the testnet was created on another machine.
@@ -634,6 +631,9 @@ enum Commands {
         /// If not used, the contacts file will have the same name as the environment.
         #[arg(long)]
         network_contacts_file_name: Option<String>,
+        /// If set to true, only print the Peer Cache webservers
+        #[clap(long, default_value_t = false)]
+        peer_cache: bool,
         /// The cloud provider that was used.
         #[clap(long, default_value_t = CloudProvider::DigitalOcean, value_parser = parse_provider, verbatim_doc_comment)]
         provider: CloudProvider,
@@ -684,7 +684,7 @@ enum Commands {
         /// Specify the type of node VM to start the antnode services on. If not provided, the antnode services on
         /// all the node VMs will be started. This is mutually exclusive with the '--custom-inventory' argument.
         ///
-        /// Valid values are "bootstrap", "genesis", "generic" and "private".
+        /// Valid values are "peer-cache", "genesis", "generic" and "private".
         #[arg(long, conflicts_with = "custom-inventory")]
         node_type: Option<NodeType>,
         /// The cloud provider for the environment.
@@ -723,7 +723,7 @@ enum Commands {
         /// Specify the type of node VM to start the telegraf services on. If not provided, the telegraf services on
         /// all the node VMs will be started. This is mutually exclusive with the '--custom-inventory' argument.
         ///
-        /// Valid values are "bootstrap", "genesis", "generic" and "private".
+        /// Valid values are "peer-cache", "genesis", "generic" and "private".
         #[arg(long, conflicts_with = "custom-inventory")]
         node_type: Option<NodeType>,
         /// The cloud provider for the environment.
@@ -755,7 +755,7 @@ enum Commands {
         /// Specify the type of node VM to stop the antnode services on. If not provided, the antnode services on
         /// all the node VMs will be stopped. This is mutually exclusive with the '--custom-inventory' argument.
         ///
-        /// Valid values are "bootstrap", "genesis", "generic" and "private".
+        /// Valid values are "peer-cache", "genesis", "generic" and "private".
         #[arg(long, conflicts_with = "custom-inventory")]
         node_type: Option<NodeType>,
         /// The cloud provider for the environment.
@@ -781,7 +781,7 @@ enum Commands {
         /// Specify the type of node VM to stop the telegraf services on. If not provided, the telegraf services on
         /// all the node VMs will be stopped. This is mutually exclusive with the '--custom-inventory' argument.
         ///
-        /// Valid values are "bootstrap", "genesis", "generic" and "private".
+        /// Valid values are "peer-cache", "genesis", "generic" and "private".
         #[arg(long, conflicts_with = "custom-inventory")]
         node_type: Option<NodeType>,
         /// The cloud provider for the environment.
@@ -828,12 +828,12 @@ enum Commands {
         /// Specify the type of node VM to upgrade the antnode services on. If not provided, the antnode services on
         /// all the node VMs will be upgraded. This is mutually exclusive with the '--custom-inventory' argument.
         ///
-        /// Valid values are "bootstrap", "genesis", "generic" and "private".
+        /// Valid values are "peer-cache", "genesis", "generic" and "private".
         #[arg(long, conflicts_with = "custom-inventory")]
         node_type: Option<NodeType>,
         /// Delay before an upgrade starts.
         ///
-        /// Useful for upgrading bootstrap nodes when there is one node per machine.
+        /// Useful for upgrading Peer Cache nodes when there is one node per machine.
         #[clap(long)]
         pre_upgrade_delay: Option<u64>,
         /// The cloud provider to deploy to.
@@ -867,7 +867,7 @@ enum Commands {
         /// antctl on all the node VMs will be upgraded.
         /// This is mutually exclusive with the '--custom-inventory' argument.
         ///
-        /// Valid values are "bootstrap", "genesis", "generic" and "private".
+        /// Valid values are "peer-cache", "genesis", "generic" and "private".
         #[arg(long, conflicts_with = "custom-inventory")]
         node_type: Option<NodeType>,
         #[arg(long)]
@@ -924,26 +924,23 @@ enum Commands {
         /// This option is not applicable to a bootstrap deployment.
         #[clap(long, verbatim_doc_comment)]
         desired_auditor_vm_count: Option<u16>,
-        /// The desired number of antnode services to be running on each bootstrap VM after the
+        /// The desired number of antnode services to be running on each Peer Cache VM after the
         /// scale.
         ///
         /// If there are currently 10 services running on each VM, and you want there to be 25, the
         /// value used should be 25, rather than 15 as a delta to reach 25.
         ///
-        /// Note: bootstrap VMs normally only use a single node service, so you probably want this
-        /// value to be 1.
-        ///
         /// This option is not applicable to a bootstrap deployment.
         #[clap(long, verbatim_doc_comment)]
-        desired_bootstrap_node_count: Option<u16>,
-        /// The desired number of bootstrap VMs to be running after the scale.
+        desired_peer_cache_node_count: Option<u16>,
+        /// The desired number of Peer Cache VMs to be running after the scale.
         ///
         /// If there are currently 10 VMs running, and you want there to be 20, use 20 as the
         /// value, not 10 as a delta.
         ///
         /// This option is not applicable to a bootstrap deployment.
         #[clap(long, verbatim_doc_comment)]
-        desired_bootstrap_node_vm_count: Option<u16>,
+        desired_peer_cache_node_vm_count: Option<u16>,
         /// The desired number of antnode services to be running on each node VM after the scale.
         ///
         /// If there are currently 10 services running on each VM, and you want there to be 25, the
@@ -1067,7 +1064,7 @@ enum Commands {
         /// Specify the type of node VM to update the peer on. If not provided, the peer will be updated on
         /// all the node VMs. This is mutually exclusive with the '--custom-inventory' argument.
         ///
-        /// Valid values are "bootstrap", "genesis", "generic" and "private".
+        /// Valid values are "peer-cache", "genesis", "generic" and "private".
         #[arg(long, conflicts_with = "custom-inventory")]
         node_type: Option<NodeType>,
         /// The new peer multiaddr to use.
@@ -1624,10 +1621,6 @@ async fn main() -> Result<()> {
             antctl_version,
             antnode_features,
             antnode_version,
-            bootstrap_node_count,
-            bootstrap_node_vm_count,
-            bootstrap_node_vm_size,
-            bootstrap_node_volume_size,
             branch,
             chunk_size,
             downloaders_count,
@@ -1657,6 +1650,10 @@ async fn main() -> Result<()> {
             node_vm_size,
             node_volume_size,
             payment_forward_pk,
+            peer_cache_node_count,
+            peer_cache_node_vm_count,
+            peer_cache_node_vm_size,
+            peer_cache_node_volume_size,
             private_node_count,
             private_node_vm_count,
             private_node_volume_size,
@@ -1759,8 +1756,8 @@ async fn main() -> Result<()> {
                 }
             };
 
-            let bootstrap_node_count =
-                bootstrap_node_count.unwrap_or(environment_type.get_default_bootstrap_node_count());
+            let peer_cache_node_count = peer_cache_node_count
+                .unwrap_or(environment_type.get_default_peer_cache_node_count());
             let node_count = node_count.unwrap_or(environment_type.get_default_node_count());
             let private_node_count =
                 private_node_count.unwrap_or(environment_type.get_default_private_node_count());
@@ -1768,10 +1765,6 @@ async fn main() -> Result<()> {
             testnet_deployer
                 .deploy(&DeployOptions {
                     binary_option: binary_option.clone(),
-                    bootstrap_node_count,
-                    bootstrap_node_vm_count,
-                    bootstrap_node_volume_size: bootstrap_node_volume_size
-                        .or_else(|| Some(calculate_size_per_attached_volume(bootstrap_node_count))),
                     chunk_size,
                     current_inventory: inventory,
                     downloaders_count,
@@ -1800,6 +1793,12 @@ async fn main() -> Result<()> {
                         .working_directory_path
                         .join("ansible")
                         .join("inventory"),
+                    peer_cache_node_count,
+                    peer_cache_node_vm_count,
+                    peer_cache_node_volume_size: peer_cache_node_volume_size.or_else(|| {
+                        Some(calculate_size_per_attached_volume(peer_cache_node_count))
+                    }),
+                    peer_cache_node_vm_size,
                     private_node_vm_count,
                     private_node_count,
                     private_node_volume_size: private_node_volume_size
@@ -1809,7 +1808,6 @@ async fn main() -> Result<()> {
                     uploader_vm_count,
                     rewards_address,
                     node_vm_size,
-                    bootstrap_node_vm_size,
                     uploader_vm_size,
                 })
                 .await?;
@@ -1848,14 +1846,14 @@ async fn main() -> Result<()> {
         }
         Commands::ExtendVolumeSize {
             ansible_verbose,
-            bootstrap_node_volume_size,
+            peer_cache_node_volume_size,
             genesis_node_volume_size,
             node_volume_size,
             name,
             private_node_volume_size,
             provider,
         } => {
-            if bootstrap_node_volume_size.is_none()
+            if peer_cache_node_volume_size.is_none()
                 && genesis_node_volume_size.is_none()
                 && node_volume_size.is_none()
                 && private_node_volume_size.is_none()
@@ -1883,9 +1881,9 @@ async fn main() -> Result<()> {
             println!("Obtained infra run options from previous deployment {infra_run_options:?}");
             let mut node_types = Vec::new();
 
-            if bootstrap_node_volume_size.is_some() {
-                infra_run_options.bootstrap_node_volume_size = bootstrap_node_volume_size;
-                node_types.push(AnsibleInventoryType::BootstrapNodes);
+            if peer_cache_node_volume_size.is_some() {
+                infra_run_options.peer_cache_node_volume_size = peer_cache_node_volume_size;
+                node_types.push(AnsibleInventoryType::PeerCacheNodes);
             }
             if genesis_node_volume_size.is_some() {
                 infra_run_options.genesis_node_volume_size = genesis_node_volume_size;
@@ -2094,11 +2092,11 @@ async fn main() -> Result<()> {
             }
         }
         Commands::Inventory {
-            bootstrap,
             force_regeneration,
             full,
             name,
             network_contacts_file_name,
+            peer_cache,
             provider,
         } => {
             let testnet_deployer = TestnetDeployBuilder::default()
@@ -2111,8 +2109,8 @@ async fn main() -> Result<()> {
                 .generate_or_retrieve_inventory(&name, force_regeneration, None)
                 .await?;
 
-            if bootstrap {
-                inventory.print_bootstrap_listeners();
+            if peer_cache {
+                inventory.print_peer_cache_webserver();
             } else {
                 inventory.print_report(full)?;
             }
@@ -2499,9 +2497,9 @@ async fn main() -> Result<()> {
             Ok(())
         }
         Commands::ConfigureSwapfile {
-            bootstrap,
             name,
             provider,
+            peer_cache,
             size,
         } => {
             let testnet_deployer = TestnetDeployBuilder::default()
@@ -2524,10 +2522,10 @@ async fn main() -> Result<()> {
                 Some(build_swapfile_extra_vars_doc(size)?),
             )?;
 
-            if bootstrap {
+            if peer_cache {
                 ansible_runner.run_playbook(
                     AnsiblePlaybook::ConfigureSwapfile,
-                    AnsibleInventoryType::BootstrapNodes,
+                    AnsibleInventoryType::PeerCacheNodes,
                     Some(build_swapfile_extra_vars_doc(size)?),
                 )?;
             }
@@ -2796,10 +2794,10 @@ async fn main() -> Result<()> {
                         ansible_verbose: false,
                         current_inventory: inventory,
                         desired_auditor_vm_count: None,
-                        desired_bootstrap_node_count: None,
-                        desired_bootstrap_node_vm_count: None,
                         desired_node_count: None,
                         desired_node_vm_count: None,
+                        desired_peer_cache_node_count: None,
+                        desired_peer_cache_node_vm_count: None,
                         desired_private_node_count: None,
                         desired_private_node_vm_count: None,
                         desired_uploader_vm_count,
@@ -2855,10 +2853,10 @@ async fn main() -> Result<()> {
         Commands::Upscale {
             ansible_verbose,
             desired_auditor_vm_count,
-            desired_bootstrap_node_count,
-            desired_bootstrap_node_vm_count,
             desired_node_count,
             desired_node_vm_count,
+            desired_peer_cache_node_count,
+            desired_peer_cache_node_vm_count,
             desired_private_node_count,
             desired_private_node_vm_count,
             desired_uploader_vm_count,
@@ -2931,10 +2929,10 @@ async fn main() -> Result<()> {
                     ansible_verbose,
                     current_inventory: inventory,
                     desired_auditor_vm_count,
-                    desired_bootstrap_node_count,
-                    desired_bootstrap_node_vm_count,
                     desired_node_count,
                     desired_node_vm_count,
+                    desired_peer_cache_node_count,
+                    desired_peer_cache_node_vm_count,
                     desired_private_node_count,
                     desired_private_node_vm_count,
                     desired_uploader_vm_count,
@@ -3031,9 +3029,9 @@ async fn main() -> Result<()> {
                 AnsibleInventoryType::Custom
             } else {
                 let inventory_type = match node_type {
-                    Some(NodeType::Bootstrap) => AnsibleInventoryType::BootstrapNodes,
                     Some(NodeType::Genesis) => AnsibleInventoryType::Genesis,
                     Some(NodeType::Generic) => AnsibleInventoryType::Nodes,
+                    Some(NodeType::PeerCache) => AnsibleInventoryType::PeerCacheNodes,
                     Some(NodeType::Private) => AnsibleInventoryType::PrivateNodes,
                     None => AnsibleInventoryType::Nodes,
                 };

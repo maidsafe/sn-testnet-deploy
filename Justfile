@@ -19,7 +19,7 @@ build-evm-node-image:
       build.pkr.hcl
   )
 
-build-bootstrap-image:
+build-peer-cache-image:
   #!/usr/bin/env bash
   (
     cd resources/packer/node

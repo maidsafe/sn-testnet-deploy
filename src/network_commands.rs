@@ -44,10 +44,10 @@ pub async fn perform_fixed_interval_network_churn(
         .map(|endpoint| (inventory.node_count(), endpoint))
         .chain(
             inventory
-                .bootstrap_node_vms
+                .peer_cache_node_vms
                 .iter()
                 .filter_map(|node_vm| node_vm.safenodemand_endpoint)
-                .map(|endpoint| (inventory.bootstrap_node_count(), endpoint)),
+                .map(|endpoint| (inventory.peer_cache_node_count(), endpoint)),
         )
         .collect::<BTreeSet<_>>();
 
@@ -104,7 +104,7 @@ pub async fn perform_random_interval_network_churn(
         .filter_map(|node_vm| node_vm.safenodemand_endpoint)
         .chain(
             inventory
-                .bootstrap_node_vms
+                .peer_cache_node_vms
                 .iter()
                 .filter_map(|node_vm| node_vm.safenodemand_endpoint),
         )
@@ -189,7 +189,7 @@ pub async fn update_node_log_levels(
     concurrent_updates: usize,
 ) -> Result<()> {
     let node_endpoints = inventory
-        .bootstrap_node_vms
+        .peer_cache_node_vms
         .iter()
         .flat_map(|node_vm| node_vm.rpc_endpoint.values())
         .chain(

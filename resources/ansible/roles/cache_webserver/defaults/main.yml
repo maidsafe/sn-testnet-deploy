@@ -1,1 +1,1 @@
-bootstrap_dir: /var/antctl/bootstrap_cache
+bootstrap_cache_dir: /var/antctl/bootstrap_cache
