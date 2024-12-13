@@ -3,7 +3,6 @@
   hosts: all
   become: True
   vars:
-    ant_version: "{{ ant_version }}"
     ant_archive_url: "https://autonomi-cli.s3.eu-west-2.amazonaws.com/ant-{{ ant_version }}-x86_64-unknown-linux-musl.tar.gz"
   tasks:
     - name: get list of ant users
