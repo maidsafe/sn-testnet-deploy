@@ -16,7 +16,7 @@ use log::debug;
 use semver::Version;
 use sn_testnet_deploy::{
     ansible::{
-        extra_vars::ExtraVarsDocBuilder,
+        extra_vars::{build_start_or_stop_uploader_extra_vars_doc, ExtraVarsDocBuilder},
         inventory::{generate_custom_environment_inventory, AnsibleInventoryType},
         AnsiblePlaybook,
     },
@@ -1275,6 +1275,9 @@ enum UploadersCommands {
         /// The cloud provider that was used.
         #[clap(long, default_value_t = CloudProvider::DigitalOcean, value_parser = parse_provider, verbatim_doc_comment)]
         provider: CloudProvider,
+        /// The number of uploaders running on each VM.
+        #[arg(long)]
+        uploader_instance_count: u16,
     },
     /// Stop all uploaders for an environment.
     Stop {
@@ -1284,6 +1287,9 @@ enum UploadersCommands {
         /// The cloud provider that was used.
         #[clap(long, default_value_t = CloudProvider::DigitalOcean, value_parser = parse_provider, verbatim_doc_comment)]
         provider: CloudProvider,
+        /// The number of uploaders running on each VM.
+        #[arg(long)]
+        uploader_instance_count: u16,
     },
     /// Upgrade the uploaders for a given environment.
     Upgrade {
@@ -2682,7 +2688,11 @@ async fn main() -> Result<()> {
             Ok(())
         }
         Commands::Uploaders(uploaders_cmd) => match uploaders_cmd {
-            UploadersCommands::Start { name, provider } => {
+            UploadersCommands::Start {
+                name,
+                provider,
+                uploader_instance_count,
+            } => {
                 let testnet_deployer = TestnetDeployBuilder::default()
                     .environment_name(&name)
                     .provider(provider)
@@ -2696,11 +2706,19 @@ async fn main() -> Result<()> {
                 ansible_runner.run_playbook(
                     AnsiblePlaybook::StartUploaders,
                     AnsibleInventoryType::Uploaders,
-                    None,
+                    Some(build_start_or_stop_uploader_extra_vars_doc(
+                        &provider.to_string(),
+                        &name,
+                        uploader_instance_count,
+                    )),
                 )?;
                 Ok(())
             }
-            UploadersCommands::Stop { name, provider } => {
+            UploadersCommands::Stop {
+                name,
+                provider,
+                uploader_instance_count,
+            } => {
                 let testnet_deployer = TestnetDeployBuilder::default()
                     .environment_name(&name)
                     .provider(provider)
@@ -2714,7 +2732,11 @@ async fn main() -> Result<()> {
                 ansible_runner.run_playbook(
                     AnsiblePlaybook::StopUploaders,
                     AnsibleInventoryType::Uploaders,
-                    None,
+                    Some(build_start_or_stop_uploader_extra_vars_doc(
+                        &provider.to_string(),
+                        &name,
+                        uploader_instance_count,
+                    )),
                 )?;
                 Ok(())
             }

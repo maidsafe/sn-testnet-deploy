@@ -1,13 +1,12 @@
 ---
-- name: ensure the safe uploader service is stopped
+- name: ensure the uploader service is stopped
   hosts: all
   become: True
   tasks:
-    - name: stop all autonomi uploader service
+    - name: stop all uploader services
       ansible.builtin.systemd:
         name: "ant_uploader_{{ item }}"
         state: stopped
         enabled: yes
       become: true
       loop: "{{ range(1, ant_uploader_instances | int + 1) | list }}"
-      ignore_errors: "{{ skip_err | default(false) }}"

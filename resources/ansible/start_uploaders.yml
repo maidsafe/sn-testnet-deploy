@@ -1,9 +1,9 @@
 ---
-- name: ensure the ant uploader service is started
+- name: ensure ant uploader services are started
   hosts: all
   become: True
   tasks:
-    - name: stop all autonomi uploader service
+    - name: start all uploader services
       ansible.builtin.systemd:
         name: "ant_uploader_{{ item }}"
         state: started
