@@ -424,17 +424,13 @@ pub fn build_uploaders_extra_vars_doc(
 
 pub fn build_start_or_stop_uploader_extra_vars_doc(
     cloud_provider: &str,
-    options: &ProvisionOptions,
-    skip_err: bool,
+    environment_name: &str,
+    uploader_instances: u16,
 ) -> String {
     let mut extra_vars = ExtraVarsDocBuilder::default();
     extra_vars.add_variable("provider", cloud_provider);
-    extra_vars.add_variable("testnet_name", &options.name);
-    extra_vars.add_variable(
-        "ant_uploader_instances",
-        &options.uploaders_count.unwrap_or(1).to_string(),
-    );
-    extra_vars.add_variable("skip_err", &skip_err.to_string());
+    extra_vars.add_variable("testnet_name", environment_name);
+    extra_vars.add_variable("ant_uploader_instances", &uploader_instances.to_string());
     extra_vars.build()
 }
 
