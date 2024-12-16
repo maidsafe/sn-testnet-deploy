@@ -38,6 +38,30 @@
   retries: 20
   delay: 10
 
+- name: prerequisites for telegraf-geoip
+  apt:
+    name: 
+      - golang-go
+    state: present
+
+- name: clone telegraf-geoip repo
+  ansible.builtin.git:
+    repo: https://github.com/a-bali/telegraf-geoip
+    dest: /root/telegraf-geoip
+
+- name: build telegraf-geoip
+  ansible.builtin.shell: |
+    cd /root/telegraf-geoip
+    go build -o geoip cmd/main.go
+
+- name: copy telegraf-geoip to /usr/local/bin
+  ansible.builtin.command:
+    cmd: cp /root/telegraf-geoip/geoip /usr/local/bin/
+
+- name: set permissions for telegraf-geoip
+  ansible.builtin.command:
+    cmd: chmod 755 /usr/local/bin/geoip
+
 # Retry logic for other package installations
 - name: install packages
   ansible.builtin.package:
@@ -59,3 +83,4 @@
 
 - name: Install boto3
   ansible.builtin.command: pip3 install boto3 --prefix /usr
+

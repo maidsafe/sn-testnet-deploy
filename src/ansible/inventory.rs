@@ -8,7 +8,7 @@ use super::AnsibleRunner;
 use crate::{
     ansible::AnsibleBinary, error::Error, inventory::VirtualMachine, run_external_command, Result,
 };
-use log::{debug, warn};
+use log::{debug, error, warn};
 use serde::Deserialize;
 use std::{
     collections::HashMap,
@@ -229,10 +229,13 @@ pub fn generate_environment_inventory(
             continue;
         }
 
-        let mut contents = std::fs::read_to_string(src_path)?;
+        let mut contents = std::fs::read_to_string(src_path).inspect_err(|err| {
+            error!("Failed to read inventory template file at {src_path:?}: {err}",)
+        })?;
         contents = contents.replace("env_value", environment_name);
         contents = contents.replace("type_value", inventory_type.tag());
-        std::fs::write(&dest_path, contents)?;
+        std::fs::write(&dest_path, contents)
+            .inspect_err(|err| error!("Failed to write inventory file at {dest_path:?}: {err}",))?;
         debug!("Created inventory file at {dest_path:#?}");
     }
 

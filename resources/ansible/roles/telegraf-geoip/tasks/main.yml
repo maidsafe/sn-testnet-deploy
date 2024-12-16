@@ -1,0 +1,103 @@
+---
+# This role has to be run after the telegraf-configuration role.
+- name: stop telegraf service
+  systemd:
+    name: telegraf
+    state: stopped
+
+- name: stop telegraf-elasticsearch service
+  systemd:
+    name: telegraf-elasticsearch
+    state: stopped
+
+- name: ensure target directory exists
+  file:
+    path: "{{ network_dashboard_repo_path }}"
+    state: directory
+
+- name: check if network dashboard repo already cloned
+  stat:
+    path: "{{ network_dashboard_repo_path }}/.git"
+  register: repo_stat
+
+- name: clone the network dashboard repo
+  git:
+    repo: "{{ network_dashboard_github_url }}"
+    dest: "{{ network_dashboard_repo_path }}"
+    version: "{{ network_dashboard_branch }}"
+    key_file: "{{ network_dashboard_sk_path }}"
+    accept_hostkey: yes
+  when: not repo_stat.stat.exists
+
+- name: ensure GeoIP directory exists
+  file:
+    path: /var/lib/geoip
+    state: directory
+    mode: '0755'
+
+- name: copy over MaxMind's GeoIP
+  copy:
+    src: "{{ network_dashboard_repo_path }}/telegraf/Plugins/geoip/GeoLite2-City.mmdb"
+    dest: /var/lib/geoip/GeoLite2-City.mmdb
+    mode: '0644'
+    remote_src: yes
+  
+- name: copy over Telegraf-Geoip Processor Plugin configuration file
+  copy:
+    src: "{{ network_dashboard_repo_path }}/telegraf/Plugins/geoip/geoip_config_file_influxdb"
+    dest: /var/lib/geoip/geoip_config_file_influxdb
+    mode: '0644'
+    remote_src: yes
+
+- name: copy over Telegraf-Geoip Processor Plugin configuration file
+  copy:
+    src: "{{ network_dashboard_repo_path }}/telegraf/Plugins/geoip/geoip_config_file_elasticsearch"
+    dest: /var/lib/geoip/geoip_config_file_elasticsearch
+    mode: '0644'
+    remote_src: yes
+
+- name: Add telegraf user to adm group
+  user:
+    name: telegraf
+    groups: adm
+    append: yes
+
+- name: copy telegraf nginx config file
+  copy:
+    src: "{{ network_dashboard_repo_path }}/telegraf/ConfigurationFile/peer_cache_nodes/telegraf_nginx.conf"
+    dest: /etc/telegraf/telegraf.d/telegraf_nginx.conf
+    remote_src: yes
+
+- name: create telegraf-elasticsearch.d subdir
+  file:
+    path: /etc/telegraf-elasticsearch/telegraf-elasticsearch.d
+    state: directory
+    mode: '0755'
+
+- name: copy telegraf nginx elasticsearch config file
+  copy:
+    src: "{{ network_dashboard_repo_path }}/telegraf/ConfigurationFile/peer_cache_nodes/telegraf_nginx_elasticsearch.conf"
+    dest: /etc/telegraf-elasticsearch/telegraf-elasticsearch.d/telegraf_nginx_elasticsearch.conf
+    remote_src: yes
+
+- name: copy telegraf elasticsearch system service file
+  copy:
+    src: "{{ network_dashboard_repo_path }}/telegraf/SystemServiceFile/telegraf-elasticsearch.service"
+    dest: /lib/systemd/system/telegraf-elasticsearch.service
+    remote_src: yes
+
+- name: reload the configuration files for systemctl daemon
+  become: True
+  command: systemctl daemon-reload
+
+- name: start telegraf-elasticsearch service
+  systemd:
+    name: telegraf-elasticsearch
+    enabled: yes
+    state: started
+
+- name: start telegraf service
+  systemd:
+    name: telegraf
+    enabled: yes
+    state: started
