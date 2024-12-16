@@ -1,6 +1,12 @@
 server {
     listen 80;
 
+    location / {
+        access_log off;
+        log_not_found off;
+        return 404;
+    }
+
     location /bootstrap_cache.json {
         alias {{ bootstrap_cache_dir }}/{{ json_files.files[0].path | basename }};
     }

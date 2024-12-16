@@ -22,6 +22,11 @@
     dest: /etc/nginx/sites-available/default
   when: json_files.matched > 0
 
+- name: ensure nginx status site file is set
+  template:
+    src: nginx_status.conf.j2
+    dest: /etc/nginx/sites-available/nginx_status
+
 - name: reload nginx to apply changes
   service:
     name: nginx

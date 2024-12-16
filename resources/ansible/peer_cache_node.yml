@@ -22,6 +22,8 @@
     - antctl
     - role: telegraf-configuration
       become: True
+    - role: telegraf-geoip
+      become: True
     - node
     - role: cache_webserver
       become: True
