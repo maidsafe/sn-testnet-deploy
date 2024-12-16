@@ -93,6 +93,12 @@
     path: /etc/telegraf-elasticsearch
     state: directory
 
+# This empty dir is required for the service to work.
+- name: create telegraf-elasticsearch.d subdir
+  file:
+    path: /etc/telegraf-elasticsearch/telegraf-elasticsearch.d
+    state: directory
+
 - name: copy telegraf elasticsearch config file from network dashboard repo
   copy:
     src: "{{ network_dashboard_repo_path }}/telegraf/ConfigurationFile/antnodes/telegraf_ant_multi_node_elasticsearch.conf"
