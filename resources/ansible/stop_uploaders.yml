@@ -1,13 +1,17 @@
 ---
-- name: ensure the safe uploader service is stopped
+- name: ensure the ant uploader service is stopped
   hosts: all
   become: True
   tasks:
-    - name: stop all autonomi uploader service
+    - name: get list of ant users
+      ansible.builtin.shell: "getent passwd | grep '^ant[0-9]\\+:' | cut -d: -f1"
+      register: ant_users
+      changed_when: false
+
+    - name: stop all ant uploader services
       ansible.builtin.systemd:
-        name: "ant_uploader_{{ item }}"
+        name: "ant_uploader_{{ item | regex_replace('ant([0-9]+)', '\\1') }}"
         state: stopped
         enabled: yes
       become: true
-      loop: "{{ range(1, ant_uploader_instances | int + 1) | list }}"
-      ignore_errors: "{{ skip_err | default(false) }}"
+      loop: "{{ ant_users.stdout_lines }}"
