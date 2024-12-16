@@ -80,7 +80,7 @@ metrics_header() {
 
 generate_random_data_file_and_upload() {
   tmpfile=$(mktemp)
-  dd if=/dev/urandom of="$tmpfile" bs=15M count=1 iflag=fullblock &> /dev/null
+  dd if=/dev/urandom of="$tmpfile" bs=100M count=1 iflag=fullblock &> /dev/null
 
   echo "Generated random data file at $tmpfile"
   file_size_kb=$(du -k "$tmpfile" | cut -f1)
@@ -111,9 +111,10 @@ generate_random_data_file_and_upload() {
 }
 
 while true; do
-  echo "$(date +"%A, %B %d, %Y %H:%M:%S")"
+  echo "================================"
   echo "Generating and uploading file..."
+  echo "================================"
+  echo "$(date +"%A, %B %d, %Y %H:%M:%S")"
   generate_random_data_file_and_upload
-  # TODO: re-enable when the new CLI has a `wallet balance` command
-  # echo "$(ant $CONTACT_PEER_ARG wallet balance)"
+  sleep 10
 done
