@@ -27,6 +27,13 @@
     src: nginx_status.conf.j2
     dest: /etc/nginx/sites-available/nginx_status
 
+- name: ensure nginx status file symlink is present
+  file:
+    src: /etc/nginx/sites-available/nginx_status
+    dest: /etc/nginx/sites-enabled/nginx_status
+    state: link
+  when: json_files.matched > 0
+
 - name: reload nginx to apply changes
   service:
     name: nginx
