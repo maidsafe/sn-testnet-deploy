@@ -288,7 +288,11 @@ impl DeploymentInventoryService {
                 let random_uploader_vm = uploader_vms
                     .choose(&mut rand::thread_rng())
                     .ok_or_else(|| eyre!("No uploader VMs available to retrieve ant version"))?;
-                Some(self.get_bin_version(&random_uploader_vm.vm, "ant --version", "ant-cli ")?)
+                Some(self.get_bin_version(
+                    &random_uploader_vm.vm,
+                    "ant --version",
+                    "Autonomi Client v",
+                )?)
             } else {
                 None
             };
