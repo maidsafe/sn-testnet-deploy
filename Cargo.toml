@@ -13,9 +13,9 @@ path="src/main.rs"
 name="testnet-deploy"
 
 [dependencies]
-alloy = { version = "0.5.3", default-features = false, features = ["signers"] }
-ant-releases = { git = "https://github.com/jacderida/ant-releases.git", branch = "chore-rename_binaries" }
-ant-service-management = { git = "https://github.com/maidsafe/autonomi.git", branch = "main" }
+alloy = { version = "0.7.3", default-features = false, features = ["signers"] }
+ant-releases = "0.4.0"
+ant-service-management = "0.4.4"
 async-recursion = "1.0.4"
 aws-config = "0.56.0"
 aws-sdk-s3 = "0.29.0"
