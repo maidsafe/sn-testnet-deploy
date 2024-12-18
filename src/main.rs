@@ -4,7 +4,7 @@
 // Please see the LICENSE file for more details.
 
 use alloy::primitives::{Address, U256};
-use ant_releases::{ReleaseType, SafeReleaseRepoActions};
+use ant_releases::{AntReleaseRepoActions, ReleaseType};
 use clap::{Parser, Subcommand};
 use color_eyre::{
     eyre::{bail, eyre, OptionExt},
@@ -2723,7 +2723,7 @@ async fn main() -> Result<()> {
                 provider,
                 version,
             } => {
-                let version = get_version_from_option(version, &ReleaseType::Autonomi).await?;
+                let version = get_version_from_option(version, &ReleaseType::Ant).await?;
 
                 let testnet_deploy = TestnetDeployBuilder::default()
                     .environment_name(&name)
@@ -3103,7 +3103,7 @@ async fn get_binary_option(
     let binary_option = if use_versions {
         print_with_banner("Binaries will be supplied from pre-built versions");
 
-        let ant_version = get_version_from_option(ant_version, &ReleaseType::Autonomi).await?;
+        let ant_version = get_version_from_option(ant_version, &ReleaseType::Ant).await?;
         let antnode_version =
             get_version_from_option(antnode_version, &ReleaseType::AntNode).await?;
         let antctl_version = get_version_from_option(antctl_version, &ReleaseType::AntCtl).await?;
@@ -3188,7 +3188,7 @@ async fn get_version_from_option(
     version: Option<String>,
     release_type: &ReleaseType,
 ) -> Result<Version> {
-    let release_repo = <dyn SafeReleaseRepoActions>::default_config();
+    let release_repo = <dyn AntReleaseRepoActions>::default_config();
     let version = if let Some(version) = version {
         println!("Using {version} for {release_type}");
         version
