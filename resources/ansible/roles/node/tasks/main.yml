@@ -68,7 +68,6 @@
 - name: add node services
   become: True
   ansible.builtin.command:
-    # The `omit` filter is used to remove arguments that don't have values
     argv: "{{ command_args | reject('equalto', omit) | list }}"
   vars:
     command_args:
@@ -80,7 +79,7 @@
       - "--count={{ nodes_to_add }}"
       - "{{ ('--peer=' + genesis_multiaddr) if genesis_multiaddr else omit }}"
       - "{{ ('--network-contacts-url=' + network_contacts_url) if network_contacts_url else omit }}"
-      - "{{ ('--network-id=' + network_id) if network_id else omit }}"
+      - "{{ ('--network-id=' + network_id) if network_id is defined and network_id else omit }}"
       - --testnet
       - "--rpc-address={{ node_rpc_ip }}"
       - "--rewards-address={{ rewards_address }}"
