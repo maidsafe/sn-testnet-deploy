@@ -850,27 +850,28 @@ enum Commands {
         /// There should be no 'v' prefix.
         version: Option<String>,
     },
-    /// Upgrade the antctl binaries to a particular version.
+    /// Upgrade antctl binaries to a particular version.
     ///
-    /// Simple mechanism that simply copies over the existing binary.
-    #[clap(name = "upgrade-node-manager")]
-    UpgradeNodeManager {
+    /// Simple mechanism that copies over the existing binary.
+    #[clap(name = "upgrade-antctl")]
+    UpgradeAntctl {
         /// Provide a list of VM names to use as a custom inventory.
         ///
-        /// This will upgrade the node manager on a particular subset of VMs.
+        /// This will upgrade antctl on a particular subset of VMs.
         #[clap(name = "custom-inventory", long, use_value_delimiter = true)]
         custom_inventory: Option<Vec<String>>,
         /// The name of the environment
         #[arg(short = 'n', long)]
         name: String,
-        /// Specify the type of node VM to upgrade the antctl services on. If not provided, the
-        /// antctl on all the node VMs will be upgraded.
+        /// Specify the type of VM to run the upgrade on.
+        /// 
+        /// If not provided, the upgrade will take place on all VMs.
+        /// 
         /// This is mutually exclusive with the '--custom-inventory' argument.
         ///
         /// Valid values are "peer-cache", "genesis", "generic" and "private".
         #[arg(long, conflicts_with = "custom-inventory")]
         node_type: Option<NodeType>,
-        #[arg(long)]
         /// The cloud provider of the environment.
         ///
         /// Valid values are "aws" or "digital-ocean".
@@ -2599,7 +2600,7 @@ async fn main() -> Result<()> {
 
             Ok(())
         }
-        Commands::UpgradeNodeManager {
+        Commands::UpgradeAntctl {
             custom_inventory,
             name,
             node_type,
@@ -2626,7 +2627,7 @@ async fn main() -> Result<()> {
                 None
             };
 
-            testnet_deployer.upgrade_node_manager(version.parse()?, node_type, custom_inventory)?;
+            testnet_deployer.upgrade_antctl(version.parse()?, node_type, custom_inventory)?;
             Ok(())
         }
         Commands::UpgradeNodeTelegrafConfig {

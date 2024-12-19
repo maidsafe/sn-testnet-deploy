@@ -751,13 +751,13 @@ impl TestnetDeployer {
         Ok(())
     }
 
-    pub fn upgrade_node_manager(
+    pub fn upgrade_antctl(
         &self,
         version: Version,
         node_type: Option<NodeType>,
         custom_inventory: Option<Vec<VirtualMachine>>,
     ) -> Result<()> {
-        self.ansible_provisioner.upgrade_node_manager(
+        self.ansible_provisioner.upgrade_antctl(
             &self.environment_name,
             &version,
             node_type,
