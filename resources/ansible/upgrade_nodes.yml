@@ -1,5 +1,5 @@
 ---
-- name: upgrade node binaries using the node manager
+- name: upgrade node binaries using antctl
   hosts: all
   tasks:
     # There is an optional delay that can be applied before the upgrade starts.
@@ -9,15 +9,15 @@
         {% if pre_upgrade_delay is defined %}
         sleep {{ pre_upgrade_delay | default(0) }}
         {% endif %}
-        cmd="safenode-manager upgrade --interval={{ interval }}"
-        {% if force_safenode is defined %}
+        cmd="antctl upgrade --interval={{ interval }}"
+        {% if force is defined %}
         cmd="$cmd --force"
         {% endif %}
         {% if env_variables is defined %}
         cmd="$cmd --env={{ env_variables }}"
         {% endif %}
-        {% if safenode_version is defined %}
-        cmd="$cmd --version={{ safenode_version }}"
+        {% if antnode_version is defined %}
+        cmd="$cmd --version={{ antnode_version }}"
         {% endif %}
         eval "$cmd"
       args:
