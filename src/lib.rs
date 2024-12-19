@@ -379,7 +379,7 @@ impl UpgradeOptions {
             extra_vars.add_variable("force", &self.force.to_string());
         }
         if let Some(version) = &self.version {
-            extra_vars.add_variable("safenode_version", version);
+            extra_vars.add_variable("antnode_version", version);
         }
         if let Some(pre_upgrade_delay) = &self.pre_upgrade_delay {
             extra_vars.add_variable("pre_upgrade_delay", &pre_upgrade_delay.to_string());
