@@ -18,6 +18,7 @@ User=ant{{ count }}
 ExecStart=/home/ant{{ count }}/upload-random-data.sh
 {% else %}
 ExecStart=/home/ant{{ count }}/upload-random-data.sh {{ genesis_multiaddr }} {{network_contacts_url}}{% if network_id is defined %} {{network_id}}{% endif %}
+
 {% endif %}
 Restart=always
 WorkingDirectory=/home/ant{{ count }}
