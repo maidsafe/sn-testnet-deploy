@@ -103,3 +103,12 @@
 - name: start the node services
   become: True
   command: antctl -v start --interval {{ interval}}
+  register: start_services_result
+  failed_when: false
+
+- name: log node services start failures
+  ansible.builtin.debug:
+    msg: "Warning: starting node services failed on {{ inventory_hostname }} with return code {{ start_services_result.rc }}"
+  when: 
+    - start_services_result.rc is defined
+    - start_services_result.rc != 0
