@@ -852,7 +852,7 @@ impl AnsibleProvisioner {
         Ok(())
     }
 
-    pub fn upgrade_node_manager(
+    pub fn upgrade_antctl(
         &self,
         environment_name: &str,
         version: &Version,
@@ -865,7 +865,7 @@ impl AnsibleProvisioner {
         if let Some(node_type) = node_type {
             println!("Running the upgrade safenode-manager playbook for {node_type:?} nodes");
             self.ansible_runner.run_playbook(
-                AnsiblePlaybook::UpgradeNodeManager,
+                AnsiblePlaybook::UpgradeAntctl,
                 node_type.to_ansible_inventory_type(),
                 Some(extra_vars.build()),
             )?;
@@ -880,7 +880,7 @@ impl AnsibleProvisioner {
                 &self.ansible_runner.working_directory_path.join("inventory"),
             )?;
             self.ansible_runner.run_playbook(
-                AnsiblePlaybook::UpgradeNodeManager,
+                AnsiblePlaybook::UpgradeAntctl,
                 AnsibleInventoryType::Custom,
                 Some(extra_vars.build()),
             )?;
@@ -890,7 +890,7 @@ impl AnsibleProvisioner {
         println!("Running the upgrade safenode-manager playbook for all node types");
         for node_inv_type in AnsibleInventoryType::iter_node_type() {
             self.ansible_runner.run_playbook(
-                AnsiblePlaybook::UpgradeNodeManager,
+                AnsiblePlaybook::UpgradeAntctl,
                 node_inv_type,
                 Some(extra_vars.build()),
             )?;

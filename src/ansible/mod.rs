@@ -156,10 +156,10 @@ pub enum AnsiblePlaybook {
     StopTelegraf,
     /// This playbook will stop the uploaders on each machine.
     StopUploaders,
-    /// The upgrade node manager playbook will upgrade the node manager to the latest version.
+    /// The upgrade antctl playbook will upgrade the antctl to the latest version.
     ///
     /// Use in combination with `AnsibleInventoryType::Genesis` or `AnsibleInventoryType::Nodes`.
-    UpgradeNodeManager,
+    UpgradeAntctl,
     /// The upgrade node manager playbook will upgrade node services to the latest version.
     ///
     /// Use in combination with `AnsibleInventoryType::Genesis` or `AnsibleInventoryType::Nodes`.
@@ -206,7 +206,7 @@ impl AnsiblePlaybook {
             AnsiblePlaybook::StopNodes => "stop_nodes.yml".to_string(),
             AnsiblePlaybook::StopTelegraf => "stop_telegraf.yml".to_string(),
             AnsiblePlaybook::StopUploaders => "stop_uploaders.yml".to_string(),
-            AnsiblePlaybook::UpgradeNodeManager => "upgrade_node_manager.yml".to_string(),
+            AnsiblePlaybook::UpgradeAntctl => "upgrade_antctl.yml".to_string(),
             AnsiblePlaybook::UpgradeNodes => "upgrade_nodes.yml".to_string(),
             AnsiblePlaybook::UpgradeNodeTelegrafConfig => {
                 "upgrade_node_telegraf_config.yml".to_string()
