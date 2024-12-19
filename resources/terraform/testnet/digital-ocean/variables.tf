@@ -122,21 +122,25 @@ variable "volumes_per_node" {
 variable "peer_cache_node_volume_size" {
   description = "Size of each volume in GB for peer cache nodes"
   type        = number
+  default = 0
 }
 
 variable "genesis_node_volume_size" {
   description = "Size of each volume in GB for the genesis node"
   type        = number
+  default = 0
 }
 
 variable "node_volume_size" {
   description = "Size of each volume in GB for generic nodes"
   type        = number
+  default = 0
 }
 
 variable "private_node_volume_size" {
   description = "Size of each volume in GB for private nodes"
   type        = number
+  default = 0
 }
 
 variable "peer_cache_reserved_ips" {
