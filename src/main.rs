@@ -836,9 +836,9 @@ enum Commands {
         #[arg(short = 'n', long)]
         name: String,
         /// Specify the type of VM to run the upgrade on.
-        /// 
+        ///
         /// If not provided, the upgrade will take place on all VMs.
-        /// 
+        ///
         /// This is mutually exclusive with the '--custom-inventory' argument.
         ///
         /// Valid values are "peer-cache", "genesis", "generic" and "private".
