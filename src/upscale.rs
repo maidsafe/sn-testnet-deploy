@@ -179,7 +179,7 @@ impl TestnetDeployer {
             return Ok(());
         }
 
-        let mut provision_options = ProvisionOptions {
+        let provision_options = ProvisionOptions {
             binary_option: options.current_inventory.binary_option.clone(),
             chunk_size: None,
             downloaders_count: options.downloaders_count,
@@ -296,66 +296,68 @@ impl TestnetDeployer {
         }
 
         if should_provision_private_nodes {
-            let private_nodes = self
-                .ansible_provisioner
-                .ansible_runner
-                .get_inventory(AnsibleInventoryType::PrivateNodes, true)
-                .map_err(|err| {
-                    println!("Failed to obtain the inventory of private node: {err:?}");
-                    err
-                })?;
-            provision_options.private_node_vms = private_nodes;
+            println!("Private node provisioning will be skipped during upscale");
+            // TODO: Reenable this after examining and fixing the problems.
+            //     let private_nodes = self
+            //         .ansible_provisioner
+            //         .ansible_runner
+            //         .get_inventory(AnsibleInventoryType::PrivateNodes, true)
+            //         .map_err(|err| {
+            //             println!("Failed to obtain the inventory of private node: {err:?}");
+            //             err
+            //         })?;
+            //     provision_options.private_node_vms = private_nodes;
 
-            self.wait_for_ssh_availability_on_new_machines(
-                AnsibleInventoryType::NatGateway,
-                &options.current_inventory,
-            )?;
-            self.ansible_provisioner
-                .print_ansible_run_banner("Provision NAT Gateway");
-            self.ansible_provisioner
-                .provision_nat_gateway(&provision_options)
-                .map_err(|err| {
-                    println!("Failed to provision NAT gateway {err:?}");
-                    err
-                })?;
+            //     self.wait_for_ssh_availability_on_new_machines(
+            //         AnsibleInventoryType::NatGateway,
+            //         &options.current_inventory,
+            //     )?;
+            //     self.ansible_provisioner
+            //         .print_ansible_run_banner("Provision NAT Gateway");
+            //     self.ansible_provisioner
+            //         .provision_nat_gateway(&provision_options)
+            //         .map_err(|err| {
+            //             println!("Failed to provision NAT gateway {err:?}");
+            //             err
+            //         })?;
 
-            self.wait_for_ssh_availability_on_new_machines(
-                AnsibleInventoryType::PrivateNodes,
-                &options.current_inventory,
-            )?;
-            self.ansible_provisioner
-                .print_ansible_run_banner("Provision Private Nodes");
-            match self.ansible_provisioner.provision_private_nodes(
-                &mut provision_options,
-                Some(initial_multiaddr),
-                Some(initial_network_contacts_url),
-            ) {
-                Ok(()) => {
-                    println!("Provisioned private nodes");
-                }
-                Err(err) => {
-                    log::error!("Failed to provision private nodes: {err}");
-                    node_provision_failed = true;
-                }
-            }
+            //     self.wait_for_ssh_availability_on_new_machines(
+            //         AnsibleInventoryType::PrivateNodes,
+            //         &options.current_inventory,
+            //     )?;
+            //     self.ansible_provisioner
+            //         .print_ansible_run_banner("Provision Private Nodes");
+            //     match self.ansible_provisioner.provision_private_nodes(
+            //         &mut provision_options,
+            //         Some(initial_multiaddr),
+            //         Some(initial_network_contacts_url),
+            //     ) {
+            //         Ok(()) => {
+            //             println!("Provisioned private nodes");
+            //         }
+            //         Err(err) => {
+            //             log::error!("Failed to provision private nodes: {err}");
+            //             node_provision_failed = true;
+            //         }
+            //     }
+            // }
+
+            // TODO: Uncomment when EVM-based payments are supported for the uploader upscale.
+            // if !is_bootstrap_deploy {
+            //     self.wait_for_ssh_availability_on_new_machines(
+            //         AnsibleInventoryType::Uploaders,
+            //         &options.current_inventory,
+            //     )?;
+            //     self.ansible_provisioner
+            //         .print_ansible_run_banner(n, total, "Provision Uploaders");
+            //     self.ansible_provisioner
+            //         .provision_uploaders(&provision_options, &initial_multiaddr)
+            //         .await
+            //         .map_err(|err| {
+            //             println!("Failed to provision uploaders {err:?}");
+            //             err
+            //         })?;
         }
-
-        // TODO: Uncomment when EVM-based payments are supported for the uploader upscale.
-        // if !is_bootstrap_deploy {
-        //     self.wait_for_ssh_availability_on_new_machines(
-        //         AnsibleInventoryType::Uploaders,
-        //         &options.current_inventory,
-        //     )?;
-        //     self.ansible_provisioner
-        //         .print_ansible_run_banner(n, total, "Provision Uploaders");
-        //     self.ansible_provisioner
-        //         .provision_uploaders(&provision_options, &initial_multiaddr)
-        //         .await
-        //         .map_err(|err| {
-        //             println!("Failed to provision uploaders {err:?}");
-        //             err
-        //         })?;
-        // }
 
         if node_provision_failed {
             println!();
