@@ -78,7 +78,7 @@
       - --log-dir-path=/mnt/antnode-storage/log
       - "--count={{ nodes_to_add }}"
       - "{{ ('--peer=' + genesis_multiaddr) if genesis_multiaddr else omit }}"
-      - "{{ ('--network-contacts-url=' + network_contacts_url) if network_contacts_url else omit }}"
+      - "{{ ('--network-contacts-url=' + network_contacts_url) if network_contacts_url is defined and network_contacts_url else omit }}"
       - "{{ ('--network-id=' + network_id) if network_id is defined and network_id else omit }}"
       - --testnet
       - "--rpc-address={{ node_rpc_ip }}"

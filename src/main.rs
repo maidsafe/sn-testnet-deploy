@@ -1458,6 +1458,14 @@ async fn main() -> Result<()> {
                 ));
             }
 
+            if evm_network_type == EvmNetwork::Anvil {
+                return Err(eyre!(
+                    "The anvil network type cannot be used for bootstrapping. 
+                    Use the custom network type, supplying the Anvil contract addresses and RPC URL
+                    from the previous network. They can be found in the network's inventory."
+                ));
+            }
+
             if evm_network_type == EvmNetwork::Custom
                 && (evm_data_payments_address.is_none()
                     || evm_payment_token_address.is_none()
