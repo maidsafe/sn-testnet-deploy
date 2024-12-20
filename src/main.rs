@@ -146,20 +146,6 @@ enum Commands {
         /// The default value from ansible.cfg is 50.
         #[clap(long)]
         forks: Option<usize>,
-        /// Optionally set the foundation public key for a custom antnode binary.
-        ///
-        /// This argument only applies if the '--branch' and '--repo-owner' arguments are used.
-        ///
-        /// If one of the new keys is supplied, all must be supplied.
-        #[arg(long)]
-        foundation_pk: Option<String>,
-        /// Optionally set the genesis public key for a custom antnode binary.
-        ///
-        /// This argument only applies if the '--branch' and '--repo-owner' arguments are used.
-        ///
-        /// If one of the new keys is supplied, all must be supplied.
-        #[arg(long)]
-        genesis_pk: Option<String>,
         /// The interval between starting each node in milliseconds.
         #[clap(long, value_parser = |t: &str| -> Result<Duration> { Ok(t.parse().map(Duration::from_millis)?)}, default_value = "2000")]
         interval: Duration,
@@ -185,13 +171,6 @@ enum Commands {
         /// By default, the network ID is set to 1, which represents the mainnet.
         #[clap(long, verbatim_doc_comment)]
         network_id: Option<u8>,
-        /// Optionally set the network royalties public key for a custom antnode binary.
-        ///
-        /// This argument only applies if the '--branch' and '--repo-owner' arguments are used.
-        ///
-        /// If one of the new keys is supplied, all must be supplied.
-        #[arg(long)]
-        network_royalties_pk: Option<String>,
         /// The number of antnode services to run on each VM.
         ///
         /// If the argument is not used, the value will be determined by the 'environment-type'
@@ -216,13 +195,6 @@ enum Commands {
         /// argument.
         #[clap(long)]
         node_volume_size: Option<u16>,
-        /// Optionally set the payment forward public key for a custom antnode binary.
-        ///
-        /// This argument only applies if the '--branch' and '--repo-owner' arguments are used.
-        ///
-        /// If one of the new keys is supplied, all must be supplied.
-        #[arg(long)]
-        payment_forward_pk: Option<String>,
         /// The number of antnode services to be run behind a NAT on each private node VM.
         ///
         /// If the argument is not used, the value will be determined by the 'environment-type'
@@ -1463,20 +1435,16 @@ async fn main() -> Result<()> {
             evm_payment_token_address,
             evm_rpc_url,
             forks,
-            foundation_pk,
-            genesis_pk,
             interval,
             log_format,
             name,
             network_id,
-            network_royalties_pk,
             node_count,
             node_vm_count,
             node_volume_size,
             node_vm_size,
             max_archived_log_files,
             max_log_files,
-            payment_forward_pk,
             private_node_count,
             private_node_vm_count,
             private_node_volume_size,
@@ -1506,13 +1474,6 @@ async fn main() -> Result<()> {
                 ));
             }
 
-            let network_keys = validate_and_get_pks(
-                foundation_pk,
-                genesis_pk,
-                network_royalties_pk,
-                payment_forward_pk,
-            )?;
-
             let binary_option = get_binary_option(
                 branch,
                 repo_owner,
@@ -1520,7 +1481,7 @@ async fn main() -> Result<()> {
                 antnode_version,
                 antctl_version,
                 antnode_features,
-                network_keys,
+                None,
             )
             .await?;
 
