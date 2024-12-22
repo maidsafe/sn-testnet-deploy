@@ -1,0 +1,31 @@
+---
+- name: copy script
+  template:
+    src: rotate_peer_cache_nodes.sh.j2
+    dest: /usr/local/bin/rotate_peer_cache_nodes.sh
+    mode: '0755'
+    owner: root
+    group: root
+
+- name: create cron job
+  cron:
+    name: "Rotate peer cache nodes"
+    job: "/usr/local/bin/rotate_peer_cache_nodes.sh >> /var/log/rotate_peer_cache_nodes.log 2>&1"
+    hour: "*"
+    minute: "0"
+    user: root
+
+- name: configure logrotate for logs
+  copy:
+    dest: /etc/logrotate.d/rotate-peer-cache-nodes
+    content: |
+      /var/log/rotate_peer_cache_nodes.log {
+        daily
+        rotate 7
+        compress
+        delaycompress
+        missingok
+        notifempty
+        create 0644 root root
+      }
+    mode: '0644'

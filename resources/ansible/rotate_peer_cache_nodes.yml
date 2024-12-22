@@ -1,0 +1,6 @@
+---
+- name: rotate peer cache nodes
+  hosts: all
+  become: True
+  roles:
+    - role: rotate-peer-cache-nodes

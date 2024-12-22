@@ -1,0 +1,70 @@
+#!/bin/bash
+
+set -euo pipefail
+
+echo "=============================================="
+echo "          PEER CACHE NODE ROTATION"
+echo "=============================================="
+echo "Starting rotation at: $(date '+%Y-%m-%d %H:%M:%S')"
+echo "=============================================="
+echo
+
+readonly ANTCTL="/usr/local/bin/antctl"
+readonly JQ="/usr/bin/jq"
+readonly NODE_REGISTRY="/var/antctl/node_registry.json"
+
+node_count=$(cat ${NODE_REGISTRY} | ${JQ} '.nodes | length')
+
+if [ "{{ evm_network_type }}" = "evm-custom" ]; then
+  rpc_url=$(cat ${NODE_REGISTRY} | ${JQ} -r '.nodes[0].evm_network.Custom.rpc_url_http')
+  payment_token_address=$(cat ${NODE_REGISTRY} | ${JQ} -r '.nodes[0].evm_network.Custom.payment_token_address')
+  data_payments_address=$(cat ${NODE_REGISTRY} | ${JQ} -r '.nodes[0].evm_network.Custom.data_payments_address')
+fi
+
+network_contacts_url=$(cat ${NODE_REGISTRY} | ${JQ} -r '.nodes[0].peers_args.network_contacts_url[0]')
+peer_multiaddr=$(cat ${NODE_REGISTRY} | ${JQ} -r '.nodes[0].peers_args.addrs[0]')
+rewards_address=$(cat ${NODE_REGISTRY} | ${JQ} -r '.nodes[0].rewards_address')
+network_id=$(cat ${NODE_REGISTRY} | ${JQ} -r '.nodes[0].network_id')
+max_archived_log_files=$(cat ${NODE_REGISTRY} | ${JQ} -r '.nodes[0].max_archived_log_files')
+max_log_files=$(cat ${NODE_REGISTRY} | ${JQ} -r '.nodes[0].max_log_files')
+
+${ANTCTL} reset --force
+
+base_rpc_port=13000
+base_metrics_port=14000
+
+for ((i=0; i<node_count; i++)); do
+  current_rpc_port=$((base_rpc_port + i))
+  current_metrics_port=$((base_metrics_port + i))
+  
+  ${ANTCTL} add \
+    --rpc-port ${current_rpc_port} \
+    --data-dir-path /mnt/antnode-storage/data \
+    --log-dir-path /mnt/antnode-storage/log \
+    --peer ${peer_multiaddr} \
+    --network-contacts-url ${network_contacts_url} \
+    --bootstrap-cache-dir /var/antctl/bootstrap_cache \
+    --network-id ${network_id} \
+    --log-format json \
+    --metrics-port ${current_metrics_port} \
+    --max-archived-log-files ${max_archived_log_files} \
+    --max-log-files ${max_log_files} \
+    --rewards-address ${rewards_address} \
+{% if evm_network_type == 'evm-custom' %}
+    {{ evm_network_type }} \
+{% else %}
+    {{ evm_network_type }}
+{% endif %}
+{% if evm_network_type == 'evm-custom' %}
+    --rpc-url ${rpc_url} \
+    --payment-token-address ${payment_token_address} \
+    --data-payments-address ${data_payments_address}
+{% endif %}
+done
+
+${ANTCTL} start --interval {{ interval }}
+
+echo
+echo "=============================================="
+echo "Rotation completed at: $(date '+%Y-%m-%d %H:%M:%S')"
+echo "=============================================="

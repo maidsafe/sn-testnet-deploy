@@ -117,6 +117,11 @@ pub enum AnsiblePlaybook {
     ///
     /// Use in combination with `AnsibleInventoryType::PeerCache`.
     PeerCacheNodes,
+    /// The rotate peer cache nodes playbook will rotate the peer cache nodes by resetting antctl
+    /// and re-adding the nodes with the same configuration.
+    ///
+    /// Use in combination with `AnsibleInventoryType::PeerCache`.
+    RotatePeerCacheNodes,
     /// The rpc client playbook will setup the `safenode_rpc_client` binary on the genesis node.
     ///
     /// Use in combination with `AnsibleInventoryType::Genesis`.
@@ -196,6 +201,7 @@ impl AnsiblePlaybook {
             AnsiblePlaybook::NatGateway => "nat_gateway.yml".to_string(),
             AnsiblePlaybook::Nodes => "nodes.yml".to_string(),
             AnsiblePlaybook::PeerCacheNodes => "peer_cache_node.yml".to_string(),
+            AnsiblePlaybook::RotatePeerCacheNodes => "rotate_peer_cache_nodes.yml".to_string(),
             AnsiblePlaybook::RpcClient => "safenode_rpc_client.yml".to_string(),
             AnsiblePlaybook::StartFaucet => "start_faucet.yml".to_string(),
             AnsiblePlaybook::StartNodes => "start_nodes.yml".to_string(),

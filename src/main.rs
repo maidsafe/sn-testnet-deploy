@@ -541,6 +541,29 @@ enum Commands {
         #[clap(long)]
         uploader_vm_size: Option<String>,
     },
+    /// Deploy the peer cache node rotation script and cron job
+    DeployRotatePeerCache {
+        /// A comma-separated list of VM names to target
+        #[clap(name = "custom-inventory", long, use_value_delimiter = true)]
+        custom_inventory: Option<Vec<String>>,
+        /// The EVM network type to use
+        #[arg(long)]
+        evm_network_type: EvmNetwork,
+        /// The interval between starting each node, in milliseconds.
+        ///
+        /// Defaults to two seconds.
+        ///
+        /// The default value is only recommended for dev networks.
+        /// For production, consider using a large value, like 5 minutes.
+        #[clap(long, value_parser = |t: &str| -> Result<Duration> { Ok(t.parse().map(Duration::from_millis)?)}, default_value = "2000")]
+        interval: Duration,
+        /// The name of the environment
+        #[arg(long)]
+        name: String,
+        /// The cloud provider for the environment.
+        #[clap(long, value_parser = parse_provider, verbatim_doc_comment, default_value_t = CloudProvider::DigitalOcean)]
+        provider: CloudProvider,
+    },
     ExtendVolumeSize {
         /// Set to run Ansible with more verbose output.
         #[arg(long)]
@@ -1811,6 +1834,65 @@ async fn main() -> Result<()> {
             inventory_service
                 .upload_network_contacts(&inventory, network_contacts_file_name)
                 .await?;
+
+            Ok(())
+        }
+        Commands::DeployRotatePeerCache {
+            name,
+            custom_inventory,
+            evm_network_type,
+            interval,
+            provider,
+        } => {
+            let testnet_deployer = TestnetDeployBuilder::default()
+                .environment_name(&name)
+                .provider(provider)
+                .build()?;
+
+            let inventory_service = DeploymentInventoryService::from(&testnet_deployer);
+            let inventory = inventory_service
+                .generate_or_retrieve_inventory(&name, true, None)
+                .await?;
+            if inventory.is_empty() {
+                return Err(eyre!("The {name} environment does not exist"));
+            }
+
+            let custom_inventory = if let Some(custom_inventory) = custom_inventory {
+                let custom_vms = get_custom_inventory(&inventory, &custom_inventory)?;
+                Some(custom_vms)
+            } else {
+                None
+            };
+
+            let mut extra_vars = ExtraVarsDocBuilder::default();
+            extra_vars.add_variable("evm_network_type", &evm_network_type.to_string());
+            extra_vars.add_variable("interval", &interval.as_millis().to_string());
+
+            let inventory_type = if let Some(custom_inventory) = custom_inventory {
+                println!("Deploying peer cache rotation against a custom inventory");
+                generate_custom_environment_inventory(
+                    &custom_inventory,
+                    &name,
+                    &testnet_deployer
+                        .ansible_provisioner
+                        .ansible_runner
+                        .working_directory_path
+                        .join("inventory"),
+                )?;
+                AnsibleInventoryType::Custom
+            } else {
+                println!("Deploying peer cache rotation against PeerCacheNodes");
+                AnsibleInventoryType::PeerCacheNodes
+            };
+
+            testnet_deployer
+                .ansible_provisioner
+                .ansible_runner
+                .run_playbook(
+                    AnsiblePlaybook::RotatePeerCacheNodes,
+                    inventory_type,
+                    Some(extra_vars.build()),
+                )?;
 
             Ok(())
         }
