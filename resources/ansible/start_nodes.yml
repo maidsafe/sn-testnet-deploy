@@ -6,4 +6,4 @@
     interval: "{{ interval }}"
   tasks:
     - name: start
-      ansible.builtin.command: "safenode-manager start --interval {{ interval }}"
+      ansible.builtin.command: "antctl start --interval {{ interval }}"

@@ -10,6 +10,6 @@
         {% if delay is defined %}
         sleep {{ delay | default(0) }}
         {% endif %}
-        safenode-manager stop --interval {{ interval }}
+        antctl stop --interval {{ interval }}
       args:
         executable: /bin/bash
