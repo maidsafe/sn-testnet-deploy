@@ -117,6 +117,10 @@ pub enum AnsiblePlaybook {
     ///
     /// Use in combination with `AnsibleInventoryType::PeerCache`.
     PeerCacheNodes,
+    /// The reset to n nodes playbook will reset the nodes to the specified number of nodes.
+    ///
+    /// See the `reset-to-n-nodes` role for more details.
+    ResetToNNodes,
     /// The rpc client playbook will setup the `safenode_rpc_client` binary on the genesis node.
     ///
     /// Use in combination with `AnsibleInventoryType::Genesis`.
@@ -197,6 +201,7 @@ impl AnsiblePlaybook {
             AnsiblePlaybook::Nodes => "nodes.yml".to_string(),
             AnsiblePlaybook::PeerCacheNodes => "peer_cache_node.yml".to_string(),
             AnsiblePlaybook::RpcClient => "safenode_rpc_client.yml".to_string(),
+            AnsiblePlaybook::ResetToNNodes => "reset_to_n_nodes.yml".to_string(),
             AnsiblePlaybook::StartFaucet => "start_faucet.yml".to_string(),
             AnsiblePlaybook::StartNodes => "start_nodes.yml".to_string(),
             AnsiblePlaybook::StartTelegraf => "start_telegraf.yml".to_string(),

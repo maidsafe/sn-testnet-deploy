@@ -1,0 +1,6 @@
+---
+- name: reset to n nodes
+  hosts: all
+  become: True
+  roles:
+    - reset-to-n-nodes
