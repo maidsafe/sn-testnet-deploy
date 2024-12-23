@@ -1,0 +1,15 @@
+# An assumption is being made that an environment for running nodes was already setup.
+# Nodes will be stopped slowly, then everything will be cleared using the `reset` command.
+---
+- name: copy script
+  template:
+    src: reset_to_n_nodes.sh.j2
+    dest: /usr/local/bin/reset_to_n_nodes.sh
+    mode: '0755'
+    owner: root
+    group: root
+
+- name: run script
+  ansible.builtin.shell: /usr/local/bin/reset_to_n_nodes.sh
+  args:
+    executable: /bin/bash

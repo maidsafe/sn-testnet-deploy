@@ -1047,6 +1047,51 @@ enum Commands {
         #[clap(long, value_parser = parse_provider, verbatim_doc_comment, default_value_t = CloudProvider::DigitalOcean)]
         provider: CloudProvider,
     },
+    /// Reset nodes to a specified count.
+    ///
+    /// This will stop all nodes, clear their data, and start the specified number of nodes.
+    #[clap(name = "reset-to-n-nodes")]
+    ResetToNNodes {
+        /// Provide a list of VM names to use as a custom inventory.
+        ///
+        /// This will reset nodes on a particular subset of VMs.
+        #[clap(name = "custom-inventory", long, use_value_delimiter = true)]
+        custom_inventory: Option<Vec<String>>,
+        /// The EVM network to use.
+        ///
+        /// Valid values are "arbitrum-one", "arbitrum-sepolia", or "custom".
+        #[clap(long, value_parser = parse_evm_network)]
+        evm_network_type: EvmNetwork,
+        /// Maximum number of forks Ansible will use to execute tasks on target hosts.
+        #[clap(long, default_value_t = 50)]
+        forks: usize,
+        /// The name of the environment.
+        #[arg(short = 'n', long)]
+        name: String,
+        /// The number of nodes to run after reset.
+        #[arg(long)]
+        node_count: u16,
+        /// Specify the type of node VM to reset the nodes on. If not provided, the nodes on
+        /// all the node VMs will be reset. This is mutually exclusive with the '--custom-inventory' argument.
+        ///
+        /// Valid values are "peer-cache", "genesis", "generic" and "private".
+        #[arg(long, conflicts_with = "custom-inventory")]
+        node_type: Option<NodeType>,
+        /// The cloud provider for the environment.
+        #[clap(long, value_parser = parse_provider, verbatim_doc_comment, default_value_t = CloudProvider::DigitalOcean)]
+        provider: CloudProvider,
+        /// The interval between starting each node in milliseconds.
+        #[clap(long, value_parser = |t: &str| -> Result<Duration> { Ok(t.parse().map(Duration::from_millis)?)}, default_value = "2000")]
+        start_interval: Duration,
+        /// The interval between stopping each node in milliseconds.
+        #[clap(long, value_parser = |t: &str| -> Result<Duration> { Ok(t.parse().map(Duration::from_millis)?)}, default_value = "2000")]
+        stop_interval: Duration,
+        /// Supply a version number for the antnode binary.
+        ///
+        /// If not provided, the latest version will be used.
+        #[arg(long)]
+        version: Option<String>,
+    },
 }
 
 #[derive(Subcommand, Debug)]
@@ -1914,7 +1959,7 @@ async fn main() -> Result<()> {
                                 eyre!("Genesis node not found. Most likely this is a bootstrap deployment."))?,
                             &inventory.genesis_multiaddr.clone().ok_or_else(||
                                 eyre!("Genesis node not found. Most likely this is a bootstrap deployment."))?,
-                        )?),
+                        )?)
                     )?;
                 }
 
@@ -3018,6 +3063,87 @@ async fn main() -> Result<()> {
                     Some(extra_vars.build()),
                 )?;
 
+            Ok(())
+        }
+        Commands::ResetToNNodes {
+            custom_inventory,
+            evm_network_type,
+            forks,
+            name,
+            node_count,
+            node_type,
+            provider,
+            start_interval,
+            stop_interval,
+            version,
+        } => {
+            // We will use 50 forks for the initial run to retrieve the inventory, then recreate the
+            // deployer using the custom fork value.
+            let testnet_deployer = TestnetDeployBuilder::default()
+                .ansible_forks(50)
+                .environment_name(&name)
+                .provider(provider)
+                .build()?;
+            let inventory_service = DeploymentInventoryService::from(&testnet_deployer);
+            let inventory = inventory_service
+                .generate_or_retrieve_inventory(&name, true, None)
+                .await?;
+            if inventory.is_empty() {
+                return Err(eyre!("The {name} environment does not exist"));
+            }
+
+            let testnet_deployer = TestnetDeployBuilder::default()
+                .ansible_forks(forks)
+                .environment_name(&name)
+                .provider(provider)
+                .build()?;
+            testnet_deployer.init().await?;
+
+            let antnode_version = get_version_from_option(version, &ReleaseType::AntNode).await?;
+            let mut extra_vars = ExtraVarsDocBuilder::default();
+            extra_vars.add_variable("environment_name", &name);
+            extra_vars.add_variable("evm_network_type", &evm_network_type.to_string());
+            extra_vars.add_variable("node_count", &node_count.to_string());
+            extra_vars.add_variable("start_interval", &start_interval.as_millis().to_string());
+            extra_vars.add_variable("stop_interval", &stop_interval.as_millis().to_string());
+            extra_vars.add_variable("version", &antnode_version.to_string());
+
+            let ansible_runner = &testnet_deployer.ansible_provisioner.ansible_runner;
+
+            if let Some(custom_inventory) = custom_inventory {
+                println!("Running the playbook with a custom inventory");
+                let custom_vms = get_custom_inventory(&inventory, &custom_inventory)?;
+                generate_custom_environment_inventory(
+                    &custom_vms,
+                    &name,
+                    &ansible_runner.working_directory_path.join("inventory"),
+                )?;
+                ansible_runner.run_playbook(
+                    AnsiblePlaybook::ResetToNNodes,
+                    AnsibleInventoryType::Custom,
+                    Some(extra_vars.build()),
+                )?;
+                return Ok(());
+            }
+
+            if let Some(node_type) = node_type {
+                println!("Running the playbook for {node_type:?} nodes");
+                ansible_runner.run_playbook(
+                    AnsiblePlaybook::ResetToNNodes,
+                    node_type.to_ansible_inventory_type(),
+                    Some(extra_vars.build()),
+                )?;
+                return Ok(());
+            }
+
+            println!("Running the playbook for all node types");
+            for node_inv_type in AnsibleInventoryType::iter_node_type() {
+                ansible_runner.run_playbook(
+                    AnsiblePlaybook::ResetToNNodes,
+                    node_inv_type,
+                    Some(extra_vars.build()),
+                )?;
+            }
             Ok(())
         }
     }
