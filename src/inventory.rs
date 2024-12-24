@@ -311,14 +311,15 @@ impl DeploymentInventoryService {
             }
         };
 
-        let (genesis_multiaddr, genesis_ip) = if environment_details.deployment_type
-            == DeploymentType::New
-        {
-            let (multiaddr, ip) = get_genesis_multiaddr(&self.ansible_runner, &self.ssh_client)?;
-            (Some(multiaddr), Some(ip))
-        } else {
-            (None, None)
-        };
+        let (genesis_multiaddr, genesis_ip) =
+            if environment_details.deployment_type == DeploymentType::New {
+                match get_genesis_multiaddr(&self.ansible_runner, &self.ssh_client) {
+                    Ok((multiaddr, ip)) => (Some(multiaddr), Some(ip)),
+                    Err(_) => (None, None),
+                }
+            } else {
+                (None, None)
+            };
         let inventory = DeploymentInventory {
             binary_option,
             environment_details,

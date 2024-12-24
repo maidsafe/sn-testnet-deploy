@@ -843,20 +843,37 @@ pub fn get_genesis_multiaddr(
     let genesis_inventory = ansible_runner.get_inventory(AnsibleInventoryType::Genesis, true)?;
     let genesis_ip = genesis_inventory[0].public_ip_addr;
 
-    let multiaddr =
-        ssh_client
+    // It's possible for the genesis host to be altered from its original state where a node was
+    // started with the `--first` flag.
+    // First attempt: try to find node with first=true
+    let multiaddr = ssh_client
         .run_command(
             &genesis_ip,
             "root",
-            // fetch the first public multiaddr with quic-v1 protocol for the genesis node
             "jq -r '.nodes[] | select(.peers_args.first == true) | .listen_addr[] | select(contains(\"127.0.0.1\") | not) | select(contains(\"quic-v1\"))' /var/antctl/node_registry.json | head -n 1",
             false,
-        )?.first()
-        .cloned()
-        .ok_or_else(|| Error::GenesisListenAddress)?;
+        )
+        .map(|output| output.first().cloned())
+        .unwrap_or_else(|err| {
+            log::error!("Failed to find first node with quic-v1 protocol: {err:?}");
+            None
+        });
 
-    // The genesis_ip is obviously inside the multiaddr, but it's just being returned as a
-    // separate item for convenience.
+    // Second attempt: if first attempt failed, see if any node is available.
+    let multiaddr = match multiaddr {
+        Some(addr) => addr,
+        None => ssh_client
+            .run_command(
+                &genesis_ip,
+                "root",
+                "jq -r '.nodes[] | .listen_addr[] | select(contains(\"127.0.0.1\") | not) | select(contains(\"quic-v1\"))' /var/antctl/node_registry.json | head -n 1",
+                false,
+            )?
+            .first()
+            .cloned()
+            .ok_or_else(|| Error::GenesisListenAddress)?,
+    };
+
     Ok((multiaddr, genesis_ip))
 }
 
