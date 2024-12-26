@@ -112,3 +112,24 @@
   when: 
     - start_services_result.rc is defined
     - start_services_result.rc != 0
+
+- name: copy the service antctl script to /usr/local/bin
+  ansible.builtin.unarchive:
+    src: "service-nodes-antctl.sh"
+    dest: /usr/local/bin/service-nodes-antctl.sh
+    mode: '0744'
+  become: true
+
+- name: create systemd service file for antctl service
+  ansible.builtin.template:
+    src: antctl_service.j2
+    dest: "/etc/systemd/system/antctl-reset.service"
+    mode: '0644'
+  become: true
+
+- name: start and enable antctl service for nodes
+  ansible.builtin.systemd:
+    name: "antctl-reset.service"
+    state: started
+    enabled: yes
+  become: true

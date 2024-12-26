@@ -1,0 +1,39 @@
+[Unit]
+Description=antctl reset service
+After=network.target
+
+[Service]
+# Extracted Variables
+Environment="NODES_TO_ADD={{ nodes_to_add }}"
+Environment="GENESIS_MULTIADDR={{ genesis_multiaddr }}"
+Environment="NETWORK_CONTACTS_URL={{ network_contacts_url }}"
+Environment="NETWORK_ID={{ network_id }}"
+Environment="NODE_RPC_IP={{ node_rpc_ip }}"
+Environment="REWARDS_ADDRESS={{ rewards_address }}"
+Environment="MAX_ARCHIVED_LOG_FILES={{ max_archived_log_files }}"
+Environment="MAX_LOG_FILES={{ max_log_files }}"
+Environment="PRIVATE_IP_ETH1={{ private_ip_eth1.stdout }}"
+Environment="MAKE_VM_PRIVATE={{ make_vm_private }}"
+Environment="RPC_PORT={{ rpc_port }}"
+Environment="USE_PORT_RANGE={{ use_port_range }}"
+Environment="RPC_START_PORT={{ rpc_start_port }}"
+Environment="RPC_END_PORT={{ rpc_end_port }}"
+Environment="METRICS_PORT={{ metrics_port }}"
+Environment="METRICS_START_PORT={{ metrics_start_port }}"
+Environment="METRICS_END_PORT={{ metrics_end_port }}"
+Environment="LOG_FORMAT={{ log_format }}"
+Environment="ENV_VARIABLES={{ env_variables }}"
+Environment="VERSION={{ version }}"
+Environment="NODE_ARCHIVE_URL={{ node_archive_url }}"
+Environment="EVM_NETWORK_TYPE={{ evm_network_type }}"
+Environment="EVM_RPC_URL={{ evm_rpc_url }}"
+Environment="EVM_PAYMENT_TOKEN_ADDRESS={{ evm_payment_token_address }}"
+Environment="EVM_DATA_PAYMENTS_ADDRESS={{ evm_data_payments_address }}"
+Enivronment="INTERVAL={{ interval }}"
+
+ExecStart=/usr/local/bin/service-nodes-antctl.sh
+Restart=on-abnormal
+WorkingDirectory=/usr/local/bin
+
+[Install]
+WantedBy=multi-user.target

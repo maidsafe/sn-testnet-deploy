@@ -1,4 +1,11 @@
 ---
+- name: stop and disable antctl service for nodes
+  ansible.builtin.systemd:
+    name: "antctl-reset.service"
+    state: stopped
+    enabled: no
+  become: true
+
 - name: upgrade node binaries using antctl
   hosts: all
   tasks:
@@ -22,3 +29,11 @@
         eval "$cmd"
       args:
         executable: /bin/bash
+
+- name: start and enable antctl service for nodes
+  ansible.builtin.systemd:
+    name: "antctl-reset.service"
+    state: started
+    enabled: yes
+  become: true
+
