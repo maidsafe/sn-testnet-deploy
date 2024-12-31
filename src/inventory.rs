@@ -242,30 +242,7 @@ impl DeploymentInventoryService {
         let binary_option = if let Some(binary_option) = binary_option {
             binary_option
         } else {
-            let antnode_version = match environment_details.deployment_type {
-                DeploymentType::New => {
-                    let (_, genesis_node_registry) = genesis_node_registry
-                        .retrieved_registries
-                        .iter()
-                        .find(|(vm_name, _)| vm_name.contains("genesis-bootstrap"))
-                        .ok_or_else(|| eyre!("Unable to retrieve genesis node registry"))?;
-                    genesis_node_registry
-                        .nodes
-                        .first()
-                        .ok_or_else(|| eyre!("Unable to obtain the genesis node"))?
-                        .version
-                        .parse()?
-                }
-                DeploymentType::Bootstrap => generic_node_registries
-                    .retrieved_registries
-                    .first()
-                    .and_then(|(_, reg)| reg.nodes.first())
-                    .ok_or_else(|| eyre!("Unable to obtain a node"))?
-                    .version
-                    .parse()?,
-            };
-
-            let antctl_version = {
+            let (antnode_version, antctl_version) = {
                 let mut random_vm = None;
                 if !generic_node_vms.is_empty() {
                     random_vm = generic_node_vms.first().cloned();
@@ -276,12 +253,21 @@ impl DeploymentInventoryService {
                 };
 
                 let Some(random_vm) = random_vm else {
-                    return Err(eyre!(
-                        "Unable to obtain a VM to retrieve the safenode-manager version"
-                    ));
+                    return Err(eyre!("Unable to obtain a VM to retrieve versions"));
                 };
 
-                self.get_bin_version(&random_vm.vm, "antctl --version", "Autonomi Node Manager v")?
+                // It's reasonable to make the assumption that one antnode service is running.
+                let antnode_version = self.get_bin_version(
+                    &random_vm.vm,
+                    "/mnt/antnode-storage/data/antnode1/antnode --version",
+                    "Autonomi Node v",
+                )?;
+                let antctl_version = self.get_bin_version(
+                    &random_vm.vm,
+                    "antctl --version",
+                    "Autonomi Node Manager v",
+                )?;
+                (antnode_version, antctl_version)
             };
 
             let ant_version = if environment_details.deployment_type != DeploymentType::Bootstrap {
