@@ -20,7 +20,6 @@ pub struct UpscaleOptions {
     pub ansible_verbose: bool,
     pub ant_version: Option<String>,
     pub current_inventory: DeploymentInventory,
-    pub desired_auditor_vm_count: Option<u16>,
     pub desired_node_count: Option<u16>,
     pub desired_node_vm_count: Option<u16>,
     pub desired_peer_cache_node_count: Option<u16>,
@@ -29,7 +28,6 @@ pub struct UpscaleOptions {
     pub desired_private_node_vm_count: Option<u16>,
     pub desired_uploader_vm_count: Option<u16>,
     pub desired_uploaders_count: Option<u16>,
-    pub downloaders_count: u16,
     pub funding_wallet_secret_key: Option<String>,
     pub gas_amount: Option<U256>,
     pub interval: Duration,
@@ -52,8 +50,7 @@ impl TestnetDeployer {
         );
 
         if is_bootstrap_deploy
-            && (options.desired_auditor_vm_count.is_some()
-                || options.desired_peer_cache_node_count.is_some()
+            && (options.desired_peer_cache_node_count.is_some()
                 || options.desired_peer_cache_node_vm_count.is_some()
                 || options.desired_uploader_vm_count.is_some())
         {
@@ -182,7 +179,7 @@ impl TestnetDeployer {
         let provision_options = ProvisionOptions {
             binary_option: options.current_inventory.binary_option.clone(),
             chunk_size: None,
-            downloaders_count: options.downloaders_count,
+            downloaders_count: 0,
             env_variables: None,
             evm_network: options
                 .current_inventory
@@ -434,7 +431,7 @@ impl TestnetDeployer {
         let provision_options = ProvisionOptions {
             binary_option: options.current_inventory.binary_option.clone(),
             chunk_size: None,
-            downloaders_count: options.downloaders_count,
+            downloaders_count: 0,
             env_variables: None,
             evm_data_payments_address: options
                 .current_inventory
