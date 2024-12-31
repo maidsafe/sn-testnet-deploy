@@ -293,7 +293,6 @@ pub enum BinaryOption {
         /// A comma-separated list that will be passed to the `--features` argument.
         antnode_features: Option<String>,
         branch: String,
-        network_keys: Option<(String, String, String, String)>,
         repo_owner: String,
     },
     /// Pre-built, versioned binaries will be fetched from S3.

@@ -386,13 +386,6 @@ enum Commands {
         /// The default value from ansible.cfg is 50.
         #[clap(long)]
         forks: Option<usize>,
-        /// Optionally set the foundation public key for a custom antnode binary.
-        ///
-        /// This argument only applies if the '--branch' and '--repo-owner' arguments are used.
-        ///
-        /// If one of the new keys is supplied, all must be supplied.
-        #[arg(long)]
-        foundation_pk: Option<String>,
         /// The secret key for the wallet that will fund all the uploaders.
         ///
         /// This argument only applies when Arbitrum or Sepolia networks are used.
@@ -405,13 +398,6 @@ enum Commands {
         /// argument.
         #[clap(long)]
         genesis_node_volume_size: Option<u16>,
-        /// Optionally set the genesis public key for a custom antnode binary.
-        ///
-        /// This argument only applies if the '--branch' and '--repo-owner' arguments are used.
-        ///
-        /// If one of the new keys is supplied, all must be supplied.
-        #[arg(long)]
-        genesis_pk: Option<String>,
         /// The interval between starting each node in milliseconds.
         #[clap(long, value_parser = |t: &str| -> Result<Duration> { Ok(t.parse().map(Duration::from_millis)?)}, default_value = "2000")]
         interval: Duration,
@@ -445,13 +431,6 @@ enum Commands {
         /// If not used, the contacts file will have the same name as the environment.
         #[arg(long)]
         network_contacts_file_name: Option<String>,
-        /// Optionally set the network royalties public key for a custom antnode binary.
-        ///
-        /// This argument only applies if the '--branch' and '--repo-owner' arguments are used.
-        ///
-        /// If one of the new keys is supplied, all must be supplied.
-        #[arg(long)]
-        network_royalties_pk: Option<String>,
         /// The number of antnode services to run on each VM.
         ///
         /// If the argument is not used, the value will be determined by the 'environment-type'
@@ -476,13 +455,6 @@ enum Commands {
         /// argument.
         #[clap(long)]
         node_volume_size: Option<u16>,
-        /// Optionally set the payment forward public key for a custom antnode binary.
-        ///
-        /// This argument only applies if the '--branch' and '--repo-owner' arguments are used.
-        ///
-        /// If one of the new keys is supplied, all must be supplied.
-        #[arg(long)]
-        payment_forward_pk: Option<String>,
         /// The number of antnode services to be run behind a NAT on each private node VM.
         ///
         /// If the argument is not used, the value will be determined by the 'environment-type'
@@ -1534,7 +1506,6 @@ async fn main() -> Result<()> {
                 antnode_version,
                 antctl_version,
                 antnode_features,
-                None,
             )
             .await?;
 
@@ -1647,10 +1618,8 @@ async fn main() -> Result<()> {
             evm_payment_token_address,
             evm_rpc_url,
             forks,
-            foundation_pk,
             funding_wallet_secret_key,
             genesis_node_volume_size,
-            genesis_pk,
             interval,
             log_format,
             logstash_stack_name,
@@ -1659,12 +1628,10 @@ async fn main() -> Result<()> {
             name,
             network_id,
             network_contacts_file_name,
-            network_royalties_pk,
             node_count,
             node_vm_count,
             node_vm_size,
             node_volume_size,
-            payment_forward_pk,
             peer_cache_node_count,
             peer_cache_node_vm_count,
             peer_cache_node_vm_size,
@@ -1696,13 +1663,6 @@ async fn main() -> Result<()> {
                 }
             }
 
-            let network_keys = validate_and_get_pks(
-                foundation_pk,
-                genesis_pk,
-                network_royalties_pk,
-                payment_forward_pk,
-            )?;
-
             if funding_wallet_secret_key.is_none() && evm_network_type != EvmNetwork::Anvil {
                 return Err(eyre!(
                     "Wallet secret key is required for Arbitrum or Sepolia networks"
@@ -1716,7 +1676,6 @@ async fn main() -> Result<()> {
                 antnode_version,
                 antctl_version,
                 antnode_features,
-                network_keys,
             )
             .await?;
 
@@ -3167,7 +3126,6 @@ async fn get_binary_option(
     antnode_version: Option<String>,
     antctl_version: Option<String>,
     antnode_features: Option<Vec<String>>,
-    network_keys: Option<(String, String, String, String)>,
 ) -> Result<BinaryOption> {
     let mut use_versions = true;
 
@@ -3219,14 +3177,6 @@ async fn get_binary_option(
             repo_owner, branch
         ));
 
-        if let Some(ref network_keys) = network_keys {
-            println!("Using custom network keys:");
-            println!("Foundation PK: {}", network_keys.0);
-            println!("Genesis PK: {}", network_keys.1);
-            println!("Network Royalties PK: {}", network_keys.2);
-            println!("Payment Forward PK: {}", network_keys.3);
-        }
-
         let url = format!("https://github.com/{repo_owner}/autonomi/tree/{branch}",);
         let response = reqwest::get(&url).await?;
         if !response.status().is_success() {
@@ -3236,7 +3186,6 @@ async fn get_binary_option(
             repo_owner,
             branch,
             antnode_features: antnode_features.map(|list| list.join(",")),
-            network_keys,
         }
     };
 
@@ -3346,39 +3295,6 @@ fn parse_chunk_size(val: &str) -> Result<u64> {
         Err(eyre!("chunk_size must be a positive integer"))
     } else {
         Ok(size)
-    }
-}
-
-fn validate_and_get_pks(
-    foundation_pk: Option<String>,
-    genesis_pk: Option<String>,
-    network_royalties_pk: Option<String>,
-    payment_forward_pk: Option<String>,
-) -> Result<Option<(String, String, String, String)>> {
-    let all_pks_supplied = foundation_pk.is_some()
-        && genesis_pk.is_some()
-        && network_royalties_pk.is_some()
-        && payment_forward_pk.is_some();
-    let any_pk_supplied = foundation_pk.is_some()
-        || genesis_pk.is_some()
-        || network_royalties_pk.is_some()
-        || payment_forward_pk.is_some();
-
-    if any_pk_supplied && !all_pks_supplied {
-        return Err(eyre!(
-            "The network keys are a set. They must be supplied together."
-        ));
-    }
-
-    if all_pks_supplied {
-        Ok(Some((
-            foundation_pk.unwrap(),
-            genesis_pk.unwrap(),
-            network_royalties_pk.unwrap(),
-            payment_forward_pk.unwrap(),
-        )))
-    } else {
-        Ok(None)
     }
 }
 

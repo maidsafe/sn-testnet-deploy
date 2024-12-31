@@ -78,7 +78,6 @@ impl ExtraVarsDocBuilder {
                 repo_owner,
                 branch,
                 antnode_features,
-                network_keys,
             } => {
                 self.add_variable("custom_bin", "true");
                 self.add_variable("testnet_name", deployment_name);
@@ -86,12 +85,6 @@ impl ExtraVarsDocBuilder {
                 self.add_variable("branch", branch);
                 if let Some(features) = antnode_features {
                     self.add_variable("antnode_features_list", features);
-                }
-                if let Some(network_keys) = network_keys {
-                    self.add_variable("foundation_pk", &network_keys.0);
-                    self.add_variable("genesis_pk", &network_keys.1);
-                    self.add_variable("network_royalties_pk", &network_keys.2);
-                    self.add_variable("payment_forward_pk", &network_keys.3);
                 }
             }
             BinaryOption::Versioned { .. } => {
