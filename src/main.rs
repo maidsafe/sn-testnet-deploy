@@ -887,14 +887,6 @@ enum Commands {
         /// exclusive with the version arguments.
         #[arg(long, verbatim_doc_comment)]
         branch: Option<String>,
-        /// The desired number of auditor VMs to be running after the scale.
-        ///
-        /// If there are currently 10 VMs running, and you want there to be 20, use 20 as the
-        /// value, not 10 as a delta.
-        ///
-        /// This option is not applicable to a bootstrap deployment.
-        #[clap(long, verbatim_doc_comment)]
-        desired_auditor_vm_count: Option<u16>,
         /// The desired number of antnode services to be running on each node VM after the scale.
         ///
         /// If there are currently 10 services running on each VM, and you want there to be 25, the
@@ -954,13 +946,6 @@ enum Commands {
         /// If you want each uploader VM to run multiple uploader services, specify the total desired count.
         #[clap(long, verbatim_doc_comment)]
         desired_uploaders_count: Option<u16>,
-        /// If set to a non-zero value, the uploaders will also be accompanied by the specified
-        /// number of downloaders.
-        ///
-        /// This will be the number on each uploader VM. So if the value here is 2 and there are
-        /// 5 uploader VMs, there will be 10 downloaders across the 5 VMs.
-        #[clap(long, default_value_t = 0)]
-        downloaders_count: u16,
         /// The secret key for the wallet that will fund all the uploaders.
         ///
         /// This argument only applies when Arbitrum or Sepolia networks are used.
@@ -2781,7 +2766,6 @@ async fn main() -> Result<()> {
                     .upscale_uploaders(&UpscaleOptions {
                         ansible_verbose: false,
                         current_inventory: inventory,
-                        desired_auditor_vm_count: None,
                         desired_node_count: None,
                         desired_node_vm_count: None,
                         desired_peer_cache_node_count: None,
@@ -2790,7 +2774,6 @@ async fn main() -> Result<()> {
                         desired_private_node_vm_count: None,
                         desired_uploader_vm_count,
                         desired_uploaders_count,
-                        downloaders_count,
                         funding_wallet_secret_key,
                         gas_amount,
                         max_archived_log_files: 1,
@@ -2844,7 +2827,6 @@ async fn main() -> Result<()> {
             antctl_version,
             antnode_version,
             branch,
-            desired_auditor_vm_count,
             desired_node_count,
             desired_node_vm_count,
             desired_peer_cache_node_count,
@@ -2853,7 +2835,6 @@ async fn main() -> Result<()> {
             desired_private_node_vm_count,
             desired_uploader_vm_count,
             desired_uploaders_count,
-            downloaders_count,
             funding_wallet_secret_key,
             infra_only,
             interval,
@@ -2941,7 +2922,6 @@ async fn main() -> Result<()> {
                 .upscale(&UpscaleOptions {
                     ansible_verbose,
                     current_inventory: inventory,
-                    desired_auditor_vm_count,
                     desired_node_count,
                     desired_node_vm_count,
                     desired_peer_cache_node_count,
@@ -2950,7 +2930,6 @@ async fn main() -> Result<()> {
                     desired_private_node_vm_count,
                     desired_uploader_vm_count,
                     desired_uploaders_count,
-                    downloaders_count,
                     funding_wallet_secret_key,
                     gas_amount: None,
                     interval,
