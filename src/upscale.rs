@@ -18,6 +18,7 @@ use std::{collections::HashSet, time::Duration};
 #[derive(Clone)]
 pub struct UpscaleOptions {
     pub ansible_verbose: bool,
+    pub ant_version: Option<String>,
     pub current_inventory: DeploymentInventory,
     pub desired_auditor_vm_count: Option<u16>,
     pub desired_node_count: Option<u16>,
@@ -37,7 +38,6 @@ pub struct UpscaleOptions {
     pub max_log_files: u16,
     pub plan: bool,
     pub public_rpc: bool,
-    pub safe_version: Option<String>,
     pub provision_only: bool,
 }
 
@@ -227,7 +227,7 @@ impl TestnetDeployer {
                 .environment_details
                 .rewards_address
                 .clone(),
-            ant_version: options.safe_version.clone(),
+            ant_version: options.ant_version.clone(),
             uploaders_count: options.desired_uploaders_count,
             gas_amount: options.gas_amount,
         };
@@ -479,7 +479,7 @@ impl TestnetDeployer {
                 .environment_details
                 .rewards_address
                 .clone(),
-            ant_version: options.safe_version.clone(),
+            ant_version: options.ant_version.clone(),
             uploaders_count: options.desired_uploaders_count,
             gas_amount: options.gas_amount,
         };
