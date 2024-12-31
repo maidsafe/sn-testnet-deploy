@@ -861,6 +861,32 @@ enum Commands {
         /// Set to run Ansible with more verbose output.
         #[arg(long)]
         ansible_verbose: bool,
+        /// Supply a version number for the antctl binary.
+        ///
+        /// There should be no 'v' prefix.
+        #[arg(long, verbatim_doc_comment)]
+        antctl_version: Option<String>,
+        /// Supply a version number for the antnode binary.
+        ///
+        /// There should be no 'v' prefix.
+        #[arg(long, verbatim_doc_comment)]
+        antnode_version: Option<String>,
+        /// Supply a version number for the safe binary to be used for new uploader VMs.
+        ///
+        /// There should be no 'v' prefix.
+        ///
+        /// This argument is required when the uploader count is supplied.
+        #[arg(long, verbatim_doc_comment)]
+        ant_version: Option<String>,
+        /// The name of a branch from which custom binaries were built.
+        ///
+        /// This only applies if the original deployment also used a custom branch. The upscale will
+        /// then use the same binaries that were built in the original deployment.
+        ///
+        /// This argument must be used in conjunction with the --repo-owner argument. It is mutually
+        /// exclusive with the version arguments.
+        #[arg(long, verbatim_doc_comment)]
+        branch: Option<String>,
         /// The desired number of auditor VMs to be running after the scale.
         ///
         /// If there are currently 10 VMs running, and you want there to be 20, use 20 as the
@@ -869,6 +895,18 @@ enum Commands {
         /// This option is not applicable to a bootstrap deployment.
         #[clap(long, verbatim_doc_comment)]
         desired_auditor_vm_count: Option<u16>,
+        /// The desired number of antnode services to be running on each node VM after the scale.
+        ///
+        /// If there are currently 10 services running on each VM, and you want there to be 25, the
+        /// value used should be 25, rather than 15 as a delta to reach 25.
+        #[clap(long, verbatim_doc_comment)]
+        desired_node_count: Option<u16>,
+        /// The desired number of node VMs to be running after the scale.
+        ///
+        /// If there are currently 10 VMs running, and you want there to be 25, the value used
+        /// should be 25, rather than 15 as a delta to reach 25.
+        #[clap(long, verbatim_doc_comment)]
+        desired_node_vm_count: Option<u16>,
         /// The desired number of antnode services to be running on each Peer Cache VM after the
         /// scale.
         ///
@@ -886,18 +924,6 @@ enum Commands {
         /// This option is not applicable to a bootstrap deployment.
         #[clap(long, verbatim_doc_comment)]
         desired_peer_cache_node_vm_count: Option<u16>,
-        /// The desired number of antnode services to be running on each node VM after the scale.
-        ///
-        /// If there are currently 10 services running on each VM, and you want there to be 25, the
-        /// value used should be 25, rather than 15 as a delta to reach 25.
-        #[clap(long, verbatim_doc_comment)]
-        desired_node_count: Option<u16>,
-        /// The desired number of node VMs to be running after the scale.
-        ///
-        /// If there are currently 10 VMs running, and you want there to be 25, the value used
-        /// should be 25, rather than 15 as a delta to reach 25.
-        #[clap(long, verbatim_doc_comment)]
-        desired_node_vm_count: Option<u16>,
         /// The desired number of antnode services to be running behind a NAT on each private node VM after the
         /// scale.
         ///
@@ -946,15 +972,15 @@ enum Commands {
         /// The interval between starting each node in milliseconds.
         #[clap(long, value_parser = |t: &str| -> Result<Duration> { Ok(t.parse().map(Duration::from_millis)?)}, default_value = "2000")]
         interval: Duration,
-        /// The name of the existing network to upscale.
-        #[arg(short = 'n', long, verbatim_doc_comment)]
-        name: String,
         /// The maximum of archived log files to keep. After reaching this limit, the older files are deleted.
         #[clap(long, default_value = "5")]
         max_archived_log_files: u16,
         /// The maximum number of log files to keep. After reaching this limit, the older files are archived.
         #[clap(long, default_value = "10")]
         max_log_files: u16,
+        /// The name of the existing network to upscale.
+        #[arg(short = 'n', long, verbatim_doc_comment)]
+        name: String,
         /// Set to only run the Terraform plan rather than applying the changes.
         ///
         /// Can be useful to preview the upscale to make sure everything is ok and that no other
@@ -972,27 +998,15 @@ enum Commands {
         /// security reasons.
         #[clap(long, default_value_t = false, verbatim_doc_comment)]
         public_rpc: bool,
-        /// Supply a version number for the safe binary to be used for new uploader VMs.
+        /// The repo owner of a branch from which custom binaries were built.
         ///
-        /// There should be no 'v' prefix.
+        /// This only applies if the original deployment also used a custom branch. The upscale will
+        /// then use the same binaries that were built in the original deployment.
         ///
-        /// This argument is required when the uploader count is supplied.
+        /// This argument must be used in conjunction with the --branch argument. It is mutually
+        /// exclusive with the version arguments.
         #[arg(long, verbatim_doc_comment)]
-        safe_version: Option<String>,
-        /// Supply a version number for the antctl binary to be used for new uploader VMs.
-        ///
-        /// There should be no 'v' prefix.
-        ///
-        /// This argument is required when the uploader count is supplied.
-        #[arg(long, verbatim_doc_comment)]
-        antnode_manager_version: Option<String>,
-        /// Supply a version number for the antnode binary to be used for new uploader VMs.
-        ///
-        /// There should be no 'v' prefix.
-        ///
-        /// This argument is required when the uploader count is supplied.
-        #[arg(long, verbatim_doc_comment)]
-        antnode_version: Option<String>,
+        repo_owner: Option<String>,
     },
     /// Update the peer multiaddr in the node registry.
     ///
@@ -2786,7 +2800,7 @@ async fn main() -> Result<()> {
                         plan,
                         provision_only,
                         public_rpc: false,
-                        safe_version: Some(autonomi_version),
+                        ant_version: Some(autonomi_version),
                     })
                     .await?;
 
@@ -2826,6 +2840,10 @@ async fn main() -> Result<()> {
         },
         Commands::Upscale {
             ansible_verbose,
+            ant_version,
+            antctl_version,
+            antnode_version,
+            branch,
             desired_auditor_vm_count,
             desired_node_count,
             desired_node_vm_count,
@@ -2839,18 +2857,30 @@ async fn main() -> Result<()> {
             funding_wallet_secret_key,
             infra_only,
             interval,
-            name,
             max_archived_log_files,
             max_log_files,
+            name,
             plan,
             provider,
             public_rpc,
-            safe_version,
-            antnode_version,
-            antnode_manager_version,
+            repo_owner,
         } => {
-            if desired_uploader_vm_count.is_some() && safe_version.is_none() {
-                return Err(eyre!("The --safe-version argument is required when --desired-uploader-vm-count is used"));
+            if branch.is_some() && repo_owner.is_none() {
+                return Err(eyre!(
+                    "The --repo-owner argument is required when --branch is used"
+                ));
+            }
+
+            if branch.is_some()
+                && (antnode_version.is_some() || antctl_version.is_some() || ant_version.is_some())
+            {
+                return Err(eyre!(
+                    "The version arguments cannot be used when --branch is specified"
+                ));
+            }
+
+            if desired_uploader_vm_count.is_some() && ant_version.is_none() {
+                return Err(eyre!("The --ant-version argument is required when --desired-uploader-vm-count is used"));
             }
 
             println!("Upscaling deployment...");
@@ -2866,28 +2896,35 @@ async fn main() -> Result<()> {
                 .generate_or_retrieve_inventory(&name, true, None)
                 .await?;
 
-            if antnode_version.is_some() || antnode_manager_version.is_some() {
+            if branch.is_some() {
+                println!("The upscale will use the binaries built in the original deployment");
+                inventory.binary_option = BinaryOption::BuildFromSource {
+                    antnode_features: None,
+                    branch: branch.unwrap(),
+                    repo_owner: repo_owner.unwrap(),
+                };
+            } else if antnode_version.is_some() || antctl_version.is_some() {
                 match &inventory.binary_option {
                     BinaryOption::Versioned {
                         ant_version: _,
                         antnode_version: existing_antnode_version,
-                        antctl_version: existing_antnode_manager_version,
+                        antctl_version: existing_antctl_version,
                     } => {
                         let new_antnode_version = antnode_version
                             .map(|v| v.parse().expect("Invalid antnode version"))
                             .unwrap_or(existing_antnode_version.clone());
-                        let new_manager_version = antnode_manager_version
+                        let new_antctl_version = antctl_version
                             .map(|v| v.parse().expect("Invalid antctl version"))
-                            .unwrap_or(existing_antnode_manager_version.clone());
+                            .unwrap_or(existing_antctl_version.clone());
 
-                        println!("Using override binary versions:");
+                        println!("The upscale will use the following override binary versions:");
                         println!("antnode: {}", new_antnode_version);
-                        println!("antctl: {}", new_manager_version);
+                        println!("antctl: {}", new_antctl_version);
 
                         inventory.binary_option = BinaryOption::Versioned {
                             ant_version: None,
                             antnode_version: new_antnode_version,
-                            antctl_version: new_manager_version,
+                            antctl_version: new_antctl_version,
                         };
                     }
                     BinaryOption::BuildFromSource { .. } => {
@@ -2897,6 +2934,8 @@ async fn main() -> Result<()> {
                     }
                 }
             }
+
+            inventory.binary_option.print();
 
             testnet_deployer
                 .upscale(&UpscaleOptions {
@@ -2921,7 +2960,7 @@ async fn main() -> Result<()> {
                     plan,
                     provision_only: false,
                     public_rpc,
-                    safe_version,
+                    ant_version,
                 })
                 .await?;
 

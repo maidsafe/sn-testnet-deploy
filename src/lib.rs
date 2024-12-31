@@ -303,6 +303,37 @@ pub enum BinaryOption {
     },
 }
 
+impl BinaryOption {
+    pub fn print(&self) {
+        match self {
+            BinaryOption::BuildFromSource {
+                antnode_features,
+                branch,
+                repo_owner,
+            } => {
+                println!("Source configuration:");
+                println!("  Repository owner: {}", repo_owner);
+                println!("  Branch: {}", branch);
+                if let Some(features) = antnode_features {
+                    println!("  Antnode features: {}", features);
+                }
+            }
+            BinaryOption::Versioned {
+                ant_version,
+                antctl_version,
+                antnode_version,
+            } => {
+                println!("Versioned binaries configuration:");
+                if let Some(version) = ant_version {
+                    println!("  ant version: {}", version);
+                }
+                println!("  antctl version: {}", antctl_version);
+                println!("  antnode version: {}", antnode_version);
+            }
+        }
+    }
+}
+
 #[derive(Debug, Clone, Copy)]
 pub enum CloudProvider {
     Aws,
