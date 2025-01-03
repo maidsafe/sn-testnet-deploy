@@ -64,7 +64,6 @@ impl InfraRunOptions {
     }
 
     /// Generate the options for an existing deployment.
-    /// This does not set the vm_size fields, as they are obtained from the tfvars file.
     pub async fn generate_existing(
         name: &str,
         terraform_runner: &TerraformRunner,
@@ -97,6 +96,12 @@ impl InfraRunOptions {
         } else {
             None
         };
+        let peer_cache_node_vm_size =
+            Self::get_value_for_resource(&resources, "peer_cache_node", "size")?;
+        let peer_cache_node_vm_size = peer_cache_node_vm_size.as_str().ok_or_else(|| {
+            log::error!("Failed to obtain str 'size' value for peer_cache_node");
+            Error::TerraformResourceFieldMissing("size".to_string())
+        })?;
 
         // There will always be a genesis node in a new deployment, but none in a bootstrap deployment.
         let genesis_vm_count = match environment_details.deployment_type {
@@ -131,6 +136,11 @@ impl InfraRunOptions {
         } else {
             None
         };
+        let node_vm_size = Self::get_value_for_resource(&resources, "node", "size")?;
+        let node_vm_size = node_vm_size.as_str().ok_or_else(|| {
+            log::error!("Failed to obtain str 'size' value for node");
+            Error::TerraformResourceFieldMissing("size".to_string())
+        })?;
 
         let private_node_vm_count = resource_count("private_node");
         let private_node_volume_size = if private_node_vm_count > 0 {
@@ -149,6 +159,12 @@ impl InfraRunOptions {
         };
 
         let uploader_vm_count = Some(resource_count("uploader"));
+        let uploader_vm_size = Self::get_value_for_resource(&resources, "uploader", "size")?;
+        let uploader_vm_size = uploader_vm_size.as_str().ok_or_else(|| {
+            log::error!("Failed to obtain str 'size' value for uploader");
+            Error::TerraformResourceFieldMissing("size".to_string())
+        })?;
+
         let evm_node_count = Some(resource_count("evm_node"));
         let build_vm_count = resource_count("build");
         let enable_build_vm = build_vm_count > 0;
@@ -157,15 +173,16 @@ impl InfraRunOptions {
         let options = Self {
             enable_build_vm,
             evm_node_count,
-            evm_node_vm_size: None, // vm_size is obtained from the tfvars file
+            // The EVM node size never needs to change so it will be obtained from the tfvars file
+            evm_node_vm_size: None,
             genesis_vm_count: Some(genesis_vm_count),
             genesis_node_volume_size,
             name: name.to_string(),
             node_vm_count: Some(node_vm_count),
-            node_vm_size: None, // vm_size is obtained from the tfvars file
+            node_vm_size: Some(node_vm_size.to_string()),
             node_volume_size,
             peer_cache_node_vm_count: Some(peer_cache_node_vm_count),
-            peer_cache_node_vm_size: None, // vm_size is obtained from the tfvars file
+            peer_cache_node_vm_size: Some(peer_cache_node_vm_size.to_string()),
             peer_cache_node_volume_size,
             private_node_vm_count: Some(private_node_vm_count),
             private_node_volume_size,
@@ -174,7 +191,7 @@ impl InfraRunOptions {
                 .environment_type
                 .get_tfvars_filename(name),
             uploader_vm_count,
-            uploader_vm_size: None, // vm_size is obtained from the tfvars file
+            uploader_vm_size: Some(uploader_vm_size.to_string()),
         };
 
         Ok(options)

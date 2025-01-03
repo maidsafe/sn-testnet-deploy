@@ -677,10 +677,11 @@ impl TestnetDeployer {
     pub fn plan(&self, options: &InfraRunOptions) -> Result<()> {
         println!("Selecting {} workspace...", options.name);
         self.terraform_runner.workspace_select(&options.name)?;
-        
+
         let args = build_terraform_args(options)?;
-        
-        self.terraform_runner.plan(Some(args), Some(options.tfvars_filename.clone()))?;
+
+        self.terraform_runner
+            .plan(Some(args), Some(options.tfvars_filename.clone()))?;
         Ok(())
     }
 
