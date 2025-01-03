@@ -44,7 +44,7 @@ use alloy::primitives::Address;
 use evmlib::Network;
 use flate2::read::GzDecoder;
 use indicatif::{ProgressBar, ProgressStyle};
-use infra::InfraRunOptions;
+use infra::{build_terraform_args, InfraRunOptions};
 use log::{debug, trace};
 use semver::Version;
 use serde::{Deserialize, Serialize};
@@ -674,12 +674,13 @@ impl TestnetDeployer {
         Ok(())
     }
 
-    pub fn plan(&self, vars: Option<Vec<(String, String)>>, tfvars_filename: &str) -> Result<()> {
-        println!("Selecting {} workspace...", self.environment_name);
-        self.terraform_runner
-            .workspace_select(&self.environment_name)?;
-        self.terraform_runner
-            .plan(vars, Some(tfvars_filename.to_string()))?;
+    pub fn plan(&self, options: &InfraRunOptions) -> Result<()> {
+        println!("Selecting {} workspace...", options.name);
+        self.terraform_runner.workspace_select(&options.name)?;
+        
+        let args = build_terraform_args(options)?;
+        
+        self.terraform_runner.plan(Some(args), Some(options.tfvars_filename.clone()))?;
         Ok(())
     }
 

@@ -90,6 +90,7 @@ impl TestnetDeployer {
             peer_cache_node_volume_size: None,
             private_node_vm_count: options.private_node_vm_count,
             private_node_volume_size: options.private_node_volume_size,
+            setup_nat_gateway: should_provision_private_nodes,
             tfvars_filename: options
                 .environment_type
                 .get_tfvars_filename(&options.name)
