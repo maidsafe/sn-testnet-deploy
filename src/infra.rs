@@ -7,8 +7,8 @@
 use crate::{
     error::{Error, Result},
     print_duration,
-    terraform::TerraformRunner,
-    EnvironmentDetails, TestnetDeployer,
+    terraform::{TerraformResource, TerraformRunner},
+    DeploymentType, EnvironmentDetails, TestnetDeployer,
 };
 use std::time::Instant;
 
@@ -28,12 +28,41 @@ pub struct InfraRunOptions {
     pub peer_cache_node_volume_size: Option<u16>,
     pub private_node_vm_count: Option<u16>,
     pub private_node_volume_size: Option<u16>,
+    pub setup_nat_gateway: bool,
     pub tfvars_filename: String,
     pub uploader_vm_count: Option<u16>,
     pub uploader_vm_size: Option<String>,
 }
 
 impl InfraRunOptions {
+    fn get_value_for_resource(
+        resources: &[TerraformResource],
+        resource_name: &str,
+        field_name: &str,
+    ) -> Result<serde_json::Value, Error> {
+        let field_value = resources
+            .iter()
+            .filter(|r| r.resource_name == resource_name)
+            .try_fold(None, |acc_value: Option<serde_json::Value>, r| {
+                let Some(value) = r.values.get(field_name) else {
+                    log::error!("Failed to obtain '{field_name}' value for {resource_name}");
+                    return Err(Error::TerraformResourceFieldMissing(field_name.to_string()));
+                };
+                match acc_value {
+                    Some(ref existing_value) if existing_value != value => {
+                        log::error!("Expected value: {existing_value}, got value: {value}");
+                        Err(Error::TerraformResourceValueMismatch {
+                            expected: existing_value.to_string(),
+                            actual: value.to_string(),
+                        })
+                    }
+                    _ => Ok(Some(value.clone())),
+                }
+            })?;
+
+        field_value.ok_or(Error::TerraformResourceFieldMissing(field_name.to_string()))
+    }
+
     /// Generate the options for an existing deployment.
     /// This does not set the vm_size fields, as they are obtained from the tfvars file.
     pub async fn generate_existing(
@@ -42,31 +71,6 @@ impl InfraRunOptions {
         environment_details: &EnvironmentDetails,
     ) -> Result<Self> {
         let resources = terraform_runner.show(name)?;
-        let get_value_for_a_resource = |resource_name: &str,
-                                        field_name: &str|
-         -> Result<serde_json::Value, Error> {
-            let vm_size = resources
-                .iter()
-                .filter(|r| r.resource_name == resource_name)
-                .try_fold(None, |vm_size: Option<serde_json::Value>, r| {
-                    let Some(size) = r.values.get(field_name) else {
-                        log::error!("Failed to obtain '{field_name}' value for {resource_name}");
-                        return Err(Error::TerraformResourceFieldMissing(field_name.to_string()));
-                    };
-                    match vm_size {
-                        Some(ref existing_size) if existing_size != size => {
-                            log::error!("Expected value: {existing_size}, got value: {size}");
-                            Err(Error::TerraformResourceValueMismatch {
-                                expected: existing_size.to_string(),
-                                actual: size.to_string(),
-                            })
-                        }
-                        _ => Ok(Some(size.clone())),
-                    }
-                })?;
-
-            vm_size.ok_or(Error::TerraformResourceFieldMissing(field_name.to_string()))
-        };
 
         let resource_count = |resource_name: &str| -> u16 {
             resources
@@ -77,23 +81,31 @@ impl InfraRunOptions {
 
         let peer_cache_node_vm_count = resource_count("peer_cache_node");
         let peer_cache_node_volume_size = if peer_cache_node_vm_count > 0 {
-            let volume_size = get_value_for_a_resource("peer_cache_node_attached_volume", "size")?
-                .as_u64()
-                .ok_or_else(|| {
-                    log::error!(
-                        "Failed to obtain u64 'size' value for peer_cache_node_attached_volume"
-                    );
-                    Error::TerraformResourceFieldMissing("size".to_string())
-                })?;
+            let volume_size = Self::get_value_for_resource(
+                &resources,
+                "peer_cache_node_attached_volume",
+                "size",
+            )?
+            .as_u64()
+            .ok_or_else(|| {
+                log::error!(
+                    "Failed to obtain u64 'size' value for peer_cache_node_attached_volume"
+                );
+                Error::TerraformResourceFieldMissing("size".to_string())
+            })?;
             Some(volume_size as u16)
         } else {
             None
         };
 
-        let genesis_vm_count = resource_count("genesis_bootstrap");
+        // There will always be a genesis node in a new deployment, but none in a bootstrap deployment.
+        let genesis_vm_count = match environment_details.deployment_type {
+            DeploymentType::New => 1,
+            DeploymentType::Bootstrap => 0,
+        };
         let genesis_node_volume_size = if genesis_vm_count > 0 {
             let genesis_node_volume_size =
-                get_value_for_a_resource("genesis_node_attached_volume", "size")?
+                Self::get_value_for_resource(&resources, "genesis_node_attached_volume", "size")?
                     .as_u64()
                     .ok_or_else(|| {
                         log::error!(
@@ -108,12 +120,13 @@ impl InfraRunOptions {
 
         let node_vm_count = resource_count("node");
         let node_volume_size = if node_vm_count > 0 {
-            let node_volume_size = get_value_for_a_resource("node_attached_volume", "size")?
-                .as_u64()
-                .ok_or_else(|| {
-                    log::error!("Failed to obtain u64 'size' value for node_attached_volume");
-                    Error::TerraformResourceFieldMissing("size".to_string())
-                })?;
+            let node_volume_size =
+                Self::get_value_for_resource(&resources, "node_attached_volume", "size")?
+                    .as_u64()
+                    .ok_or_else(|| {
+                        log::error!("Failed to obtain u64 'size' value for node_attached_volume");
+                        Error::TerraformResourceFieldMissing("size".to_string())
+                    })?;
             Some(node_volume_size as u16)
         } else {
             None
@@ -122,7 +135,7 @@ impl InfraRunOptions {
         let private_node_vm_count = resource_count("private_node");
         let private_node_volume_size = if private_node_vm_count > 0 {
             let private_node_volume_size =
-                get_value_for_a_resource("private_node_attached_volume", "size")?
+                Self::get_value_for_resource(&resources, "private_node_attached_volume", "size")?
                     .as_u64()
                     .ok_or_else(|| {
                         log::error!(
@@ -139,6 +152,7 @@ impl InfraRunOptions {
         let evm_node_count = Some(resource_count("evm_node"));
         let build_vm_count = resource_count("build");
         let enable_build_vm = build_vm_count > 0;
+        let setup_nat_gateway = private_node_vm_count > 0;
 
         let options = Self {
             enable_build_vm,
@@ -155,6 +169,7 @@ impl InfraRunOptions {
             peer_cache_node_volume_size,
             private_node_vm_count: Some(private_node_vm_count),
             private_node_volume_size,
+            setup_nat_gateway,
             tfvars_filename: environment_details
                 .environment_type
                 .get_tfvars_filename(name),
@@ -173,98 +188,7 @@ impl TestnetDeployer {
         println!("Selecting {} workspace...", options.name);
         self.terraform_runner.workspace_select(&options.name)?;
 
-        let mut args = Vec::new();
-
-        if let Some(reserved_ips) = crate::reserved_ip::get_reserved_ips_args(&options.name) {
-            args.push(("peer_cache_reserved_ips".to_string(), reserved_ips));
-        }
-
-        if let Some(genesis_vm_count) = options.genesis_vm_count {
-            args.push(("genesis_vm_count".to_string(), genesis_vm_count.to_string()));
-        }
-
-        if let Some(peer_cache_node_vm_count) = options.peer_cache_node_vm_count {
-            args.push((
-                "peer_cache_node_vm_count".to_string(),
-                peer_cache_node_vm_count.to_string(),
-            ));
-        }
-        if let Some(node_vm_count) = options.node_vm_count {
-            args.push(("node_vm_count".to_string(), node_vm_count.to_string()));
-        }
-        if let Some(private_node_vm_count) = options.private_node_vm_count {
-            args.push((
-                "private_node_vm_count".to_string(),
-                private_node_vm_count.to_string(),
-            ));
-            args.push((
-                "setup_nat_gateway".to_string(),
-                (private_node_vm_count > 0).to_string(),
-            ));
-        }
-
-        if let Some(evm_node_count) = options.evm_node_count {
-            args.push(("evm_node_vm_count".to_string(), evm_node_count.to_string()));
-        }
-
-        if let Some(uploader_vm_count) = options.uploader_vm_count {
-            args.push((
-                "uploader_vm_count".to_string(),
-                uploader_vm_count.to_string(),
-            ));
-        }
-
-        args.push((
-            "use_custom_bin".to_string(),
-            options.enable_build_vm.to_string(),
-        ));
-
-        if let Some(node_vm_size) = &options.node_vm_size {
-            args.push(("node_droplet_size".to_string(), node_vm_size.clone()));
-        }
-
-        if let Some(peer_cache_vm_size) = &options.peer_cache_node_vm_size {
-            args.push((
-                "peer_cache_droplet_size".to_string(),
-                peer_cache_vm_size.clone(),
-            ));
-        }
-
-        if let Some(uploader_vm_size) = &options.uploader_vm_size {
-            args.push((
-                "uploader_droplet_size".to_string(),
-                uploader_vm_size.clone(),
-            ));
-        }
-
-        if let Some(evm_node_vm_size) = &options.evm_node_vm_size {
-            args.push((
-                "evm_node_droplet_size".to_string(),
-                evm_node_vm_size.clone(),
-            ));
-        }
-
-        if let Some(peer_cache_node_volume_size) = options.peer_cache_node_volume_size {
-            args.push((
-                "peer_cache_node_volume_size".to_string(),
-                peer_cache_node_volume_size.to_string(),
-            ));
-        }
-        if let Some(genesis_node_volume_size) = options.genesis_node_volume_size {
-            args.push((
-                "genesis_node_volume_size".to_string(),
-                genesis_node_volume_size.to_string(),
-            ));
-        }
-        if let Some(node_volume_size) = options.node_volume_size {
-            args.push(("node_volume_size".to_string(), node_volume_size.to_string()));
-        }
-        if let Some(private_node_volume_size) = options.private_node_volume_size {
-            args.push((
-                "private_node_volume_size".to_string(),
-                private_node_volume_size.to_string(),
-            ));
-        }
+        let args = build_terraform_args(options)?;
 
         println!("Running terraform apply...");
         self.terraform_runner
@@ -272,4 +196,103 @@ impl TestnetDeployer {
         print_duration(start.elapsed());
         Ok(())
     }
+}
+
+/// Build the terraform arguments from InfraRunOptions
+pub fn build_terraform_args(options: &InfraRunOptions) -> Result<Vec<(String, String)>> {
+    let mut args = Vec::new();
+
+    if let Some(reserved_ips) = crate::reserved_ip::get_reserved_ips_args(&options.name) {
+        args.push(("peer_cache_reserved_ips".to_string(), reserved_ips));
+    }
+
+    if let Some(genesis_vm_count) = options.genesis_vm_count {
+        args.push(("genesis_vm_count".to_string(), genesis_vm_count.to_string()));
+    }
+
+    if let Some(peer_cache_node_vm_count) = options.peer_cache_node_vm_count {
+        args.push((
+            "peer_cache_node_vm_count".to_string(),
+            peer_cache_node_vm_count.to_string(),
+        ));
+    }
+    if let Some(node_vm_count) = options.node_vm_count {
+        args.push(("node_vm_count".to_string(), node_vm_count.to_string()));
+    }
+
+    args.push((
+        "setup_nat_gateway".to_string(),
+        options.setup_nat_gateway.to_string(),
+    ));
+    if let Some(private_node_vm_count) = options.private_node_vm_count {
+        args.push((
+            "private_node_vm_count".to_string(),
+            private_node_vm_count.to_string(),
+        ));
+    }
+
+    if let Some(evm_node_count) = options.evm_node_count {
+        args.push(("evm_node_vm_count".to_string(), evm_node_count.to_string()));
+    }
+
+    if let Some(uploader_vm_count) = options.uploader_vm_count {
+        args.push((
+            "uploader_vm_count".to_string(),
+            uploader_vm_count.to_string(),
+        ));
+    }
+
+    args.push((
+        "use_custom_bin".to_string(),
+        options.enable_build_vm.to_string(),
+    ));
+
+    if let Some(node_vm_size) = &options.node_vm_size {
+        args.push(("node_droplet_size".to_string(), node_vm_size.clone()));
+    }
+
+    if let Some(peer_cache_vm_size) = &options.peer_cache_node_vm_size {
+        args.push((
+            "peer_cache_droplet_size".to_string(),
+            peer_cache_vm_size.clone(),
+        ));
+    }
+
+    if let Some(uploader_vm_size) = &options.uploader_vm_size {
+        args.push((
+            "uploader_droplet_size".to_string(),
+            uploader_vm_size.clone(),
+        ));
+    }
+
+    if let Some(evm_node_vm_size) = &options.evm_node_vm_size {
+        args.push((
+            "evm_node_droplet_size".to_string(),
+            evm_node_vm_size.clone(),
+        ));
+    }
+
+    if let Some(peer_cache_node_volume_size) = options.peer_cache_node_volume_size {
+        args.push((
+            "peer_cache_node_volume_size".to_string(),
+            peer_cache_node_volume_size.to_string(),
+        ));
+    }
+    if let Some(genesis_node_volume_size) = options.genesis_node_volume_size {
+        args.push((
+            "genesis_node_volume_size".to_string(),
+            genesis_node_volume_size.to_string(),
+        ));
+    }
+    if let Some(node_volume_size) = options.node_volume_size {
+        args.push(("node_volume_size".to_string(), node_volume_size.to_string()));
+    }
+    if let Some(private_node_volume_size) = options.private_node_volume_size {
+        args.push((
+            "private_node_volume_size".to_string(),
+            private_node_volume_size.to_string(),
+        ));
+    }
+
+    Ok(args)
 }

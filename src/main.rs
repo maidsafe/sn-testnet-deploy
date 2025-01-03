@@ -594,17 +594,6 @@ enum Commands {
         #[arg(short = 'n', long)]
         name: String,
     },
-    /// Run 'terraform plan' for a given environment.
-    ///
-    /// Useful for reviewing infrastructure changes before deploying them.
-    Plan {
-        /// The name of the environment
-        #[arg(short = 'n', long)]
-        name: String,
-        /// Valid values are "aws" or "digital-ocean".
-        #[clap(long, default_value_t = CloudProvider::DigitalOcean, value_parser = parse_provider, verbatim_doc_comment)]
-        provider: CloudProvider,
-    },
     Setup {},
     /// Start all nodes in an environment.
     ///
@@ -1308,13 +1297,6 @@ enum UploadersCommands {
         /// If you want each uploader VM to run multiple uploader services, specify the total desired count.
         #[clap(long, verbatim_doc_comment)]
         desired_uploaders_count: Option<u16>,
-        /// If set to a non-zero value, the uploaders will also be accompanied by the specified
-        /// number of downloaders.
-        ///
-        /// This will be the number on each uploader VM. So if the value here is 2 and there are
-        /// 5 uploader VMs, there will be 10 downloaders across the 5 VMs.
-        #[clap(long, default_value_t = 0)]
-        downloaders_count: u16,
         /// The secret key for the wallet that will fund all the uploaders.
         ///
         /// This argument only applies when Arbitrum or Sepolia networks are used.
@@ -2276,23 +2258,6 @@ async fn main() -> Result<()> {
             notify_slack(inventory).await?;
             Ok(())
         }
-        Commands::Plan { name, provider } => {
-            let testnet_deployer = TestnetDeployBuilder::default()
-                .environment_name(&name)
-                .provider(provider)
-                .build()?;
-            let inventory_service = DeploymentInventoryService::from(&testnet_deployer);
-            let inventory = inventory_service
-                .generate_or_retrieve_inventory(&name, true, None)
-                .await?;
-            if inventory.is_empty() {
-                return Err(eyre!("The {name} environment does not exist"));
-            }
-
-            testnet_deployer.init().await?;
-            testnet_deployer.plan(None, &inventory.get_tfvars_filename())?;
-            Ok(())
-        }
         Commands::Setup {} => {
             setup_dotenv_file()?;
             Ok(())
@@ -2727,7 +2692,6 @@ async fn main() -> Result<()> {
                 autonomi_version,
                 desired_uploader_vm_count,
                 desired_uploaders_count,
-                downloaders_count,
                 funding_wallet_secret_key,
                 gas_amount,
                 infra_only,

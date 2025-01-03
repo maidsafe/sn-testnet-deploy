@@ -116,45 +116,6 @@ impl TestnetDeployer {
         }
         debug!("Using {desired_private_node_count} for desired private node count");
 
-        if options.plan {
-            let vars = vec![
-                (
-                    "peer_cache_node_vm_count".to_string(),
-                    desired_peer_cache_node_vm_count.to_string(),
-                ),
-                (
-                    "node_vm_count".to_string(),
-                    desired_node_vm_count.to_string(),
-                ),
-                (
-                    "private_node_vm_count".to_string(),
-                    desired_private_node_vm_count.to_string(),
-                ),
-                (
-                    "uploader_vm_count".to_string(),
-                    desired_uploader_vm_count.to_string(),
-                ),
-                (
-                    "genesis_vm_count".to_string(),
-                    match options
-                        .current_inventory
-                        .environment_details
-                        .deployment_type
-                    {
-                        DeploymentType::New => "1",
-                        DeploymentType::Bootstrap => "0",
-                    }
-                    .to_string(),
-                ),
-                (
-                    "setup_nat_gateway".to_string(),
-                    (desired_private_node_vm_count > 0).to_string(),
-                ),
-            ];
-            self.plan(Some(vars), &options.current_inventory.get_tfvars_filename())?;
-            return Ok(());
-        }
-
         let mut infra_run_options = InfraRunOptions::generate_existing(
             &options.current_inventory.name,
             &self.terraform_runner,
@@ -165,6 +126,11 @@ impl TestnetDeployer {
         infra_run_options.node_vm_count = Some(desired_node_vm_count);
         infra_run_options.private_node_vm_count = Some(desired_private_node_vm_count);
         infra_run_options.uploader_vm_count = Some(desired_uploader_vm_count);
+
+        if options.plan {
+            self.plan(&infra_run_options)?;
+            return Ok(());
+        }
 
         self.create_or_update_infra(&infra_run_options)
             .map_err(|err| {
@@ -391,23 +357,20 @@ impl TestnetDeployer {
         }
         debug!("Using {desired_uploader_vm_count} for desired uploader VM count");
 
+        let mut infra_run_options = InfraRunOptions::generate_existing(
+            &options.current_inventory.name,
+            &self.terraform_runner,
+            &options.current_inventory.environment_details,
+        )
+        .await?;
+        infra_run_options.uploader_vm_count = Some(desired_uploader_vm_count);
+
         if options.plan {
-            let vars = vec![(
-                "uploader_vm_count".to_string(),
-                desired_uploader_vm_count.to_string(),
-            )];
-            self.plan(Some(vars), &options.current_inventory.get_tfvars_filename())?;
+            self.plan(&infra_run_options)?;
             return Ok(());
         }
 
         if !options.provision_only {
-            let mut infra_run_options = InfraRunOptions::generate_existing(
-                &options.current_inventory.name,
-                &self.terraform_runner,
-                &options.current_inventory.environment_details,
-            )
-            .await?;
-            infra_run_options.uploader_vm_count = Some(desired_uploader_vm_count);
             self.create_or_update_infra(&infra_run_options)
                 .map_err(|err| {
                     println!("Failed to create infra {err:?}");
