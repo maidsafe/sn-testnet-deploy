@@ -89,7 +89,7 @@ impl TestnetDeployer {
             setup_nat_gateway: options
                 .private_node_vm_count
                 .map(|count| count > 0)
-                .unwrap_or(false),
+                .unwrap_or(true),
             tfvars_filename: options.environment_type.get_tfvars_filename(&options.name),
             uploader_vm_count: options.uploader_vm_count,
             uploader_vm_size: options.uploader_vm_size.clone(),
