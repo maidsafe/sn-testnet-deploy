@@ -41,6 +41,7 @@ use crate::{
     terraform::TerraformRunner,
 };
 use alloy::primitives::Address;
+use ant_service_management::ServiceStatus;
 use evmlib::Network;
 use flate2::read::GzDecoder;
 use indicatif::{ProgressBar, ProgressStyle};
@@ -726,6 +727,81 @@ impl TestnetDeployer {
         generic_node_registries.print();
         private_node_registries.print();
         genesis_node_registry.print();
+
+        let all_registries = [
+            &peer_cache_node_registries,
+            &generic_node_registries,
+            &private_node_registries,
+            &genesis_node_registry,
+        ];
+
+        let mut total_nodes = 0;
+        let mut running_nodes = 0;
+        let mut stopped_nodes = 0;
+        let mut added_nodes = 0;
+        let mut removed_nodes = 0;
+
+        for (_, registry) in all_registries
+            .iter()
+            .flat_map(|r| r.retrieved_registries.iter())
+        {
+            for node in registry.nodes.iter() {
+                total_nodes += 1;
+                match node.status {
+                    ServiceStatus::Running => running_nodes += 1,
+                    ServiceStatus::Stopped => stopped_nodes += 1,
+                    ServiceStatus::Added => added_nodes += 1,
+                    ServiceStatus::Removed => removed_nodes += 1,
+                }
+            }
+        }
+
+        let peer_cache_hosts = peer_cache_node_registries.retrieved_registries.len();
+        let generic_hosts = generic_node_registries.retrieved_registries.len();
+        let private_hosts = private_node_registries.retrieved_registries.len();
+
+        let peer_cache_nodes = peer_cache_node_registries
+            .retrieved_registries
+            .iter()
+            .flat_map(|(_, n)| n.nodes.iter())
+            .count();
+        let generic_nodes = generic_node_registries
+            .retrieved_registries
+            .iter()
+            .flat_map(|(_, n)| n.nodes.iter())
+            .count();
+        let private_nodes = private_node_registries
+            .retrieved_registries
+            .iter()
+            .flat_map(|(_, n)| n.nodes.iter())
+            .count();
+
+        println!("-------");
+        println!("Summary");
+        println!("-------");
+        println!(
+            "Total peer cache nodes ({}x{}): {}",
+            peer_cache_hosts,
+            peer_cache_nodes / peer_cache_hosts,
+            peer_cache_nodes
+        );
+        println!(
+            "Total generic nodes ({}x{}): {}",
+            generic_hosts,
+            generic_nodes / generic_hosts,
+            generic_nodes
+        );
+        println!(
+            "Total private nodes ({}x{}): {}",
+            private_hosts,
+            private_nodes / private_hosts,
+            private_nodes
+        );
+        println!("Total nodes: {}", total_nodes);
+        println!("Running nodes: {}", running_nodes);
+        println!("Stopped nodes: {}", stopped_nodes);
+        println!("Added nodes: {}", added_nodes);
+        println!("Removed nodes: {}", removed_nodes);
 
         Ok(())
     }
