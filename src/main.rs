@@ -1389,7 +1389,7 @@ enum FundsCommand {
         provider: CloudProvider,
         /// The number of tokens to transfer, in U256
         ///
-        /// 1 Token = 1_000_000_000_000_000_000. Defaults to 1 token.
+        /// 1 Token = 1_000_000_000_000_000_000. Defaults to 100 token.
         #[arg(long)]
         tokens_to_transfer: Option<U256>,
     },
