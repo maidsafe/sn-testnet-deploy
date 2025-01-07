@@ -18,8 +18,8 @@ use log::{debug, error, warn};
 use std::collections::HashMap;
 use std::str::FromStr;
 
-/// 1 token (1e18)
-const DEFAULT_TOKEN_AMOUNT: &str = "1_000_000_000_000_000_000";
+/// 100 token (1e20)
+const DEFAULT_TOKEN_AMOUNT: &str = "100_000_000_000_000_000_000";
 /// 0.1 ETH (1e17)
 const DEFAULT_GAS_AMOUNT: &str = "100_000_000_000_000_000";
 
@@ -35,7 +35,7 @@ pub struct FundingOptions {
     /// Have to specify during upscale and deploy
     pub uploaders_count: Option<u16>,
     /// The amount of tokens to transfer to each uploader.
-    /// Defaults to 1 token, i.e., 1_000_000_000_000_000_000
+    /// Defaults to 100 token, i.e., 100_000_000_000_000_000_000
     pub token_amount: Option<U256>,
     /// The amount of gas tokens to transfer to each uploader
     /// Defaults to 0.1 ETH i.e, 100_000_000_000_000_000
