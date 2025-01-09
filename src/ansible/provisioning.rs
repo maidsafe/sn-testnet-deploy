@@ -337,13 +337,12 @@ impl AnsibleProvisioner {
             return Err(Error::EmptyInventory(AnsibleInventoryType::PrivateNodes));
         }
 
+        let vars = extra_vars::build_nat_gateway_extra_vars_doc(&options.name, private_ips);
+        debug!("Provisioning NAT Gateway with vars: {vars}");
         self.ansible_runner.run_playbook(
             AnsiblePlaybook::NatGateway,
             AnsibleInventoryType::NatGateway,
-            Some(extra_vars::build_nat_gateway_extra_vars_doc(
-                &options.name,
-                private_ips,
-            )),
+            Some(vars),
         )?;
 
         print_duration(start.elapsed());

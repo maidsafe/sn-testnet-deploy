@@ -321,9 +321,6 @@ pub fn generate_private_node_static_environment_inventory(
         AnsibleInventoryType::PrivateNodesStatic
             .get_inventory_path(environment_name, "digital_ocean"),
     );
-    if dest_path.exists() {
-        return Ok(());
-    }
     debug!("Generating private node static inventory at {dest_path:?}",);
 
     let mut file = File::create(&dest_path)?;

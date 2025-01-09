@@ -33,5 +33,5 @@
 - name: Add eth1 of node VM to the NAT gateway with random parameter
   command: >
     iptables -t nat -A POSTROUTING -s {{ item }} -o eth0 -j MASQUERADE --random
+  loop: "{{ node_private_ips_eth1 }}"
   when: nat_gateway_output.stdout.find(item) == -1
-  with_items: "{{ node_private_ips_eth1 }}"
