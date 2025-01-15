@@ -2,7 +2,7 @@
 - name: deploy antnode to remaining nodes
   hosts: all
   become: False
-  max_fail_percentage: 10
+  any_errors_fatal: false
   ignore_unreachable: yes
   vars:
     is_genesis: False
