@@ -292,8 +292,8 @@ impl TestnetDeployer {
                 .print_ansible_run_banner("Provision Private Nodes");
             match self.ansible_provisioner.provision_private_nodes(
                 &mut provision_options,
-                Some(initial_multiaddr),
-                Some(initial_network_contacts_url),
+                Some(initial_multiaddr.clone()),
+                Some(initial_network_contacts_url.clone()),
             ) {
                 Ok(()) => {
                     println!("Provisioned private nodes");
@@ -305,22 +305,26 @@ impl TestnetDeployer {
             }
         }
 
-        // // TODO: Uncomment when EVM-based payments are supported for the uploader upscale.
-        // if !is_bootstrap_deploy {
-        //     self.wait_for_ssh_availability_on_new_machines(
-        //         AnsibleInventoryType::Uploaders,
-        //         &options.current_inventory,
-        //     )?;
-        //     self.ansible_provisioner
-        //         .print_ansible_run_banner(n, total, "Provision Uploaders");
-        //     self.ansible_provisioner
-        //         .provision_uploaders(&provision_options, &initial_multiaddr)
-        //         .await
-        //         .map_err(|err| {
-        //             println!("Failed to provision uploaders {err:?}");
-        //             err
-        //         })?;
-        // }
+        if !is_bootstrap_deploy {
+            self.wait_for_ssh_availability_on_new_machines(
+                AnsibleInventoryType::Uploaders,
+                &options.current_inventory,
+            )?;
+            let genesis_network_contacts = get_bootstrap_cache_url(&initial_ip_addr);
+            self.ansible_provisioner
+                .print_ansible_run_banner("Provision Uploaders");
+            self.ansible_provisioner
+                .provision_uploaders(
+                    &provision_options,
+                    Some(initial_multiaddr.clone()),
+                    Some(genesis_network_contacts.clone()),
+                )
+                .await
+                .map_err(|err| {
+                    println!("Failed to provision uploaders {err:?}");
+                    err
+                })?;
+        }
 
         if node_provision_failed {
             println!();
