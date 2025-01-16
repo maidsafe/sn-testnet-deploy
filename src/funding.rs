@@ -410,51 +410,47 @@ impl AnsibleProvisioner {
         let default_token_amount = U256::from_str(DEFAULT_TOKEN_AMOUNT).unwrap();
         let default_gas_amount = U256::from_str(DEFAULT_GAS_AMOUNT).unwrap();
 
-        let tokens_for_each_uploader = options.token_amount.unwrap_or(default_token_amount);
-        let gas_for_each_uploader = options.gas_amount.unwrap_or(default_gas_amount);
+        let token_amount = options.token_amount.unwrap_or(default_token_amount);
+        let gas_amount = options.gas_amount.unwrap_or(default_gas_amount);
 
-        println!("Transferring {tokens_for_each_uploader} tokens and {gas_for_each_uploader} gas tokens to each uploader");
-        debug!("Transferring {tokens_for_each_uploader} tokens and {gas_for_each_uploader} gas tokens to each uploader");
+        println!("Transferring {token_amount} tokens and {gas_amount} gas tokens to each uploader");
+        debug!("Transferring {token_amount} tokens and {gas_amount} gas tokens to each uploader");
 
-        for (vm, sks_per_machine) in all_secret_keys.iter() {
-            debug!("Transferring funds for uploader vm: {}", vm.name);
-            for sk in sks_per_machine.iter() {
+        for (vm, vm_secret_keys) in all_secret_keys.iter() {
+            println!("Transferring funds for uploader vm: {}", vm.name);
+            for sk in vm_secret_keys.iter() {
                 sk.address();
 
-                if !tokens_for_each_uploader.is_zero() {
-                    debug!(
-                        "Transferring {tokens_for_each_uploader} tokens for uploader vm: {} with public key: {}",
-                        vm.name,
-                        sk.address()
-                    );
+                if !token_amount.is_zero() {
+                    print!("Transferring {token_amount} tokens to {}...", sk.address());
                     from_wallet
-                    .transfer_tokens(sk.address(), tokens_for_each_uploader)
-                    .await.inspect_err(|err| {
-                        debug!(
-                            "Failed to transfer {tokens_for_each_uploader} tokens to {} with err: {err:?}", sk.address()
-                        )
-                    })?;
+                        .transfer_tokens(sk.address(), token_amount)
+                        .await
+                        .inspect_err(|err| {
+                            debug!(
+                                "Failed to transfer {token_amount} tokens to {}: {err:?}",
+                                sk.address()
+                            )
+                        })?;
+                    println!("Transfer complete");
                 }
-                if !gas_for_each_uploader.is_zero() {
-                    debug!(
-                        "Transferring {gas_for_each_uploader} gas for uploader vm: {} with public key: {}",
-                        vm.name,
-                        sk.address()
-                    );
+                if !gas_amount.is_zero() {
+                    print!("Transferring {gas_amount} gas to {}...", sk.address());
                     from_wallet
-                    .transfer_gas_tokens(sk.address(), gas_for_each_uploader)
-                    .await
-                    .inspect_err(|err| {
-                        debug!(
-                            "Failed to transfer {gas_for_each_uploader} gas tokens to {} with err: {err:?}", sk.address()
-                        )
-                    })
-                    ?;
+                        .transfer_gas_tokens(sk.address(), gas_amount)
+                        .await
+                        .inspect_err(|err| {
+                            debug!(
+                                "Failed to transfer {gas_amount} gas to {}: {err:?}",
+                                sk.address()
+                            )
+                        })?;
+                    println!("Transfer complete");
                 }
             }
         }
-        println!("All Funds transferred successfully");
-        debug!("All Funds transferred successfully");
+        println!("All funds transferred successfully");
+        debug!("All funds transferred successfully");
 
         Ok(())
     }
