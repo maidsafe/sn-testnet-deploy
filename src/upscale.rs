@@ -213,8 +213,6 @@ impl TestnetDeployer {
         let initial_network_contacts_url = get_bootstrap_cache_url(&initial_ip_addr);
         debug!("Retrieved initial peer {initial_multiaddr} and initial network contacts {initial_network_contacts_url}");
 
-        let should_provision_private_nodes = desired_private_node_vm_count > 0;
-
         if !is_bootstrap_deploy {
             self.wait_for_ssh_availability_on_new_machines(
                 AnsibleInventoryType::PeerCacheNodes,
@@ -258,6 +256,7 @@ impl TestnetDeployer {
             }
         }
 
+        let should_provision_private_nodes = desired_private_node_vm_count > 0;
         if should_provision_private_nodes {
             println!("Private node provisioning will be skipped during upscale");
             // TODO: Reenable this after examining and fixing the problems.
@@ -305,7 +304,9 @@ impl TestnetDeployer {
             }
         }
 
-        if !is_bootstrap_deploy {
+        let should_provision_uploaders = options.desired_uploaders_count.is_some()
+            || options.desired_uploader_vm_count.is_some();
+        if should_provision_uploaders {
             self.wait_for_ssh_availability_on_new_machines(
                 AnsibleInventoryType::Uploaders,
                 &options.current_inventory,
