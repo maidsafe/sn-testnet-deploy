@@ -2825,7 +2825,17 @@ async fn main() -> Result<()> {
             }
 
             if desired_uploader_vm_count.is_some() && ant_version.is_none() {
-                return Err(eyre!("The --ant-version argument is required when --desired-uploader-vm-count is used"));
+                return Err(eyre!(
+                    "The ant version is required to upscale the uploaders"
+                ));
+            }
+
+            if (desired_uploader_vm_count.is_some() || desired_uploaders_count.is_some())
+                && funding_wallet_secret_key.is_none()
+            {
+                return Err(eyre!(
+                    "The funding wallet secret key is required to upscale the uploaders"
+                ));
             }
 
             println!("Upscaling deployment...");
