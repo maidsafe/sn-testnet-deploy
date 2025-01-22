@@ -82,6 +82,7 @@ impl TestnetDeployer {
             genesis_vm_count: Some(0),
             genesis_node_volume_size: None,
             name: options.name.clone(),
+            nat_gateway_vm_size: None, // We can take the value from tfvars for bootstrap deployments.
             node_vm_count: options.node_vm_count,
             node_vm_size: options.node_vm_size.clone(),
             node_volume_size: options.node_volume_size,
