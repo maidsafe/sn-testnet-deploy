@@ -35,3 +35,16 @@
     iptables -t nat -A POSTROUTING -s {{ item }} -o eth0 -j MASQUERADE --random
   loop: "{{ node_private_ips_eth1 }}"
   when: nat_gateway_output.stdout.find(item) == -1
+
+- name: set netfilter conntrack max
+  sysctl:
+    name: net.netfilter.nf_conntrack_max
+    value: 1048576
+    state: present
+    reload: true
+
+- name: ensure netfilter conntrack max is set in sysctl.conf
+  lineinfile:
+    path: /etc/sysctl.conf
+    line: 'net.netfilter.nf_conntrack_max=1048576'
+    state: present
