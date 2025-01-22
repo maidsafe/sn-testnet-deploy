@@ -32,6 +32,7 @@ pub struct InfraRunOptions {
     pub tfvars_filename: String,
     pub uploader_vm_count: Option<u16>,
     pub uploader_vm_size: Option<String>,
+    pub nat_gateway_vm_size: Option<String>,
 }
 
 impl InfraRunOptions {
@@ -170,6 +171,12 @@ impl InfraRunOptions {
         let enable_build_vm = build_vm_count > 0;
         let setup_nat_gateway = private_node_vm_count > 0;
 
+        let nat_gateway_vm_size = Self::get_value_for_resource(&resources, "nat_gateway", "size")?;
+        let nat_gateway_vm_size = nat_gateway_vm_size.as_str().ok_or_else(|| {
+            log::error!("Failed to obtain str 'size' value for nat_gateway");
+            Error::TerraformResourceFieldMissing("size".to_string())
+        })?;
+
         let options = Self {
             enable_build_vm,
             evm_node_count,
@@ -178,6 +185,7 @@ impl InfraRunOptions {
             genesis_vm_count: Some(genesis_vm_count),
             genesis_node_volume_size,
             name: name.to_string(),
+            nat_gateway_vm_size: Some(nat_gateway_vm_size.to_string()),
             node_vm_count: Some(node_vm_count),
             node_vm_size: Some(node_vm_size.to_string()),
             node_volume_size,
@@ -308,6 +316,13 @@ pub fn build_terraform_args(options: &InfraRunOptions) -> Result<Vec<(String, St
         args.push((
             "private_node_volume_size".to_string(),
             private_node_volume_size.to_string(),
+        ));
+    }
+
+    if let Some(nat_gateway_vm_size) = &options.nat_gateway_vm_size {
+        args.push((
+            "nat_gateway_droplet_size".to_string(),
+            nat_gateway_vm_size.clone(),
         ));
     }
 

@@ -420,6 +420,9 @@ enum Commands {
         /// The name of the environment
         #[arg(short = 'n', long)]
         name: String,
+        /// Override the size of the NAT gateway VM.
+        #[clap(long)]
+        nat_gateway_vm_size: Option<String>,
         /// Specify the network ID to use for the node services. This is used to partition the network and will not allow
         /// nodes with different network IDs to join.
         ///
@@ -1607,6 +1610,7 @@ async fn main() -> Result<()> {
             max_archived_log_files,
             max_log_files,
             name,
+            nat_gateway_vm_size,
             network_id,
             network_contacts_file_name,
             node_count,
@@ -1723,47 +1727,48 @@ async fn main() -> Result<()> {
                     chunk_size,
                     current_inventory: inventory,
                     downloaders_count,
-                    environment_type: environment_type.clone(),
                     env_variables,
+                    environment_type: environment_type.clone(),
                     evm_data_payments_address,
                     evm_network: evm_network_type,
+                    evm_node_vm_size,
                     evm_payment_token_address,
                     evm_rpc_url,
-                    evm_node_vm_size,
                     funding_wallet_secret_key,
                     genesis_node_volume_size: genesis_node_volume_size
                         .or_else(|| Some(calculate_size_per_attached_volume(1))),
                     interval,
                     log_format,
                     logstash_details,
+                    max_archived_log_files,
+                    max_log_files,
                     name: name.clone(),
+                    nat_gateway_vm_size,
                     network_id,
                     node_count,
                     node_vm_count,
+                    node_vm_size,
                     node_volume_size: node_volume_size
                         .or_else(|| Some(calculate_size_per_attached_volume(node_count))),
-                    max_archived_log_files,
-                    max_log_files,
                     output_inventory_dir_path: inventory_service
                         .working_directory_path
                         .join("ansible")
                         .join("inventory"),
                     peer_cache_node_count,
                     peer_cache_node_vm_count,
+                    peer_cache_node_vm_size,
                     peer_cache_node_volume_size: peer_cache_node_volume_size.or_else(|| {
                         Some(calculate_size_per_attached_volume(peer_cache_node_count))
                     }),
-                    peer_cache_node_vm_size,
-                    private_node_vm_count,
                     private_node_count,
+                    private_node_vm_count,
                     private_node_volume_size: private_node_volume_size
                         .or_else(|| Some(calculate_size_per_attached_volume(private_node_count))),
                     public_rpc,
-                    uploaders_count,
-                    uploader_vm_count,
                     rewards_address,
-                    node_vm_size,
+                    uploader_vm_count,
                     uploader_vm_size,
+                    uploaders_count,
                 })
                 .await?;
 
