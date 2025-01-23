@@ -2,9 +2,7 @@
 # This role should be called before setting up the nodes
 - name: define conditional variables
   set_fact:
-    do_gateway_is_configured: false
     nat_gateway_is_configured: false
-    do_wan_route_is_removed: false
 
 - debug: var=nat_gateway_private_ip_eth1
 
@@ -17,40 +15,25 @@
     nat_gateway_is_configured: true
   when: ip_route_output.stdout.find(nat_gateway_private_ip_eth1) != -1
 
-- name: delete original default DO route if found
-  command: ip route del default
-  when: not nat_gateway_is_configured and ip_route_output.stdout.find('default via') != -1
-
-- name: change default route to private ip of DO droplet used as a safenode gateway
-  command: ip route add default via {{ nat_gateway_private_ip_eth1 }} dev eth1
-  when: not nat_gateway_is_configured
-
-- name: identify /20 CIDR network route from the routing table
-  shell: ip route show | grep "dev eth0 proto kernel" | grep -v "\/16" | head -n 1 | awk '{print $1}'
-  register: do_wanroute
-
-- name: set do_wan_route_is_removed to true if /20 CIDR network route is removed
-  set_fact:
-    do_wan_route_is_removed: true
-  when: do_wanroute.stdout == ""
-
-- name: remove /20 CIDR network route from the routing table
-  command: ip route del {{ do_wanroute.stdout }} dev eth0
-  when: not do_wan_route_is_removed
+- name: Check if a backup netplan conf file exists
+  stat:
+    path: /etc/netplan/50-cloud-init.yaml.backup
+  register: netplan_conf_backup
 
 - name: obtain DO gateway ip
   command: curl -s http://169.254.169.254/metadata/v1/interfaces/public/0/ipv4/gateway
   register: do_gateway_ip
+  when: not nat_gateway_is_configured and not netplan_conf_backup.stat.exists
 
-- name: execute ip route show command
-  command: ip route show
-  register: do_gateway_route
+- name: backup and configure the new netplan configuration file
+  shell: |
+    cp /etc/netplan/50-cloud-init.yaml /etc/netplan/50-cloud-init.yaml.backup
+    sed -i '/eth0:/,/set-name: eth0/{/routes:/,/set-name: eth0/d}' /etc/netplan/50-cloud-init.yaml
+    sed -i '/set-name: eth1/a\ \ \ \ \ \ \ \ \ \ \ \ routes:\n\ \ \ \ \ \ \ \ \ \ \ \ - \ \ to: 0.0.0.0/0\n\ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ via: {{ nat_gateway_private_ip_eth1 }}' /etc/netplan/50-cloud-init.yaml
+    sed -i '/eth0:/a\ \ \ \ \ \ \ \ \ \ \ \ routes:\n\ \ \ \ \ \ \ \ \ \ \ \ - \ \ \ to: 169.254.169.254\n\ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ via: {{ do_gateway_ip.stdout }}\n\ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ on-link: true' /etc/netplan/50-cloud-init.yaml
+    sed -i '/^[ \t]*- [0-9.]*\/20[ \t]*$/d' /etc/netplan/50-cloud-init.yaml
+  when: not nat_gateway_is_configured and not netplan_conf_backup.stat.exists
 
-- name: set do_gateway_is_configured to true if DO gateway is configured
-  set_fact:
-    do_gateway_is_configured: true
-  when: do_gateway_route.stdout.find('169.254.169.254') != -1 and do_gateway_route.stdout.find(do_gateway_ip.stdout) != -1
-
-- name: add route to DO gateway via eth0 utilizing onlink attribute
-  command: ip route add 169.254.169.254 via {{ do_gateway_ip.stdout }} dev eth0 onlink
-  when: not do_gateway_is_configured
+- name: apply the netplan rules
+  command: netplan apply -debug
+  when: not nat_gateway_is_configured
