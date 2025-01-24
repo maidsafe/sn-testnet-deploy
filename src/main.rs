@@ -1140,9 +1140,6 @@ enum LogCommands {
         /// The cloud provider that was used.
         #[clap(long, default_value_t = CloudProvider::DigitalOcean, value_parser = parse_provider, verbatim_doc_comment)]
         provider: CloudProvider,
-        /// Should we copy the resource-usage.logs only
-        #[arg(short = 'r', long)]
-        resources_only: bool,
         /// Optionally only sync the logs for the VMs that contain the following string.
         #[arg(long)]
         vm_filter: Option<String>,
@@ -2148,7 +2145,6 @@ async fn main() -> Result<()> {
             LogCommands::Rsync {
                 name,
                 provider,
-                resources_only,
                 vm_filter,
             } => {
                 let testnet_deployer = TestnetDeployBuilder::default()
@@ -2159,7 +2155,7 @@ async fn main() -> Result<()> {
                 let inventory_service = DeploymentInventoryService::from(&testnet_deployer);
                 inventory_service.setup_environment_inventory(&name)?;
 
-                testnet_deployer.rsync_logs(&name, resources_only, vm_filter)?;
+                testnet_deployer.rsync_logs(&name, vm_filter)?;
                 Ok(())
             }
         },

@@ -23,12 +23,7 @@ use std::{
 };
 
 impl TestnetDeployer {
-    pub fn rsync_logs(
-        &self,
-        name: &str,
-        resources_only: bool,
-        vm_filter: Option<String>,
-    ) -> Result<()> {
+    pub fn rsync_logs(&self, name: &str, vm_filter: Option<String>) -> Result<()> {
         // take root_dir at the top as `get_all_node_inventory` changes the working dir.
         let root_dir = std::env::current_dir()?;
         let all_node_inventory = self.get_all_node_inventory(name)?;
@@ -44,32 +39,22 @@ impl TestnetDeployer {
         let log_abs_dest = create_initial_log_dir_setup(&root_dir, name, &all_node_inventory)?;
 
         // Rsync args
-        let mut rsync_args = vec![
+        let rsync_args = vec![
             "--compress".to_string(),
             "--archive".to_string(),
             "--prune-empty-dirs".to_string(),
             "--verbose".to_string(),
             "--verbose".to_string(),
+            "--filter=+ */".to_string(), // Include all directories for traversal
+            "--filter=+ *.log*".to_string(), // Include all *.log* files
+            "--filter=- *".to_string(),  // Exclude all other files
         ];
-        if !resources_only {
-            // to filter the log files
-            rsync_args.extend(vec![
-                "--filter=+ */".to_string(),     // Include all directories for traversal
-                "--filter=+ *.log*".to_string(), // Include all *.log* files
-                "--filter=- *".to_string(),      // Exclude all other files
-            ])
-        } else {
-            // to filter the resource usage files
-            rsync_args.extend(vec![
-                "--filter=+ */".to_string(), // Include all directories for traversal
-                "--filter=+ resource-usage.log".to_string(), // Include only the resource-usage logs
-                "--filter=- *".to_string(),  // Exclude all other files
-            ])
-        }
+
+        let mut public_rsync_args = rsync_args.clone();
         // Add the ssh details
         // TODO: SSH limits the connections/instances to 10 at a time. Changing /etc/ssh/sshd_config, doesn't work?
         // How to bypass this?
-        rsync_args.extend(vec![
+        public_rsync_args.extend(vec![
             "-e".to_string(),
             format!(
                 "ssh -i {} -q -o StrictHostKeyChecking=no -o BatchMode=yes -o ConnectTimeout=30",
@@ -80,15 +65,53 @@ impl TestnetDeployer {
             ),
         ]);
 
+        let nat_gateway_inventory = self.get_nat_gateway_inventory(name)?;
+        let private_rsync_args = if !nat_gateway_inventory.is_empty() {
+            let nat_gateway_inventory = nat_gateway_inventory.first().unwrap();
+            let mut private_rsync_args = rsync_args.clone();
+            private_rsync_args.extend(vec![
+                "-e".to_string(),
+                format!(
+                    "ssh -i {} -q -o StrictHostKeyChecking=no -o BatchMode=yes -o ConnectTimeout=30 -o ProxyCommand='ssh root@{} -W %h:%p -i {}'",
+                    self.ssh_client
+                        .get_private_key_path()
+                        .to_string_lossy()
+                        .as_ref(),
+                        nat_gateway_inventory.public_ip_addr,
+                    self.ssh_client
+                        .get_private_key_path()
+                        .to_string_lossy()
+                        .as_ref(),
+                ),
+            ]);
+            Some(private_rsync_args)
+        } else {
+            None
+        };
+
         // We might use the script, so goto the resource dir.
         std::env::set_current_dir(self.working_directory_path.clone())?;
         println!("Starting to rsync the log files");
         let progress_bar = get_progress_bar(all_node_inventory.len() as u64)?;
 
         let failed_inventory = all_node_inventory.par_iter().filter_map(|vm| {
-            if let Err(err) =
-                Self::run_rsync(&vm.name, &vm.public_ip_addr, &log_abs_dest, &rsync_args)
-            {
+            let args = if vm.name.contains("private") {
+                if let Some(private_rsync_args) = &private_rsync_args {
+                    debug!("Using private rsync args for {:?}", vm.name);
+                    private_rsync_args
+                } else {
+                    debug!(
+                        "Fallback to public rsync args for private node {:?}",
+                        vm.name
+                    );
+                    &public_rsync_args
+                }
+            } else {
+                debug!("Using public rsync args for {:?}", vm.name);
+                &public_rsync_args
+            };
+
+            if let Err(err) = Self::run_rsync(&vm.name, &vm.public_ip_addr, &log_abs_dest, args) {
                 println!(
                     "Failed to rsync. Retrying it after ssh-keygen {:?} : {} with err: {err:?}",
                     vm.name, vm.public_ip_addr
@@ -283,6 +306,14 @@ impl TestnetDeployer {
             return Err(Error::EnvironmentDoesNotExist(name.to_string()));
         }
         self.ansible_provisioner.get_all_node_inventory()
+    }
+
+    fn get_nat_gateway_inventory(&self, name: &str) -> Result<Vec<VirtualMachine>> {
+        let environments = self.terraform_runner.workspace_list()?;
+        if !environments.contains(&name.to_string()) {
+            return Err(Error::EnvironmentDoesNotExist(name.to_string()));
+        }
+        self.ansible_provisioner.get_nat_gateway_inventory()
     }
 }
 

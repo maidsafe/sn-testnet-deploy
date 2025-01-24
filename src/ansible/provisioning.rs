@@ -212,6 +212,11 @@ impl AnsibleProvisioner {
         Ok(all_node_inventory)
     }
 
+    pub fn get_nat_gateway_inventory(&self) -> Result<Vec<VirtualMachine>> {
+        self.ansible_runner
+            .get_inventory(AnsibleInventoryType::NatGateway, false)
+    }
+
     pub fn get_node_registries(
         &self,
         inventory_type: &AnsibleInventoryType,
