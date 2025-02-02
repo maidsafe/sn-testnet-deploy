@@ -95,9 +95,17 @@
     name: telegraf-elasticsearch
     enabled: yes
     state: started
+  register: telegraf_start
+  retries: 3
+  delay: 5
+  until: telegraf_start is not failed
 
 - name: start telegraf service
   systemd:
     name: telegraf
     enabled: yes
     state: started
+  register: telegraf_start
+  retries: 3
+  delay: 5
+  until: telegraf_start is not failed

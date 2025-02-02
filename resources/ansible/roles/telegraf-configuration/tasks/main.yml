@@ -124,3 +124,7 @@
     name: telegraf
     enabled: yes
     state: started
+  register: telegraf_start
+  retries: 3
+  delay: 5
+  until: telegraf_start is not failed
