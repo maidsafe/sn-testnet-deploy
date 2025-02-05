@@ -84,11 +84,6 @@ variable "private_node_vm_count" {
   description = "The number of droplets to launch for private nodes"
 }
 
-variable "setup_nat_gateway" {
-  type        = bool
-  description = "A boolean to enable NAT gateway VM. This is required to enable home-network nodes."
-}
-
 variable "uploader_vm_count" {
   default     = 2
   description = "The number of droplets to launch for uploaders"

@@ -173,7 +173,7 @@ impl TestnetDeployer {
             log_format: None,
             logstash_details: None,
             name: options.current_inventory.name.clone(),
-            nat_gateway: None,
+            nat_gateway_vms: Vec::new(),
             network_id: options.current_inventory.environment_details.network_id,
             node_count: desired_node_count,
             max_archived_log_files: options.max_archived_log_files,
@@ -428,7 +428,7 @@ impl TestnetDeployer {
             log_format: None,
             logstash_details: None,
             name: options.current_inventory.name.clone(),
-            nat_gateway: None,
+            nat_gateway_vms: Vec::new(),
             network_id: options.current_inventory.environment_details.network_id,
             node_count: 0,
             max_archived_log_files: options.max_archived_log_files,
@@ -502,7 +502,7 @@ impl TestnetDeployer {
                 .cloned()
                 .collect(),
             AnsibleInventoryType::NatGateway => {
-                current_inventory.nat_gateway_vm.iter().cloned().collect()
+                current_inventory.nat_gateway_vms.iter().cloned().collect()
             }
             AnsibleInventoryType::PrivateNodes => current_inventory
                 .private_node_vms

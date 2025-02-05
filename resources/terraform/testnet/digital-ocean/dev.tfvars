@@ -9,7 +9,6 @@ peer_cache_droplet_size = "s-2vcpu-4gb"
 peer_cache_droplet_image_id = 173264988
 peer_cache_node_vm_count = 3
 private_node_vm_count = 1
-setup_nat_gateway = true
 uploader_droplet_size = "s-2vcpu-4gb"
 uploader_droplet_image_id = 172724146
 uploader_vm_count = 1

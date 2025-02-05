@@ -305,17 +305,20 @@ pub fn generate_private_node_static_environment_inventory(
     environment_name: &str,
     output_inventory_dir_path: &Path,
     private_node_vms: &[VirtualMachine],
-    nat_gateway_vm: &Option<VirtualMachine>,
+    nat_gateway_vms: &[VirtualMachine],
     ssh_sk_path: &Path,
 ) -> Result<()> {
-    let Some(nat_gateway_vm) = nat_gateway_vm.clone() else {
-        println!("No NAT gateway VM found. Skipping private node static inventory generation.");
+    if nat_gateway_vms.is_empty() {
+        println!("No NAT gateway VMs found. Skipping private node static inventory generation.");
         return Ok(());
     };
 
     if private_node_vms.is_empty() {
         return Err(Error::EmptyInventory(AnsibleInventoryType::PrivateNodes));
     }
+
+    let private_node_nat_gateway_map =
+        match_private_node_vm_and_nat_gateway_vm(private_node_vms, nat_gateway_vms)?;
 
     let dest_path = output_inventory_dir_path.join(
         AnsibleInventoryType::PrivateNodesStatic
@@ -324,23 +327,61 @@ pub fn generate_private_node_static_environment_inventory(
     debug!("Generating private node static inventory at {dest_path:?}",);
 
     let mut file = File::create(&dest_path)?;
-    writeln!(file, "[private_nodes]")?;
-    for vm in private_node_vms.iter() {
-        writeln!(file, "{}", vm.private_ip_addr)?;
-    }
 
-    writeln!(file, "[private_nodes:vars]")?;
-    writeln!(
-        file,
-        "ansible_ssh_common_args='-o ProxyCommand=\"ssh -p 22 -W %h:%p -q root@{} -i \"{}\" -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null\"'",
-        nat_gateway_vm.public_ip_addr,
-        ssh_sk_path.to_string_lossy()
-    )?;
-    writeln!(file, "ansible_host_key_checking=False")?;
+    for (privat_node_vm, nat_gateway_vm) in private_node_nat_gateway_map.iter() {
+        let node_number = privat_node_vm.name.split('-').last().unwrap();
+        writeln!(file, "[private_node_{}]", node_number)?;
+        writeln!(file, "{}", privat_node_vm.private_ip_addr)?;
+        writeln!(file, "[private_node_{}:vars]", node_number)?;
+        writeln!(
+            file,
+            "ansible_ssh_common_args='-o ProxyCommand=\"ssh -p 22 -W %h:%p -q root@{} -i \"{}\" -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null\"'",
+            nat_gateway_vm.public_ip_addr,
+            ssh_sk_path.to_string_lossy()
+        )?;
+        writeln!(file, "ansible_host_key_checking=False")?;
+    }
 
     debug!("Created private node inventory file with ssh proxy at {dest_path:?}");
 
     Ok(())
+}
+
+/// Map of private node VMs to their corresponding NAT Gateway VMs.
+pub fn match_private_node_vm_and_nat_gateway_vm(
+    private_node_vms: &[VirtualMachine],
+    nat_gateway_vms: &[VirtualMachine],
+) -> Result<HashMap<VirtualMachine, VirtualMachine>> {
+    if private_node_vms.len() != nat_gateway_vms.len() {
+        println!(
+            "The number of private node VMs ({}) does not match the number of NAT Gateway VMs ({})",
+            private_node_vms.len(),
+            nat_gateway_vms.len()
+        );
+        return Err(Error::InventoryCountsMismatch);
+    }
+
+    let mut map = HashMap::new();
+    for private_vm in private_node_vms {
+        let nat_gateway = nat_gateway_vms
+            .iter()
+            .find(|vm| {
+                let private_node_name = private_vm.name.split('-').last().unwrap();
+                let nat_gateway_name = vm.name.split('-').last().unwrap();
+                private_node_name == nat_gateway_name
+            })
+            .ok_or_else(|| {
+                println!(
+                    "Failed to find a matching NAT Gateway for private node: {}",
+                    private_vm.name
+                );
+                Error::EmptyInventory(AnsibleInventoryType::NatGateway)
+            })?;
+
+        let _ = map.insert(private_vm.clone(), nat_gateway.clone());
+    }
+
+    Ok(map)
 }
 
 // The following three structs are utilities that are used to parse the output of the

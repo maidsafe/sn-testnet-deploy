@@ -8,7 +8,7 @@ use crate::{
     ansible::{
         inventory::{
             generate_environment_inventory, generate_private_node_static_environment_inventory,
-            AnsibleInventoryType,
+            match_private_node_vm_and_nat_gateway_vm, AnsibleInventoryType,
         },
         provisioning::AnsibleProvisioner,
         AnsibleRunner,
@@ -153,11 +153,9 @@ impl DeploymentInventoryService {
             .get_inventory(AnsibleInventoryType::Build, false)?;
         misc_vms.extend(build_vm);
 
-        let nat_gateway_vm = self
+        let nat_gateway_vms = self
             .ansible_runner
-            .get_inventory(AnsibleInventoryType::NatGateway, false)?
-            .first()
-            .cloned();
+            .get_inventory(AnsibleInventoryType::NatGateway, false)?;
 
         let generic_node_vms = self
             .ansible_runner
@@ -172,14 +170,14 @@ impl DeploymentInventoryService {
             name,
             &output_inventory_dir_path,
             &private_node_vms,
-            &nat_gateway_vm,
+            &nat_gateway_vms,
             &self.ssh_client.private_key_path,
         )?;
 
         // Set up the SSH client to route through the NAT gateway if it exists. This updates all the client clones.
-        if let Some(nat_gateway) = &nat_gateway_vm {
+        if !nat_gateway_vms.is_empty() {
             self.ssh_client
-                .set_routed_vms(private_node_vms.clone(), nat_gateway.public_ip_addr)?;
+                .set_routed_vms(&private_node_vms, &nat_gateway_vms)?;
         }
 
         let peer_cache_node_vms = self
@@ -315,7 +313,7 @@ impl DeploymentInventoryService {
             genesis_vm,
             name: name.to_string(),
             misc_vms,
-            nat_gateway_vm,
+            nat_gateway_vms,
             node_vms: generic_node_vms,
             peer_cache_node_vms,
             private_node_vms,
@@ -342,11 +340,9 @@ impl DeploymentInventoryService {
             &output_inventory_dir_path,
         )?;
 
-        let nat_gateway_vm = self
+        let nat_gateway_vms = self
             .ansible_runner
-            .get_inventory(AnsibleInventoryType::NatGateway, false)?
-            .first()
-            .cloned();
+            .get_inventory(AnsibleInventoryType::NatGateway, false)?;
 
         let private_node_vms = self
             .ansible_runner
@@ -357,14 +353,14 @@ impl DeploymentInventoryService {
             name,
             &output_inventory_dir_path,
             &private_node_vms,
-            &nat_gateway_vm,
+            &nat_gateway_vms,
             &self.ssh_client.private_key_path,
         )?;
 
         // Set up the SSH client to route through the NAT gateway if it exists. This updates all the client clones.
-        if let Some(nat_gateway) = &nat_gateway_vm {
+        if !nat_gateway_vms.is_empty() {
             self.ssh_client
-                .set_routed_vms(private_node_vms.clone(), nat_gateway.public_ip_addr)?;
+                .set_routed_vms(&private_node_vms, &nat_gateway_vms)?;
         }
 
         Ok(())
@@ -613,7 +609,7 @@ pub struct DeploymentInventory {
     pub genesis_multiaddr: Option<String>,
     pub misc_vms: Vec<VirtualMachine>,
     pub name: String,
-    pub nat_gateway_vm: Option<VirtualMachine>,
+    pub nat_gateway_vms: Vec<VirtualMachine>,
     pub node_vms: Vec<NodeVirtualMachine>,
     pub peer_cache_node_vms: Vec<NodeVirtualMachine>,
     pub private_node_vms: Vec<NodeVirtualMachine>,
@@ -636,7 +632,7 @@ impl DeploymentInventory {
             faucet_address: None,
             misc_vms: Vec::new(),
             name: name.to_string(),
-            nat_gateway_vm: None,
+            nat_gateway_vms: Vec::new(),
             node_vms: Vec::new(),
             peer_cache_node_vms: Vec::new(),
             private_node_vms: Vec::new(),
@@ -662,7 +658,7 @@ impl DeploymentInventory {
 
     pub fn vm_list(&self) -> Vec<VirtualMachine> {
         let mut list = Vec::new();
-        list.extend(self.nat_gateway_vm.clone());
+        list.extend(self.nat_gateway_vms.clone());
         list.extend(
             self.peer_cache_node_vms
                 .iter()
@@ -844,24 +840,35 @@ impl DeploymentInventory {
         println!("=================");
         println!("Private Node VMs");
         println!("=================");
-        for node_vm in self.private_node_vms.iter() {
-            println!("{}: {}", node_vm.vm.name, node_vm.vm.public_ip_addr);
-            if let Some(nat_gateway_vm) = &self.nat_gateway_vm {
-                let ssh = if let Some(ssh_key_path) = self.ssh_private_key_path.to_str() {
-                    format!(
+        let private_node_nat_gateway_map = match_private_node_vm_and_nat_gateway_vm(
+            self.private_node_vms
+                .iter()
+                .map(|node_vm| node_vm.vm.clone())
+                .collect::<Vec<_>>()
+                .as_slice(),
+            &self.nat_gateway_vms,
+        )?;
+
+        for (node_vm, nat_gateway_vm) in private_node_nat_gateway_map.iter() {
+            println!(
+                "{}: {} ==routed through==> {}: {}",
+                node_vm.name,
+                node_vm.public_ip_addr,
+                nat_gateway_vm.name,
+                nat_gateway_vm.public_ip_addr
+            );
+            let ssh = if let Some(ssh_key_path) = self.ssh_private_key_path.to_str() {
+                format!(
                         "ssh -i {ssh_key_path} -o ProxyCommand=\"ssh -W %h:%p root@{} -i {ssh_key_path}\" root@{}",
-                        nat_gateway_vm.public_ip_addr, node_vm.vm.private_ip_addr
+                        nat_gateway_vm.public_ip_addr, node_vm.private_ip_addr
                     )
-                } else {
-                    format!(
-                        "ssh -o ProxyCommand=\"ssh -W %h:%p root@{}\" root@{}",
-                        nat_gateway_vm.public_ip_addr, node_vm.vm.private_ip_addr
-                    )
-                };
-                println!("SSH using NAT gateway: {ssh}");
             } else {
-                println!("Error: NAT gateway VM not found");
-            }
+                format!(
+                    "ssh -o ProxyCommand=\"ssh -W %h:%p root@{}\" root@{}",
+                    nat_gateway_vm.public_ip_addr, node_vm.private_ip_addr
+                )
+            };
+            println!("SSH using NAT gateway: {ssh}");
         }
         println!("Nodes per VM: {}", self.node_count());
         println!("SSH user: {}", self.ssh_user);
@@ -886,7 +893,7 @@ impl DeploymentInventory {
             }
         }
 
-        if !self.misc_vms.is_empty() || self.nat_gateway_vm.is_some() {
+        if !self.misc_vms.is_empty() {
             println!("=========");
             println!("Other VMs");
             println!("=========");
@@ -897,7 +904,7 @@ impl DeploymentInventory {
             }
         }
 
-        if let Some(nat_gateway_vm) = &self.nat_gateway_vm {
+        for nat_gateway_vm in self.nat_gateway_vms.iter() {
             println!("{}: {}", nat_gateway_vm.name, nat_gateway_vm.public_ip_addr);
         }
 

@@ -4,11 +4,15 @@
   set_fact:
     nat_gateway_is_configured: false
 
-- debug: var=nat_gateway_private_ip_eth1
+- debug: var=nat_gateway_private_ip_map
 
 - name: execute ip route show command
   command: ip route show
   register: ip_route_output
+
+- name: Retrieve private IP of the corresponding private node vm
+  set_fact:
+    nat_gateway_private_ip_eth1: "{{ nat_gateway_private_ip_map[inventory_hostname] }}"
 
 - name: set nat_gateway_is_configured to true if nat gateway is configured
   set_fact:

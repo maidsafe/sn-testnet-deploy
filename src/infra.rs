@@ -28,7 +28,6 @@ pub struct InfraRunOptions {
     pub peer_cache_node_volume_size: Option<u16>,
     pub private_node_vm_count: Option<u16>,
     pub private_node_volume_size: Option<u16>,
-    pub setup_nat_gateway: bool,
     pub tfvars_filename: String,
     pub uploader_vm_count: Option<u16>,
     pub uploader_vm_size: Option<String>,
@@ -169,7 +168,6 @@ impl InfraRunOptions {
         let evm_node_count = Some(resource_count("evm_node"));
         let build_vm_count = resource_count("build");
         let enable_build_vm = build_vm_count > 0;
-        let setup_nat_gateway = private_node_vm_count > 0;
 
         let nat_gateway_vm_size = Self::get_value_for_resource(&resources, "nat_gateway", "size")?;
         let nat_gateway_vm_size = nat_gateway_vm_size.as_str().ok_or_else(|| {
@@ -194,7 +192,6 @@ impl InfraRunOptions {
             peer_cache_node_volume_size,
             private_node_vm_count: Some(private_node_vm_count),
             private_node_volume_size,
-            setup_nat_gateway,
             tfvars_filename: environment_details
                 .environment_type
                 .get_tfvars_filename(name),
@@ -245,10 +242,6 @@ pub fn build_terraform_args(options: &InfraRunOptions) -> Result<Vec<(String, St
         args.push(("node_vm_count".to_string(), node_vm_count.to_string()));
     }
 
-    args.push((
-        "setup_nat_gateway".to_string(),
-        options.setup_nat_gateway.to_string(),
-    ));
     if let Some(private_node_vm_count) = options.private_node_vm_count {
         args.push((
             "private_node_vm_count".to_string(),
