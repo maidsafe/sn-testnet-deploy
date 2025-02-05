@@ -186,6 +186,7 @@ pub struct EnvironmentDetails {
     pub evm_payment_token_address: Option<String>,
     pub evm_rpc_url: Option<String>,
     pub funding_wallet_address: Option<String>,
+    pub nat_gateway_type: NatGatewayType,
     pub network_id: Option<u8>,
     pub rewards_address: String,
 }
@@ -249,6 +250,34 @@ impl FromStr for EnvironmentType {
             "production" => Ok(EnvironmentType::Production),
             "staging" => Ok(EnvironmentType::Staging),
             _ => Err(Error::EnvironmentNameFromStringError(s.to_string())),
+        }
+    }
+}
+
+#[derive(Clone, Debug, Default, Serialize, Deserialize)]
+pub enum NatGatewayType {
+    #[default]
+    NatRandomized,
+    FullCone,
+}
+
+impl std::fmt::Display for NatGatewayType {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            NatGatewayType::NatRandomized => write!(f, "nat-randomized"),
+            NatGatewayType::FullCone => write!(f, "full-cone"),
+        }
+    }
+}
+
+impl std::str::FromStr for NatGatewayType {
+    type Err = String;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s.to_lowercase().as_str() {
+            "nat-randomized" => Ok(NatGatewayType::NatRandomized),
+            "full-cone" => Ok(NatGatewayType::FullCone),
+            _ => Err(format!("Invalid NAT gateway type: {}", s)),
         }
     }
 }

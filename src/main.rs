@@ -34,7 +34,7 @@ use sn_testnet_deploy::{
     network_commands, notify_slack,
     setup::setup_dotenv_file,
     upscale::UpscaleOptions,
-    BinaryOption, CloudProvider, EnvironmentType, EvmNetwork, LogFormat, NodeType,
+    BinaryOption, CloudProvider, EnvironmentType, EvmNetwork, LogFormat, NatGatewayType, NodeType,
     TestnetDeployBuilder, UpgradeOptions,
 };
 use std::{env, net::IpAddr};
@@ -165,6 +165,11 @@ enum Commands {
         /// The name of the environment
         #[arg(short = 'n', long)]
         name: String,
+        /// Specify the type of NAT gateway to use.
+        ///
+        /// Valid values are "nat-randomized" or "full-cone".
+        #[clap(long, default_value = "nat-randomized", verbatim_doc_comment)]
+        nat_gateway_type: NatGatewayType,
         /// Specify the network ID to use for the node services. This is used to partition the network and will not allow
         /// nodes with different network IDs to join.
         ///
@@ -430,6 +435,11 @@ enum Commands {
         /// The name of the environment
         #[arg(short = 'n', long)]
         name: String,
+        /// Specify the type of NAT gateway to use.
+        ///
+        /// Valid values are "nat-randomized" or "full-cone".
+        #[clap(long, default_value = "nat-randomized", verbatim_doc_comment)]
+        nat_gateway_type: NatGatewayType,
         /// Override the size of the NAT gateway VM.
         #[clap(long)]
         nat_gateway_vm_size: Option<String>,
@@ -1446,6 +1456,7 @@ async fn main() -> Result<()> {
             interval,
             log_format,
             name,
+            nat_gateway_type,
             network_id,
             node_count,
             node_vm_count,
@@ -1554,6 +1565,7 @@ async fn main() -> Result<()> {
                     interval,
                     log_format,
                     name: name.clone(),
+                    nat_gateway_type,
                     network_id,
                     node_count,
                     node_vm_count,
@@ -1619,6 +1631,7 @@ async fn main() -> Result<()> {
             max_archived_log_files,
             max_log_files,
             name,
+            nat_gateway_type,
             nat_gateway_vm_size,
             network_id,
             network_contacts_file_name,
@@ -1754,6 +1767,7 @@ async fn main() -> Result<()> {
                     max_archived_log_files,
                     max_log_files,
                     name: name.clone(),
+                    nat_gateway_type,
                     nat_gateway_vm_size,
                     network_id,
                     node_count,

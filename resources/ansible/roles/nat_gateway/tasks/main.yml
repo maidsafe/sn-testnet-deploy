@@ -4,6 +4,10 @@
   set_fact:
     ipv4_forwarded: false
 
+- name: public IP of the gateway vm
+  set_fact:
+    gateway_public_ip: "{{ ansible_host }}"
+
 - name: check if ipv4 is forwarded
   command: sysctl net.ipv4.ip_forward
   register: ipv4_forward_output
@@ -34,10 +38,21 @@
   command: iptables -t nat -L POSTROUTING -v
   register: nat_gateway_output
 
-- name: Add eht1 of node VM to the NAT gateway
+# Nat randomized setup
+- name: Add eth1 of node VM to the NAT gateway
   command: >
-    iptables -t nat -A POSTROUTING -s {{ node_private_ip_eth1 }} -o eth0 -j MASQUERADE
-  when: nat_gateway_output.stdout.find(node_private_ip_eth1) == -1
+    iptables -t nat -A POSTROUTING -s {{ node_private_ip_eth1 }} -o eth0 -j MASQUERADE  --random
+  when: nat_gateway_output.stdout.find(node_private_ip_eth1) == -1 and gateway_type == "nat-randomized"
+
+# Full cone nat setup
+- name: Add public IP of the gateway as source
+  command: >
+    iptables -t nat -A POSTROUTING -o eth0 -j SNAT --to-source {{ gateway_public_ip }}
+  when: nat_gateway_output.stdout.find(gateway_public_ip) == -1 and gateway_type == "full-cone-nat"
+- name: Add eth1 of node VM as dest
+  command: >
+    iptables -t nat -A PREROUTING -i eth0 -j DNAT --to-destination {{ node_private_ip_eth1 }}
+  when: nat_gateway_output.stdout.find(node_private_ip_eth1) == -1 and gateway_type == "full-cone-nat"
 
 - name: set netfilter conntrack max
   sysctl:

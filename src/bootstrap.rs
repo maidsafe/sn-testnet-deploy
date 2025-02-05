@@ -10,7 +10,7 @@ use crate::{
     ansible::{inventory::AnsibleInventoryType, provisioning::ProvisionOptions},
     error::Result,
     write_environment_details, BinaryOption, DeploymentType, EnvironmentDetails, EnvironmentType,
-    EvmNetwork, InfraRunOptions, LogFormat, NodeType, TestnetDeployer,
+    EvmNetwork, InfraRunOptions, LogFormat, NatGatewayType, NodeType, TestnetDeployer,
 };
 use colored::Colorize;
 
@@ -30,6 +30,7 @@ pub struct BootstrapOptions {
     pub log_format: Option<LogFormat>,
     pub max_archived_log_files: u16,
     pub max_log_files: u16,
+    pub nat_gateway_type: NatGatewayType,
     pub name: String,
     pub network_id: Option<u8>,
     pub node_count: u16,
@@ -69,6 +70,7 @@ impl TestnetDeployer {
                 evm_payment_token_address: options.evm_payment_token_address.clone(),
                 evm_rpc_url: options.evm_rpc_url.clone(),
                 funding_wallet_address: None,
+                nat_gateway_type: options.nat_gateway_type.clone(),
                 network_id: options.network_id,
                 rewards_address: options.rewards_address.clone(),
             },

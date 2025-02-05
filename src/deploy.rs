@@ -10,7 +10,7 @@ use crate::{
     funding::get_address_from_sk,
     get_anvil_node_data, get_bootstrap_cache_url, get_genesis_multiaddr, write_environment_details,
     BinaryOption, DeploymentInventory, DeploymentType, EnvironmentDetails, EnvironmentType,
-    EvmNetwork, InfraRunOptions, LogFormat, NodeType, TestnetDeployer,
+    EvmNetwork, InfraRunOptions, LogFormat, NatGatewayType, NodeType, TestnetDeployer,
 };
 use alloy::{hex::ToHexExt, primitives::U256};
 use colored::Colorize;
@@ -39,6 +39,7 @@ pub struct DeployOptions {
     pub max_archived_log_files: u16,
     pub max_log_files: u16,
     pub name: String,
+    pub nat_gateway_type: NatGatewayType,
     pub nat_gateway_vm_size: Option<String>,
     pub network_id: Option<u8>,
     pub node_count: u16,
@@ -116,6 +117,7 @@ impl TestnetDeployer {
                 evm_payment_token_address: options.evm_payment_token_address.clone(),
                 evm_rpc_url: options.evm_rpc_url.clone(),
                 funding_wallet_address: None,
+                nat_gateway_type: options.nat_gateway_type.clone(),
                 network_id: options.network_id,
                 rewards_address: options.rewards_address.clone(),
             },
@@ -176,6 +178,7 @@ impl TestnetDeployer {
                 evm_payment_token_address: provision_options.evm_payment_token_address.clone(),
                 evm_rpc_url: provision_options.evm_rpc_url.clone(),
                 funding_wallet_address,
+                nat_gateway_type: options.nat_gateway_type.clone(),
                 network_id: options.network_id,
                 rewards_address: options.rewards_address.clone(),
             },
