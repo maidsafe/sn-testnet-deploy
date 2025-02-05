@@ -37,6 +37,7 @@ pub struct UpscaleOptions {
     pub plan: bool,
     pub public_rpc: bool,
     pub provision_only: bool,
+    pub token_amount: Option<U256>,
 }
 
 impl TestnetDeployer {
@@ -193,6 +194,7 @@ impl TestnetDeployer {
             ant_version: options.ant_version.clone(),
             uploaders_count: options.desired_uploaders_count,
             gas_amount: options.gas_amount,
+            token_amount: None,
         };
         let mut node_provision_failed = false;
 
@@ -447,6 +449,7 @@ impl TestnetDeployer {
             ant_version: options.ant_version.clone(),
             uploaders_count: options.desired_uploaders_count,
             gas_amount: options.gas_amount,
+            token_amount: options.token_amount,
         };
 
         self.wait_for_ssh_availability_on_new_machines(

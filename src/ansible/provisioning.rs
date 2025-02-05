@@ -48,30 +48,31 @@ pub struct ProvisionOptions {
     pub evm_network: EvmNetwork,
     pub evm_payment_token_address: Option<String>,
     pub evm_rpc_url: Option<String>,
-    /// Used to fund the uploaders.
     pub funding_wallet_secret_key: Option<String>,
     pub gas_amount: Option<U256>,
     pub interval: Duration,
     pub log_format: Option<LogFormat>,
     pub logstash_details: Option<(String, Vec<SocketAddr>)>,
+    pub max_archived_log_files: u16,
+    pub max_log_files: u16,
     pub name: String,
     pub nat_gateway: Option<VirtualMachine>,
     pub network_id: Option<u8>,
     pub node_count: u16,
-    pub max_archived_log_files: u16,
-    pub max_log_files: u16,
     pub output_inventory_dir_path: PathBuf,
     pub peer_cache_node_count: u16,
     pub private_node_count: u16,
     pub private_node_vms: Vec<VirtualMachine>,
     pub public_rpc: bool,
-    pub uploaders_count: Option<u16>,
     pub rewards_address: String,
+    pub token_amount: Option<U256>,
+    pub uploaders_count: Option<u16>,
 }
 
 impl From<BootstrapOptions> for ProvisionOptions {
     fn from(bootstrap_options: BootstrapOptions) -> Self {
         ProvisionOptions {
+            ant_version: None,
             binary_option: bootstrap_options.binary_option,
             chunk_size: bootstrap_options.chunk_size,
             downloaders_count: 0,
@@ -97,7 +98,7 @@ impl From<BootstrapOptions> for ProvisionOptions {
             private_node_vms: Vec::new(),
             public_rpc: false,
             rewards_address: bootstrap_options.rewards_address,
-            ant_version: None,
+            token_amount: None,
             uploaders_count: None,
         }
     }
@@ -106,6 +107,7 @@ impl From<BootstrapOptions> for ProvisionOptions {
 impl From<DeployOptions> for ProvisionOptions {
     fn from(deploy_options: DeployOptions) -> Self {
         ProvisionOptions {
+            ant_version: None,
             binary_option: deploy_options.binary_option,
             chunk_size: deploy_options.chunk_size,
             downloaders_count: deploy_options.downloaders_count,
@@ -115,24 +117,24 @@ impl From<DeployOptions> for ProvisionOptions {
             evm_payment_token_address: deploy_options.evm_payment_token_address,
             evm_rpc_url: deploy_options.evm_rpc_url,
             funding_wallet_secret_key: deploy_options.funding_wallet_secret_key,
-            gas_amount: None,
+            gas_amount: deploy_options.initial_gas,
             interval: deploy_options.interval,
             log_format: deploy_options.log_format,
             logstash_details: deploy_options.logstash_details,
+            max_archived_log_files: deploy_options.max_archived_log_files,
+            max_log_files: deploy_options.max_log_files,
             name: deploy_options.name,
             nat_gateway: None,
             network_id: deploy_options.network_id,
             node_count: deploy_options.node_count,
-            max_archived_log_files: deploy_options.max_archived_log_files,
-            max_log_files: deploy_options.max_log_files,
             output_inventory_dir_path: deploy_options.output_inventory_dir_path,
             peer_cache_node_count: deploy_options.peer_cache_node_count,
-            public_rpc: deploy_options.public_rpc,
             private_node_count: deploy_options.private_node_count,
             private_node_vms: Vec::new(),
-            ant_version: None,
-            uploaders_count: Some(deploy_options.uploaders_count),
+            public_rpc: deploy_options.public_rpc,
             rewards_address: deploy_options.rewards_address,
+            token_amount: deploy_options.initial_tokens,
+            uploaders_count: Some(deploy_options.uploaders_count),
         }
     }
 }
@@ -517,13 +519,13 @@ impl AnsibleProvisioner {
         let sk_map = self
             .deposit_funds_to_uploaders(&FundingOptions {
                 evm_data_payments_address: options.evm_data_payments_address.clone(),
+                evm_network: options.evm_network.clone(),
                 evm_payment_token_address: options.evm_payment_token_address.clone(),
                 evm_rpc_url: options.evm_rpc_url.clone(),
-                uploaders_count: options.uploaders_count,
-                evm_network: options.evm_network.clone(),
                 funding_wallet_secret_key: options.funding_wallet_secret_key.clone(),
-                token_amount: None,
                 gas_amount: options.gas_amount,
+                token_amount: options.token_amount,
+                uploaders_count: options.uploaders_count,
             })
             .await?;
 

@@ -12,7 +12,7 @@ use crate::{
     BinaryOption, DeploymentInventory, DeploymentType, EnvironmentDetails, EnvironmentType,
     EvmNetwork, InfraRunOptions, LogFormat, NodeType, TestnetDeployer,
 };
-use alloy::hex::ToHexExt;
+use alloy::{hex::ToHexExt, primitives::U256};
 use colored::Colorize;
 use std::{net::SocketAddr, path::PathBuf, time::Duration};
 
@@ -31,6 +31,8 @@ pub struct DeployOptions {
     pub evm_rpc_url: Option<String>,
     pub funding_wallet_secret_key: Option<String>,
     pub genesis_node_volume_size: Option<u16>,
+    pub initial_gas: Option<U256>,
+    pub initial_tokens: Option<U256>,
     pub interval: Duration,
     pub log_format: Option<LogFormat>,
     pub logstash_details: Option<(String, Vec<SocketAddr>)>,
