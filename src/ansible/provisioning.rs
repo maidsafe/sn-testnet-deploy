@@ -17,8 +17,8 @@ use crate::{
     error::{Error, Result},
     funding::FundingOptions,
     inventory::{DeploymentNodeRegistries, VirtualMachine},
-    print_duration, BinaryOption, CloudProvider, EvmNetwork, LogFormat, NodeType, SshClient,
-    UpgradeOptions,
+    print_duration, BinaryOption, CloudProvider, EvmNetwork, LogFormat, NatGatewayType, NodeType,
+    SshClient, UpgradeOptions,
 };
 use ant_service_management::NodeRegistry;
 use evmlib::common::U256;
@@ -59,6 +59,7 @@ pub struct ProvisionOptions {
     pub max_archived_log_files: u16,
     pub max_log_files: u16,
     pub name: String,
+    pub nat_gateway_type: NatGatewayType,
     pub nat_gateway_vms: Vec<VirtualMachine>,
     pub network_id: Option<u8>,
     pub node_count: u16,
@@ -92,6 +93,7 @@ impl From<BootstrapOptions> for ProvisionOptions {
             max_archived_log_files: bootstrap_options.max_archived_log_files,
             max_log_files: bootstrap_options.max_log_files,
             name: bootstrap_options.name,
+            nat_gateway_type: bootstrap_options.nat_gateway_type,
             nat_gateway_vms: Vec::new(),
             network_id: bootstrap_options.network_id,
             node_count: bootstrap_options.node_count,
@@ -127,6 +129,7 @@ impl From<DeployOptions> for ProvisionOptions {
             max_archived_log_files: deploy_options.max_archived_log_files,
             max_log_files: deploy_options.max_log_files,
             name: deploy_options.name,
+            nat_gateway_type: deploy_options.nat_gateway_type,
             nat_gateway_vms: Vec::new(),
             network_id: deploy_options.network_id,
             node_count: deploy_options.node_count,
@@ -359,7 +362,11 @@ impl AnsibleProvisioner {
             return Err(Error::EmptyInventory(AnsibleInventoryType::PrivateNodes));
         }
 
-        let vars = extra_vars::build_nat_gateway_extra_vars_doc(&options.name, private_node_ip_map);
+        let vars = extra_vars::build_nat_gateway_extra_vars_doc(
+            &options.name,
+            &options.nat_gateway_type,
+            private_node_ip_map,
+        );
         debug!("Provisioning NAT Gateway with vars: {vars}");
         self.ansible_runner.run_playbook(
             AnsiblePlaybook::NatGateway,

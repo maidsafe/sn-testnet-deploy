@@ -173,6 +173,11 @@ impl TestnetDeployer {
             log_format: None,
             logstash_details: None,
             name: options.current_inventory.name.clone(),
+            nat_gateway_type: options
+                .current_inventory
+                .environment_details
+                .nat_gateway_type
+                .clone(),
             nat_gateway_vms: Vec::new(),
             network_id: options.current_inventory.environment_details.network_id,
             node_count: desired_node_count,
@@ -428,6 +433,11 @@ impl TestnetDeployer {
             log_format: None,
             logstash_details: None,
             name: options.current_inventory.name.clone(),
+            nat_gateway_type: options
+                .current_inventory
+                .environment_details
+                .nat_gateway_type
+                .clone(),
             nat_gateway_vms: Vec::new(),
             network_id: options.current_inventory.environment_details.network_id,
             node_count: 0,

@@ -5,9 +5,9 @@
 // Please see the LICENSE file for more details.
 
 use crate::inventory::VirtualMachine;
-use crate::NodeType;
 use crate::{ansible::provisioning::ProvisionOptions, CloudProvider, EvmNetwork};
 use crate::{BinaryOption, Error, Result};
+use crate::{NatGatewayType, NodeType};
 use alloy::hex::ToHexExt;
 use alloy::signers::local::PrivateKeySigner;
 use serde_json::Value;
@@ -268,6 +268,7 @@ impl ExtraVarsDocBuilder {
 
 pub fn build_nat_gateway_extra_vars_doc(
     name: &str,
+    gateway_type: &NatGatewayType,
     private_node_ip_map: HashMap<String, IpAddr>,
 ) -> String {
     let mut extra_vars = ExtraVarsDocBuilder::default();
@@ -279,6 +280,7 @@ pub fn build_nat_gateway_extra_vars_doc(
             .map(|(k, v)| (k, Value::String(v.to_string())))
             .collect(),
     );
+    extra_vars.add_variable("gateway_type", &gateway_type.to_string());
 
     extra_vars.add_serde_value("node_private_ip_map", serde_map);
 
