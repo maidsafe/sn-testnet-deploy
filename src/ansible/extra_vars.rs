@@ -12,6 +12,9 @@ use alloy::hex::ToHexExt;
 use alloy::signers::local::PrivateKeySigner;
 use serde_json::Value;
 use std::collections::HashMap;
+use std::net::IpAddr;
+
+use super::inventory::match_private_node_vm_and_nat_gateway_vm;
 
 const ANT_S3_BUCKET_URL: &str = "https://autonomi-cli.s3.eu-west-2.amazonaws.com";
 const ANTCTL_S3_BUCKET_URL: &str = "https://antctl.s3.eu-west-2.amazonaws.com";
@@ -263,10 +266,22 @@ impl ExtraVarsDocBuilder {
     }
 }
 
-pub fn build_nat_gateway_extra_vars_doc(name: &str, private_ips: Vec<String>) -> String {
+pub fn build_nat_gateway_extra_vars_doc(
+    name: &str,
+    private_node_ip_map: HashMap<String, IpAddr>,
+) -> String {
     let mut extra_vars = ExtraVarsDocBuilder::default();
     extra_vars.add_variable("testnet_name", name);
-    extra_vars.add_list_variable("node_private_ips_eth1", private_ips);
+
+    let serde_map = Value::Object(
+        private_node_ip_map
+            .into_iter()
+            .map(|(k, v)| (k, Value::String(v.to_string())))
+            .collect(),
+    );
+
+    extra_vars.add_serde_value("node_private_ip_map", serde_map);
+
     extra_vars.build()
 }
 
@@ -308,11 +323,24 @@ pub fn build_node_extra_vars_doc(
         extra_vars.add_variable("public_rpc", "true");
     }
 
-    if let Some(nat_gateway) = &options.nat_gateway {
-        extra_vars.add_variable(
-            "nat_gateway_private_ip_eth1",
-            &nat_gateway.private_ip_addr.to_string(),
+    if !options.nat_gateway_vms.is_empty() {
+        let private_node_nat_gateway_map = match_private_node_vm_and_nat_gateway_vm(
+            &options.nat_gateway_vms,
+            &options.private_node_vms,
+        )?;
+        let serde_map = Value::Object(
+            private_node_nat_gateway_map
+                .into_iter()
+                .map(|(private_node_vm, nat_gateway_vm)| {
+                    (
+                        private_node_vm.name,
+                        Value::String(nat_gateway_vm.private_ip_addr.to_string()),
+                    )
+                })
+                .collect(),
         );
+        extra_vars.add_serde_value("nat_gateway_private_ip_map", serde_map);
+
         extra_vars.add_variable("make_vm_private", "true");
     } else if matches!(node_type, NodeType::Private) {
         return Err(Error::NatGatewayNotSupplied);

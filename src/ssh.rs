@@ -5,12 +5,14 @@
 // Please see the LICENSE file for more details.
 
 use crate::{
+    ansible::inventory::match_private_node_vm_and_nat_gateway_vm,
     error::{Error, Result},
     inventory::VirtualMachine,
     run_external_command,
 };
 use log::debug;
 use std::{
+    collections::HashMap,
     net::IpAddr,
     path::PathBuf,
     sync::{Arc, RwLock},
@@ -18,8 +20,7 @@ use std::{
 
 #[derive(Clone, Debug)]
 pub struct RoutedVms {
-    vms: Vec<VirtualMachine>,
-    gateway: IpAddr,
+    private_node_nat_gateway_ip_map: HashMap<VirtualMachine, IpAddr>,
 }
 
 #[derive(Clone)]
@@ -38,14 +39,28 @@ impl SshClient {
 
     /// Set the list of VMs that are routed through a gateway.
     /// This updates all the copies of the `SshClient` that have been cloned.
-    pub fn set_routed_vms(&self, vms: Vec<VirtualMachine>, gateway: IpAddr) -> Result<()> {
+    pub fn set_routed_vms(
+        &self,
+        private_node_vms: &[VirtualMachine],
+        nat_gateway_vms: &[VirtualMachine],
+    ) -> Result<()> {
+        let private_node_nat_gateway_map =
+            match_private_node_vm_and_nat_gateway_vm(private_node_vms, nat_gateway_vms)?;
+        let private_node_nat_gateway_ip_map = private_node_nat_gateway_map
+            .into_iter()
+            .map(|(private_node_vm, nat_gateway_vm)| {
+                (private_node_vm, nat_gateway_vm.public_ip_addr)
+            })
+            .collect::<HashMap<_, _>>();
         self.routed_vms
             .write()
             .map_err(|err| {
                 log::error!("Failed to set routed VMs: {err}");
                 Error::SshSettingsRwLockError
             })?
-            .replace(RoutedVms { vms, gateway });
+            .replace(RoutedVms {
+                private_node_nat_gateway_ip_map,
+            });
 
         debug!("Routed VMs have been set.");
 
@@ -72,23 +87,27 @@ impl SshClient {
             log::error!("Failed to read routed VMs: {err}");
             Error::SshSettingsRwLockError
         })?;
-        if let Some((vm, gateway)) = routed_vm_read.as_ref().and_then(|routed_vms| {
-            routed_vms
-                .vms
-                .iter()
-                .find(|vm| vm.public_ip_addr == *ip_address)
-                .map(|vm| (vm, routed_vms.gateway))
+        if let Some((vm, gateway_ip)) = routed_vm_read.as_ref().and_then(|routed_vms| {
+            routed_vms.private_node_nat_gateway_ip_map.iter().find_map(
+                |(private_vm, gateway_ip)| {
+                    if private_vm.public_ip_addr == *ip_address {
+                        Some((private_vm, gateway_ip))
+                    } else {
+                        None
+                    }
+                },
+            )
         }) {
             println!(
                 "Checking for SSH availability at {} ({ip_address}) via gateway {}...",
-                vm.private_ip_addr, gateway
+                vm.private_ip_addr, gateway_ip
             );
             args.push("-o".to_string());
             args.push(format!(
                 "ProxyCommand=ssh -i {} -W %h:%p {}@{}",
                 self.private_key_path.to_string_lossy(),
                 user,
-                gateway
+                gateway_ip
             ));
             args.push(format!("{user}@{}", vm.private_ip_addr));
         } else {
@@ -149,10 +168,15 @@ impl SshClient {
 
         if let Some((vm, gateway)) = routed_vm_read.as_ref().and_then(|routed_vms| {
             routed_vms
-                .vms
+                .private_node_nat_gateway_ip_map
                 .iter()
-                .find(|vm| vm.public_ip_addr == *ip_address)
-                .map(|vm| (vm, routed_vms.gateway))
+                .find_map(|(private_vm, gateway)| {
+                    if private_vm.public_ip_addr == *ip_address {
+                        Some((private_vm, gateway))
+                    } else {
+                        None
+                    }
+                })
         }) {
             debug!(
                 "Running command '{}' on {} ({ip_address}) via gateway {gateway}...",

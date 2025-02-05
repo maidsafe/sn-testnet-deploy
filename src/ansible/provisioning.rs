@@ -9,7 +9,9 @@ use super::{
     AnsibleInventoryType, AnsiblePlaybook, AnsibleRunner,
 };
 use crate::{
-    ansible::inventory::generate_custom_environment_inventory,
+    ansible::inventory::{
+        generate_custom_environment_inventory, match_private_node_vm_and_nat_gateway_vm,
+    },
     bootstrap::BootstrapOptions,
     deploy::DeployOptions,
     error::{Error, Result},
@@ -23,7 +25,8 @@ use evmlib::common::U256;
 use log::{debug, error, trace};
 use semver::Version;
 use std::{
-    net::SocketAddr,
+    collections::HashMap,
+    net::{IpAddr, SocketAddr},
     path::PathBuf,
     time::{Duration, Instant},
 };
@@ -56,7 +59,7 @@ pub struct ProvisionOptions {
     pub max_archived_log_files: u16,
     pub max_log_files: u16,
     pub name: String,
-    pub nat_gateway: Option<VirtualMachine>,
+    pub nat_gateway_vms: Vec<VirtualMachine>,
     pub network_id: Option<u8>,
     pub node_count: u16,
     pub output_inventory_dir_path: PathBuf,
@@ -89,7 +92,7 @@ impl From<BootstrapOptions> for ProvisionOptions {
             max_archived_log_files: bootstrap_options.max_archived_log_files,
             max_log_files: bootstrap_options.max_log_files,
             name: bootstrap_options.name,
-            nat_gateway: None,
+            nat_gateway_vms: Vec::new(),
             network_id: bootstrap_options.network_id,
             node_count: bootstrap_options.node_count,
             output_inventory_dir_path: bootstrap_options.output_inventory_dir_path,
@@ -124,7 +127,7 @@ impl From<DeployOptions> for ProvisionOptions {
             max_archived_log_files: deploy_options.max_archived_log_files,
             max_log_files: deploy_options.max_log_files,
             name: deploy_options.name,
-            nat_gateway: None,
+            nat_gateway_vms: Vec::new(),
             network_id: deploy_options.network_id,
             node_count: deploy_options.node_count,
             output_inventory_dir_path: deploy_options.output_inventory_dir_path,
@@ -330,21 +333,33 @@ impl AnsibleProvisioner {
         let nat_gateway_inventory = self
             .ansible_runner
             .get_inventory(AnsibleInventoryType::NatGateway, true)?;
-        let nat_gateway_ip = nat_gateway_inventory[0].public_ip_addr;
-        self.ssh_client
-            .wait_for_ssh_availability(&nat_gateway_ip, &self.cloud_provider.get_ssh_user())?;
-        let private_ips = options
-            .private_node_vms
-            .iter()
-            .map(|vm| vm.private_ip_addr.to_string())
-            .collect::<Vec<_>>();
+        for vm in &nat_gateway_inventory {
+            println!(
+                "Checking SSH availability for NAT Gateway: {}",
+                vm.public_ip_addr
+            );
+            self.ssh_client
+                .wait_for_ssh_availability(&vm.public_ip_addr, &self.cloud_provider.get_ssh_user())
+                .map_err(|e| {
+                    println!("Failed to establish SSH connection to NAT Gateway: {}", e);
+                    e
+                })?;
+        }
+        let private_node_nat_gateway_map = match_private_node_vm_and_nat_gateway_vm(
+            &options.private_node_vms,
+            &nat_gateway_inventory,
+        )?;
+        let private_node_ip_map = private_node_nat_gateway_map
+            .into_iter()
+            .map(|(k, v)| (v.name.clone(), k.private_ip_addr))
+            .collect::<HashMap<String, IpAddr>>();
 
-        if private_ips.is_empty() {
+        if private_node_ip_map.is_empty() {
             println!("There are no private node VM available to be routed through the NAT Gateway");
             return Err(Error::EmptyInventory(AnsibleInventoryType::PrivateNodes));
         }
 
-        let vars = extra_vars::build_nat_gateway_extra_vars_doc(&options.name, private_ips);
+        let vars = extra_vars::build_nat_gateway_extra_vars_doc(&options.name, private_node_ip_map);
         debug!("Provisioning NAT Gateway with vars: {vars}");
         self.ansible_runner.run_playbook(
             AnsiblePlaybook::NatGateway,
@@ -480,17 +495,14 @@ impl AnsibleProvisioner {
             .map_err(|err| {
                 println!("Failed to get NAT Gateway inventory {err:?}");
                 err
-            })?
-            .first()
-            .ok_or_else(|| Error::EmptyInventory(AnsibleInventoryType::NatGateway))?
-            .clone();
+            })?;
 
-        options.nat_gateway = Some(nat_gateway_inventory.clone());
+        options.nat_gateway_vms = nat_gateway_inventory.clone();
         generate_private_node_static_environment_inventory(
             &options.name,
             &options.output_inventory_dir_path,
             &options.private_node_vms,
-            &Some(nat_gateway_inventory),
+            &options.nat_gateway_vms,
             &self.ssh_client.private_key_path,
         )
         .inspect_err(|err| {

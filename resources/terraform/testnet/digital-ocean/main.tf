@@ -47,9 +47,9 @@ resource "digitalocean_droplet" "genesis_bootstrap" {
 }
 
 resource "digitalocean_droplet" "nat_gateway" {
-  count    = var.setup_nat_gateway ? 1 : 0
+  count    = var.private_node_vm_count
   image    = var.nat_gateway_droplet_image_id
-  name     = "${terraform.workspace}-nat-gateway"
+  name     = "${terraform.workspace}-nat-gateway-${count.index + 1}"
   region   = var.region
   size     = var.nat_gateway_droplet_size
   ssh_keys = var.droplet_ssh_keys

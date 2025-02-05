@@ -26,15 +26,18 @@
   command: sed -i 's/#net.ipv4.ip_forward/net.ipv4.ip_forward/g' /etc/sysctl.conf
   when: not ipv4_forwarded
 
-- name: check if node_private_ips_eth1 is added to the NAT gateway
+- name: Retrieve private IP of the corresponding private node vm
+  set_fact:
+    node_private_ip_eth1: "{{ node_private_ip_map[inventory_hostname] }}"
+
+- name: check if node_private_ip_eth1 is added to the NAT gateway
   command: iptables -t nat -L POSTROUTING -v
   register: nat_gateway_output
 
-- name: Add eth1 of node VM to the NAT gateway with random parameter
+- name: Add eht1 of node VM to the NAT gateway
   command: >
-    iptables -t nat -A POSTROUTING -s {{ item }} -o eth0 -j MASQUERADE --random
-  loop: "{{ node_private_ips_eth1 }}"
-  when: nat_gateway_output.stdout.find(item) == -1
+    iptables -t nat -A POSTROUTING -s {{ node_private_ip_eth1 }} -o eth0 -j MASQUERADE
+  when: nat_gateway_output.stdout.find(node_private_ip_eth1) == -1
 
 - name: set netfilter conntrack max
   sysctl:
