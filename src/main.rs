@@ -398,6 +398,16 @@ enum Commands {
         /// argument.
         #[clap(long)]
         genesis_node_volume_size: Option<u16>,
+        /// The amount of gas to initially transfer to each uploader, in U256
+        ///
+        /// 1 ETH = 1_000_000_000_000_000_000. Defaults to 0.1 ETH
+        #[arg(long)]
+        initial_gas: Option<U256>,
+        /// The amount of tokens to initially transfer to each uploader, in U256
+        ///
+        /// 1 Token = 1_000_000_000_000_000_000. Defaults to 100 token.
+        #[arg(long)]
+        initial_tokens: Option<U256>,
         /// The interval between starting each node in milliseconds.
         #[clap(long, value_parser = |t: &str| -> Result<Duration> { Ok(t.parse().map(Duration::from_millis)?)}, default_value = "2000")]
         interval: Duration,
@@ -1601,6 +1611,8 @@ async fn main() -> Result<()> {
             forks,
             funding_wallet_secret_key,
             genesis_node_volume_size,
+            initial_gas,
+            initial_tokens,
             interval,
             log_format,
             logstash_stack_name,
@@ -1734,6 +1746,8 @@ async fn main() -> Result<()> {
                     funding_wallet_secret_key,
                     genesis_node_volume_size: genesis_node_volume_size
                         .or_else(|| Some(calculate_size_per_attached_volume(1))),
+                    initial_gas,
+                    initial_tokens,
                     interval,
                     log_format,
                     logstash_details,
@@ -2749,6 +2763,7 @@ async fn main() -> Result<()> {
                         provision_only,
                         public_rpc: false,
                         ant_version: Some(autonomi_version),
+                        token_amount: None,
                     })
                     .await?;
 
@@ -2896,6 +2911,7 @@ async fn main() -> Result<()> {
             testnet_deployer
                 .upscale(&UpscaleOptions {
                     ansible_verbose,
+                    ant_version,
                     current_inventory: inventory,
                     desired_node_count,
                     desired_node_vm_count,
@@ -2907,14 +2923,14 @@ async fn main() -> Result<()> {
                     desired_uploaders_count,
                     funding_wallet_secret_key,
                     gas_amount: None,
+                    infra_only,
                     interval,
                     max_archived_log_files,
                     max_log_files,
-                    infra_only,
                     plan,
                     provision_only: false,
                     public_rpc,
-                    ant_version,
+                    token_amount: None,
                 })
                 .await?;
 
