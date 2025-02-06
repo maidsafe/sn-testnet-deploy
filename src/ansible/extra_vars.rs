@@ -327,15 +327,16 @@ pub fn build_node_extra_vars_doc(
 
     if !options.nat_gateway_vms.is_empty() {
         let private_node_nat_gateway_map = match_private_node_vm_and_nat_gateway_vm(
-            &options.nat_gateway_vms,
             &options.private_node_vms,
+            &options.nat_gateway_vms,
         )?;
         let serde_map = Value::Object(
             private_node_nat_gateway_map
                 .into_iter()
                 .map(|(private_node_vm, nat_gateway_vm)| {
                     (
-                        private_node_vm.name,
+                        // hostname of private node returns the private ip address, since we're using static inventory.
+                        private_node_vm.private_ip_addr.to_string(),
                         Value::String(nat_gateway_vm.private_ip_addr.to_string()),
                     )
                 })
