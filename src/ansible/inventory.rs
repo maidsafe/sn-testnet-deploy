@@ -358,7 +358,7 @@ pub fn match_private_node_vm_and_nat_gateway_vm(
             private_node_vms.len(),
             nat_gateway_vms.len()
         );
-        return Err(Error::InventoryCountsMismatch);
+        return Err(Error::VmCountMismatchPrivateAndNatGateway);
     }
 
     let mut map = HashMap::new();

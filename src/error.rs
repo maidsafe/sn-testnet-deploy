@@ -95,8 +95,8 @@ pub enum Error {
     InvalidUpscaleDesiredUploaderVmCount,
     #[error("Options were used that are not applicable to a bootstrap deployment")]
     InvalidUpscaleOptionsForBootstrapDeployment,
-    #[error("The inventory counts do not match")]
-    InventoryCountsMismatch,
+    #[error("The vm count for private and NAT gateway VMs does not match")]
+    VmCountMismatchPrivateAndNatGateway,
     #[error(transparent)]
     Io(#[from] std::io::Error),
     #[error("Could not obtain IpDetails")]

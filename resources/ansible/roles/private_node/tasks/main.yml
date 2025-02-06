@@ -10,7 +10,7 @@
   command: ip route show
   register: ip_route_output
 
-- name: Retrieve private IP of the corresponding private node vm
+- name: Retrieve private IP of the corresponding nat gateway
   set_fact:
     nat_gateway_private_ip_eth1: "{{ nat_gateway_private_ip_map[inventory_hostname] }}"
 
