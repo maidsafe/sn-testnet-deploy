@@ -115,9 +115,15 @@
   become: True
   command: systemctl daemon-reload
 
-- name: reload the configuration files for systemctl daemon
-  become: True
-  command: systemctl start telegraf-elasticsearch.service
+- name: start telegraf-elasticsearch service
+  systemd:
+    name: telegraf-elasticsearch
+    enabled: yes
+    state: started
+  register: telegraf_elasticsearch_start
+  retries: 3
+  delay: 5
+  until: telegraf_elasticsearch_start is not failed
 
 - name: start telegraf service
   systemd:
