@@ -268,14 +268,23 @@ impl AnsibleRunner {
         extra_vars_document: Option<String>,
     ) -> Result<()> {
         // prioritize the static private node inventory if it exists. Else fall back to the dynamic one.
-        if matches!(inventory_type, AnsibleInventoryType::PrivateNodes)
+        if matches!(inventory_type, AnsibleInventoryType::SymmetricPrivateNodes)
             && self
-                .get_inventory_path(&AnsibleInventoryType::PrivateNodesStatic)
+                .get_inventory_path(&AnsibleInventoryType::SymmetricPrivateNodesStatic)
                 .is_ok()
         {
-            println!("Using static private node inventory to run playbook");
-            inventory_type = AnsibleInventoryType::PrivateNodesStatic;
+            println!("Using symmetric static private node inventory to run playbook");
+            inventory_type = AnsibleInventoryType::SymmetricPrivateNodesStatic;
         }
+        if matches!(inventory_type, AnsibleInventoryType::FullConePrivateNodes)
+            && self
+                .get_inventory_path(&AnsibleInventoryType::FullConePrivateNodesStatic)
+                .is_ok()
+        {
+            println!("Using full cone static private node inventory to run playbook");
+            inventory_type = AnsibleInventoryType::FullConePrivateNodesStatic;
+        }
+
         debug!(
             "Running playbook: {:?} on {inventory_type:?} with extra vars: {extra_vars_document:?}",
             playbook.get_playbook_name()

@@ -19,8 +19,13 @@ variable "droplet_ssh_keys" {
   ]
 }
 
-variable "nat_gateway_droplet_size" {
-  description = "The size of the droplet for NAT gateway VM"
+variable "full_cone_nat_gateway_droplet_size" {
+  description = "The size of the droplet for Full Cone NAT gateway VM"
+  default = "s-1vcpu-2gb"
+}
+
+variable "symmetric_nat_gateway_droplet_size" {
+  description = "The size of the droplet for Symmetric NAT gateway VM"
   default = "s-1vcpu-2gb"
 }
 
@@ -79,9 +84,14 @@ variable "node_vm_count" {
   description = "The number of droplets to launch for nodes"
 }
 
-variable "private_node_vm_count" {
+variable "full_cone_private_node_vm_count" {
   default     = 1
-  description = "The number of droplets to launch for private nodes"
+  description = "The number of droplets to launch for full cone private nodes"
+}
+
+variable "symmetric_private_node_vm_count" {
+  default     = 1
+  description = "The number of droplets to launch for symmetric private nodes"
 }
 
 variable "uploader_vm_count" {
@@ -132,8 +142,14 @@ variable "node_volume_size" {
   default = 0
 }
 
-variable "private_node_volume_size" {
-  description = "Size of each volume in GB for private nodes"
+variable "full_cone_private_node_volume_size" {
+  description = "Size of each volume in GB for full cone private nodes"
+  type        = number
+  default = 0
+}
+
+variable "symmetric_private_node_volume_size" {
+  description = "Size of each volume in GB for symmetric private nodes"
   type        = number
   default = 0
 }

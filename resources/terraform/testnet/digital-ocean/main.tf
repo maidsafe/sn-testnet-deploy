@@ -46,14 +46,24 @@ resource "digitalocean_droplet" "genesis_bootstrap" {
   tags     = ["environment:${terraform.workspace}", "type:genesis"]
 }
 
-resource "digitalocean_droplet" "nat_gateway" {
-  count    = var.private_node_vm_count
+resource "digitalocean_droplet" "full_cone_nat_gateway" {
+  count    = var.full_cone_private_node_vm_count
   image    = var.nat_gateway_droplet_image_id
-  name     = "${terraform.workspace}-nat-gateway-${count.index + 1}"
+  name     = "${terraform.workspace}-full-cone-nat-gateway-${count.index + 1}"
   region   = var.region
-  size     = var.nat_gateway_droplet_size
+  size     = var.full_cone_nat_gateway_droplet_size
   ssh_keys = var.droplet_ssh_keys
-  tags     = ["environment:${terraform.workspace}", "type:nat_gateway"]
+  tags     = ["environment:${terraform.workspace}", "type:full_cone_nat_gateway"]
+}
+
+resource "digitalocean_droplet" "symmetric_nat_gateway" {
+  count    = var.symmetric_private_node_vm_count
+  image    = var.nat_gateway_droplet_image_id
+  name     = "${terraform.workspace}-symmetric-nat-gateway-${count.index + 1}"
+  region   = var.region
+  size     = var.symmetric_nat_gateway_droplet_size
+  ssh_keys = var.droplet_ssh_keys
+  tags     = ["environment:${terraform.workspace}", "type:symmetric_nat_gateway"]
 }
 
 resource "digitalocean_droplet" "node" {
@@ -66,14 +76,24 @@ resource "digitalocean_droplet" "node" {
   tags     = ["environment:${terraform.workspace}", "type:node"]
 }
 
-resource "digitalocean_droplet" "private_node" {
-  count   = var.private_node_vm_count
+resource "digitalocean_droplet" "full_cone_private_node" {
+  count   = var.full_cone_private_node_vm_count
   image    = var.node_droplet_image_id
-  name     = "${terraform.workspace}-private-node-${count.index + 1}"
+  name     = "${terraform.workspace}-full-cone-private-node-${count.index + 1}"
   region   = var.region
   size     = var.node_droplet_size
   ssh_keys = var.droplet_ssh_keys
-  tags     = ["environment:${terraform.workspace}", "type:private_node"]
+  tags     = ["environment:${terraform.workspace}", "type:full_cone_private_node"]
+}
+
+resource "digitalocean_droplet" "symmetric_private_node" {
+  count   = var.symmetric_private_node_vm_count
+  image    = var.node_droplet_image_id
+  name     = "${terraform.workspace}-symmetric-private-node-${count.index + 1}"
+  region   = var.region
+  size     = var.node_droplet_size
+  ssh_keys = var.droplet_ssh_keys
+  tags     = ["environment:${terraform.workspace}", "type:symmetric_private_node"]
 }
 
 resource "digitalocean_droplet" "uploader" {
@@ -115,8 +135,14 @@ locals {
     ]
   ])
 
-  private_node_volume_keys = flatten([
-    for node_index in range(var.private_node_vm_count) : [
+  full_cone_private_node_volume_keys = flatten([
+    for node_index in range(var.full_cone_private_node_vm_count) : [
+      for volume_index in range(var.volumes_per_node) : "${node_index+1}-${volume_index+1}"
+    ]
+  ])
+
+   symmetric_private_node_volume_keys = flatten([
+    for node_index in range(var.symmetric_private_node_vm_count) : [
       for volume_index in range(var.volumes_per_node) : "${node_index+1}-${volume_index+1}"
     ]
   ])
@@ -161,15 +187,29 @@ resource "digitalocean_volume_attachment" "node_volume_attachment" {
   volume_id  = digitalocean_volume.node_attached_volume[each.key].id
 }
 
-resource "digitalocean_volume" "private_node_attached_volume" {
-  for_each = { for key in local.private_node_volume_keys : key => key }
-  name        = lower("${terraform.workspace}-private-node-${split("-", each.key)[0]}-volume-${split("-", each.key)[1]}")
-  size        = var.private_node_volume_size
+resource "digitalocean_volume" "full_cone_private_node_attached_volume" {
+  for_each = { for key in local.full_cone_private_node_volume_keys : key => key }
+  name        = lower("${terraform.workspace}-full-cone-private-node-${split("-", each.key)[0]}-volume-${split("-", each.key)[1]}")
+  size        = var.full_cone_private_node_volume_size
   region      = var.region
 }
 
-resource "digitalocean_volume_attachment" "private_node_volume_attachment" {
-  for_each = { for key in local.private_node_volume_keys : key => key }
-  droplet_id = digitalocean_droplet.private_node[tonumber(split("-", each.key)[0]) -1 ].id
-  volume_id  = digitalocean_volume.private_node_attached_volume[each.key].id
+resource "digitalocean_volume_attachment" "full_cone_private_node_volume_attachment" {
+  for_each = { for key in local.full_cone_private_node_volume_keys : key => key }
+  droplet_id = digitalocean_droplet.full_cone_private_node[tonumber(split("-", each.key)[0]) -1 ].id
+  volume_id  = digitalocean_volume.full_cone_private_node_attached_volume[each.key].id
+}
+
+
+resource "digitalocean_volume" "symmetric_private_node_attached_volume" {
+  for_each = { for key in local.symmetric_private_node_volume_keys : key => key }
+  name        = lower("${terraform.workspace}-symmetric-private-node-${split("-", each.key)[0]}-volume-${split("-", each.key)[1]}")
+  size        = var.symmetric_private_node_volume_size
+  region      = var.region
+}
+
+resource "digitalocean_volume_attachment" "symmetric_private_node_volume_attachment" {
+  for_each = { for key in local.symmetric_private_node_volume_keys : key => key }
+  droplet_id = digitalocean_droplet.symmetric_private_node[tonumber(split("-", each.key)[0]) -1 ].id
+  volume_id  = digitalocean_volume.symmetric_private_node_attached_volume[each.key].id
 }

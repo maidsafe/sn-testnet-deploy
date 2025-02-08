@@ -34,7 +34,7 @@ use sn_testnet_deploy::{
     network_commands, notify_slack,
     setup::setup_dotenv_file,
     upscale::UpscaleOptions,
-    BinaryOption, CloudProvider, EnvironmentType, EvmNetwork, LogFormat, NatGatewayType, NodeType,
+    BinaryOption, CloudProvider, EnvironmentType, EvmNetwork, LogFormat, NodeType,
     TestnetDeployBuilder, UpgradeOptions,
 };
 use std::{env, net::IpAddr};
@@ -146,6 +146,26 @@ enum Commands {
         /// The default value from ansible.cfg is 50.
         #[clap(long)]
         forks: Option<usize>,
+        /// The number of antnode services to be run behind a Full Cone NAT Gateway on each private node VM.
+        ///
+        /// If the argument is not used, the value will be determined by the 'environment-type'
+        /// argument.
+        #[clap(long, verbatim_doc_comment)]
+        full_cone_private_node_count: Option<u16>,
+        /// The number of private node VMs to create. The private nodes will be behind a Full Cone NAT Gateway.
+        ///
+        /// Each VM will run many antnode services.
+        ///
+        /// If the argument is not used, the value will be determined by the 'environment-type'
+        #[clap(long, verbatim_doc_comment)]
+        full_cone_private_node_vm_count: Option<u16>,
+        /// The size of the volumes to attach to each private node VM. This argument will set the size of all the
+        /// 7 attached volumes.
+        ///
+        /// If the argument is not used, the value will be determined by the 'environment-type'
+        /// argument.
+        #[clap(long)]
+        full_cone_private_node_volume_size: Option<u16>,
         /// The interval between starting each node in milliseconds.
         #[clap(long, value_parser = |t: &str| -> Result<Duration> { Ok(t.parse().map(Duration::from_millis)?)}, default_value = "2000")]
         interval: Duration,
@@ -165,11 +185,6 @@ enum Commands {
         /// The name of the environment
         #[arg(short = 'n', long)]
         name: String,
-        /// Specify the type of NAT gateway to use.
-        ///
-        /// Valid values are "nat-randomized" or "full-cone".
-        #[clap(long, default_value = "nat-randomized", verbatim_doc_comment)]
-        nat_gateway_type: NatGatewayType,
         /// Specify the network ID to use for the node services. This is used to partition the network and will not allow
         /// nodes with different network IDs to join.
         ///
@@ -200,26 +215,6 @@ enum Commands {
         /// argument.
         #[clap(long)]
         node_volume_size: Option<u16>,
-        /// The number of antnode services to be run behind a NAT on each private node VM.
-        ///
-        /// If the argument is not used, the value will be determined by the 'environment-type'
-        /// argument.
-        #[clap(long, verbatim_doc_comment)]
-        private_node_count: Option<u16>,
-        /// The number of private node VMs to create.
-        ///
-        /// Each VM will run many antnode services.
-        ///
-        /// If the argument is not used, the value will be determined by the 'environment-type'
-        #[clap(long, verbatim_doc_comment)]
-        private_node_vm_count: Option<u16>,
-        /// The size of the volumes to attach to each private node VM. This argument will set the size of all the
-        /// 7 attached volumes.
-        ///
-        /// If the argument is not used, the value will be determined by the 'environment-type'
-        /// argument.
-        #[clap(long)]
-        private_node_volume_size: Option<u16>,
         /// The cloud provider to deploy to.
         ///
         /// Valid values are "aws" or "digital-ocean".
@@ -239,6 +234,26 @@ enum Commands {
         /// The rewards address for each of the antnode services.
         #[arg(long, required = true)]
         rewards_address: String,
+        /// The number of antnode services to be run behind a Symmetric NAT Gateway on each private node VM.
+        ///
+        /// If the argument is not used, the value will be determined by the 'environment-type'
+        /// argument.
+        #[clap(long, verbatim_doc_comment)]
+        symmetric_private_node_count: Option<u16>,
+        /// The number of private node VMs to create. The private nodes will be behind a Symmetric NAT Gateway.
+        ///
+        /// Each VM will run many antnode services.
+        ///
+        /// If the argument is not used, the value will be determined by the 'environment-type'
+        #[clap(long, verbatim_doc_comment)]
+        symmetric_private_node_vm_count: Option<u16>,
+        /// The size of the volumes to attach to each private node VM. This argument will set the size of all the
+        /// 7 attached volumes.
+        ///
+        /// If the argument is not used, the value will be determined by the 'environment-type'
+        /// argument.
+        #[clap(long)]
+        symmetric_private_node_volume_size: Option<u16>,
     },
     /// Clean a deployed testnet environment.
     Clean {
@@ -391,6 +406,29 @@ enum Commands {
         /// The default value from ansible.cfg is 50.
         #[clap(long)]
         forks: Option<usize>,
+        /// Override the size of the Full Cone NAT gateway VM.
+        #[clap(long)]
+        full_cone_nat_gateway_vm_size: Option<String>,
+        /// The number of antnode services to be run behind a Full Cone NAT Gateway on each private node VM.
+        ///
+        /// If the argument is not used, the value will be determined by the 'environment-type'
+        /// argument.
+        #[clap(long, verbatim_doc_comment)]
+        full_cone_private_node_count: Option<u16>,
+        /// The number of private node VMs to create. The private nodes will be behind a Full Cone NAT Gateway.
+        ///
+        /// Each VM will run many antnode services.
+        ///
+        /// If the argument is not used, the value will be determined by the 'environment-type'
+        #[clap(long, verbatim_doc_comment)]
+        full_cone_private_node_vm_count: Option<u16>,
+        /// The size of the volumes to attach to each private node VM. This argument will set the size of all the
+        /// 7 attached volumes.
+        ///
+        /// If the argument is not used, the value will be determined by the 'environment-type'
+        /// argument.
+        #[clap(long)]
+        full_cone_private_node_volume_size: Option<u16>,
         /// The secret key for the wallet that will fund all the uploaders.
         ///
         /// This argument only applies when Arbitrum or Sepolia networks are used.
@@ -435,14 +473,6 @@ enum Commands {
         /// The name of the environment
         #[arg(short = 'n', long)]
         name: String,
-        /// Specify the type of NAT gateway to use.
-        ///
-        /// Valid values are "nat-randomized" or "full-cone".
-        #[clap(long, default_value = "nat-randomized", verbatim_doc_comment)]
-        nat_gateway_type: NatGatewayType,
-        /// Override the size of the NAT gateway VM.
-        #[clap(long)]
-        nat_gateway_vm_size: Option<String>,
         /// Specify the network ID to use for the node services. This is used to partition the network and will not allow
         /// nodes with different network IDs to join.
         ///
@@ -478,26 +508,6 @@ enum Commands {
         /// argument.
         #[clap(long)]
         node_volume_size: Option<u16>,
-        /// The number of antnode services to be run behind a NAT on each private node VM.
-        ///
-        /// If the argument is not used, the value will be determined by the 'environment-type'
-        /// argument.
-        #[clap(long, verbatim_doc_comment)]
-        private_node_count: Option<u16>,
-        /// The number of private node VMs to create.
-        ///
-        /// Each VM will run many antnode services.
-        ///
-        /// If the argument is not used, the value will be determined by the 'environment-type'
-        #[clap(long, verbatim_doc_comment)]
-        private_node_vm_count: Option<u16>,
-        /// The size of the volumes to attach to each private node VM. This argument will set the size of all the
-        /// 7 attached volumes.
-        ///
-        /// If the argument is not used, the value will be determined by the 'environment-type'
-        /// argument.
-        #[clap(long)]
-        private_node_volume_size: Option<u16>,
         /// The cloud provider to deploy to.
         ///
         /// Valid values are "aws" or "digital-ocean".
@@ -523,6 +533,29 @@ enum Commands {
         /// The rewards address for each of the antnode services.
         #[arg(long, required = true)]
         rewards_address: String,
+        /// Override the size of the Symmetric NAT gateway VM.
+        #[clap(long)]
+        symmetric_nat_gateway_vm_size: Option<String>,
+        /// The number of antnode services to be run behind a Symmetric NAT Gateway on each private node VM.
+        ///
+        /// If the argument is not used, the value will be determined by the 'environment-type'
+        /// argument.
+        #[clap(long, verbatim_doc_comment)]
+        symmetric_private_node_count: Option<u16>,
+        /// The number of private node VMs to create. The private nodes will be behind a Symmetric NAT Gateway.
+        ///
+        /// Each VM will run many antnode services.
+        ///
+        /// If the argument is not used, the value will be determined by the 'environment-type'
+        #[clap(long, verbatim_doc_comment)]
+        symmetric_private_node_vm_count: Option<u16>,
+        /// The size of the volumes to attach to each private node VM. This argument will set the size of all the
+        /// 7 attached volumes.
+        ///
+        /// If the argument is not used, the value will be determined by the 'environment-type'
+        /// argument.
+        #[clap(long)]
+        symmetric_private_node_volume_size: Option<u16>,
         /// The desired number of uploaders per VM.
         #[clap(long, default_value_t = 1)]
         uploaders_count: u16,
@@ -540,13 +573,13 @@ enum Commands {
         /// Set to run Ansible with more verbose output.
         #[arg(long)]
         ansible_verbose: bool,
-        /// The new size of the volumes attached to each Peer Cache node VM. This argument will scale up the size of all
-        /// the 7 attached volumes.
+        /// The new size of the volumes attached to each private node VM that is behind a Full Cone NAT Gateway.
+        /// This argument will scale up the size of all the 7 attached volumes.
         ///
         /// If the argument is not used, the value will be determined by the 'environment-type'
         /// argument.
         #[clap(long)]
-        peer_cache_node_volume_size: Option<u16>,
+        full_cone_private_node_volume_size: Option<u16>,
         /// The new size of the volumes attached to each genesis node VM. This argument will scale up the size of all
         /// the 7 attached volumes.
         ///
@@ -564,16 +597,23 @@ enum Commands {
         /// argument.
         #[clap(long)]
         node_volume_size: Option<u16>,
-        /// The new size of the volumes attached to each private node VM. This argument will scale up the size of all
+        /// The new size of the volumes attached to each Peer Cache node VM. This argument will scale up the size of all
         /// the 7 attached volumes.
         ///
         /// If the argument is not used, the value will be determined by the 'environment-type'
         /// argument.
         #[clap(long)]
-        private_node_volume_size: Option<u16>,
+        peer_cache_node_volume_size: Option<u16>,
         /// The cloud provider for the environment.
         #[clap(long, value_parser = parse_provider, verbatim_doc_comment, default_value_t = CloudProvider::DigitalOcean)]
         provider: CloudProvider,
+        /// The new size of the volumes attached to each private node VM that is behind a Symmetric NAT Gateway.
+        /// This argument will scale up the size of all the 7 attached volumes.
+        ///
+        /// If the argument is not used, the value will be determined by the 'environment-type'
+        /// argument.
+        #[clap(long)]
+        symmetric_private_node_volume_size: Option<u16>,
     },
     /// Manage the faucet for an environment
     #[clap(name = "faucet", subcommand)]
@@ -899,6 +939,23 @@ enum Commands {
         /// exclusive with the version arguments.
         #[arg(long, verbatim_doc_comment)]
         branch: Option<String>,
+        /// The desired number of antnode services to be running behind a Full Cone NAT on each private node VM after
+        /// the scale.
+        ///
+        /// If there are currently 10 services running on each VM, and you want there to be 25, the
+        /// value used should be 25, rather than 15 as a delta to reach 25.
+        ///
+        /// This option is not applicable to a bootstrap deployment.
+        #[clap(long, verbatim_doc_comment)]
+        desired_full_cone_private_node_count: Option<u16>,
+        /// The desired number of private node VMs to be running behind a Full Cone NAT after the scale.
+        ///
+        /// If there are currently 10 VMs running, and you want there to be 20, use 20 as the
+        /// value, not 10 as a delta.
+        ///
+        /// This option is not applicable to a bootstrap deployment.
+        #[clap(long, verbatim_doc_comment)]
+        desired_full_cone_private_node_vm_count: Option<u16>,
         /// The desired number of antnode services to be running on each node VM after the scale.
         ///
         /// If there are currently 10 services running on each VM, and you want there to be 25, the
@@ -928,23 +985,23 @@ enum Commands {
         /// This option is not applicable to a bootstrap deployment.
         #[clap(long, verbatim_doc_comment)]
         desired_peer_cache_node_vm_count: Option<u16>,
-        /// The desired number of antnode services to be running behind a NAT on each private node VM after the
-        /// scale.
+        /// The desired number of antnode services to be running behind a Symmetric NAT on each private node VM after
+        /// the scale.
         ///
         /// If there are currently 10 services running on each VM, and you want there to be 25, the
         /// value used should be 25, rather than 15 as a delta to reach 25.
         ///
         /// This option is not applicable to a bootstrap deployment.
         #[clap(long, verbatim_doc_comment)]
-        desired_private_node_count: Option<u16>,
-        /// The desired number of private node VMs to be running after the scale.
+        desired_symmetric_private_node_count: Option<u16>,
+        /// The desired number of private node VMs to be running behind a Symmetric NAT after the scale.
         ///
         /// If there are currently 10 VMs running, and you want there to be 20, use 20 as the
         /// value, not 10 as a delta.
         ///
         /// This option is not applicable to a bootstrap deployment.
         #[clap(long, verbatim_doc_comment)]
-        desired_private_node_vm_count: Option<u16>,
+        desired_symmetric_private_node_vm_count: Option<u16>,
         /// The desired number of uploader VMs to be running after the scale.
         ///
         /// If there are currently 10 VMs running, and you want there to be 25, the value used
@@ -1452,11 +1509,13 @@ async fn main() -> Result<()> {
             evm_network_type,
             evm_payment_token_address,
             evm_rpc_url,
+            full_cone_private_node_count,
+            full_cone_private_node_vm_count,
+            full_cone_private_node_volume_size,
             forks,
             interval,
             log_format,
             name,
-            nat_gateway_type,
             network_id,
             node_count,
             node_vm_count,
@@ -1464,9 +1523,9 @@ async fn main() -> Result<()> {
             node_vm_size,
             max_archived_log_files,
             max_log_files,
-            private_node_count,
-            private_node_vm_count,
-            private_node_volume_size,
+            symmetric_private_node_count,
+            symmetric_private_node_vm_count,
+            symmetric_private_node_volume_size,
             provider,
             repo_owner,
             rewards_address,
@@ -1548,8 +1607,10 @@ async fn main() -> Result<()> {
             }
 
             let node_count = node_count.unwrap_or(environment_type.get_default_node_count());
-            let private_node_count =
-                private_node_count.unwrap_or(environment_type.get_default_private_node_count());
+            let symmetric_private_node_count = symmetric_private_node_count
+                .unwrap_or(environment_type.get_default_symmetric_private_node_count());
+            let full_cone_private_node_count = full_cone_private_node_count
+                .unwrap_or(environment_type.get_default_full_cone_private_node_count());
 
             testnet_deployer
                 .bootstrap(&BootstrapOptions {
@@ -1562,10 +1623,18 @@ async fn main() -> Result<()> {
                     evm_network: evm_network_type,
                     evm_payment_token_address,
                     evm_rpc_url,
+                    full_cone_private_node_count,
+                    full_cone_private_node_vm_count,
+                    full_cone_private_node_volume_size: full_cone_private_node_volume_size.or_else(
+                        || {
+                            Some(calculate_size_per_attached_volume(
+                                full_cone_private_node_count,
+                            ))
+                        },
+                    ),
                     interval,
                     log_format,
                     name: name.clone(),
-                    nat_gateway_type,
                     network_id,
                     node_count,
                     node_vm_count,
@@ -1578,10 +1647,15 @@ async fn main() -> Result<()> {
                         .working_directory_path
                         .join("ansible")
                         .join("inventory"),
-                    private_node_vm_count,
-                    private_node_count,
-                    private_node_volume_size: private_node_volume_size
-                        .or_else(|| Some(calculate_size_per_attached_volume(private_node_count))),
+                    symmetric_private_node_vm_count,
+                    symmetric_private_node_count,
+                    symmetric_private_node_volume_size: symmetric_private_node_volume_size.or_else(
+                        || {
+                            Some(calculate_size_per_attached_volume(
+                                symmetric_private_node_count,
+                            ))
+                        },
+                    ),
                     rewards_address,
                     chunk_size,
                 })
@@ -1620,6 +1694,10 @@ async fn main() -> Result<()> {
             evm_node_vm_size,
             evm_payment_token_address,
             evm_rpc_url,
+            full_cone_nat_gateway_vm_size,
+            full_cone_private_node_count,
+            full_cone_private_node_vm_count,
+            full_cone_private_node_volume_size,
             forks,
             funding_wallet_secret_key,
             genesis_node_volume_size,
@@ -1631,8 +1709,6 @@ async fn main() -> Result<()> {
             max_archived_log_files,
             max_log_files,
             name,
-            nat_gateway_type,
-            nat_gateway_vm_size,
             network_id,
             network_contacts_file_name,
             node_count,
@@ -1643,9 +1719,10 @@ async fn main() -> Result<()> {
             peer_cache_node_vm_count,
             peer_cache_node_vm_size,
             peer_cache_node_volume_size,
-            private_node_count,
-            private_node_vm_count,
-            private_node_volume_size,
+            symmetric_nat_gateway_vm_size,
+            symmetric_private_node_count,
+            symmetric_private_node_vm_count,
+            symmetric_private_node_volume_size,
             provider,
             public_rpc,
             repo_owner,
@@ -1740,8 +1817,10 @@ async fn main() -> Result<()> {
             let peer_cache_node_count = peer_cache_node_count
                 .unwrap_or(environment_type.get_default_peer_cache_node_count());
             let node_count = node_count.unwrap_or(environment_type.get_default_node_count());
-            let private_node_count =
-                private_node_count.unwrap_or(environment_type.get_default_private_node_count());
+            let symmetric_private_node_count = symmetric_private_node_count
+                .unwrap_or(environment_type.get_default_symmetric_private_node_count());
+            let full_cone_private_node_count = full_cone_private_node_count
+                .unwrap_or(environment_type.get_default_full_cone_private_node_count());
 
             testnet_deployer
                 .deploy(&DeployOptions {
@@ -1757,6 +1836,16 @@ async fn main() -> Result<()> {
                     evm_payment_token_address,
                     evm_rpc_url,
                     funding_wallet_secret_key,
+                    full_cone_nat_gateway_vm_size,
+                    full_cone_private_node_count,
+                    full_cone_private_node_vm_count,
+                    full_cone_private_node_volume_size: full_cone_private_node_volume_size.or_else(
+                        || {
+                            Some(calculate_size_per_attached_volume(
+                                full_cone_private_node_count,
+                            ))
+                        },
+                    ),
                     genesis_node_volume_size: genesis_node_volume_size
                         .or_else(|| Some(calculate_size_per_attached_volume(1))),
                     initial_gas,
@@ -1767,8 +1856,6 @@ async fn main() -> Result<()> {
                     max_archived_log_files,
                     max_log_files,
                     name: name.clone(),
-                    nat_gateway_type,
-                    nat_gateway_vm_size,
                     network_id,
                     node_count,
                     node_vm_count,
@@ -1785,10 +1872,16 @@ async fn main() -> Result<()> {
                     peer_cache_node_volume_size: peer_cache_node_volume_size.or_else(|| {
                         Some(calculate_size_per_attached_volume(peer_cache_node_count))
                     }),
-                    private_node_count,
-                    private_node_vm_count,
-                    private_node_volume_size: private_node_volume_size
-                        .or_else(|| Some(calculate_size_per_attached_volume(private_node_count))),
+                    symmetric_nat_gateway_vm_size,
+                    symmetric_private_node_count,
+                    symmetric_private_node_vm_count,
+                    symmetric_private_node_volume_size: symmetric_private_node_volume_size.or_else(
+                        || {
+                            Some(calculate_size_per_attached_volume(
+                                symmetric_private_node_count,
+                            ))
+                        },
+                    ),
                     public_rpc,
                     rewards_address,
                     uploader_vm_count,
@@ -1831,17 +1924,19 @@ async fn main() -> Result<()> {
         }
         Commands::ExtendVolumeSize {
             ansible_verbose,
-            peer_cache_node_volume_size,
             genesis_node_volume_size,
+            full_cone_private_node_volume_size,
             node_volume_size,
             name,
-            private_node_volume_size,
+            peer_cache_node_volume_size,
             provider,
+            symmetric_private_node_volume_size,
         } => {
             if peer_cache_node_volume_size.is_none()
                 && genesis_node_volume_size.is_none()
                 && node_volume_size.is_none()
-                && private_node_volume_size.is_none()
+                && symmetric_private_node_volume_size.is_none()
+                && full_cone_private_node_volume_size.is_none()
             {
                 return Err(eyre!("At least one volume size must be provided"));
             }
@@ -1878,9 +1973,15 @@ async fn main() -> Result<()> {
                 infra_run_options.node_volume_size = node_volume_size;
                 node_types.push(AnsibleInventoryType::Nodes);
             }
-            if private_node_volume_size.is_some() {
-                infra_run_options.private_node_volume_size = private_node_volume_size;
-                node_types.push(AnsibleInventoryType::PrivateNodes);
+            if symmetric_private_node_volume_size.is_some() {
+                infra_run_options.symmetric_private_node_volume_size =
+                    symmetric_private_node_volume_size;
+                node_types.push(AnsibleInventoryType::SymmetricPrivateNodes);
+            }
+            if full_cone_private_node_volume_size.is_some() {
+                infra_run_options.full_cone_private_node_volume_size =
+                    full_cone_private_node_volume_size;
+                node_types.push(AnsibleInventoryType::FullConePrivateNodes);
             }
 
             println!("Running infra update with new volume sizes: {infra_run_options:?}");
@@ -2759,12 +2860,14 @@ async fn main() -> Result<()> {
                     .upscale_uploaders(&UpscaleOptions {
                         ansible_verbose: false,
                         current_inventory: inventory,
+                        desired_full_cone_private_node_count: None,
+                        desired_full_cone_private_node_vm_count: None,
                         desired_node_count: None,
                         desired_node_vm_count: None,
                         desired_peer_cache_node_count: None,
                         desired_peer_cache_node_vm_count: None,
-                        desired_private_node_count: None,
-                        desired_private_node_vm_count: None,
+                        desired_symmetric_private_node_count: None,
+                        desired_symmetric_private_node_vm_count: None,
                         desired_uploader_vm_count,
                         desired_uploaders_count,
                         funding_wallet_secret_key,
@@ -2822,11 +2925,13 @@ async fn main() -> Result<()> {
             antnode_version,
             branch,
             desired_node_count,
+            desired_full_cone_private_node_count,
+            desired_full_cone_private_node_vm_count,
             desired_node_vm_count,
             desired_peer_cache_node_count,
             desired_peer_cache_node_vm_count,
-            desired_private_node_count,
-            desired_private_node_vm_count,
+            desired_symmetric_private_node_count,
+            desired_symmetric_private_node_vm_count,
             desired_uploader_vm_count,
             desired_uploaders_count,
             funding_wallet_secret_key,
@@ -2928,11 +3033,13 @@ async fn main() -> Result<()> {
                     ant_version,
                     current_inventory: inventory,
                     desired_node_count,
+                    desired_full_cone_private_node_count,
+                    desired_full_cone_private_node_vm_count,
                     desired_node_vm_count,
                     desired_peer_cache_node_count,
                     desired_peer_cache_node_vm_count,
-                    desired_private_node_count,
-                    desired_private_node_vm_count,
+                    desired_symmetric_private_node_count,
+                    desired_symmetric_private_node_vm_count,
                     desired_uploader_vm_count,
                     desired_uploaders_count,
                     funding_wallet_secret_key,
@@ -3026,10 +3133,15 @@ async fn main() -> Result<()> {
                 AnsibleInventoryType::Custom
             } else {
                 let inventory_type = match node_type {
+                    Some(NodeType::FullConePrivateNode) => {
+                        AnsibleInventoryType::FullConePrivateNodes
+                    }
                     Some(NodeType::Genesis) => AnsibleInventoryType::Genesis,
                     Some(NodeType::Generic) => AnsibleInventoryType::Nodes,
                     Some(NodeType::PeerCache) => AnsibleInventoryType::PeerCacheNodes,
-                    Some(NodeType::Private) => AnsibleInventoryType::PrivateNodes,
+                    Some(NodeType::SymmetricPrivateNode) => {
+                        AnsibleInventoryType::SymmetricPrivateNodes
+                    }
                     None => AnsibleInventoryType::Nodes,
                 };
                 println!("Updating peers against {inventory_type:?}");

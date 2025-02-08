@@ -85,18 +85,22 @@ pub enum Error {
     InvalidUpscaleDesiredNodeVmCount,
     #[error("The desired node count is smaller than the current count. This is invalid for an upscale operation.")]
     InvalidUpscaleDesiredNodeCount,
-    #[error("The desired private node VM count is smaller than the current count. This is invalid for an upscale operation.")]
-    InvalidUpscaleDesiredPrivateNodeVmCount,
-    #[error("The desired private node count is smaller than the current count. This is invalid for an upscale operation.")]
-    InvalidUpscaleDesiredPrivateNodeCount,
+    #[error("The desired full cone private node VM count is smaller than the current count. This is invalid for an upscale operation.")]
+    InvalidUpscaleDesiredFullConePrivateNodeVmCount,
+    #[error("The desired symmetric private node VM count is smaller than the current count. This is invalid for an upscale operation.")]
+    InvalidUpscaleDesiredSymmetricPrivateNodeVmCount,
+    #[error("The desired full cone private node count is smaller than the current count. This is invalid for an upscale operation.")]
+    InvalidUpscaleDesiredFullConePrivateNodeCount,
+    #[error("The desired symmetric private node count is smaller than the current count. This is invalid for an upscale operation.")]
+    InvalidUpscaleDesiredSymmetricPrivateNodeCount,
     #[error("The desired uploader count is smaller than the current count. This is invalid for an upscale operation.")]
     InvalidUpscaleDesiredUploaderCount,
     #[error("The desired uploader VM count is smaller than the current count. This is invalid for an upscale operation.")]
     InvalidUpscaleDesiredUploaderVmCount,
     #[error("Options were used that are not applicable to a bootstrap deployment")]
     InvalidUpscaleOptionsForBootstrapDeployment,
-    #[error("The vm count for private and NAT gateway VMs does not match")]
-    VmCountMismatchPrivateAndNatGateway,
+    #[error("The vm count for the provided custom vms are not equal: {0:?} != {1:?}")]
+    VmCountMismatch(Option<AnsibleInventoryType>, Option<AnsibleInventoryType>),
     #[error(transparent)]
     Io(#[from] std::io::Error),
     #[error("Could not obtain IpDetails")]

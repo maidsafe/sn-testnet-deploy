@@ -6,7 +6,10 @@
 
 use super::AnsibleRunner;
 use crate::{
-    ansible::AnsibleBinary, error::Error, inventory::VirtualMachine, run_external_command, Result,
+    ansible::{provisioning::PrivateNodeProvisionInventory, AnsibleBinary},
+    error::Error,
+    inventory::VirtualMachine,
+    run_external_command, Result,
 };
 use log::{debug, error, warn};
 use serde::Deserialize;
@@ -32,24 +35,32 @@ pub enum AnsibleInventoryType {
     Custom,
     /// Use to run a playbook against all EVM nodes.
     EvmNodes,
+    /// Use to run a playbook against the Full Cone NAT gateway.
+    FullConeNatGateway,
+    /// Use to run a inventory against the Full Cone NAT private nodes. This does not route the ssh connection through
+    /// the NAT gateway and hence cannot run playbooks. Use PrivateNodesStatic for playbooks.
+    FullConePrivateNodes,
+    /// Use to run a playbook against the private nodes. This is similar to the PrivateNodes inventory, but uses
+    /// a static custom inventory file. This is just used for running playbooks and not inventory.
+    FullConePrivateNodesStatic,
     /// Use to run a playbook against the genesis node.
     ///
     /// Only one machine will be returned in this inventory.
     Genesis,
     /// Use to run a playbook against the Logstash servers.
     Logstash,
-    /// Use to run a playbook against the NAT gateway.
-    NatGateway,
     /// Use to run a playbook against all nodes except the genesis node.
     Nodes,
     /// Use to run a playbook against all Peer Cache nodes.
     PeerCacheNodes,
-    /// Use to run a inventory against the private nodes. This does not route the ssh connection through the NAT gateway
-    /// and hence cannot run playbooks. Use PrivateNodesStatic for that.
-    PrivateNodes,
+    /// Use to run a playbook against the Symmetric NAT gateway.
+    SymmetricNatGateway,
+    /// Use to run a inventory against the Symmetric NAT private nodes. This does not route the ssh connection through
+    /// the NAT gateway and hence cannot run playbooks. Use PrivateNodesStatic for playbooks.
+    SymmetricPrivateNodes,
     /// Use to run a playbook against the private nodes. This is similar to the PrivateNodes inventory, but uses
     /// a static custom inventory file. This is just used for running playbooks and not inventory.
-    PrivateNodesStatic,
+    SymmetricPrivateNodesStatic,
     /// Use to run a playbook against all the uploader machines.
     Uploaders,
 }
@@ -61,12 +72,15 @@ impl std::fmt::Display for AnsibleInventoryType {
             AnsibleInventoryType::Build => "Build",
             AnsibleInventoryType::Custom => "Custom",
             AnsibleInventoryType::EvmNodes => "EvmNodes",
+            AnsibleInventoryType::FullConeNatGateway => "FullConeNatGateway",
+            AnsibleInventoryType::FullConePrivateNodes => "FullConePrivateNodes",
+            AnsibleInventoryType::FullConePrivateNodesStatic => "FullConePrivateNodesStatic",
             AnsibleInventoryType::Genesis => "Genesis",
             AnsibleInventoryType::Logstash => "Logstash",
-            AnsibleInventoryType::NatGateway => "NatGateway",
             AnsibleInventoryType::Nodes => "Nodes",
-            AnsibleInventoryType::PrivateNodes => "PrivateNodes",
-            AnsibleInventoryType::PrivateNodesStatic => "PrivateNodesStatic",
+            AnsibleInventoryType::SymmetricNatGateway => "SymmetricNatGateway",
+            AnsibleInventoryType::SymmetricPrivateNodes => "SymmetricPrivateNodes",
+            AnsibleInventoryType::SymmetricPrivateNodesStatic => "SymmetricPrivateNodesStatic",
             AnsibleInventoryType::Uploaders => "Uploaders",
         };
         write!(f, "{}", s)
@@ -82,17 +96,26 @@ impl AnsibleInventoryType {
             Self::Build => PathBuf::from(format!(".{name}_build_inventory_{provider}.yml")),
             Self::Custom => PathBuf::from(format!(".{name}_custom_inventory_{provider}.ini")),
             Self::EvmNodes => PathBuf::from(format!(".{name}_evm_node_inventory_{provider}.yml")),
+            Self::FullConeNatGateway => PathBuf::from(format!(
+                ".{name}_full_cone_nat_gateway_inventory_{provider}.yml"
+            )),
+            Self::FullConePrivateNodes => PathBuf::from(format!(
+                ".{name}_full_cone_private_node_inventory_{provider}.yml"
+            )),
+            Self::FullConePrivateNodesStatic => PathBuf::from(format!(
+                ".{name}_full_cone_private_node_static_inventory_{provider}.yml"
+            )),
             Self::Genesis => PathBuf::from(format!(".{name}_genesis_inventory_{provider}.yml")),
             Self::Logstash => PathBuf::from(format!(".{name}_logstash_inventory_{provider}.yml")),
-            Self::NatGateway => {
-                PathBuf::from(format!(".{name}_nat_gateway_inventory_{provider}.yml"))
-            }
             Self::Nodes => PathBuf::from(format!(".{name}_node_inventory_{provider}.yml")),
-            Self::PrivateNodes => {
-                PathBuf::from(format!(".{name}_private_node_inventory_{provider}.yml"))
-            }
-            Self::PrivateNodesStatic => PathBuf::from(format!(
-                ".{name}_private_node_static_inventory_{provider}.yml"
+            Self::SymmetricNatGateway => PathBuf::from(format!(
+                ".{name}_symmetric_nat_gateway_inventory_{provider}.yml"
+            )),
+            Self::SymmetricPrivateNodes => PathBuf::from(format!(
+                ".{name}_symmetric_private_node_inventory_{provider}.yml"
+            )),
+            Self::SymmetricPrivateNodesStatic => PathBuf::from(format!(
+                ".{name}_symmetric_private_node_static_inventory_{provider}.yml"
             )),
             Self::Uploaders => PathBuf::from(format!(".{name}_uploader_inventory_{provider}.yml")),
         }
@@ -104,12 +127,15 @@ impl AnsibleInventoryType {
             Self::Build => "build",
             Self::Custom => "custom",
             Self::EvmNodes => "evm_node",
+            Self::FullConeNatGateway => "full_cone_nat_gateway",
+            Self::FullConePrivateNodes => "full_cone_private_node",
+            Self::FullConePrivateNodesStatic => "full_cone_private_node",
             Self::Genesis => "genesis",
             Self::Logstash => "logstash",
-            Self::NatGateway => "nat_gateway",
             Self::Nodes => "node",
-            Self::PrivateNodes => "private_node",
-            Self::PrivateNodesStatic => "private_node",
+            Self::SymmetricNatGateway => "symmetric_nat_gateway",
+            Self::SymmetricPrivateNodes => "symmetric_private_node",
+            Self::SymmetricPrivateNodesStatic => "symmetric_private_node",
             Self::Uploaders => "uploader",
         }
     }
@@ -117,9 +143,10 @@ impl AnsibleInventoryType {
     pub fn iter_node_type() -> impl Iterator<Item = Self> {
         [
             Self::Genesis,
-            Self::PeerCacheNodes,
+            Self::FullConePrivateNodes,
             Self::Nodes,
-            Self::PrivateNodes,
+            Self::PeerCacheNodes,
+            Self::SymmetricPrivateNodes,
         ]
         .into_iter()
     }
@@ -211,14 +238,16 @@ pub fn generate_environment_inventory(
     output_inventory_dir_path: &Path,
 ) -> Result<()> {
     let inventory_types = [
-        AnsibleInventoryType::PeerCacheNodes,
         AnsibleInventoryType::Build,
-        AnsibleInventoryType::Genesis,
-        AnsibleInventoryType::NatGateway,
-        AnsibleInventoryType::Nodes,
-        AnsibleInventoryType::PrivateNodes,
-        AnsibleInventoryType::Uploaders,
         AnsibleInventoryType::EvmNodes,
+        AnsibleInventoryType::FullConeNatGateway,
+        AnsibleInventoryType::FullConePrivateNodes,
+        AnsibleInventoryType::Genesis,
+        AnsibleInventoryType::Nodes,
+        AnsibleInventoryType::PeerCacheNodes,
+        AnsibleInventoryType::SymmetricNatGateway,
+        AnsibleInventoryType::SymmetricPrivateNodes,
+        AnsibleInventoryType::Uploaders,
     ];
     for inventory_type in inventory_types.into_iter() {
         let src_path = base_inventory_path;
@@ -251,15 +280,18 @@ pub fn cleanup_environment_inventory(
     inventory_types: Option<Vec<AnsibleInventoryType>>,
 ) -> Result<()> {
     let default_inventory_types = [
-        AnsibleInventoryType::PeerCacheNodes,
         AnsibleInventoryType::Build,
-        AnsibleInventoryType::Genesis,
-        AnsibleInventoryType::NatGateway,
-        AnsibleInventoryType::Nodes,
-        AnsibleInventoryType::PrivateNodes,
-        AnsibleInventoryType::PrivateNodesStatic,
-        AnsibleInventoryType::Uploaders,
         AnsibleInventoryType::EvmNodes,
+        AnsibleInventoryType::FullConeNatGateway,
+        AnsibleInventoryType::FullConePrivateNodes,
+        AnsibleInventoryType::FullConePrivateNodesStatic,
+        AnsibleInventoryType::Genesis,
+        AnsibleInventoryType::Nodes,
+        AnsibleInventoryType::PeerCacheNodes,
+        AnsibleInventoryType::SymmetricNatGateway,
+        AnsibleInventoryType::SymmetricPrivateNodes,
+        AnsibleInventoryType::SymmetricPrivateNodesStatic,
+        AnsibleInventoryType::Uploaders,
     ];
     let inventory_types = inventory_types
         .as_deref()
@@ -300,39 +332,45 @@ pub fn generate_custom_environment_inventory(
     Ok(())
 }
 
-/// Generate the static inventory for the private node. This is just used during ansible-playbook.
-pub fn generate_private_node_static_environment_inventory(
+/// Generate the static inventory for the private node that are behind a Symmetric NAT gateway.
+/// This is just used during ansible-playbook.
+pub fn generate_symmetric_private_node_static_environment_inventory(
     environment_name: &str,
     output_inventory_dir_path: &Path,
-    private_node_vms: &[VirtualMachine],
-    nat_gateway_vms: &[VirtualMachine],
+    symmetric_private_node_vms: &[VirtualMachine],
+    symmetric_nat_gateway_vms: &[VirtualMachine],
     ssh_sk_path: &Path,
 ) -> Result<()> {
-    if nat_gateway_vms.is_empty() {
-        println!("No NAT gateway VMs found. Skipping private node static inventory generation.");
+    if symmetric_nat_gateway_vms.is_empty() {
+        println!("No Symmetric NAT gateway VMs found. Skipping symmetric private node static inventory generation.");
         return Ok(());
     };
 
-    if private_node_vms.is_empty() {
-        return Err(Error::EmptyInventory(AnsibleInventoryType::PrivateNodes));
+    if symmetric_private_node_vms.is_empty() {
+        return Err(Error::EmptyInventory(
+            AnsibleInventoryType::SymmetricPrivateNodes,
+        ));
     }
 
     let private_node_nat_gateway_map =
-        match_private_node_vm_and_nat_gateway_vm(private_node_vms, nat_gateway_vms)?;
+        PrivateNodeProvisionInventory::match_private_node_vm_and_gateway_vm(
+            symmetric_private_node_vms,
+            symmetric_nat_gateway_vms,
+        )?;
 
     let dest_path = output_inventory_dir_path.join(
-        AnsibleInventoryType::PrivateNodesStatic
+        AnsibleInventoryType::SymmetricPrivateNodesStatic
             .get_inventory_path(environment_name, "digital_ocean"),
     );
-    debug!("Generating private node static inventory at {dest_path:?}",);
+    debug!("Generating symmetric private node static inventory at {dest_path:?}",);
 
     let mut file = File::create(&dest_path)?;
 
     for (privat_node_vm, nat_gateway_vm) in private_node_nat_gateway_map.iter() {
         let node_number = privat_node_vm.name.split('-').last().unwrap();
-        writeln!(file, "[private_node_{}]", node_number)?;
+        writeln!(file, "[symmetric_private_node_{}]", node_number)?;
         writeln!(file, "{}", privat_node_vm.private_ip_addr)?;
-        writeln!(file, "[private_node_{}:vars]", node_number)?;
+        writeln!(file, "[symmetric_private_node_{}:vars]", node_number)?;
         writeln!(
             file,
             "ansible_ssh_common_args='-o ProxyCommand=\"ssh -p 22 -W %h:%p -q root@{} -i \"{}\" -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null\"'",
@@ -342,46 +380,65 @@ pub fn generate_private_node_static_environment_inventory(
         writeln!(file, "ansible_host_key_checking=False")?;
     }
 
-    debug!("Created private node inventory file with ssh proxy at {dest_path:?}");
+    debug!("Created symmetric private node inventory file with ssh proxy at {dest_path:?}");
 
     Ok(())
 }
 
-/// Map of private node VMs to their corresponding NAT Gateway VMs.
-pub fn match_private_node_vm_and_nat_gateway_vm(
-    private_node_vms: &[VirtualMachine],
-    nat_gateway_vms: &[VirtualMachine],
-) -> Result<HashMap<VirtualMachine, VirtualMachine>> {
-    if private_node_vms.len() != nat_gateway_vms.len() {
-        println!(
-            "The number of private node VMs ({}) does not match the number of NAT Gateway VMs ({})",
-            private_node_vms.len(),
-            nat_gateway_vms.len()
-        );
-        return Err(Error::VmCountMismatchPrivateAndNatGateway);
+/// Generate the static inventory for the private node that are behind a Full Cone NAT gateway.
+/// This is just used during ansible-playbook.
+pub fn generate_full_cone_private_node_static_environment_inventory(
+    environment_name: &str,
+    output_inventory_dir_path: &Path,
+    full_cone_private_node_vms: &[VirtualMachine],
+    full_cone_nat_gateway_vms: &[VirtualMachine],
+) -> Result<()> {
+    if full_cone_nat_gateway_vms.is_empty() {
+        println!("No full cone NAT gateway VMs found. Skipping full cone private node static inventory generation.");
+        return Ok(());
+    };
+
+    if full_cone_private_node_vms.is_empty() {
+        return Err(Error::EmptyInventory(
+            AnsibleInventoryType::FullConePrivateNodes,
+        ));
     }
 
-    let mut map = HashMap::new();
-    for private_vm in private_node_vms {
-        let nat_gateway = nat_gateway_vms
-            .iter()
-            .find(|vm| {
-                let private_node_name = private_vm.name.split('-').last().unwrap();
-                let nat_gateway_name = vm.name.split('-').last().unwrap();
-                private_node_name == nat_gateway_name
-            })
-            .ok_or_else(|| {
-                println!(
-                    "Failed to find a matching NAT Gateway for private node: {}",
-                    private_vm.name
-                );
-                Error::EmptyInventory(AnsibleInventoryType::NatGateway)
-            })?;
+    let private_node_nat_gateway_map =
+        PrivateNodeProvisionInventory::match_private_node_vm_and_gateway_vm(
+            full_cone_private_node_vms,
+            full_cone_nat_gateway_vms,
+        )?;
 
-        let _ = map.insert(private_vm.clone(), nat_gateway.clone());
+    let dest_path = output_inventory_dir_path.join(
+        AnsibleInventoryType::FullConePrivateNodesStatic
+            .get_inventory_path(environment_name, "digital_ocean"),
+    );
+    debug!("Generating full cone private node static inventory at {dest_path:?}",);
+
+    let mut file = File::create(&dest_path)?;
+
+    for (privat_node_vm, nat_gateway_vm) in private_node_nat_gateway_map.iter() {
+        let node_number = privat_node_vm.name.split('-').last().unwrap();
+        writeln!(file, "[private_node_{}]", node_number)?;
+        writeln!(
+            file,
+            "{} ansible_host={} ansible_user=root",
+            privat_node_vm.private_ip_addr, nat_gateway_vm.public_ip_addr
+        )?;
+        writeln!(file, "[private_node_{}:vars]", node_number)?;
+        // writeln!(
+        //     file,
+        //     "ansible_ssh_common_args='-o ProxyCommand=\"ssh -p 22 -W %h:%p -q root@{} -i \"{}\" -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null\"'",
+        //     nat_gateway_vm.public_ip_addr,
+        //     ssh_sk_path.to_string_lossy()
+        // )?;
+        writeln!(file, "ansible_host_key_checking=False")?;
     }
 
-    Ok(map)
+    debug!("Created full cone private node inventory file with ssh proxy at {dest_path:?}");
+
+    Ok(())
 }
 
 // The following three structs are utilities that are used to parse the output of the

@@ -5,7 +5,10 @@
 // Please see the LICENSE file for more details.
 
 use crate::{
-    ansible::{inventory::AnsibleInventoryType, provisioning::ProvisionOptions},
+    ansible::{
+        inventory::AnsibleInventoryType,
+        provisioning::{PrivateNodeProvisionInventory, ProvisionOptions},
+    },
     error::{Error, Result},
     get_bootstrap_cache_url, get_genesis_multiaddr, get_multiaddr, DeploymentInventory,
     DeploymentType, InfraRunOptions, NodeType, TestnetDeployer,
@@ -20,12 +23,14 @@ pub struct UpscaleOptions {
     pub ansible_verbose: bool,
     pub ant_version: Option<String>,
     pub current_inventory: DeploymentInventory,
+    pub desired_full_cone_private_node_count: Option<u16>,
+    pub desired_full_cone_private_node_vm_count: Option<u16>,
     pub desired_node_count: Option<u16>,
     pub desired_node_vm_count: Option<u16>,
     pub desired_peer_cache_node_count: Option<u16>,
     pub desired_peer_cache_node_vm_count: Option<u16>,
-    pub desired_private_node_count: Option<u16>,
-    pub desired_private_node_vm_count: Option<u16>,
+    pub desired_symmetric_private_node_count: Option<u16>,
+    pub desired_symmetric_private_node_vm_count: Option<u16>,
     pub desired_uploader_vm_count: Option<u16>,
     pub desired_uploaders_count: Option<u16>,
     pub funding_wallet_secret_key: Option<String>,
@@ -76,13 +81,25 @@ impl TestnetDeployer {
         }
         debug!("Using {desired_node_vm_count} for desired node VM count");
 
-        let desired_private_node_vm_count = options
-            .desired_private_node_vm_count
-            .unwrap_or(options.current_inventory.private_node_vms.len() as u16);
-        if desired_private_node_vm_count < options.current_inventory.private_node_vms.len() as u16 {
-            return Err(Error::InvalidUpscaleDesiredPrivateNodeVmCount);
+        let desired_full_cone_private_node_vm_count = options
+            .desired_full_cone_private_node_vm_count
+            .unwrap_or(options.current_inventory.full_cone_private_node_vms.len() as u16);
+        if desired_full_cone_private_node_vm_count
+            < options.current_inventory.full_cone_private_node_vms.len() as u16
+        {
+            return Err(Error::InvalidUpscaleDesiredFullConePrivateNodeVmCount);
         }
-        debug!("Using {desired_private_node_vm_count} for desired private node VM count");
+        debug!("Using {desired_full_cone_private_node_vm_count} for desired full cone private node VM count");
+
+        let desired_symmetric_private_node_vm_count = options
+            .desired_symmetric_private_node_vm_count
+            .unwrap_or(options.current_inventory.symmetric_private_node_vms.len() as u16);
+        if desired_symmetric_private_node_vm_count
+            < options.current_inventory.symmetric_private_node_vms.len() as u16
+        {
+            return Err(Error::InvalidUpscaleDesiredSymmetricPrivateNodeVmCount);
+        }
+        debug!("Using {desired_symmetric_private_node_vm_count} for desired full cone private node VM count");
 
         let desired_uploader_vm_count = options
             .desired_uploader_vm_count
@@ -109,13 +126,29 @@ impl TestnetDeployer {
         }
         debug!("Using {desired_node_count} for desired node count");
 
-        let desired_private_node_count = options
-            .desired_private_node_count
-            .unwrap_or(options.current_inventory.private_node_count() as u16);
-        if desired_private_node_count < options.current_inventory.private_node_count() as u16 {
-            return Err(Error::InvalidUpscaleDesiredPrivateNodeCount);
+        let desired_full_cone_private_node_count = options
+            .desired_full_cone_private_node_count
+            .unwrap_or(options.current_inventory.full_cone_private_node_count() as u16);
+        if desired_full_cone_private_node_count
+            < options.current_inventory.full_cone_private_node_count() as u16
+        {
+            return Err(Error::InvalidUpscaleDesiredFullConePrivateNodeCount);
         }
-        debug!("Using {desired_private_node_count} for desired private node count");
+        debug!(
+            "Using {desired_full_cone_private_node_count} for desired full cone private node count"
+        );
+
+        let desired_symmetric_private_node_count = options
+            .desired_symmetric_private_node_count
+            .unwrap_or(options.current_inventory.symmetric_private_node_count() as u16);
+        if desired_symmetric_private_node_count
+            < options.current_inventory.symmetric_private_node_count() as u16
+        {
+            return Err(Error::InvalidUpscaleDesiredSymmetricPrivateNodeCount);
+        }
+        debug!(
+            "Using {desired_symmetric_private_node_count} for desired symmetric private node count"
+        );
 
         let mut infra_run_options = InfraRunOptions::generate_existing(
             &options.current_inventory.name,
@@ -125,7 +158,10 @@ impl TestnetDeployer {
         .await?;
         infra_run_options.peer_cache_node_vm_count = Some(desired_peer_cache_node_vm_count);
         infra_run_options.node_vm_count = Some(desired_node_vm_count);
-        infra_run_options.private_node_vm_count = Some(desired_private_node_vm_count);
+        infra_run_options.full_cone_private_node_vm_count =
+            Some(desired_full_cone_private_node_vm_count);
+        infra_run_options.symmetric_private_node_vm_count =
+            Some(desired_symmetric_private_node_vm_count);
         infra_run_options.uploader_vm_count = Some(desired_uploader_vm_count);
 
         if options.plan {
@@ -168,17 +204,12 @@ impl TestnetDeployer {
                 .environment_details
                 .evm_rpc_url
                 .clone(),
+            full_cone_private_node_count: desired_full_cone_private_node_count,
             funding_wallet_secret_key: options.funding_wallet_secret_key.clone(),
             interval: options.interval,
             log_format: None,
             logstash_details: None,
             name: options.current_inventory.name.clone(),
-            nat_gateway_type: options
-                .current_inventory
-                .environment_details
-                .nat_gateway_type
-                .clone(),
-            nat_gateway_vms: Vec::new(),
             network_id: options.current_inventory.environment_details.network_id,
             node_count: desired_node_count,
             max_archived_log_files: options.max_archived_log_files,
@@ -188,14 +219,13 @@ impl TestnetDeployer {
                 .join("ansible")
                 .join("inventory"),
             peer_cache_node_count: desired_peer_cache_node_count,
-            private_node_count: desired_private_node_count,
-            private_node_vms: Vec::new(),
             public_rpc: options.public_rpc,
             rewards_address: options
                 .current_inventory
                 .environment_details
                 .rewards_address
                 .clone(),
+            symmetric_private_node_count: desired_symmetric_private_node_count,
             ant_version: options.ant_version.clone(),
             uploaders_count: options.desired_uploaders_count,
             gas_amount: options.gas_amount,
@@ -227,10 +257,12 @@ impl TestnetDeployer {
             )?;
             self.ansible_provisioner
                 .print_ansible_run_banner("Provision Peer Cache Nodes");
-            match self.ansible_provisioner.provision_peer_cache_nodes(
+            match self.ansible_provisioner.provision_nodes(
                 &provision_options,
                 Some(initial_multiaddr.clone()),
                 Some(initial_network_contacts_url.clone()),
+                NodeType::PeerCache,
+                None,
             ) {
                 Ok(()) => {
                     println!("Provisioned Peer Cache nodes");
@@ -253,6 +285,7 @@ impl TestnetDeployer {
             Some(initial_multiaddr.clone()),
             Some(initial_network_contacts_url.clone()),
             NodeType::Generic,
+            None,
         ) {
             Ok(()) => {
                 println!("Provisioned normal nodes");
@@ -263,49 +296,79 @@ impl TestnetDeployer {
             }
         }
 
-        let should_provision_private_nodes = desired_private_node_vm_count > 0;
-        if should_provision_private_nodes {
-            println!("Private node provisioning will be skipped during upscale");
-            // TODO: Reenable this after examining and fixing the problems.
-            let private_nodes = self
-                .ansible_provisioner
-                .ansible_runner
-                .get_inventory(AnsibleInventoryType::PrivateNodes, true)
-                .map_err(|err| {
-                    println!("Failed to obtain the inventory of private node: {err:?}");
-                    err
-                })?;
-            provision_options.private_node_vms = private_nodes;
+        let private_node_inventory = PrivateNodeProvisionInventory::new(
+            &self.ansible_provisioner,
+            Some(desired_full_cone_private_node_vm_count),
+            Some(desired_symmetric_private_node_vm_count),
+        )?;
 
+        if private_node_inventory.should_provision_full_cone_private_nodes() {
             self.wait_for_ssh_availability_on_new_machines(
-                AnsibleInventoryType::NatGateway,
+                AnsibleInventoryType::FullConeNatGateway,
                 &options.current_inventory,
             )?;
             self.ansible_provisioner
-                .print_ansible_run_banner("Provision NAT Gateway");
+                .print_ansible_run_banner("Provision Full Cone NAT Gateway");
             self.ansible_provisioner
-                .provision_nat_gateway(&provision_options)
+                .provision_full_cone_nat_gateway(&provision_options, &private_node_inventory)
                 .map_err(|err| {
-                    println!("Failed to provision NAT gateway {err:?}");
+                    println!("Failed to provision full cone NAT gateway {err:?}");
                     err
                 })?;
 
             self.wait_for_ssh_availability_on_new_machines(
-                AnsibleInventoryType::PrivateNodes,
+                AnsibleInventoryType::FullConePrivateNodes,
                 &options.current_inventory,
             )?;
             self.ansible_provisioner
-                .print_ansible_run_banner("Provision Private Nodes");
-            match self.ansible_provisioner.provision_private_nodes(
+                .print_ansible_run_banner("Provision Full Cone Private Nodes");
+            match self.ansible_provisioner.provision_full_cone_private_nodes(
                 &mut provision_options,
                 Some(initial_multiaddr.clone()),
                 Some(initial_network_contacts_url.clone()),
+                &private_node_inventory,
             ) {
                 Ok(()) => {
-                    println!("Provisioned private nodes");
+                    println!("Provisioned full cone private nodes");
                 }
                 Err(err) => {
-                    log::error!("Failed to provision private nodes: {err}");
+                    log::error!("Failed to provision full cone private nodes: {err}");
+                    node_provision_failed = true;
+                }
+            }
+        }
+
+        if private_node_inventory.should_provision_symmetric_private_nodes() {
+            self.wait_for_ssh_availability_on_new_machines(
+                AnsibleInventoryType::SymmetricNatGateway,
+                &options.current_inventory,
+            )?;
+            self.ansible_provisioner
+                .print_ansible_run_banner("Provision Symmetric NAT Gateway");
+            self.ansible_provisioner
+                .provision_symmetric_nat_gateway(&provision_options, &private_node_inventory)
+                .map_err(|err| {
+                    println!("Failed to provision symmetric NAT gateway {err:?}");
+                    err
+                })?;
+
+            self.wait_for_ssh_availability_on_new_machines(
+                AnsibleInventoryType::SymmetricPrivateNodes,
+                &options.current_inventory,
+            )?;
+            self.ansible_provisioner
+                .print_ansible_run_banner("Provision Symmetric Private Nodes");
+            match self.ansible_provisioner.provision_symmetric_private_nodes(
+                &mut provision_options,
+                Some(initial_multiaddr.clone()),
+                Some(initial_network_contacts_url.clone()),
+                &private_node_inventory,
+            ) {
+                Ok(()) => {
+                    println!("Provisioned symmetric private nodes");
+                }
+                Err(err) => {
+                    log::error!("Failed to provision symmetric private nodes: {err}");
                     node_provision_failed = true;
                 }
             }
@@ -428,17 +491,12 @@ impl TestnetDeployer {
                 .environment_details
                 .evm_rpc_url
                 .clone(),
+            full_cone_private_node_count: 0,
             funding_wallet_secret_key: options.funding_wallet_secret_key.clone(),
             interval: options.interval,
             log_format: None,
             logstash_details: None,
             name: options.current_inventory.name.clone(),
-            nat_gateway_type: options
-                .current_inventory
-                .environment_details
-                .nat_gateway_type
-                .clone(),
-            nat_gateway_vms: Vec::new(),
             network_id: options.current_inventory.environment_details.network_id,
             node_count: 0,
             max_archived_log_files: options.max_archived_log_files,
@@ -448,14 +506,14 @@ impl TestnetDeployer {
                 .join("ansible")
                 .join("inventory"),
             peer_cache_node_count: 0,
-            private_node_count: 0,
-            private_node_vms: Vec::new(),
+
             public_rpc: options.public_rpc,
             rewards_address: options
                 .current_inventory
                 .environment_details
                 .rewards_address
                 .clone(),
+            symmetric_private_node_count: 0,
             ant_version: options.ant_version.clone(),
             uploaders_count: options.desired_uploaders_count,
             gas_amount: options.gas_amount,
@@ -511,11 +569,24 @@ impl TestnetDeployer {
                 .map(|uploader_vm| &uploader_vm.vm)
                 .cloned()
                 .collect(),
-            AnsibleInventoryType::NatGateway => {
-                current_inventory.nat_gateway_vms.iter().cloned().collect()
-            }
-            AnsibleInventoryType::PrivateNodes => current_inventory
-                .private_node_vms
+            AnsibleInventoryType::FullConeNatGateway => current_inventory
+                .full_cone_nat_gateway_vms
+                .iter()
+                .cloned()
+                .collect(),
+            AnsibleInventoryType::SymmetricNatGateway => current_inventory
+                .symmetric_nat_gateway_vms
+                .iter()
+                .cloned()
+                .collect(),
+            AnsibleInventoryType::FullConePrivateNodes => current_inventory
+                .full_cone_private_node_vms
+                .iter()
+                .map(|node_vm| &node_vm.vm)
+                .cloned()
+                .collect(),
+            AnsibleInventoryType::SymmetricPrivateNodes => current_inventory
+                .symmetric_private_node_vms
                 .iter()
                 .map(|node_vm| &node_vm.vm)
                 .cloned()
