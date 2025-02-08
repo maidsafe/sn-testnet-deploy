@@ -38,6 +38,16 @@
   retries: 20
   delay: 10
 
+- name: install iptables-persistent (requires shell instead of command)
+  shell: |
+    echo iptables-persistent iptables-persistent/autosave_v4 boolean true | debconf-set-selections
+    echo iptables-persistent iptables-persistent/autosave_v6 boolean true | debconf-set-selections
+    apt install -y iptables-persistent
+  register: result
+  until: result is succeeded
+  retries: 20
+  delay: 10
+
 - name: prerequisites for telegraf-geoip
   apt:
     name: 
