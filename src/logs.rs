@@ -65,29 +65,29 @@ impl TestnetDeployer {
             ),
         ]);
 
-        let nat_gateway_inventory = self.get_nat_gateway_inventory(name)?;
-        let private_rsync_args = if !nat_gateway_inventory.is_empty() {
-            let nat_gateway_inventory = nat_gateway_inventory.first().unwrap();
-            let mut private_rsync_args = rsync_args.clone();
-            private_rsync_args.extend(vec![
-                "-e".to_string(),
-                format!(
-                    "ssh -i {} -q -o StrictHostKeyChecking=no -o BatchMode=yes -o ConnectTimeout=30 -o ProxyCommand='ssh root@{} -W %h:%p -i {}'",
-                    self.ssh_client
-                        .get_private_key_path()
-                        .to_string_lossy()
-                        .as_ref(),
-                        nat_gateway_inventory.public_ip_addr,
-                    self.ssh_client
-                        .get_private_key_path()
-                        .to_string_lossy()
-                        .as_ref(),
-                ),
-            ]);
-            Some(private_rsync_args)
-        } else {
-            None
-        };
+        // let symmetric_nat_gateway_inventory = self.get_symmetric_nat_gateway_inventory(name)?;
+        // let private_rsync_args = if !nat_gateway_inventory.is_empty() {
+        //     let nat_gateway_inventory = nat_gateway_inventory.first().unwrap();
+        //     let mut private_rsync_args = rsync_args.clone();
+        //     private_rsync_args.extend(vec![
+        //         "-e".to_string(),
+        //         format!(
+        //             "ssh -i {} -q -o StrictHostKeyChecking=no -o BatchMode=yes -o ConnectTimeout=30 -o ProxyCommand='ssh root@{} -W %h:%p -i {}'",
+        //             self.ssh_client
+        //                 .get_private_key_path()
+        //                 .to_string_lossy()
+        //                 .as_ref(),
+        //                 nat_gateway_inventory.public_ip_addr,
+        //             self.ssh_client
+        //                 .get_private_key_path()
+        //                 .to_string_lossy()
+        //                 .as_ref(),
+        //         ),
+        //     ]);
+        //     Some(private_rsync_args)
+        // } else {
+        //     None
+        // };
 
         // We might use the script, so goto the resource dir.
         std::env::set_current_dir(self.working_directory_path.clone())?;
@@ -96,16 +96,16 @@ impl TestnetDeployer {
 
         let failed_inventory = all_node_inventory.par_iter().filter_map(|vm| {
             let args = if vm.name.contains("private") {
-                if let Some(private_rsync_args) = &private_rsync_args {
-                    debug!("Using private rsync args for {:?}", vm.name);
-                    private_rsync_args
-                } else {
-                    debug!(
-                        "Fallback to public rsync args for private node {:?}",
-                        vm.name
-                    );
-                    &public_rsync_args
-                }
+                // if let Some(private_rsync_args) = &private_rsync_args {
+                //     debug!("Using private rsync args for {:?}", vm.name);
+                //     private_rsync_args
+                // } else {
+                debug!(
+                    "Fallback to public rsync args for private node {:?}",
+                    vm.name
+                );
+                &public_rsync_args
+                // }
             } else {
                 debug!("Using public rsync args for {:?}", vm.name);
                 &public_rsync_args
@@ -308,12 +308,22 @@ impl TestnetDeployer {
         self.ansible_provisioner.get_all_node_inventory()
     }
 
-    fn get_nat_gateway_inventory(&self, name: &str) -> Result<Vec<VirtualMachine>> {
+    fn get_symmetric_nat_gateway_inventory(&self, name: &str) -> Result<Vec<VirtualMachine>> {
         let environments = self.terraform_runner.workspace_list()?;
         if !environments.contains(&name.to_string()) {
             return Err(Error::EnvironmentDoesNotExist(name.to_string()));
         }
-        self.ansible_provisioner.get_nat_gateway_inventory()
+        self.ansible_provisioner
+            .get_symmetric_nat_gateway_inventory()
+    }
+
+    fn get_full_cone_nat_gateway_inventory(&self, name: &str) -> Result<Vec<VirtualMachine>> {
+        let environments = self.terraform_runner.workspace_list()?;
+        if !environments.contains(&name.to_string()) {
+            return Err(Error::EnvironmentDoesNotExist(name.to_string()));
+        }
+        self.ansible_provisioner
+            .get_full_cone_nat_gateway_inventory()
     }
 }
 

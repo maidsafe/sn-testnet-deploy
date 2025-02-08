@@ -103,10 +103,11 @@ impl std::str::FromStr for DeploymentType {
 
 #[derive(Debug, Clone)]
 pub enum NodeType {
+    FullConePrivateNode,
     Generic,
     Genesis,
     PeerCache,
-    Private,
+    SymmetricPrivateNode,
 }
 
 impl std::str::FromStr for NodeType {
@@ -114,10 +115,11 @@ impl std::str::FromStr for NodeType {
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         match s.to_lowercase().as_str() {
-            "peer-cache" => Ok(NodeType::PeerCache),
+            "full-cone-private" => Ok(NodeType::FullConePrivateNode),
             "generic" => Ok(NodeType::Generic),
             "genesis" => Ok(NodeType::Genesis),
-            "private" => Ok(NodeType::Private),
+            "peer-cache" => Ok(NodeType::PeerCache),
+            "symmetric-private" => Ok(NodeType::SymmetricPrivateNode),
             _ => Err(format!("Invalid node type: {}", s)),
         }
     }
@@ -126,19 +128,21 @@ impl std::str::FromStr for NodeType {
 impl NodeType {
     pub fn telegraf_role(&self) -> &'static str {
         match self {
-            NodeType::PeerCache => "PEER_CACHE_NODE",
+            NodeType::FullConePrivateNode => "NAT_FULL_CONE_NODE",
             NodeType::Generic => "GENERIC_NODE",
             NodeType::Genesis => "GENESIS_NODE",
-            NodeType::Private => "NAT_RANDOMIZED_NODE",
+            NodeType::PeerCache => "PEER_CACHE_NODE",
+            NodeType::SymmetricPrivateNode => "NAT_RANDOMIZED_NODE",
         }
     }
 
     pub fn to_ansible_inventory_type(&self) -> AnsibleInventoryType {
         match self {
-            NodeType::PeerCache => AnsibleInventoryType::PeerCacheNodes,
+            NodeType::FullConePrivateNode => AnsibleInventoryType::FullConePrivateNodes,
             NodeType::Generic => AnsibleInventoryType::Nodes,
             NodeType::Genesis => AnsibleInventoryType::Genesis,
-            NodeType::Private => AnsibleInventoryType::PrivateNodes,
+            NodeType::PeerCache => AnsibleInventoryType::PeerCacheNodes,
+            NodeType::SymmetricPrivateNode => AnsibleInventoryType::SymmetricPrivateNodes,
         }
     }
 }
@@ -186,7 +190,6 @@ pub struct EnvironmentDetails {
     pub evm_payment_token_address: Option<String>,
     pub evm_rpc_url: Option<String>,
     pub funding_wallet_address: Option<String>,
-    pub nat_gateway_type: NatGatewayType,
     pub network_id: Option<u8>,
     pub rewards_address: String,
 }
@@ -226,7 +229,11 @@ impl EnvironmentType {
         }
     }
 
-    pub fn get_default_private_node_count(&self) -> u16 {
+    pub fn get_default_symmetric_private_node_count(&self) -> u16 {
+        self.get_default_node_count()
+    }
+
+    pub fn get_default_full_cone_private_node_count(&self) -> u16 {
         self.get_default_node_count()
     }
 }
@@ -250,34 +257,6 @@ impl FromStr for EnvironmentType {
             "production" => Ok(EnvironmentType::Production),
             "staging" => Ok(EnvironmentType::Staging),
             _ => Err(Error::EnvironmentNameFromStringError(s.to_string())),
-        }
-    }
-}
-
-#[derive(Clone, Debug, Default, Serialize, Deserialize)]
-pub enum NatGatewayType {
-    #[default]
-    NatRandomized,
-    FullCone,
-}
-
-impl std::fmt::Display for NatGatewayType {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            NatGatewayType::NatRandomized => write!(f, "nat-randomized"),
-            NatGatewayType::FullCone => write!(f, "full-cone"),
-        }
-    }
-}
-
-impl std::str::FromStr for NatGatewayType {
-    type Err = String;
-
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        match s.to_lowercase().as_str() {
-            "nat-randomized" => Ok(NatGatewayType::NatRandomized),
-            "full-cone" => Ok(NatGatewayType::FullCone),
-            _ => Err(format!("Invalid NAT gateway type: {}", s)),
         }
     }
 }
@@ -746,7 +725,7 @@ impl TestnetDeployer {
             .get_node_registries(&AnsibleInventoryType::Nodes)?;
         let private_node_registries = self
             .ansible_provisioner
-            .get_node_registries(&AnsibleInventoryType::PrivateNodes)?;
+            .get_node_registries(&AnsibleInventoryType::SymmetricPrivateNodes)?;
         let genesis_node_registry = self
             .ansible_provisioner
             .get_node_registries(&AnsibleInventoryType::Genesis)?
@@ -1225,10 +1204,10 @@ pub async fn do_clean(
     let options =
         InfraRunOptions::generate_existing(name, terraform_runner, &environment_details).await?;
     let mut args = Vec::new();
-    if let Some(peer_cache_node_volume_size) = options.peer_cache_node_volume_size {
+    if let Some(full_cone_private_node_volume_size) = options.full_cone_private_node_volume_size {
         args.push((
-            "peer_cache_node_volume_size".to_string(),
-            peer_cache_node_volume_size.to_string(),
+            "full_cone_private_node_volume_size".to_string(),
+            full_cone_private_node_volume_size.to_string(),
         ));
     }
     if let Some(genesis_node_volume_size) = options.genesis_node_volume_size {
@@ -1240,10 +1219,16 @@ pub async fn do_clean(
     if let Some(node_volume_size) = options.node_volume_size {
         args.push(("node_volume_size".to_string(), node_volume_size.to_string()));
     }
-    if let Some(private_node_volume_size) = options.private_node_volume_size {
+    if let Some(peer_cache_node_volume_size) = options.peer_cache_node_volume_size {
         args.push((
-            "private_node_volume_size".to_string(),
-            private_node_volume_size.to_string(),
+            "peer_cache_node_volume_size".to_string(),
+            peer_cache_node_volume_size.to_string(),
+        ));
+    }
+    if let Some(symmetric_private_node_volume_size) = options.symmetric_private_node_volume_size {
+        args.push((
+            "symmetric_private_node_volume_size".to_string(),
+            symmetric_private_node_volume_size.to_string(),
         ));
     }
 

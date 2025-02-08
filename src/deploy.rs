@@ -5,12 +5,12 @@
 // Please see the LICENSE file for more details.
 
 use crate::{
-    ansible::{inventory::AnsibleInventoryType, provisioning::ProvisionOptions},
+    ansible::provisioning::{PrivateNodeProvisionInventory, ProvisionOptions},
     error::Result,
     funding::get_address_from_sk,
     get_anvil_node_data, get_bootstrap_cache_url, get_genesis_multiaddr, write_environment_details,
     BinaryOption, DeploymentInventory, DeploymentType, EnvironmentDetails, EnvironmentType,
-    EvmNetwork, InfraRunOptions, LogFormat, NatGatewayType, NodeType, TestnetDeployer,
+    EvmNetwork, InfraRunOptions, LogFormat, NodeType, TestnetDeployer,
 };
 use alloy::{hex::ToHexExt, primitives::U256};
 use colored::Colorize;
@@ -29,6 +29,10 @@ pub struct DeployOptions {
     pub evm_node_vm_size: Option<String>,
     pub evm_payment_token_address: Option<String>,
     pub evm_rpc_url: Option<String>,
+    pub full_cone_nat_gateway_vm_size: Option<String>,
+    pub full_cone_private_node_count: u16,
+    pub full_cone_private_node_vm_count: Option<u16>,
+    pub full_cone_private_node_volume_size: Option<u16>,
     pub funding_wallet_secret_key: Option<String>,
     pub genesis_node_volume_size: Option<u16>,
     pub initial_gas: Option<U256>,
@@ -39,8 +43,6 @@ pub struct DeployOptions {
     pub max_archived_log_files: u16,
     pub max_log_files: u16,
     pub name: String,
-    pub nat_gateway_type: NatGatewayType,
-    pub nat_gateway_vm_size: Option<String>,
     pub network_id: Option<u8>,
     pub node_count: u16,
     pub node_vm_count: Option<u16>,
@@ -51,9 +53,10 @@ pub struct DeployOptions {
     pub peer_cache_node_vm_count: Option<u16>,
     pub peer_cache_node_vm_size: Option<String>,
     pub peer_cache_node_volume_size: Option<u16>,
-    pub private_node_count: u16,
-    pub private_node_vm_count: Option<u16>,
-    pub private_node_volume_size: Option<u16>,
+    pub symmetric_nat_gateway_vm_size: Option<String>,
+    pub symmetric_private_node_count: u16,
+    pub symmetric_private_node_vm_count: Option<u16>,
+    pub symmetric_private_node_volume_size: Option<u16>,
     pub public_rpc: bool,
     pub rewards_address: String,
     pub uploader_vm_count: Option<u16>,
@@ -79,18 +82,21 @@ impl TestnetDeployer {
                 EvmNetwork::Custom => Some(0),
             },
             evm_node_vm_size: options.evm_node_vm_size.clone(),
+            full_cone_nat_gateway_vm_size: options.full_cone_nat_gateway_vm_size.clone(),
+            full_cone_private_node_vm_count: options.full_cone_private_node_vm_count,
+            full_cone_private_node_volume_size: options.full_cone_private_node_volume_size,
             genesis_vm_count: Some(1),
             genesis_node_volume_size: options.genesis_node_volume_size,
             name: options.name.clone(),
-            nat_gateway_vm_size: options.nat_gateway_vm_size.clone(),
             node_vm_count: options.node_vm_count,
             node_vm_size: options.node_vm_size.clone(),
             node_volume_size: options.node_volume_size,
             peer_cache_node_vm_count: options.peer_cache_node_vm_count,
             peer_cache_node_vm_size: options.peer_cache_node_vm_size.clone(),
             peer_cache_node_volume_size: options.peer_cache_node_volume_size,
-            private_node_vm_count: options.private_node_vm_count,
-            private_node_volume_size: options.private_node_volume_size,
+            symmetric_nat_gateway_vm_size: options.symmetric_nat_gateway_vm_size.clone(),
+            symmetric_private_node_vm_count: options.symmetric_private_node_vm_count,
+            symmetric_private_node_volume_size: options.symmetric_private_node_volume_size,
             tfvars_filename: options.environment_type.get_tfvars_filename(&options.name),
             uploader_vm_count: options.uploader_vm_count,
             uploader_vm_size: options.uploader_vm_size.clone(),
@@ -99,12 +105,6 @@ impl TestnetDeployer {
             println!("Failed to create infra {err:?}");
             err
         })?;
-
-        // All the environment types set private_node_vm count to >0 if not specified.
-        let should_provision_private_nodes = options
-            .private_node_vm_count
-            .map(|count| count > 0)
-            .unwrap_or(true);
 
         write_environment_details(
             &self.s3_repository,
@@ -117,7 +117,6 @@ impl TestnetDeployer {
                 evm_payment_token_address: options.evm_payment_token_address.clone(),
                 evm_rpc_url: options.evm_rpc_url.clone(),
                 funding_wallet_address: None,
-                nat_gateway_type: options.nat_gateway_type.clone(),
                 network_id: options.network_id,
                 rewards_address: options.rewards_address.clone(),
             },
@@ -178,7 +177,6 @@ impl TestnetDeployer {
                 evm_payment_token_address: provision_options.evm_payment_token_address.clone(),
                 evm_rpc_url: provision_options.evm_rpc_url.clone(),
                 funding_wallet_address,
-                nat_gateway_type: options.nat_gateway_type.clone(),
                 network_id: options.network_id,
                 rewards_address: options.rewards_address.clone(),
             },
@@ -217,10 +215,12 @@ impl TestnetDeployer {
         let mut node_provision_failed = false;
         self.ansible_provisioner
             .print_ansible_run_banner("Provision Peer Cache Nodes");
-        match self.ansible_provisioner.provision_peer_cache_nodes(
+        match self.ansible_provisioner.provision_nodes(
             &provision_options,
             Some(genesis_multiaddr.clone()),
             Some(genesis_network_contacts.clone()),
+            NodeType::PeerCache,
+            None,
         ) {
             Ok(()) => {
                 println!("Provisioned Peer Cache nodes");
@@ -238,6 +238,7 @@ impl TestnetDeployer {
             Some(genesis_multiaddr.clone()),
             Some(genesis_network_contacts.clone()),
             NodeType::Generic,
+            None,
         ) {
             Ok(()) => {
                 println!("Provisioned normal nodes");
@@ -248,38 +249,63 @@ impl TestnetDeployer {
             }
         }
 
-        if should_provision_private_nodes {
-            let private_nodes = self
-                .ansible_provisioner
-                .ansible_runner
-                .get_inventory(AnsibleInventoryType::PrivateNodes, true)
-                .map_err(|err| {
-                    println!("Failed to obtain the inventory of private node: {err:?}");
-                    err
-                })?;
+        let private_node_inventory = PrivateNodeProvisionInventory::new(
+            &self.ansible_provisioner,
+            options.full_cone_private_node_vm_count,
+            options.symmetric_private_node_vm_count,
+        )?;
 
-            provision_options.private_node_vms = private_nodes;
+        if private_node_inventory.should_provision_full_cone_private_nodes() {
             self.ansible_provisioner
-                .print_ansible_run_banner("Provision NAT Gateway");
+                .print_ansible_run_banner("Provision Full Cone NAT Gateway");
             self.ansible_provisioner
-                .provision_nat_gateway(&provision_options)
+                .provision_full_cone_nat_gateway(&provision_options, &private_node_inventory)
                 .map_err(|err| {
-                    println!("Failed to provision NAT gateway {err:?}");
+                    println!("Failed to provision Full Cone NAT gateway {err:?}");
                     err
                 })?;
 
             self.ansible_provisioner
-                .print_ansible_run_banner("Provision Private Nodes");
-            match self.ansible_provisioner.provision_private_nodes(
+                .print_ansible_run_banner("Provision Full Cone Private Nodes");
+            match self.ansible_provisioner.provision_full_cone_private_nodes(
                 &mut provision_options,
                 Some(genesis_multiaddr.clone()),
                 Some(genesis_network_contacts.clone()),
+                &private_node_inventory,
             ) {
                 Ok(()) => {
-                    println!("Provisioned private nodes");
+                    println!("Provisioned Full Cone Private nodes");
                 }
                 Err(err) => {
-                    log::error!("Failed to provision private nodes: {err}");
+                    log::error!("Failed to provision Full Cone private nodes: {err}");
+                    node_provision_failed = true;
+                }
+            }
+        }
+
+        if private_node_inventory.should_provision_symmetric_private_nodes() {
+            self.ansible_provisioner
+                .print_ansible_run_banner("Provision Symmetric NAT Gateway");
+            self.ansible_provisioner
+                .provision_symmetric_nat_gateway(&provision_options, &private_node_inventory)
+                .map_err(|err| {
+                    println!("Failed to provision Symmetric NAT gateway {err:?}");
+                    err
+                })?;
+
+            self.ansible_provisioner
+                .print_ansible_run_banner("Provision Symmetric Private Nodes");
+            match self.ansible_provisioner.provision_symmetric_private_nodes(
+                &mut provision_options,
+                Some(genesis_multiaddr.clone()),
+                Some(genesis_network_contacts.clone()),
+                &private_node_inventory,
+            ) {
+                Ok(()) => {
+                    println!("Provisioned Symmetric private nodes");
+                }
+                Err(err) => {
+                    log::error!("Failed to provision Symmetric Private nodes: {err}");
                     node_provision_failed = true;
                 }
             }

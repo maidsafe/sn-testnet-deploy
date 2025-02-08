@@ -4,17 +4,18 @@
 // This SAFE Network Software is licensed under the BSD-3-Clause license.
 // Please see the LICENSE file for more details.
 
+use super::inventory::AnsibleInventoryType;
+use super::provisioning::PrivateNodeProvisionInventory;
 use crate::inventory::VirtualMachine;
+use crate::NodeType;
 use crate::{ansible::provisioning::ProvisionOptions, CloudProvider, EvmNetwork};
 use crate::{BinaryOption, Error, Result};
-use crate::{NatGatewayType, NodeType};
 use alloy::hex::ToHexExt;
 use alloy::signers::local::PrivateKeySigner;
+use log::error;
 use serde_json::Value;
 use std::collections::HashMap;
 use std::net::IpAddr;
-
-use super::inventory::match_private_node_vm_and_nat_gateway_vm;
 
 const ANT_S3_BUCKET_URL: &str = "https://autonomi-cli.s3.eu-west-2.amazonaws.com";
 const ANTCTL_S3_BUCKET_URL: &str = "https://antctl.s3.eu-west-2.amazonaws.com";
@@ -268,8 +269,8 @@ impl ExtraVarsDocBuilder {
 
 pub fn build_nat_gateway_extra_vars_doc(
     name: &str,
-    gateway_type: &NatGatewayType,
     private_node_ip_map: HashMap<String, IpAddr>,
+    gateway_type: &str,
 ) -> String {
     let mut extra_vars = ExtraVarsDocBuilder::default();
     extra_vars.add_variable("testnet_name", name);
@@ -280,10 +281,8 @@ pub fn build_nat_gateway_extra_vars_doc(
             .map(|(k, v)| (k, Value::String(v.to_string())))
             .collect(),
     );
-    extra_vars.add_variable("gateway_type", &gateway_type.to_string());
-
+    extra_vars.add_variable("gateway_type", gateway_type);
     extra_vars.add_serde_value("node_private_ip_map", serde_map);
-
     extra_vars.build()
 }
 
@@ -296,6 +295,7 @@ pub fn build_node_extra_vars_doc(
     network_contacts_url: Option<String>,
     node_instance_count: u16,
     evm_network: EvmNetwork,
+    private_node_inventory: Option<&PrivateNodeProvisionInventory>,
 ) -> Result<String> {
     let mut extra_vars = ExtraVarsDocBuilder::default();
     extra_vars.add_variable("provider", cloud_provider);
@@ -325,14 +325,21 @@ pub fn build_node_extra_vars_doc(
         extra_vars.add_variable("public_rpc", "true");
     }
 
-    if !options.nat_gateway_vms.is_empty() {
-        let private_node_nat_gateway_map = match_private_node_vm_and_nat_gateway_vm(
-            &options.private_node_vms,
-            &options.nat_gateway_vms,
-        )?;
+    if matches!(node_type, NodeType::FullConePrivateNode) {
+        let private_node_inventory = private_node_inventory.ok_or({
+            error!("Private node inventory not supplied");
+            Error::EmptyInventory(AnsibleInventoryType::FullConePrivateNodes)
+        })?;
+        let map = private_node_inventory.full_cone_private_node_and_gateway_map()?;
+        if map.is_empty() {
+            error!("Private node inventory map is empty");
+            return Err(Error::EmptyInventory(
+                AnsibleInventoryType::FullConePrivateNodes,
+            ));
+        }
+
         let serde_map = Value::Object(
-            private_node_nat_gateway_map
-                .into_iter()
+            map.into_iter()
                 .map(|(private_node_vm, nat_gateway_vm)| {
                     (
                         // hostname of private node returns the private ip address, since we're using static inventory.
@@ -345,9 +352,35 @@ pub fn build_node_extra_vars_doc(
         extra_vars.add_serde_value("nat_gateway_private_ip_map", serde_map);
 
         extra_vars.add_variable("make_vm_private", "true");
-    } else if matches!(node_type, NodeType::Private) {
-        return Err(Error::NatGatewayNotSupplied);
+    } else if matches!(node_type, NodeType::SymmetricPrivateNode) {
+        let private_node_inventory = private_node_inventory.ok_or({
+            error!("Private node inventory not supplied");
+            Error::EmptyInventory(AnsibleInventoryType::FullConePrivateNodes)
+        })?;
+        let map = private_node_inventory.symmetric_private_node_and_gateway_map()?;
+        if map.is_empty() {
+            error!("Private node inventory map is empty");
+            return Err(Error::EmptyInventory(
+                AnsibleInventoryType::SymmetricPrivateNodes,
+            ));
+        }
+
+        let serde_map = Value::Object(
+            map.into_iter()
+                .map(|(private_node_vm, nat_gateway_vm)| {
+                    (
+                        // hostname of private node returns the private ip address, since we're using static inventory.
+                        private_node_vm.private_ip_addr.to_string(),
+                        Value::String(nat_gateway_vm.private_ip_addr.to_string()),
+                    )
+                })
+                .collect(),
+        );
+        extra_vars.add_serde_value("nat_gateway_private_ip_map", serde_map);
+
+        extra_vars.add_variable("make_vm_private", "true");
     }
+
     if let Some(network_id) = options.network_id {
         extra_vars.add_variable("network_id", &network_id.to_string());
     }

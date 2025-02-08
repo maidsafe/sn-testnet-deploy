@@ -5,20 +5,22 @@
 // Please see the LICENSE file for more details.
 
 use super::{
-    extra_vars::ExtraVarsDocBuilder, inventory::generate_private_node_static_environment_inventory,
+    extra_vars::ExtraVarsDocBuilder,
+    inventory::{
+        generate_full_cone_private_node_static_environment_inventory,
+        generate_symmetric_private_node_static_environment_inventory,
+    },
     AnsibleInventoryType, AnsiblePlaybook, AnsibleRunner,
 };
 use crate::{
-    ansible::inventory::{
-        generate_custom_environment_inventory, match_private_node_vm_and_nat_gateway_vm,
-    },
+    ansible::inventory::generate_custom_environment_inventory,
     bootstrap::BootstrapOptions,
     deploy::DeployOptions,
     error::{Error, Result},
     funding::FundingOptions,
     inventory::{DeploymentNodeRegistries, VirtualMachine},
-    print_duration, BinaryOption, CloudProvider, EvmNetwork, LogFormat, NatGatewayType, NodeType,
-    SshClient, UpgradeOptions,
+    print_duration, BinaryOption, CloudProvider, EvmNetwork, LogFormat, NodeType, SshClient,
+    UpgradeOptions,
 };
 use ant_service_management::NodeRegistry;
 use evmlib::common::U256;
@@ -51,6 +53,7 @@ pub struct ProvisionOptions {
     pub evm_network: EvmNetwork,
     pub evm_payment_token_address: Option<String>,
     pub evm_rpc_url: Option<String>,
+    pub full_cone_private_node_count: u16,
     pub funding_wallet_secret_key: Option<String>,
     pub gas_amount: Option<U256>,
     pub interval: Duration,
@@ -59,18 +62,165 @@ pub struct ProvisionOptions {
     pub max_archived_log_files: u16,
     pub max_log_files: u16,
     pub name: String,
-    pub nat_gateway_type: NatGatewayType,
-    pub nat_gateway_vms: Vec<VirtualMachine>,
     pub network_id: Option<u8>,
     pub node_count: u16,
     pub output_inventory_dir_path: PathBuf,
     pub peer_cache_node_count: u16,
-    pub private_node_count: u16,
-    pub private_node_vms: Vec<VirtualMachine>,
+    pub symmetric_private_node_count: u16,
     pub public_rpc: bool,
     pub rewards_address: String,
     pub token_amount: Option<U256>,
     pub uploaders_count: Option<u16>,
+}
+
+/// These are obtained by running the inventory playbook
+#[derive(Clone)]
+pub struct PrivateNodeProvisionInventory {
+    pub full_cone_nat_gateway_vms: Vec<VirtualMachine>,
+    pub full_cone_private_node_vms: Vec<VirtualMachine>,
+    pub symmetric_nat_gateway_vms: Vec<VirtualMachine>,
+    pub symmetric_private_node_vms: Vec<VirtualMachine>,
+}
+
+impl PrivateNodeProvisionInventory {
+    pub fn new(
+        provisioner: &AnsibleProvisioner,
+        full_cone_private_node_vm_count: Option<u16>,
+        symmetric_private_node_vm_count: Option<u16>,
+    ) -> Result<Self> {
+        // All the environment types set private_node_vm count to >0 if not specified.
+        let should_provision_full_cone_private_nodes = full_cone_private_node_vm_count
+            .map(|count| count > 0)
+            .unwrap_or(true);
+        let should_provision_symmetric_private_nodes = symmetric_private_node_vm_count
+            .map(|count| count > 0)
+            .unwrap_or(true);
+
+        let mut inventory = Self {
+            full_cone_nat_gateway_vms: Default::default(),
+            full_cone_private_node_vms: Default::default(),
+            symmetric_nat_gateway_vms: Default::default(),
+            symmetric_private_node_vms: Default::default(),
+        };
+
+        if should_provision_full_cone_private_nodes {
+            let full_cone_private_node_vms = provisioner
+                .ansible_runner
+                .get_inventory(AnsibleInventoryType::FullConePrivateNodes, true)
+                .inspect_err(|err| {
+                    println!("Failed to obtain the inventory of Full Cone private node: {err:?}");
+                })?;
+
+            let full_cone_nat_gateway_inventory = provisioner
+                .ansible_runner
+                .get_inventory(AnsibleInventoryType::FullConeNatGateway, true)
+                .inspect_err(|err| {
+                    println!("Failed to get Full Cone NAT Gateway inventory {err:?}");
+                })?;
+
+            if full_cone_nat_gateway_inventory.len() != full_cone_private_node_vms.len() {
+                println!("The number of Full Cone private nodes does not match the number of Full Cone NAT Gateway VMs");
+                return Err(Error::VmCountMismatch(
+                    Some(AnsibleInventoryType::FullConePrivateNodes),
+                    Some(AnsibleInventoryType::FullConeNatGateway),
+                ));
+            }
+
+            inventory.full_cone_private_node_vms = full_cone_private_node_vms;
+            inventory.full_cone_nat_gateway_vms = full_cone_nat_gateway_inventory;
+        }
+
+        if should_provision_symmetric_private_nodes {
+            let symmetric_private_node_vms = provisioner
+                .ansible_runner
+                .get_inventory(AnsibleInventoryType::SymmetricPrivateNodes, true)
+                .inspect_err(|err| {
+                    println!("Failed to obtain the inventory of Symmetric private node: {err:?}");
+                })?;
+
+            let symmetric_nat_gateway_inventory = provisioner
+                .ansible_runner
+                .get_inventory(AnsibleInventoryType::SymmetricNatGateway, true)
+                .inspect_err(|err| {
+                    println!("Failed to get Symmetric NAT Gateway inventory {err:?}");
+                })?;
+
+            if symmetric_nat_gateway_inventory.len() != symmetric_private_node_vms.len() {
+                println!("The number of Symmetric private nodes does not match the number of Symmetric NAT Gateway VMs");
+                return Err(Error::VmCountMismatch(
+                    Some(AnsibleInventoryType::SymmetricPrivateNodes),
+                    Some(AnsibleInventoryType::SymmetricNatGateway),
+                ));
+            }
+
+            inventory.symmetric_private_node_vms = symmetric_private_node_vms;
+            inventory.symmetric_nat_gateway_vms = symmetric_nat_gateway_inventory;
+        }
+
+        Ok(inventory)
+    }
+
+    pub fn should_provision_full_cone_private_nodes(&self) -> bool {
+        !self.full_cone_private_node_vms.is_empty()
+    }
+
+    pub fn should_provision_symmetric_private_nodes(&self) -> bool {
+        !self.symmetric_private_node_vms.is_empty()
+    }
+
+    pub fn symmetric_private_node_and_gateway_map(
+        &self,
+    ) -> Result<HashMap<VirtualMachine, VirtualMachine>> {
+        Self::match_private_node_vm_and_gateway_vm(
+            &self.symmetric_private_node_vms,
+            &self.symmetric_nat_gateway_vms,
+        )
+    }
+
+    pub fn full_cone_private_node_and_gateway_map(
+        &self,
+    ) -> Result<HashMap<VirtualMachine, VirtualMachine>> {
+        Self::match_private_node_vm_and_gateway_vm(
+            &self.full_cone_private_node_vms,
+            &self.full_cone_nat_gateway_vms,
+        )
+    }
+
+    pub fn match_private_node_vm_and_gateway_vm(
+        private_node_vms: &[VirtualMachine],
+        nat_gateway_vms: &[VirtualMachine],
+    ) -> Result<HashMap<VirtualMachine, VirtualMachine>> {
+        if private_node_vms.len() != nat_gateway_vms.len() {
+            println!(
+            "The number of private node VMs ({}) does not match the number of NAT Gateway VMs ({})",
+            private_node_vms.len(),
+            nat_gateway_vms.len()
+        );
+            return Err(Error::VmCountMismatch(None, None));
+        }
+
+        let mut map = HashMap::new();
+        for private_vm in private_node_vms {
+            let nat_gateway = nat_gateway_vms
+                .iter()
+                .find(|vm| {
+                    let private_node_name = private_vm.name.split('-').last().unwrap();
+                    let nat_gateway_name = vm.name.split('-').last().unwrap();
+                    private_node_name == nat_gateway_name
+                })
+                .ok_or_else(|| {
+                    println!(
+                        "Failed to find a matching NAT Gateway for private node: {}",
+                        private_vm.name
+                    );
+                    Error::VmCountMismatch(None, None)
+                })?;
+
+            let _ = map.insert(private_vm.clone(), nat_gateway.clone());
+        }
+
+        Ok(map)
+    }
 }
 
 impl From<BootstrapOptions> for ProvisionOptions {
@@ -85,6 +235,7 @@ impl From<BootstrapOptions> for ProvisionOptions {
             evm_network: bootstrap_options.evm_network,
             evm_payment_token_address: bootstrap_options.evm_payment_token_address,
             evm_rpc_url: bootstrap_options.evm_rpc_url,
+            full_cone_private_node_count: bootstrap_options.full_cone_private_node_count,
             funding_wallet_secret_key: None,
             gas_amount: None,
             interval: bootstrap_options.interval,
@@ -93,14 +244,11 @@ impl From<BootstrapOptions> for ProvisionOptions {
             max_archived_log_files: bootstrap_options.max_archived_log_files,
             max_log_files: bootstrap_options.max_log_files,
             name: bootstrap_options.name,
-            nat_gateway_type: bootstrap_options.nat_gateway_type,
-            nat_gateway_vms: Vec::new(),
             network_id: bootstrap_options.network_id,
             node_count: bootstrap_options.node_count,
             output_inventory_dir_path: bootstrap_options.output_inventory_dir_path,
             peer_cache_node_count: 0,
-            private_node_count: bootstrap_options.private_node_count,
-            private_node_vms: Vec::new(),
+            symmetric_private_node_count: bootstrap_options.symmetric_private_node_count,
             public_rpc: false,
             rewards_address: bootstrap_options.rewards_address,
             token_amount: None,
@@ -121,6 +269,7 @@ impl From<DeployOptions> for ProvisionOptions {
             evm_network: deploy_options.evm_network,
             evm_payment_token_address: deploy_options.evm_payment_token_address,
             evm_rpc_url: deploy_options.evm_rpc_url,
+            full_cone_private_node_count: deploy_options.full_cone_private_node_count,
             funding_wallet_secret_key: deploy_options.funding_wallet_secret_key,
             gas_amount: deploy_options.initial_gas,
             interval: deploy_options.interval,
@@ -129,14 +278,11 @@ impl From<DeployOptions> for ProvisionOptions {
             max_archived_log_files: deploy_options.max_archived_log_files,
             max_log_files: deploy_options.max_log_files,
             name: deploy_options.name,
-            nat_gateway_type: deploy_options.nat_gateway_type,
-            nat_gateway_vms: Vec::new(),
             network_id: deploy_options.network_id,
             node_count: deploy_options.node_count,
             output_inventory_dir_path: deploy_options.output_inventory_dir_path,
             peer_cache_node_count: deploy_options.peer_cache_node_count,
-            private_node_count: deploy_options.private_node_count,
-            private_node_vms: Vec::new(),
+            symmetric_private_node_count: deploy_options.symmetric_private_node_count,
             public_rpc: deploy_options.public_rpc,
             rewards_address: deploy_options.rewards_address,
             token_amount: deploy_options.initial_tokens,
@@ -220,9 +366,14 @@ impl AnsibleProvisioner {
         Ok(all_node_inventory)
     }
 
-    pub fn get_nat_gateway_inventory(&self) -> Result<Vec<VirtualMachine>> {
+    pub fn get_symmetric_nat_gateway_inventory(&self) -> Result<Vec<VirtualMachine>> {
         self.ansible_runner
-            .get_inventory(AnsibleInventoryType::NatGateway, false)
+            .get_inventory(AnsibleInventoryType::SymmetricNatGateway, false)
+    }
+
+    pub fn get_full_cone_nat_gateway_inventory(&self) -> Result<Vec<VirtualMachine>> {
+        self.ansible_runner
+            .get_inventory(AnsibleInventoryType::FullConeNatGateway, false)
     }
 
     pub fn get_node_registries(
@@ -323,6 +474,7 @@ impl AnsibleProvisioner {
                 None,
                 1,
                 options.evm_network.clone(),
+                None,
             )?),
         )?;
 
@@ -331,46 +483,101 @@ impl AnsibleProvisioner {
         Ok(())
     }
 
-    pub fn provision_nat_gateway(&self, options: &ProvisionOptions) -> Result<()> {
+    pub fn provision_full_cone_nat_gateway(
+        &self,
+        options: &ProvisionOptions,
+        private_node_inventory: &PrivateNodeProvisionInventory,
+    ) -> Result<()> {
         let start = Instant::now();
-        let nat_gateway_inventory = self
-            .ansible_runner
-            .get_inventory(AnsibleInventoryType::NatGateway, true)?;
-        for vm in &nat_gateway_inventory {
+        for vm in &private_node_inventory.full_cone_nat_gateway_vms {
             println!(
-                "Checking SSH availability for NAT Gateway: {}",
+                "Checking SSH availability for Full Cone NAT Gateway: {}",
                 vm.public_ip_addr
             );
             self.ssh_client
                 .wait_for_ssh_availability(&vm.public_ip_addr, &self.cloud_provider.get_ssh_user())
                 .map_err(|e| {
-                    println!("Failed to establish SSH connection to NAT Gateway: {}", e);
+                    println!(
+                        "Failed to establish SSH connection to Full Cone NAT Gateway: {}",
+                        e
+                    );
                     e
                 })?;
         }
-        let private_node_nat_gateway_map = match_private_node_vm_and_nat_gateway_vm(
-            &options.private_node_vms,
-            &nat_gateway_inventory,
-        )?;
-        let private_node_ip_map = private_node_nat_gateway_map
+
+        let private_node_ip_map = private_node_inventory
+            .full_cone_private_node_and_gateway_map()?
             .into_iter()
             .map(|(k, v)| (v.name.clone(), k.private_ip_addr))
             .collect::<HashMap<String, IpAddr>>();
 
         if private_node_ip_map.is_empty() {
-            println!("There are no private node VM available to be routed through the NAT Gateway");
-            return Err(Error::EmptyInventory(AnsibleInventoryType::PrivateNodes));
+            println!("There are no full cone private node VM available to be routed through the full cone NAT Gateway");
+            return Err(Error::EmptyInventory(
+                AnsibleInventoryType::FullConePrivateNodes,
+            ));
         }
 
         let vars = extra_vars::build_nat_gateway_extra_vars_doc(
             &options.name,
-            &options.nat_gateway_type,
             private_node_ip_map,
+            "full_cone",
         );
-        debug!("Provisioning NAT Gateway with vars: {vars}");
+        debug!("Provisioning Full Cone NAT Gateway with vars: {vars}");
         self.ansible_runner.run_playbook(
             AnsiblePlaybook::NatGateway,
-            AnsibleInventoryType::NatGateway,
+            AnsibleInventoryType::FullConeNatGateway,
+            Some(vars),
+        )?;
+
+        print_duration(start.elapsed());
+        Ok(())
+    }
+
+    pub fn provision_symmetric_nat_gateway(
+        &self,
+        options: &ProvisionOptions,
+        private_node_inventory: &PrivateNodeProvisionInventory,
+    ) -> Result<()> {
+        let start = Instant::now();
+        for vm in &private_node_inventory.symmetric_nat_gateway_vms {
+            println!(
+                "Checking SSH availability for Symmetric NAT Gateway: {}",
+                vm.public_ip_addr
+            );
+            self.ssh_client
+                .wait_for_ssh_availability(&vm.public_ip_addr, &self.cloud_provider.get_ssh_user())
+                .map_err(|e| {
+                    println!(
+                        "Failed to establish SSH connection to Symmetric NAT Gateway: {}",
+                        e
+                    );
+                    e
+                })?;
+        }
+
+        let private_node_ip_map = private_node_inventory
+            .symmetric_private_node_and_gateway_map()?
+            .into_iter()
+            .map(|(k, v)| (v.name.clone(), k.private_ip_addr))
+            .collect::<HashMap<String, IpAddr>>();
+
+        if private_node_ip_map.is_empty() {
+            println!("There are no Symmetric private node VM available to be routed through the Symmetric NAT Gateway");
+            return Err(Error::EmptyInventory(
+                AnsibleInventoryType::SymmetricPrivateNodes,
+            ));
+        }
+
+        let vars = extra_vars::build_nat_gateway_extra_vars_doc(
+            &options.name,
+            private_node_ip_map,
+            "symmetric",
+        );
+        debug!("Provisioning Symmetric NAT Gateway with vars: {vars}");
+        self.ansible_runner.run_playbook(
+            AnsiblePlaybook::NatGateway,
+            AnsibleInventoryType::SymmetricNatGateway,
             Some(vars),
         )?;
 
@@ -384,17 +591,25 @@ impl AnsibleProvisioner {
         initial_contact_peer: Option<String>,
         initial_network_contacts_url: Option<String>,
         node_type: NodeType,
+        private_node_inventory: Option<&PrivateNodeProvisionInventory>,
     ) -> Result<()> {
         let start = Instant::now();
         let (inventory_type, node_count) = match &node_type {
-            NodeType::PeerCache => return Err(Error::InvalidNodeType(node_type)),
-            NodeType::Generic => (node_type.to_ansible_inventory_type(), options.node_count),
-            NodeType::Private => (
+            NodeType::FullConePrivateNode => (
                 node_type.to_ansible_inventory_type(),
-                options.private_node_count,
+                options.full_cone_private_node_count,
             ),
             // use provision_genesis_node fn
+            NodeType::Generic => (node_type.to_ansible_inventory_type(), options.node_count),
             NodeType::Genesis => return Err(Error::InvalidNodeType(node_type)),
+            NodeType::PeerCache => (
+                node_type.to_ansible_inventory_type(),
+                options.peer_cache_node_count,
+            ),
+            NodeType::SymmetricPrivateNode => (
+                node_type.to_ansible_inventory_type(),
+                options.symmetric_private_node_count,
+            ),
         };
 
         // For a new deployment, it's quite probable that SSH is available, because this part occurs
@@ -430,6 +645,7 @@ impl AnsibleProvisioner {
                 initial_network_contacts_url,
                 node_count,
                 options.evm_network.clone(),
+                private_node_inventory,
             )?),
         )?;
 
@@ -437,90 +653,63 @@ impl AnsibleProvisioner {
         Ok(())
     }
 
-    pub fn provision_peer_cache_nodes(
-        &self,
-        options: &ProvisionOptions,
-        initial_contact_peer: Option<String>,
-        initial_network_contacts_url: Option<String>,
-    ) -> Result<()> {
-        let start = Instant::now();
-        let node_type = NodeType::PeerCache;
-
-        // For a new deployment, it's quite probable that SSH is available, because this part occurs
-        // after the genesis node has been provisioned. However, for a bootstrap deploy, we need to
-        // check that SSH is available before proceeding.
-        println!("Obtaining IP addresses for peer cache nodes...");
-        let inventory = self
-            .ansible_runner
-            .get_inventory(node_type.to_ansible_inventory_type(), true)?;
-
-        println!("Waiting for SSH availability on {node_type:?} nodes...");
-        for vm in inventory.iter() {
-            println!(
-                "Checking SSH availability for {}: {}",
-                vm.name, vm.public_ip_addr
-            );
-            self.ssh_client
-                .wait_for_ssh_availability(&vm.public_ip_addr, &self.cloud_provider.get_ssh_user())
-                .map_err(|e| {
-                    println!("Failed to establish SSH connection to {}: {}", vm.name, e);
-                    e
-                })?;
-        }
-
-        println!("SSH is available on peer cache nodes. Proceeding with provisioning...");
-
-        self.ansible_runner.run_playbook(
-            AnsiblePlaybook::PeerCacheNodes,
-            node_type.to_ansible_inventory_type(),
-            Some(extra_vars::build_node_extra_vars_doc(
-                &self.cloud_provider.to_string(),
-                options,
-                node_type.clone(),
-                initial_contact_peer,
-                initial_network_contacts_url,
-                options.peer_cache_node_count,
-                options.evm_network.clone(),
-            )?),
-        )?;
-
-        print_duration(start.elapsed());
-        Ok(())
-    }
-
-    pub fn provision_private_nodes(
+    pub fn provision_symmetric_private_nodes(
         &self,
         options: &mut ProvisionOptions,
         initial_contact_peer: Option<String>,
         initial_network_contacts_url: Option<String>,
+        private_node_inventory: &PrivateNodeProvisionInventory,
     ) -> Result<()> {
         let start = Instant::now();
 
-        let nat_gateway_inventory = self
-            .ansible_runner
-            .get_inventory(AnsibleInventoryType::NatGateway, true)
-            .map_err(|err| {
-                println!("Failed to get NAT Gateway inventory {err:?}");
-                err
-            })?;
-
-        options.nat_gateway_vms = nat_gateway_inventory.clone();
-        generate_private_node_static_environment_inventory(
+        generate_symmetric_private_node_static_environment_inventory(
             &options.name,
             &options.output_inventory_dir_path,
-            &options.private_node_vms,
-            &options.nat_gateway_vms,
+            &private_node_inventory.symmetric_private_node_vms,
+            &private_node_inventory.symmetric_nat_gateway_vms,
             &self.ssh_client.private_key_path,
         )
         .inspect_err(|err| {
-            error!("Failed to generate private node static inv with err: {err:?}")
+            error!("Failed to generate symmetric private node static inv with err: {err:?}")
         })?;
 
         self.provision_nodes(
             options,
             initial_contact_peer,
             initial_network_contacts_url,
-            NodeType::Private,
+            NodeType::SymmetricPrivateNode,
+            Some(private_node_inventory),
+        )?;
+
+        print_duration(start.elapsed());
+        Ok(())
+    }
+
+    pub fn provision_full_cone_private_nodes(
+        &self,
+        options: &mut ProvisionOptions,
+        initial_contact_peer: Option<String>,
+        initial_network_contacts_url: Option<String>,
+        private_node_inventory: &PrivateNodeProvisionInventory,
+    ) -> Result<()> {
+        let start = Instant::now();
+
+        generate_full_cone_private_node_static_environment_inventory(
+            &options.name,
+            &options.output_inventory_dir_path,
+            &private_node_inventory.full_cone_private_node_vms,
+            &private_node_inventory.full_cone_nat_gateway_vms,
+        )
+        .inspect_err(|err| {
+            error!("Failed to generate full cone private node static inv with err: {err:?}")
+        })?;
+
+        self.provision_nodes(
+            options,
+            initial_contact_peer,
+            initial_network_contacts_url,
+            NodeType::FullConePrivateNode,
+            Some(private_node_inventory),
         )?;
 
         print_duration(start.elapsed());
@@ -775,10 +964,19 @@ impl AnsibleProvisioner {
 
         self.ansible_runner.run_playbook(
             AnsiblePlaybook::UpgradeNodeTelegrafConfig,
-            AnsibleInventoryType::PrivateNodes,
+            AnsibleInventoryType::SymmetricPrivateNodes,
             Some(extra_vars::build_node_telegraf_upgrade(
                 name,
-                &NodeType::Private,
+                &NodeType::SymmetricPrivateNode,
+            )?),
+        )?;
+
+        self.ansible_runner.run_playbook(
+            AnsiblePlaybook::UpgradeNodeTelegrafConfig,
+            AnsibleInventoryType::FullConePrivateNodes,
+            Some(extra_vars::build_node_telegraf_upgrade(
+                name,
+                &NodeType::FullConePrivateNode,
             )?),
         )?;
         Ok(())
@@ -855,7 +1053,7 @@ impl AnsibleProvisioner {
         }
         match self.ansible_runner.run_playbook(
             AnsiblePlaybook::UpgradeNodes,
-            AnsibleInventoryType::PrivateNodes,
+            AnsibleInventoryType::SymmetricPrivateNodes,
             Some(options.get_ansible_vars()),
         ) {
             Ok(()) => println!("All private nodes were successfully upgraded"),

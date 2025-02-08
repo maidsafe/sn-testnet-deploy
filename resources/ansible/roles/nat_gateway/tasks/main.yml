@@ -47,7 +47,7 @@
 - name: Add eth1 of node VM to the NAT gateway
   command: >
     iptables -t nat -A POSTROUTING -s {{ node_private_ip_eth1 }} -o eth0 -j MASQUERADE  --random
-  when: nat_gateway_output.stdout.find(node_private_ip_eth1) == -1 and gateway_type == "nat-randomized"
+  when: nat_gateway_output.stdout.find(node_private_ip_eth1) == -1 and gateway_type == "symmetric"
 
 - name: set netfilter conntrack max
   sysctl:
@@ -66,8 +66,8 @@
 - name: Add public IP of the gateway as source
   command: >
     iptables -t nat -A POSTROUTING -o eth0 -j SNAT --to-source {{ gateway_public_ip }}
-  when: nat_gateway_output.stdout.find(gateway_public_ip) == -1 and gateway_type == "full-cone"
+  when: nat_gateway_output.stdout.find(gateway_public_ip) == -1 and gateway_type == "full_cone"
 - name: Add eth1 of node VM as dest
   command: >
     iptables -t nat -A PREROUTING -i eth0 -j DNAT --to-destination {{ node_private_ip_eth1 }}
-  when: nat_gateway_output.stdout.find(node_private_ip_eth1) == -1 and gateway_type == "full-cone"
+  when: nat_gateway_output.stdout.find(node_private_ip_eth1) == -1 and gateway_type == "full_cone"

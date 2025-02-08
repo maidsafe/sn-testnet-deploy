@@ -7,10 +7,11 @@
 use crate::{
     ansible::{
         inventory::{
-            generate_environment_inventory, generate_private_node_static_environment_inventory,
-            match_private_node_vm_and_nat_gateway_vm, AnsibleInventoryType,
+            generate_environment_inventory,
+            generate_full_cone_private_node_static_environment_inventory,
+            generate_symmetric_private_node_static_environment_inventory, AnsibleInventoryType,
         },
-        provisioning::AnsibleProvisioner,
+        provisioning::{AnsibleProvisioner, PrivateNodeProvisionInventory},
         AnsibleRunner,
     },
     get_bootstrap_cache_url, get_environment_details, get_genesis_multiaddr,
@@ -153,31 +154,51 @@ impl DeploymentInventoryService {
             .get_inventory(AnsibleInventoryType::Build, false)?;
         misc_vms.extend(build_vm);
 
-        let nat_gateway_vms = self
+        let full_cone_nat_gateway_vms = self
             .ansible_runner
-            .get_inventory(AnsibleInventoryType::NatGateway, false)?;
+            .get_inventory(AnsibleInventoryType::FullConeNatGateway, false)?;
+        let full_cone_private_node_vms = self
+            .ansible_runner
+            .get_inventory(AnsibleInventoryType::FullConePrivateNodes, false)?;
+
+        let symmetric_nat_gateway_vms = self
+            .ansible_runner
+            .get_inventory(AnsibleInventoryType::SymmetricNatGateway, false)?;
+        let symmetric_private_node_vms = self
+            .ansible_runner
+            .get_inventory(AnsibleInventoryType::SymmetricPrivateNodes, false)?;
 
         let generic_node_vms = self
             .ansible_runner
             .get_inventory(AnsibleInventoryType::Nodes, false)?;
 
-        let private_node_vms = self
-            .ansible_runner
-            .get_inventory(AnsibleInventoryType::PrivateNodes, false)?;
-
         // Create static inventory for private nodes. Will be used during ansible-playbook run.
-        generate_private_node_static_environment_inventory(
+        generate_full_cone_private_node_static_environment_inventory(
             name,
             &output_inventory_dir_path,
-            &private_node_vms,
-            &nat_gateway_vms,
+            &full_cone_private_node_vms,
+            &full_cone_nat_gateway_vms,
+        )?;
+        generate_symmetric_private_node_static_environment_inventory(
+            name,
+            &output_inventory_dir_path,
+            &symmetric_private_node_vms,
+            &symmetric_nat_gateway_vms,
             &self.ssh_client.private_key_path,
         )?;
 
         // Set up the SSH client to route through the NAT gateway if it exists. This updates all the client clones.
-        if !nat_gateway_vms.is_empty() {
-            self.ssh_client
-                .set_routed_vms(&private_node_vms, &nat_gateway_vms)?;
+        if !symmetric_nat_gateway_vms.is_empty() {
+            self.ssh_client.set_symmetric_nat_routed_vms(
+                &symmetric_private_node_vms,
+                &symmetric_nat_gateway_vms,
+            )?;
+        }
+        if !full_cone_nat_gateway_vms.is_empty() {
+            self.ssh_client.set_full_cone_nat_routed_vms(
+                &full_cone_private_node_vms,
+                &full_cone_nat_gateway_vms,
+            )?;
         }
 
         let peer_cache_node_vms = self
@@ -216,11 +237,20 @@ impl DeploymentInventoryService {
         let generic_node_vms =
             NodeVirtualMachine::from_list(&generic_node_vms, &generic_node_registries);
 
-        let private_node_registries = self
+        let symmetric_private_node_registries = self
             .ansible_provisioner
-            .get_node_registries(&AnsibleInventoryType::PrivateNodes)?;
-        let private_node_vms =
-            NodeVirtualMachine::from_list(&private_node_vms, &private_node_registries);
+            .get_node_registries(&AnsibleInventoryType::SymmetricPrivateNodes)?;
+        let symmetric_private_node_vms = NodeVirtualMachine::from_list(
+            &symmetric_private_node_vms,
+            &symmetric_private_node_registries,
+        );
+        let full_cone_private_node_registries = self
+            .ansible_provisioner
+            .get_node_registries(&AnsibleInventoryType::FullConePrivateNodes)?;
+        let full_cone_private_node_vms = NodeVirtualMachine::from_list(
+            &full_cone_private_node_vms,
+            &full_cone_private_node_registries,
+        );
 
         let genesis_node_registry = self
             .ansible_provisioner
@@ -234,7 +264,8 @@ impl DeploymentInventoryService {
 
         failed_node_registry_vms.extend(peer_cache_node_registries.failed_vms);
         failed_node_registry_vms.extend(generic_node_registries.failed_vms);
-        failed_node_registry_vms.extend(private_node_registries.failed_vms);
+        failed_node_registry_vms.extend(full_cone_private_node_registries.failed_vms);
+        failed_node_registry_vms.extend(symmetric_private_node_registries.failed_vms);
         failed_node_registry_vms.extend(genesis_node_registry.failed_vms);
 
         let binary_option = if let Some(binary_option) = binary_option {
@@ -309,16 +340,18 @@ impl DeploymentInventoryService {
             environment_details,
             failed_node_registry_vms,
             faucet_address: genesis_ip.map(|ip| format!("{ip}:8000")),
+            full_cone_nat_gateway_vms,
+            full_cone_private_node_vms,
             genesis_multiaddr,
             genesis_vm,
             name: name.to_string(),
             misc_vms,
-            nat_gateway_vms,
             node_vms: generic_node_vms,
             peer_cache_node_vms,
-            private_node_vms,
             ssh_user: self.cloud_provider.get_ssh_user(),
             ssh_private_key_path: self.ssh_client.private_key_path.clone(),
+            symmetric_nat_gateway_vms,
+            symmetric_private_node_vms,
             uploaded_files: Vec::new(),
             uploader_vms,
         };
@@ -340,27 +373,49 @@ impl DeploymentInventoryService {
             &output_inventory_dir_path,
         )?;
 
-        let nat_gateway_vms = self
+        let full_cone_nat_gateway_vms = self
             .ansible_runner
-            .get_inventory(AnsibleInventoryType::NatGateway, false)?;
+            .get_inventory(AnsibleInventoryType::FullConeNatGateway, false)?;
+        let full_cone_private_node_vms = self
+            .ansible_runner
+            .get_inventory(AnsibleInventoryType::FullConePrivateNodes, false)?;
 
-        let private_node_vms = self
+        let symmetric_nat_gateway_vms = self
             .ansible_runner
-            .get_inventory(AnsibleInventoryType::PrivateNodes, false)?;
+            .get_inventory(AnsibleInventoryType::SymmetricNatGateway, false)?;
+        let symmetric_private_node_vms = self
+            .ansible_runner
+            .get_inventory(AnsibleInventoryType::SymmetricPrivateNodes, false)?;
 
         // Create static inventory for private nodes. Will be used during ansible-playbook run.
-        generate_private_node_static_environment_inventory(
+        generate_symmetric_private_node_static_environment_inventory(
             name,
             &output_inventory_dir_path,
-            &private_node_vms,
-            &nat_gateway_vms,
+            &symmetric_private_node_vms,
+            &symmetric_nat_gateway_vms,
             &self.ssh_client.private_key_path,
         )?;
 
+        generate_full_cone_private_node_static_environment_inventory(
+            name,
+            &output_inventory_dir_path,
+            &full_cone_private_node_vms,
+            &full_cone_nat_gateway_vms,
+        )?;
+
         // Set up the SSH client to route through the NAT gateway if it exists. This updates all the client clones.
-        if !nat_gateway_vms.is_empty() {
-            self.ssh_client
-                .set_routed_vms(&private_node_vms, &nat_gateway_vms)?;
+        if !full_cone_nat_gateway_vms.is_empty() {
+            self.ssh_client.set_full_cone_nat_routed_vms(
+                &full_cone_private_node_vms,
+                &full_cone_nat_gateway_vms,
+            )?;
+        }
+
+        if !symmetric_nat_gateway_vms.is_empty() {
+            self.ssh_client.set_symmetric_nat_routed_vms(
+                &symmetric_private_node_vms,
+                &symmetric_nat_gateway_vms,
+            )?;
         }
 
         Ok(())
@@ -605,16 +660,18 @@ pub struct DeploymentInventory {
     pub environment_details: EnvironmentDetails,
     pub failed_node_registry_vms: Vec<String>,
     pub faucet_address: Option<String>,
+    pub full_cone_nat_gateway_vms: Vec<VirtualMachine>,
+    pub full_cone_private_node_vms: Vec<NodeVirtualMachine>,
     pub genesis_vm: Option<NodeVirtualMachine>,
     pub genesis_multiaddr: Option<String>,
     pub misc_vms: Vec<VirtualMachine>,
     pub name: String,
-    pub nat_gateway_vms: Vec<VirtualMachine>,
     pub node_vms: Vec<NodeVirtualMachine>,
     pub peer_cache_node_vms: Vec<NodeVirtualMachine>,
-    pub private_node_vms: Vec<NodeVirtualMachine>,
     pub ssh_user: String,
     pub ssh_private_key_path: PathBuf,
+    pub symmetric_nat_gateway_vms: Vec<VirtualMachine>,
+    pub symmetric_private_node_vms: Vec<NodeVirtualMachine>,
     pub uploaded_files: Vec<(String, String)>,
     pub uploader_vms: Vec<UploaderVirtualMachine>,
 }
@@ -626,20 +683,22 @@ impl DeploymentInventory {
         Self {
             binary_option,
             environment_details: EnvironmentDetails::default(),
-            genesis_vm: None,
-            genesis_multiaddr: None,
-            failed_node_registry_vms: Vec::new(),
-            faucet_address: None,
-            misc_vms: Vec::new(),
+            genesis_vm: Default::default(),
+            genesis_multiaddr: Default::default(),
+            failed_node_registry_vms: Default::default(),
+            faucet_address: Default::default(),
+            full_cone_nat_gateway_vms: Default::default(),
+            full_cone_private_node_vms: Default::default(),
+            misc_vms: Default::default(),
             name: name.to_string(),
-            nat_gateway_vms: Vec::new(),
-            node_vms: Vec::new(),
-            peer_cache_node_vms: Vec::new(),
-            private_node_vms: Vec::new(),
+            node_vms: Default::default(),
+            peer_cache_node_vms: Default::default(),
             ssh_user: "root".to_string(),
-            ssh_private_key_path: PathBuf::new(),
-            uploaded_files: Vec::new(),
-            uploader_vms: Vec::new(),
+            ssh_private_key_path: Default::default(),
+            symmetric_nat_gateway_vms: Default::default(),
+            symmetric_private_node_vms: Default::default(),
+            uploaded_files: Default::default(),
+            uploader_vms: Default::default(),
         }
     }
 
@@ -658,7 +717,8 @@ impl DeploymentInventory {
 
     pub fn vm_list(&self) -> Vec<VirtualMachine> {
         let mut list = Vec::new();
-        list.extend(self.nat_gateway_vms.clone());
+        list.extend(self.symmetric_nat_gateway_vms.clone());
+        list.extend(self.full_cone_nat_gateway_vms.clone());
         list.extend(
             self.peer_cache_node_vms
                 .iter()
@@ -668,7 +728,12 @@ impl DeploymentInventory {
         list.extend(self.node_vms.iter().map(|node_vm| node_vm.vm.clone()));
         list.extend(self.misc_vms.clone());
         list.extend(
-            self.private_node_vms
+            self.symmetric_private_node_vms
+                .iter()
+                .map(|node_vm| node_vm.vm.clone()),
+        );
+        list.extend(
+            self.full_cone_private_node_vms
                 .iter()
                 .map(|node_vm| node_vm.vm.clone()),
         );
@@ -685,7 +750,8 @@ impl DeploymentInventory {
         list.extend(self.peer_cache_node_vms.iter().cloned());
         list.extend(self.genesis_vm.iter().cloned());
         list.extend(self.node_vms.iter().cloned());
-        list.extend(self.private_node_vms.iter().cloned());
+        list.extend(self.full_cone_private_node_vms.iter().cloned());
+        list.extend(self.symmetric_private_node_vms.iter().cloned());
 
         list
     }
@@ -708,7 +774,12 @@ impl DeploymentInventory {
                 .flat_map(|node_vm| node_vm.get_quic_addresses()),
         );
         list.extend(
-            self.private_node_vms
+            self.full_cone_private_node_vms
+                .iter()
+                .flat_map(|node_vm| node_vm.get_quic_addresses()),
+        );
+        list.extend(
+            self.symmetric_private_node_vms
                 .iter()
                 .flat_map(|node_vm| node_vm.get_quic_addresses()),
         );
@@ -762,8 +833,16 @@ impl DeploymentInventory {
         }
     }
 
-    pub fn private_node_count(&self) -> usize {
-        if let Some(first_vm) = self.private_node_vms.first() {
+    pub fn full_cone_private_node_count(&self) -> usize {
+        if let Some(first_vm) = self.full_cone_private_node_vms.first() {
+            first_vm.node_count
+        } else {
+            0
+        }
+    }
+
+    pub fn symmetric_private_node_count(&self) -> usize {
+        if let Some(first_vm) = self.symmetric_private_node_vms.first() {
             first_vm.node_count
         } else {
             0
@@ -838,18 +917,54 @@ impl DeploymentInventory {
         println!();
 
         println!("=================");
-        println!("Private Node VMs");
+        println!("Full Cone Private Node VMs");
         println!("=================");
-        let private_node_nat_gateway_map = match_private_node_vm_and_nat_gateway_vm(
-            self.private_node_vms
-                .iter()
-                .map(|node_vm| node_vm.vm.clone())
-                .collect::<Vec<_>>()
-                .as_slice(),
-            &self.nat_gateway_vms,
-        )?;
+        let full_cone_private_node_nat_gateway_map =
+            PrivateNodeProvisionInventory::match_private_node_vm_and_gateway_vm(
+                self.full_cone_private_node_vms
+                    .iter()
+                    .map(|node_vm| node_vm.vm.clone())
+                    .collect::<Vec<_>>()
+                    .as_slice(),
+                &self.full_cone_nat_gateway_vms,
+            )?;
 
-        for (node_vm, nat_gateway_vm) in private_node_nat_gateway_map.iter() {
+        for (node_vm, nat_gateway_vm) in full_cone_private_node_nat_gateway_map.iter() {
+            println!(
+                "{}: {} ==routed through==> {}: {}",
+                node_vm.name,
+                node_vm.public_ip_addr,
+                nat_gateway_vm.name,
+                nat_gateway_vm.public_ip_addr
+            );
+            let ssh = if let Some(ssh_key_path) = self.ssh_private_key_path.to_str() {
+                format!(
+                    "ssh -i {ssh_key_path} root@{}",
+                    nat_gateway_vm.public_ip_addr,
+                )
+            } else {
+                format!("ssh root@{}", nat_gateway_vm.public_ip_addr,)
+            };
+            println!("SSH using NAT gateway: {ssh}");
+        }
+        println!("Nodes per VM: {}", self.node_count());
+        println!("SSH user: {}", self.ssh_user);
+        println!();
+
+        println!("=================");
+        println!("Symmetric Private Node VMs");
+        println!("=================");
+        let symmetric_private_node_nat_gateway_map =
+            PrivateNodeProvisionInventory::match_private_node_vm_and_gateway_vm(
+                self.symmetric_private_node_vms
+                    .iter()
+                    .map(|node_vm| node_vm.vm.clone())
+                    .collect::<Vec<_>>()
+                    .as_slice(),
+                &self.symmetric_nat_gateway_vms,
+            )?;
+
+        for (node_vm, nat_gateway_vm) in symmetric_private_node_nat_gateway_map.iter() {
             println!(
                 "{}: {} ==routed through==> {}: {}",
                 node_vm.name,
@@ -870,9 +985,6 @@ impl DeploymentInventory {
             };
             println!("SSH using NAT gateway: {ssh}");
         }
-        println!("Nodes per VM: {}", self.node_count());
-        println!("SSH user: {}", self.ssh_user);
-        println!();
 
         if !self.uploader_vms.is_empty() {
             println!("============");
@@ -904,7 +1016,11 @@ impl DeploymentInventory {
             }
         }
 
-        for nat_gateway_vm in self.nat_gateway_vms.iter() {
+        for nat_gateway_vm in self.full_cone_nat_gateway_vms.iter() {
+            println!("{}: {}", nat_gateway_vm.name, nat_gateway_vm.public_ip_addr);
+        }
+
+        for nat_gateway_vm in self.symmetric_nat_gateway_vms.iter() {
             println!("{}: {}", nat_gateway_vm.name, nat_gateway_vm.public_ip_addr);
         }
 
@@ -1039,7 +1155,7 @@ impl DeploymentInventory {
 pub fn get_data_directory() -> Result<PathBuf> {
     let path = dirs_next::data_dir()
         .ok_or_else(|| eyre!("Could not retrieve data directory"))?
-        .join("safe")
+        .join("autonomi")
         .join("testnet-deploy");
     if !path.exists() {
         std::fs::create_dir_all(path.clone())?;

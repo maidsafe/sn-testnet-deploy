@@ -17,6 +17,9 @@ pub struct InfraRunOptions {
     pub enable_build_vm: bool,
     pub evm_node_count: Option<u16>,
     pub evm_node_vm_size: Option<String>,
+    pub full_cone_nat_gateway_vm_size: Option<String>,
+    pub full_cone_private_node_vm_count: Option<u16>,
+    pub full_cone_private_node_volume_size: Option<u16>,
     pub genesis_vm_count: Option<u16>,
     pub genesis_node_volume_size: Option<u16>,
     pub name: String,
@@ -26,12 +29,12 @@ pub struct InfraRunOptions {
     pub peer_cache_node_vm_count: Option<u16>,
     pub peer_cache_node_vm_size: Option<String>,
     pub peer_cache_node_volume_size: Option<u16>,
-    pub private_node_vm_count: Option<u16>,
-    pub private_node_volume_size: Option<u16>,
+    pub symmetric_nat_gateway_vm_size: Option<String>,
+    pub symmetric_private_node_vm_count: Option<u16>,
+    pub symmetric_private_node_volume_size: Option<u16>,
     pub tfvars_filename: String,
     pub uploader_vm_count: Option<u16>,
     pub uploader_vm_size: Option<String>,
-    pub nat_gateway_vm_size: Option<String>,
 }
 
 impl InfraRunOptions {
@@ -142,18 +145,39 @@ impl InfraRunOptions {
             Error::TerraformResourceFieldMissing("size".to_string())
         })?;
 
-        let private_node_vm_count = resource_count("private_node");
-        let private_node_volume_size = if private_node_vm_count > 0 {
-            let private_node_volume_size =
-                Self::get_value_for_resource(&resources, "private_node_attached_volume", "size")?
-                    .as_u64()
-                    .ok_or_else(|| {
-                        log::error!(
-                            "Failed to obtain u64 'size' value for private_node_attached_volume"
-                        );
-                        Error::TerraformResourceFieldMissing("size".to_string())
-                    })?;
-            Some(private_node_volume_size as u16)
+        let symmetric_private_node_vm_count = resource_count("symmetric_private_node");
+        let symmetric_private_node_volume_size = if symmetric_private_node_vm_count > 0 {
+            let symmetric_private_node_volume_size = Self::get_value_for_resource(
+                &resources,
+                "symmetric_private_node_attached_volume",
+                "size",
+            )?
+            .as_u64()
+            .ok_or_else(|| {
+                log::error!(
+                    "Failed to obtain u64 'size' value for symmetric_private_node_attached_volume"
+                );
+                Error::TerraformResourceFieldMissing("size".to_string())
+            })?;
+            Some(symmetric_private_node_volume_size as u16)
+        } else {
+            None
+        };
+        let full_cone_private_node_vm_count = resource_count("full_cone_private_node");
+        let full_cone_private_node_volume_size = if full_cone_private_node_vm_count > 0 {
+            let full_cone_private_node_volume_size = Self::get_value_for_resource(
+                &resources,
+                "full_cone_private_node_attached_volume",
+                "size",
+            )?
+            .as_u64()
+            .ok_or_else(|| {
+                log::error!(
+                    "Failed to obtain u64 'size' value for full_cone_private_node_attached_volume"
+                );
+                Error::TerraformResourceFieldMissing("size".to_string())
+            })?;
+            Some(full_cone_private_node_volume_size as u16)
         } else {
             None
         };
@@ -169,29 +193,42 @@ impl InfraRunOptions {
         let build_vm_count = resource_count("build");
         let enable_build_vm = build_vm_count > 0;
 
-        let nat_gateway_vm_size = Self::get_value_for_resource(&resources, "nat_gateway", "size")?;
-        let nat_gateway_vm_size = nat_gateway_vm_size.as_str().ok_or_else(|| {
-            log::error!("Failed to obtain str 'size' value for nat_gateway");
-            Error::TerraformResourceFieldMissing("size".to_string())
-        })?;
+        let full_cone_nat_gateway_vm_size =
+            Self::get_value_for_resource(&resources, "full_cone_nat_gateway", "size")?;
+        let full_cone_nat_gateway_vm_size =
+            full_cone_nat_gateway_vm_size.as_str().ok_or_else(|| {
+                log::error!("Failed to obtain str 'size' value for full_cone_nat_gateway");
+                Error::TerraformResourceFieldMissing("size".to_string())
+            })?;
+
+        let symmetric_nat_gateway_vm_size =
+            Self::get_value_for_resource(&resources, "symmetric_nat_gateway", "size")?;
+        let symmetric_nat_gateway_vm_size =
+            symmetric_nat_gateway_vm_size.as_str().ok_or_else(|| {
+                log::error!("Failed to obtain str 'size' value for symmetric_nat_gateway");
+                Error::TerraformResourceFieldMissing("size".to_string())
+            })?;
 
         let options = Self {
             enable_build_vm,
             evm_node_count,
             // The EVM node size never needs to change so it will be obtained from the tfvars file
             evm_node_vm_size: None,
+            full_cone_nat_gateway_vm_size: Some(full_cone_nat_gateway_vm_size.to_string()),
+            full_cone_private_node_vm_count: Some(full_cone_private_node_vm_count),
+            full_cone_private_node_volume_size,
             genesis_vm_count: Some(genesis_vm_count),
             genesis_node_volume_size,
             name: name.to_string(),
-            nat_gateway_vm_size: Some(nat_gateway_vm_size.to_string()),
             node_vm_count: Some(node_vm_count),
             node_vm_size: Some(node_vm_size.to_string()),
             node_volume_size,
             peer_cache_node_vm_count: Some(peer_cache_node_vm_count),
             peer_cache_node_vm_size: Some(peer_cache_node_vm_size.to_string()),
             peer_cache_node_volume_size,
-            private_node_vm_count: Some(private_node_vm_count),
-            private_node_volume_size,
+            symmetric_nat_gateway_vm_size: Some(symmetric_nat_gateway_vm_size.to_string()),
+            symmetric_private_node_vm_count: Some(symmetric_private_node_vm_count),
+            symmetric_private_node_volume_size,
             tfvars_filename: environment_details
                 .environment_type
                 .get_tfvars_filename(name),
@@ -242,10 +279,16 @@ pub fn build_terraform_args(options: &InfraRunOptions) -> Result<Vec<(String, St
         args.push(("node_vm_count".to_string(), node_vm_count.to_string()));
     }
 
-    if let Some(private_node_vm_count) = options.private_node_vm_count {
+    if let Some(symmetric_private_node_vm_count) = options.symmetric_private_node_vm_count {
         args.push((
-            "private_node_vm_count".to_string(),
-            private_node_vm_count.to_string(),
+            "symmetric_private_node_vm_count".to_string(),
+            symmetric_private_node_vm_count.to_string(),
+        ));
+    }
+    if let Some(full_cone_private_node_vm_count) = options.full_cone_private_node_vm_count {
+        args.push((
+            "full_cone_private_node_vm_count".to_string(),
+            full_cone_private_node_vm_count.to_string(),
         ));
     }
 
@@ -305,17 +348,30 @@ pub fn build_terraform_args(options: &InfraRunOptions) -> Result<Vec<(String, St
     if let Some(node_volume_size) = options.node_volume_size {
         args.push(("node_volume_size".to_string(), node_volume_size.to_string()));
     }
-    if let Some(private_node_volume_size) = options.private_node_volume_size {
+
+    if let Some(full_cone_gateway_vm_size) = &options.full_cone_nat_gateway_vm_size {
         args.push((
-            "private_node_volume_size".to_string(),
-            private_node_volume_size.to_string(),
+            "full_cone_nat_gateway_droplet_size".to_string(),
+            full_cone_gateway_vm_size.clone(),
+        ));
+    }
+    if let Some(full_cone_private_node_volume_size) = options.full_cone_private_node_volume_size {
+        args.push((
+            "full_cone_private_node_volume_size".to_string(),
+            full_cone_private_node_volume_size.to_string(),
         ));
     }
 
-    if let Some(nat_gateway_vm_size) = &options.nat_gateway_vm_size {
+    if let Some(nat_gateway_vm_size) = &options.symmetric_nat_gateway_vm_size {
         args.push((
-            "nat_gateway_droplet_size".to_string(),
+            "symmetric_nat_gateway_droplet_size".to_string(),
             nat_gateway_vm_size.clone(),
+        ));
+    }
+    if let Some(symmetric_private_node_volume_size) = options.symmetric_private_node_volume_size {
+        args.push((
+            "symmetric_private_node_volume_size".to_string(),
+            symmetric_private_node_volume_size.to_string(),
         ));
     }
 
