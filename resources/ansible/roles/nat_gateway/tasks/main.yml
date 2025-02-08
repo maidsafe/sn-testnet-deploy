@@ -63,11 +63,9 @@
     state: present
 
 # Full cone nat setup
-- name: Add public IP of the gateway as source
-  command: >
+- name: Setup iptables for full cone setup and save them to disk
+  shell: |
     iptables -t nat -A POSTROUTING -o eth0 -j SNAT --to-source {{ gateway_public_ip }}
-  when: nat_gateway_output.stdout.find(gateway_public_ip) == -1 and gateway_type == "full_cone"
-- name: Add eth1 of node VM as dest
-  command: >
     iptables -t nat -A PREROUTING -i eth0 -j DNAT --to-destination {{ node_private_ip_eth1 }}
-  when: nat_gateway_output.stdout.find(node_private_ip_eth1) == -1 and gateway_type == "full_cone"
+    service netfilter-persistent save
+  when: nat_gateway_output.stdout.find(node_private_ip_eth1) == -1 and gateway_type == "full-cone"
