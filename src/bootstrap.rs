@@ -125,7 +125,6 @@ impl TestnetDeployer {
             options.bootstrap_peer.clone(),
             options.bootstrap_network_contacts_url.clone(),
             NodeType::Generic,
-            None,
         ) {
             Ok(()) => {
                 println!("Provisioned normal nodes");
@@ -143,28 +142,17 @@ impl TestnetDeployer {
         )?;
 
         if private_node_inventory.should_provision_full_cone_private_nodes() {
-            self.ansible_provisioner
-                .print_ansible_run_banner("Provision Full Cone NAT Gateway");
-            self.ansible_provisioner
-                .provision_full_cone_nat_gateway(&provision_options, &private_node_inventory)
-                .map_err(|err| {
-                    println!("Failed to provision Full Cone NAT gateway {err:?}");
-                    err
-                })?;
-
-            self.ansible_provisioner
-                .print_ansible_run_banner("Provision Full Cone Private Nodes");
-            match self.ansible_provisioner.provision_full_cone_private_nodes(
-                &mut provision_options,
+            match self.ansible_provisioner.provision_full_cone(
+                &provision_options,
                 options.bootstrap_peer.clone(),
                 options.bootstrap_network_contacts_url.clone(),
                 &private_node_inventory,
             ) {
                 Ok(()) => {
-                    println!("Provisioned Full Cone Private nodes");
+                    println!("Provisioned Full Cone nodes and Gateway");
                 }
                 Err(err) => {
-                    error!("Failed to provision Full Cone private nodes: {err}");
+                    error!("Failed to provision Full Cone nodes and Gateway: {err}");
                     failed_to_provision = true;
                 }
             }

@@ -308,23 +308,23 @@ impl TestnetDeployer {
         self.ansible_provisioner.get_all_node_inventory()
     }
 
-    fn get_symmetric_nat_gateway_inventory(&self, name: &str) -> Result<Vec<VirtualMachine>> {
-        let environments = self.terraform_runner.workspace_list()?;
-        if !environments.contains(&name.to_string()) {
-            return Err(Error::EnvironmentDoesNotExist(name.to_string()));
-        }
-        self.ansible_provisioner
-            .get_symmetric_nat_gateway_inventory()
-    }
+    // fn get_symmetric_nat_gateway_inventory(&self, name: &str) -> Result<Vec<VirtualMachine>> {
+    //     let environments = self.terraform_runner.workspace_list()?;
+    //     if !environments.contains(&name.to_string()) {
+    //         return Err(Error::EnvironmentDoesNotExist(name.to_string()));
+    //     }
+    //     self.ansible_provisioner
+    //         .get_symmetric_nat_gateway_inventory()
+    // }
 
-    fn get_full_cone_nat_gateway_inventory(&self, name: &str) -> Result<Vec<VirtualMachine>> {
-        let environments = self.terraform_runner.workspace_list()?;
-        if !environments.contains(&name.to_string()) {
-            return Err(Error::EnvironmentDoesNotExist(name.to_string()));
-        }
-        self.ansible_provisioner
-            .get_full_cone_nat_gateway_inventory()
-    }
+    // fn get_full_cone_nat_gateway_inventory(&self, name: &str) -> Result<Vec<VirtualMachine>> {
+    //     let environments = self.terraform_runner.workspace_list()?;
+    //     if !environments.contains(&name.to_string()) {
+    //         return Err(Error::EnvironmentDoesNotExist(name.to_string()));
+    //     }
+    //     self.ansible_provisioner
+    //         .get_full_cone_nat_gateway_inventory()
+    // }
 }
 
 pub async fn get_logs(name: &str) -> Result<()> {

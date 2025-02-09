@@ -262,7 +262,6 @@ impl TestnetDeployer {
                 Some(initial_multiaddr.clone()),
                 Some(initial_network_contacts_url.clone()),
                 NodeType::PeerCache,
-                None,
             ) {
                 Ok(()) => {
                     println!("Provisioned Peer Cache nodes");
@@ -285,7 +284,6 @@ impl TestnetDeployer {
             Some(initial_multiaddr.clone()),
             Some(initial_network_contacts_url.clone()),
             NodeType::Generic,
-            None,
         ) {
             Ok(()) => {
                 println!("Provisioned normal nodes");
@@ -303,39 +301,39 @@ impl TestnetDeployer {
         )?;
 
         if private_node_inventory.should_provision_full_cone_private_nodes() {
-            self.wait_for_ssh_availability_on_new_machines(
-                AnsibleInventoryType::FullConeNatGateway,
-                &options.current_inventory,
-            )?;
-            self.ansible_provisioner
-                .print_ansible_run_banner("Provision Full Cone NAT Gateway");
-            self.ansible_provisioner
-                .provision_full_cone_nat_gateway(&provision_options, &private_node_inventory)
-                .map_err(|err| {
-                    println!("Failed to provision full cone NAT gateway {err:?}");
-                    err
-                })?;
+            // self.wait_for_ssh_availability_on_new_machines(
+            //     AnsibleInventoryType::FullConeNatGateway,
+            //     &options.current_inventory,
+            // )?;
+            // self.ansible_provisioner
+            //     .print_ansible_run_banner("Provision Full Cone NAT Gateway");
+            // self.ansible_provisioner
+            //     .provision_full_cone_nat_gateway(&provision_options, &private_node_inventory)
+            //     .map_err(|err| {
+            //         println!("Failed to provision full cone NAT gateway {err:?}");
+            //         err
+            //     })?;
 
-            self.wait_for_ssh_availability_on_new_machines(
-                AnsibleInventoryType::FullConePrivateNodes,
-                &options.current_inventory,
-            )?;
-            self.ansible_provisioner
-                .print_ansible_run_banner("Provision Full Cone Private Nodes");
-            match self.ansible_provisioner.provision_full_cone_private_nodes(
-                &mut provision_options,
-                Some(initial_multiaddr.clone()),
-                Some(initial_network_contacts_url.clone()),
-                &private_node_inventory,
-            ) {
-                Ok(()) => {
-                    println!("Provisioned full cone private nodes");
-                }
-                Err(err) => {
-                    log::error!("Failed to provision full cone private nodes: {err}");
-                    node_provision_failed = true;
-                }
-            }
+            // self.wait_for_ssh_availability_on_new_machines(
+            //     AnsibleInventoryType::FullConePrivateNodes,
+            //     &options.current_inventory,
+            // )?;
+            // self.ansible_provisioner
+            //     .print_ansible_run_banner("Provision Full Cone Private Nodes");
+            // match self.ansible_provisioner.provision_full_cone_private_nodes(
+            //     &mut provision_options,
+            //     Some(initial_multiaddr.clone()),
+            //     Some(initial_network_contacts_url.clone()),
+            //     &private_node_inventory,
+            // ) {
+            //     Ok(()) => {
+            //         println!("Provisioned full cone private nodes");
+            //     }
+            //     Err(err) => {
+            //         log::error!("Failed to provision full cone private nodes: {err}");
+            //         node_provision_failed = true;
+            //     }
+            // }
         }
 
         if private_node_inventory.should_provision_symmetric_private_nodes() {

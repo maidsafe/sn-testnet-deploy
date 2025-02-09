@@ -91,6 +91,10 @@ pub enum AnsiblePlaybook {
     ///
     /// Use in combination with `AnsibleInventoryType::Genesis`.
     Faucet,
+    /// This playbook will setup the VM to act as a Full Cone NAT gateway and will route the private node through it.
+    ///
+    /// Use in combination with `AnsibleInventoryType::FullConeNatGateway`.
+    FullConeNatGateway,
     /// This playbook will fund the uploaders using the faucet.
     FundUploaders,
     /// The genesis playbook will use the node manager to setup the genesis node, which the other
@@ -102,11 +106,6 @@ pub enum AnsiblePlaybook {
     ///
     /// Use in combination with `AnsibleInventoryType::Logstash`.
     Logstash,
-    /// The NAT gateway playbook will setup the NAT gateway to enable NAT routing with randomization.
-    /// It allows us to simulate a private node that is behind a NAT.
-    ///
-    /// Use in combination with `AnsibleInventoryType::NatGateway`.
-    NatGateway,
     /// The node playbook will setup any nodes except the genesis node. These nodes will bootstrap
     /// using genesis as a peer reference.
     ///
@@ -117,6 +116,12 @@ pub enum AnsiblePlaybook {
     ///
     /// Use in combination with `AnsibleInventoryType::PeerCache`.
     PeerCacheNodes,
+    /// The private node playbook will setup the configs required for the routing the private node through a
+    /// NAT gateway. This has to be run before running the Nodes playbook.
+    ///
+    /// Use in combination with `AnsibleInventoryType::SymmetricPrivateNodes` or
+    /// `AnsibleInventoryType::FullConePrivateNodes`.
+    PrivateNodeConfig,
     /// The reset to n nodes playbook will reset the nodes to the specified number of nodes.
     ///
     /// See the `reset-to-n-nodes` role for more details.
@@ -160,6 +165,10 @@ pub enum AnsiblePlaybook {
     StopTelegraf,
     /// This playbook will stop the uploaders on each machine.
     StopUploaders,
+    /// This playbook will setup the VM to act as a Symmetric NAT gateway and will route the private node through it.
+    ///
+    /// Use in combination with `AnsibleInventoryType::SymmetricNatGateway`.
+    SymmetricNatGateway,
     /// The upgrade antctl playbook will upgrade the antctl to the latest version.
     ///
     /// Use in combination with `AnsibleInventoryType::Genesis` or `AnsibleInventoryType::Nodes`.
@@ -194,12 +203,13 @@ impl AnsiblePlaybook {
             AnsiblePlaybook::EvmNodes => "evm_nodes.yml".to_string(),
             AnsiblePlaybook::ExtendVolumeSize => "extend_volume_size.yml".to_string(),
             AnsiblePlaybook::Faucet => "faucet.yml".to_string(),
+            AnsiblePlaybook::FullConeNatGateway => "full_cone_nat_gateway.yml".to_string(),
             AnsiblePlaybook::FundUploaders => "fund_uploaders.yml".to_string(),
             AnsiblePlaybook::Genesis => "genesis_node.yml".to_string(),
             AnsiblePlaybook::Logstash => "logstash.yml".to_string(),
-            AnsiblePlaybook::NatGateway => "nat_gateway.yml".to_string(),
             AnsiblePlaybook::Nodes => "nodes.yml".to_string(),
             AnsiblePlaybook::PeerCacheNodes => "peer_cache_node.yml".to_string(),
+            AnsiblePlaybook::PrivateNodeConfig => "private_node_config.yml".to_string(),
             AnsiblePlaybook::RpcClient => "safenode_rpc_client.yml".to_string(),
             AnsiblePlaybook::ResetToNNodes => "reset_to_n_nodes.yml".to_string(),
             AnsiblePlaybook::StartFaucet => "start_faucet.yml".to_string(),
@@ -211,6 +221,7 @@ impl AnsiblePlaybook {
             AnsiblePlaybook::StopNodes => "stop_nodes.yml".to_string(),
             AnsiblePlaybook::StopTelegraf => "stop_telegraf.yml".to_string(),
             AnsiblePlaybook::StopUploaders => "stop_uploaders.yml".to_string(),
+            AnsiblePlaybook::SymmetricNatGateway => "symmetric_nat_gateway.yml".to_string(),
             AnsiblePlaybook::UpgradeAntctl => "upgrade_antctl.yml".to_string(),
             AnsiblePlaybook::UpgradeNodes => "upgrade_nodes.yml".to_string(),
             AnsiblePlaybook::UpgradeNodeTelegrafConfig => {

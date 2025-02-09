@@ -14,6 +14,7 @@ use crate::{
 };
 use alloy::{hex::ToHexExt, primitives::U256};
 use colored::Colorize;
+use log::error;
 use std::{net::SocketAddr, path::PathBuf, time::Duration};
 
 #[derive(Clone)]
@@ -152,7 +153,7 @@ impl TestnetDeployer {
             let address = get_address_from_sk(&emv_data.deployer_wallet_private_key)?;
             Some(address.encode_hex())
         } else {
-            log::error!("Funding wallet address not provided");
+            error!("Funding wallet address not provided");
             None
         };
 
@@ -220,13 +221,12 @@ impl TestnetDeployer {
             Some(genesis_multiaddr.clone()),
             Some(genesis_network_contacts.clone()),
             NodeType::PeerCache,
-            None,
         ) {
             Ok(()) => {
                 println!("Provisioned Peer Cache nodes");
             }
             Err(err) => {
-                log::error!("Failed to provision Peer Cache nodes: {err}");
+                error!("Failed to provision Peer Cache nodes: {err}");
                 node_provision_failed = true;
             }
         }
@@ -238,13 +238,12 @@ impl TestnetDeployer {
             Some(genesis_multiaddr.clone()),
             Some(genesis_network_contacts.clone()),
             NodeType::Generic,
-            None,
         ) {
             Ok(()) => {
                 println!("Provisioned normal nodes");
             }
             Err(err) => {
-                log::error!("Failed to provision normal nodes: {err}");
+                error!("Failed to provision normal nodes: {err}");
                 node_provision_failed = true;
             }
         }
@@ -256,28 +255,17 @@ impl TestnetDeployer {
         )?;
 
         if private_node_inventory.should_provision_full_cone_private_nodes() {
-            self.ansible_provisioner
-                .print_ansible_run_banner("Provision Full Cone NAT Gateway");
-            self.ansible_provisioner
-                .provision_full_cone_nat_gateway(&provision_options, &private_node_inventory)
-                .map_err(|err| {
-                    println!("Failed to provision Full Cone NAT gateway {err:?}");
-                    err
-                })?;
-
-            self.ansible_provisioner
-                .print_ansible_run_banner("Provision Full Cone Private Nodes");
-            match self.ansible_provisioner.provision_full_cone_private_nodes(
-                &mut provision_options,
+            match self.ansible_provisioner.provision_full_cone(
+                &provision_options,
                 Some(genesis_multiaddr.clone()),
                 Some(genesis_network_contacts.clone()),
                 &private_node_inventory,
             ) {
                 Ok(()) => {
-                    println!("Provisioned Full Cone Private nodes");
+                    println!("Provisioned Full Cone nodes and Gateway");
                 }
                 Err(err) => {
-                    log::error!("Failed to provision Full Cone private nodes: {err}");
+                    error!("Failed to provision Full Cone nodes and Gateway: {err}");
                     node_provision_failed = true;
                 }
             }
@@ -305,7 +293,7 @@ impl TestnetDeployer {
                     println!("Provisioned Symmetric private nodes");
                 }
                 Err(err) => {
-                    log::error!("Failed to provision Symmetric Private nodes: {err}");
+                    error!("Failed to provision Symmetric Private nodes: {err}");
                     node_provision_failed = true;
                 }
             }

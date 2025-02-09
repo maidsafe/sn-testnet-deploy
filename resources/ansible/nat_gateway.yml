@@ -1,6 +1,0 @@
----
-- name: provision nat gateway
-  hosts: all
-  become: True
-  roles:
-    - nat_gateway

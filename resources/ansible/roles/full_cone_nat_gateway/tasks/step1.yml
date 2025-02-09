@@ -1,0 +1,26 @@
+---
+- name: define conditional variables
+  set_fact:
+    ipv4_forwarded: false
+
+- name: check if ipv4 is forwarded
+  command: sysctl net.ipv4.ip_forward
+  register: ipv4_forward_output
+
+- name: set ipv4_forwarded to true if ipv4 is forwarded
+  set_fact:
+    ipv4_forwarded: true
+  # not(not found)
+  when: ipv4_forward_output.stdout.find('net.ipv4.ip_forward = 1') != -1
+
+- name: enable IPv4 forwarding
+  sysctl:
+    name: net.ipv4.ip_forward
+    value: 1
+    state: present
+    reload: true
+  when: not ipv4_forwarded
+
+- name: persist IPv4 forwarding on reboots
+  command: sed -i 's/#net.ipv4.ip_forward/net.ipv4.ip_forward/g' /etc/sysctl.conf
+  when: not ipv4_forwarded

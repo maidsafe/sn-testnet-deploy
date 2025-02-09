@@ -270,7 +270,7 @@ impl ExtraVarsDocBuilder {
 pub fn build_nat_gateway_extra_vars_doc(
     name: &str,
     private_node_ip_map: HashMap<String, IpAddr>,
-    gateway_type: &str,
+    action: &str,
 ) -> String {
     let mut extra_vars = ExtraVarsDocBuilder::default();
     extra_vars.add_variable("testnet_name", name);
@@ -281,8 +281,8 @@ pub fn build_nat_gateway_extra_vars_doc(
             .map(|(k, v)| (k, Value::String(v.to_string())))
             .collect(),
     );
-    extra_vars.add_variable("gateway_type", gateway_type);
     extra_vars.add_serde_value("node_private_ip_map", serde_map);
+    extra_vars.add_variable("action", action);
     extra_vars.build()
 }
 
@@ -295,7 +295,7 @@ pub fn build_node_extra_vars_doc(
     network_contacts_url: Option<String>,
     node_instance_count: u16,
     evm_network: EvmNetwork,
-    private_node_inventory: Option<&PrivateNodeProvisionInventory>,
+    home_network_flag: bool,
 ) -> Result<String> {
     let mut extra_vars = ExtraVarsDocBuilder::default();
     extra_vars.add_variable("provider", cloud_provider);
@@ -325,60 +325,8 @@ pub fn build_node_extra_vars_doc(
         extra_vars.add_variable("public_rpc", "true");
     }
 
-    if matches!(node_type, NodeType::FullConePrivateNode) {
-        let private_node_inventory = private_node_inventory.ok_or({
-            error!("Private node inventory not supplied");
-            Error::EmptyInventory(AnsibleInventoryType::FullConePrivateNodes)
-        })?;
-        let map = private_node_inventory.full_cone_private_node_and_gateway_map()?;
-        if map.is_empty() {
-            error!("Private node inventory map is empty");
-            return Err(Error::EmptyInventory(
-                AnsibleInventoryType::FullConePrivateNodes,
-            ));
-        }
-
-        let serde_map = Value::Object(
-            map.into_iter()
-                .map(|(private_node_vm, nat_gateway_vm)| {
-                    (
-                        // hostname of private node returns the private ip address, since we're using static inventory.
-                        private_node_vm.private_ip_addr.to_string(),
-                        Value::String(nat_gateway_vm.private_ip_addr.to_string()),
-                    )
-                })
-                .collect(),
-        );
-        extra_vars.add_serde_value("nat_gateway_private_ip_map", serde_map);
-
-        extra_vars.add_variable("make_vm_private", "true");
-    } else if matches!(node_type, NodeType::SymmetricPrivateNode) {
-        let private_node_inventory = private_node_inventory.ok_or({
-            error!("Private node inventory not supplied");
-            Error::EmptyInventory(AnsibleInventoryType::FullConePrivateNodes)
-        })?;
-        let map = private_node_inventory.symmetric_private_node_and_gateway_map()?;
-        if map.is_empty() {
-            error!("Private node inventory map is empty");
-            return Err(Error::EmptyInventory(
-                AnsibleInventoryType::SymmetricPrivateNodes,
-            ));
-        }
-
-        let serde_map = Value::Object(
-            map.into_iter()
-                .map(|(private_node_vm, nat_gateway_vm)| {
-                    (
-                        // hostname of private node returns the private ip address, since we're using static inventory.
-                        private_node_vm.private_ip_addr.to_string(),
-                        Value::String(nat_gateway_vm.private_ip_addr.to_string()),
-                    )
-                })
-                .collect(),
-        );
-        extra_vars.add_serde_value("nat_gateway_private_ip_map", serde_map);
-
-        extra_vars.add_variable("make_vm_private", "true");
+    if home_network_flag {
+        extra_vars.add_variable("home_network", "true");
     }
 
     if let Some(network_id) = options.network_id {
@@ -415,6 +363,64 @@ pub fn build_node_extra_vars_doc(
     if let Some(evm_rpc_url) = &options.evm_rpc_url {
         extra_vars.add_variable("evm_rpc_url", evm_rpc_url);
     }
+
+    Ok(extra_vars.build())
+}
+
+pub fn build_full_cone_private_node_config_extra_vars_docs(
+    private_node_inventory: &PrivateNodeProvisionInventory,
+) -> Result<String> {
+    let mut extra_vars = ExtraVarsDocBuilder::default();
+
+    let map = private_node_inventory.full_cone_private_node_and_gateway_map()?;
+    if map.is_empty() {
+        error!("Private node inventory map is empty");
+        return Err(Error::EmptyInventory(
+            AnsibleInventoryType::FullConePrivateNodes,
+        ));
+    }
+
+    let serde_map = Value::Object(
+        map.into_iter()
+            .map(|(private_node_vm, nat_gateway_vm)| {
+                (
+                    // hostname of private node returns the private ip address, since we're using static inventory.
+                    private_node_vm.private_ip_addr.to_string(),
+                    Value::String(nat_gateway_vm.private_ip_addr.to_string()),
+                )
+            })
+            .collect(),
+    );
+    extra_vars.add_serde_value("nat_gateway_private_ip_map", serde_map);
+
+    Ok(extra_vars.build())
+}
+
+pub fn build_symmetric_private_node_config_extra_vars_doc(
+    private_node_inventory: &PrivateNodeProvisionInventory,
+) -> Result<String> {
+    let mut extra_vars = ExtraVarsDocBuilder::default();
+
+    let map = private_node_inventory.symmetric_private_node_and_gateway_map()?;
+    if map.is_empty() {
+        error!("Private node inventory map is empty");
+        return Err(Error::EmptyInventory(
+            AnsibleInventoryType::SymmetricPrivateNodes,
+        ));
+    }
+
+    let serde_map = Value::Object(
+        map.into_iter()
+            .map(|(private_node_vm, nat_gateway_vm)| {
+                (
+                    // hostname of private node returns the private ip address, since we're using static inventory.
+                    private_node_vm.private_ip_addr.to_string(),
+                    Value::String(nat_gateway_vm.private_ip_addr.to_string()),
+                )
+            })
+            .collect(),
+    );
+    extra_vars.add_serde_value("nat_gateway_private_ip_map", serde_map);
 
     Ok(extra_vars.build())
 }

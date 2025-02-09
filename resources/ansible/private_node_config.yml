@@ -1,0 +1,6 @@
+---
+- name: setup private node config
+  hosts: all
+  become: True
+  roles:
+    - private_node_config

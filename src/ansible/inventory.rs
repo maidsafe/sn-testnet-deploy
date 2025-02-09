@@ -392,6 +392,8 @@ pub fn generate_full_cone_private_node_static_environment_inventory(
     output_inventory_dir_path: &Path,
     full_cone_private_node_vms: &[VirtualMachine],
     full_cone_nat_gateway_vms: &[VirtualMachine],
+    ssh_sk_path: &Path,
+    step1: bool,
 ) -> Result<()> {
     if full_cone_nat_gateway_vms.is_empty() {
         println!("No full cone NAT gateway VMs found. Skipping full cone private node static inventory generation.");
@@ -420,20 +422,25 @@ pub fn generate_full_cone_private_node_static_environment_inventory(
 
     for (privat_node_vm, nat_gateway_vm) in private_node_nat_gateway_map.iter() {
         let node_number = privat_node_vm.name.split('-').last().unwrap();
-        writeln!(file, "[private_node_{}]", node_number)?;
-        writeln!(
-            file,
-            "{} ansible_host={} ansible_user=root",
-            privat_node_vm.private_ip_addr, nat_gateway_vm.public_ip_addr
-        )?;
-        writeln!(file, "[private_node_{}:vars]", node_number)?;
-        // writeln!(
-        //     file,
-        //     "ansible_ssh_common_args='-o ProxyCommand=\"ssh -p 22 -W %h:%p -q root@{} -i \"{}\" -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null\"'",
-        //     nat_gateway_vm.public_ip_addr,
-        //     ssh_sk_path.to_string_lossy()
-        // )?;
-        writeln!(file, "ansible_host_key_checking=False")?;
+        writeln!(file, "[full_cone_private_node_{}]", node_number)?;
+
+        if step1 {
+            writeln!(file, "{}", privat_node_vm.private_ip_addr)?;
+        } else {
+            writeln!(file, "{} ansible_ssh_common_args='-o StrictHostKeyChecking=accept-new -o UserKnownHostsFile=/dev/null'", nat_gateway_vm.public_ip_addr)?;
+        }
+
+        if step1 {
+            writeln!(file, "[full_cone_private_node_{}:vars]", node_number)?;
+            writeln!(
+                file,
+                "ansible_ssh_common_args='-o ProxyCommand=\"ssh -p 22 -W %h:%p -q root@{} -i \"{}\" -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null\"'",
+                nat_gateway_vm.public_ip_addr,
+                ssh_sk_path.to_string_lossy()
+
+            )?;
+            writeln!(file, "ansible_host_key_checking=False")?;
+        }
     }
 
     debug!("Created full cone private node inventory file with ssh proxy at {dest_path:?}");

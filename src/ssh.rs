@@ -29,6 +29,7 @@ impl RoutedVms {
         &self,
         ip_address: &IpAddr,
     ) -> Option<(&VirtualMachine, &IpAddr)> {
+        debug!("Check if {ip_address} is a symmetric NAT routed node...");
         self.symmetric_private_node_nat_gateway_ip_map
             .iter()
             .find_map(|(private_vm, gateway_ip)| {
@@ -38,12 +39,16 @@ impl RoutedVms {
                     None
                 }
             })
+            .inspect(|op| {
+                debug!("Found symmetric NAT routed node: {op:?}");
+            })
     }
 
     fn find_full_cone_nat_routed_node(
         &self,
         ip_address: &IpAddr,
     ) -> Option<(&VirtualMachine, &IpAddr)> {
+        debug!("Check if {ip_address} is a full cone NAT routed node...");
         self.full_cone_private_node_nat_gateway_ip_map
             .iter()
             .find_map(|(private_vm, gateway_ip)| {
@@ -52,6 +57,9 @@ impl RoutedVms {
                 } else {
                     None
                 }
+            })
+            .inspect(|op| {
+                debug!("Found full cone NAT routed node: {op:?}");
             })
     }
 }
@@ -88,20 +96,24 @@ impl SshClient {
                 (private_node_vm, nat_gateway_vm.public_ip_addr)
             })
             .collect::<HashMap<_, _>>();
-        if let Some(routed_vms) = self
-            .routed_vms
-            .write()
-            .map_err(|err| {
-                log::error!("Failed to set routed VMs: {err}");
-                Error::SshSettingsRwLockError
-            })?
-            .as_mut()
-        {
-            routed_vms.full_cone_private_node_nat_gateway_ip_map =
-                full_cone_private_node_nat_gateway_ip_map;
-        }
+        let mut write_access = self.routed_vms.write().map_err(|err| {
+            log::error!("Failed to set routed VMs: {err}");
+            Error::SshSettingsRwLockError
+        })?;
 
-        debug!("Full Cone Private Routed VMs have been set.");
+        debug!("Full Cone Private Routed VMs have been set to: {full_cone_private_node_nat_gateway_ip_map:?}");
+        match write_access.as_mut() {
+            Some(routed_vms) => {
+                routed_vms.full_cone_private_node_nat_gateway_ip_map =
+                    full_cone_private_node_nat_gateway_ip_map;
+            }
+            None => {
+                *write_access = Some(RoutedVms {
+                    full_cone_private_node_nat_gateway_ip_map,
+                    symmetric_private_node_nat_gateway_ip_map: HashMap::new(),
+                });
+            }
+        }
 
         Ok(())
     }
@@ -124,20 +136,24 @@ impl SshClient {
                 (private_node_vm, nat_gateway_vm.public_ip_addr)
             })
             .collect::<HashMap<_, _>>();
-        if let Some(routed_vms) = self
-            .routed_vms
-            .write()
-            .map_err(|err| {
-                log::error!("Failed to set routed VMs: {err}");
-                Error::SshSettingsRwLockError
-            })?
-            .as_mut()
-        {
-            routed_vms.symmetric_private_node_nat_gateway_ip_map =
-                symmetric_private_node_nat_gateway_ip_map;
-        }
+        let mut write_access = self.routed_vms.write().map_err(|err| {
+            log::error!("Failed to set routed VMs: {err}");
+            Error::SshSettingsRwLockError
+        })?;
+        debug!("Symmetric Private node Routed VMs have been set to: {symmetric_private_node_nat_gateway_ip_map:?}");
 
-        debug!("Symmetric Private node Routed VMs have been set.");
+        match write_access.as_mut() {
+            Some(routed_vms) => {
+                routed_vms.symmetric_private_node_nat_gateway_ip_map =
+                    symmetric_private_node_nat_gateway_ip_map;
+            }
+            None => {
+                *write_access = Some(RoutedVms {
+                    full_cone_private_node_nat_gateway_ip_map: HashMap::new(),
+                    symmetric_private_node_nat_gateway_ip_map,
+                });
+            }
+        }
 
         Ok(())
     }
@@ -170,6 +186,10 @@ impl SshClient {
                 "Checking for SSH availability at {} ({ip_address}) via symmetric NAT gateway {gateway_ip}...",
                 vm.private_ip_addr
             );
+            debug!(
+                "Checking for SSH availability at {} ({ip_address}) via symmetric NAT gateway {gateway_ip}...",
+                vm.private_ip_addr
+            );
             args.push("-o".to_string());
             args.push(format!(
                 "ProxyCommand=ssh -i {} -W %h:%p {}@{}",
@@ -183,6 +203,10 @@ impl SshClient {
             .and_then(|routed_vms| routed_vms.find_full_cone_nat_routed_node(ip_address))
         {
             println!(
+                "Checking for SSH availability at {} ({ip_address}) via Full Cone NAT gateway {gateway_ip}...",
+                vm.private_ip_addr,
+            );
+            debug!(
                 "Checking for SSH availability at {} ({ip_address}) via Full Cone NAT gateway {gateway_ip}...",
                 vm.private_ip_addr,
             );

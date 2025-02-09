@@ -1,0 +1,6 @@
+---
+- name: provision full cone nat gateway
+  hosts: all
+  become: True
+  roles:
+    - full_cone_nat_gateway
