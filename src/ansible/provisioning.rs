@@ -19,8 +19,8 @@ use crate::{
     error::{Error, Result},
     funding::FundingOptions,
     inventory::{DeploymentNodeRegistries, VirtualMachine},
-    print_duration, BinaryOption, CloudProvider, EvmNetwork, LogFormat, NodeType, SshClient,
-    UpgradeOptions,
+    print_duration, run_external_command, BinaryOption, CloudProvider, EvmNetwork, LogFormat,
+    NodeType, SshClient, UpgradeOptions,
 };
 use ant_service_management::NodeRegistry;
 use evmlib::common::U256;
@@ -380,7 +380,7 @@ impl AnsibleProvisioner {
         &self,
         inventory_type: &AnsibleInventoryType,
     ) -> Result<DeploymentNodeRegistries> {
-        debug!("Fetching node manager inventory");
+        debug!("Fetching node manager inventory for {inventory_type:?}");
         let temp_dir_path = tempfile::tempdir()?.into_path();
         let temp_dir_json = serde_json::to_string(&temp_dir_path)?;
 
@@ -397,7 +397,6 @@ impl AnsibleProvisioner {
                 if entry.file_type().is_file()
                     && entry.path().extension().is_some_and(|ext| ext == "json")
                 {
-                    trace!("Found file with json extension: {:?}", entry.path());
                     // tempdir/<testnet_name>-node/var/safenode-manager/node_registry.json
                     let mut vm_name = entry.path().to_path_buf();
                     trace!("Found file with json extension: {vm_name:?}");
@@ -474,7 +473,7 @@ impl AnsibleProvisioner {
                 None,
                 1,
                 options.evm_network.clone(),
-                None,
+                false,
             )?),
         )?;
 
@@ -483,12 +482,16 @@ impl AnsibleProvisioner {
         Ok(())
     }
 
-    pub fn provision_full_cone_nat_gateway(
+    pub fn provision_full_cone(
         &self,
         options: &ProvisionOptions,
+        initial_contact_peer: Option<String>,
+        initial_network_contacts_url: Option<String>,
         private_node_inventory: &PrivateNodeProvisionInventory,
     ) -> Result<()> {
+        // Step 1 of Full Cone NAT Gateway
         let start = Instant::now();
+        self.print_ansible_run_banner("Provision Full Cone NAT Gateway - Step 1");
         for vm in &private_node_inventory.full_cone_nat_gateway_vms {
             println!(
                 "Checking SSH availability for Full Cone NAT Gateway: {}",
@@ -520,20 +523,125 @@ impl AnsibleProvisioner {
 
         let vars = extra_vars::build_nat_gateway_extra_vars_doc(
             &options.name,
-            private_node_ip_map,
-            "full_cone",
+            private_node_ip_map.clone(),
+            "step1",
         );
-        debug!("Provisioning Full Cone NAT Gateway with vars: {vars}");
+        debug!("Provisioning Full Cone NAT Gateway - Step 1 with vars: {vars}");
         self.ansible_runner.run_playbook(
-            AnsiblePlaybook::NatGateway,
+            AnsiblePlaybook::FullConeNatGateway,
             AnsibleInventoryType::FullConeNatGateway,
             Some(vars),
+        )?;
+        print_duration(start.elapsed());
+
+        // setup private node config
+        self.print_ansible_run_banner("Provisioning Full Cone Private Node Config");
+
+        generate_full_cone_private_node_static_environment_inventory(
+            &options.name,
+            &options.output_inventory_dir_path,
+            &private_node_inventory.full_cone_private_node_vms,
+            &private_node_inventory.full_cone_nat_gateway_vms,
+            &self.ssh_client.private_key_path,
+            true,
+        )
+        .inspect_err(|err| {
+            error!("Failed to generate full cone private node static inv with err: {err:?}")
+        })?;
+
+        // For a new deployment, it's quite probable that SSH is available, because this part occurs
+        // after the genesis node has been provisioned. However, for a bootstrap deploy, we need to
+        // check that SSH is available before proceeding.
+        println!("Obtaining IP addresses for nodes...");
+        let inventory = self
+            .ansible_runner
+            .get_inventory(AnsibleInventoryType::FullConePrivateNodes, true)?;
+
+        println!("Waiting for SSH availability on Symmetric Private nodes...");
+        for vm in inventory.iter() {
+            println!(
+                "Checking SSH availability for {}: {}",
+                vm.name, vm.public_ip_addr
+            );
+            self.ssh_client
+                .wait_for_ssh_availability(&vm.public_ip_addr, &self.cloud_provider.get_ssh_user())
+                .map_err(|e| {
+                    println!("Failed to establish SSH connection to {}: {}", vm.name, e);
+                    e
+                })?;
+        }
+
+        println!("SSH is available on all nodes. Proceeding with provisioning...");
+
+        self.ansible_runner.run_playbook(
+            AnsiblePlaybook::PrivateNodeConfig,
+            AnsibleInventoryType::FullConePrivateNodes,
+            Some(
+                extra_vars::build_full_cone_private_node_config_extra_vars_docs(
+                    private_node_inventory,
+                )?,
+            ),
+        )?;
+
+        // Step 2 of Full Cone NAT Gateway
+
+        let vars = extra_vars::build_nat_gateway_extra_vars_doc(
+            &options.name,
+            private_node_ip_map,
+            "step2",
+        );
+
+        self.print_ansible_run_banner("Provisioning Full Cone NAT Gateway - Step 2");
+        debug!("Provisioning Full Cone NAT Gateway - Step 2 with vars: {vars}");
+        self.ansible_runner.run_playbook(
+            AnsiblePlaybook::FullConeNatGateway,
+            AnsibleInventoryType::FullConeNatGateway,
+            Some(vars),
+        )?;
+
+        // provision the nodes
+
+        let home_dir = std::env::var("HOME").inspect_err(|err| {
+            println!("Failed to get home directory with error: {err:?}",);
+        })?;
+        let known_hosts_path = format!("{}/.ssh/known_hosts", home_dir);
+        debug!("Cleaning up known hosts file at {known_hosts_path} ");
+        run_external_command(
+            PathBuf::from("rm"),
+            std::env::current_dir()?,
+            vec![known_hosts_path],
+            false,
+            false,
+        )?;
+
+        self.print_ansible_run_banner("Provision Full Cone Private Nodes");
+        generate_full_cone_private_node_static_environment_inventory(
+            &options.name,
+            &options.output_inventory_dir_path,
+            &private_node_inventory.full_cone_private_node_vms,
+            &private_node_inventory.full_cone_nat_gateway_vms,
+            &self.ssh_client.private_key_path,
+            false,
+        )
+        .inspect_err(|err| {
+            error!("Failed to generate full cone private node static inv with err: {err:?}")
+        })?;
+
+        self.ssh_client.set_full_cone_nat_routed_vms(
+            &private_node_inventory.full_cone_private_node_vms,
+            &private_node_inventory.full_cone_nat_gateway_vms,
+        )?;
+
+        self.provision_nodes(
+            options,
+            initial_contact_peer,
+            initial_network_contacts_url,
+            NodeType::FullConePrivateNode,
         )?;
 
         print_duration(start.elapsed());
         Ok(())
     }
-
     pub fn provision_symmetric_nat_gateway(
         &self,
         options: &ProvisionOptions,
@@ -576,7 +684,7 @@ impl AnsibleProvisioner {
         );
         debug!("Provisioning Symmetric NAT Gateway with vars: {vars}");
         self.ansible_runner.run_playbook(
-            AnsiblePlaybook::NatGateway,
+            AnsiblePlaybook::SymmetricNatGateway,
             AnsibleInventoryType::SymmetricNatGateway,
             Some(vars),
         )?;
@@ -591,14 +699,17 @@ impl AnsibleProvisioner {
         initial_contact_peer: Option<String>,
         initial_network_contacts_url: Option<String>,
         node_type: NodeType,
-        private_node_inventory: Option<&PrivateNodeProvisionInventory>,
     ) -> Result<()> {
         let start = Instant::now();
+        let mut home_network_flag = false;
         let (inventory_type, node_count) = match &node_type {
-            NodeType::FullConePrivateNode => (
-                node_type.to_ansible_inventory_type(),
-                options.full_cone_private_node_count,
-            ),
+            NodeType::FullConePrivateNode => {
+                home_network_flag = true;
+                (
+                    node_type.to_ansible_inventory_type(),
+                    options.full_cone_private_node_count,
+                )
+            }
             // use provision_genesis_node fn
             NodeType::Generic => (node_type.to_ansible_inventory_type(), options.node_count),
             NodeType::Genesis => return Err(Error::InvalidNodeType(node_type)),
@@ -606,10 +717,13 @@ impl AnsibleProvisioner {
                 node_type.to_ansible_inventory_type(),
                 options.peer_cache_node_count,
             ),
-            NodeType::SymmetricPrivateNode => (
-                node_type.to_ansible_inventory_type(),
-                options.symmetric_private_node_count,
-            ),
+            NodeType::SymmetricPrivateNode => {
+                home_network_flag = true;
+                (
+                    node_type.to_ansible_inventory_type(),
+                    options.symmetric_private_node_count,
+                )
+            }
         };
 
         // For a new deployment, it's quite probable that SSH is available, because this part occurs
@@ -645,7 +759,7 @@ impl AnsibleProvisioner {
                 initial_network_contacts_url,
                 node_count,
                 options.evm_network.clone(),
-                private_node_inventory,
+                home_network_flag,
             )?),
         )?;
 
@@ -661,6 +775,7 @@ impl AnsibleProvisioner {
         private_node_inventory: &PrivateNodeProvisionInventory,
     ) -> Result<()> {
         let start = Instant::now();
+        self.print_ansible_run_banner("Provision Symmetric Private Node Config");
 
         generate_symmetric_private_node_static_environment_inventory(
             &options.name,
@@ -673,46 +788,55 @@ impl AnsibleProvisioner {
             error!("Failed to generate symmetric private node static inv with err: {err:?}")
         })?;
 
+        self.ssh_client.set_symmetric_nat_routed_vms(
+            &private_node_inventory.symmetric_private_node_vms,
+            &private_node_inventory.symmetric_nat_gateway_vms,
+        )?;
+
+        let inventory_type = AnsibleInventoryType::SymmetricPrivateNodes;
+
+        // For a new deployment, it's quite probable that SSH is available, because this part occurs
+        // after the genesis node has been provisioned. However, for a bootstrap deploy, we need to
+        // check that SSH is available before proceeding.
+        println!("Obtaining IP addresses for nodes...");
+        let inventory = self.ansible_runner.get_inventory(inventory_type, true)?;
+
+        println!("Waiting for SSH availability on Symmetric Private nodes...");
+        for vm in inventory.iter() {
+            println!(
+                "Checking SSH availability for {}: {}",
+                vm.name, vm.public_ip_addr
+            );
+            self.ssh_client
+                .wait_for_ssh_availability(&vm.public_ip_addr, &self.cloud_provider.get_ssh_user())
+                .map_err(|e| {
+                    println!("Failed to establish SSH connection to {}: {}", vm.name, e);
+                    e
+                })?;
+        }
+
+        println!("SSH is available on all nodes. Proceeding with provisioning...");
+
+        self.ansible_runner.run_playbook(
+            AnsiblePlaybook::PrivateNodeConfig,
+            inventory_type,
+            Some(
+                extra_vars::build_symmetric_private_node_config_extra_vars_doc(
+                    private_node_inventory,
+                )?,
+            ),
+        )?;
+
+        println!("Provisioned Symmetric Private Node Config");
+        print_duration(start.elapsed());
+
         self.provision_nodes(
             options,
             initial_contact_peer,
             initial_network_contacts_url,
             NodeType::SymmetricPrivateNode,
-            Some(private_node_inventory),
         )?;
 
-        print_duration(start.elapsed());
-        Ok(())
-    }
-
-    pub fn provision_full_cone_private_nodes(
-        &self,
-        options: &mut ProvisionOptions,
-        initial_contact_peer: Option<String>,
-        initial_network_contacts_url: Option<String>,
-        private_node_inventory: &PrivateNodeProvisionInventory,
-    ) -> Result<()> {
-        let start = Instant::now();
-
-        generate_full_cone_private_node_static_environment_inventory(
-            &options.name,
-            &options.output_inventory_dir_path,
-            &private_node_inventory.full_cone_private_node_vms,
-            &private_node_inventory.full_cone_nat_gateway_vms,
-        )
-        .inspect_err(|err| {
-            error!("Failed to generate full cone private node static inv with err: {err:?}")
-        })?;
-
-        self.provision_nodes(
-            options,
-            initial_contact_peer,
-            initial_network_contacts_url,
-            NodeType::FullConePrivateNode,
-            Some(private_node_inventory),
-        )?;
-
-        print_duration(start.elapsed());
         Ok(())
     }
 

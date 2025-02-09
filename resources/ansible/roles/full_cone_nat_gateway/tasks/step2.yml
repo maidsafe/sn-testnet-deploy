@@ -1,0 +1,37 @@
+---
+- name: Retrieve private IP of the corresponding private node vm
+  set_fact:
+    node_private_ip_eth1: "{{ node_private_ip_map[inventory_hostname] }}"
+
+- name: public IP of the gateway vm
+  set_fact:
+    gateway_public_ip: "{{ ansible_host }}"
+
+- name: check if node_private_ip_eth1 is added to the NAT gateway
+  command: iptables -t nat -L POSTROUTING -v
+  register: nat_gateway_output
+
+- name: Load ip_conntrack module
+  modprobe:
+    name: ip_conntrack
+    state: present
+
+- name: set netfilter conntrack max
+  sysctl:
+    name: net.netfilter.nf_conntrack_max
+    value: 1048576
+    state: present
+    reload: true
+
+- name: ensure netfilter conntrack max is set in sysctl.conf
+  lineinfile:
+    path: /etc/sysctl.conf
+    line: 'net.netfilter.nf_conntrack_max=1048576'
+    state: present
+
+- name: Setup iptables for full cone setup and save them to disk
+  shell: |
+    iptables -t nat -A POSTROUTING -o eth0 -j SNAT --to-source {{ gateway_public_ip }}
+    iptables -t nat -A PREROUTING -i eth0 -j DNAT --to-destination {{ node_private_ip_eth1 }}
+    service netfilter-persistent save
+  when: nat_gateway_output.stdout.find(node_private_ip_eth1) == -1

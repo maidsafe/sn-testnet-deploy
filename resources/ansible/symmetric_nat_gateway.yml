@@ -1,0 +1,6 @@
+---
+- name: provision symmetric nat gateway
+  hosts: all
+  become: True
+  roles:
+    - symmetric_nat_gateway
