@@ -179,7 +179,6 @@ impl DeploymentInventoryService {
             &full_cone_private_node_vms,
             &full_cone_nat_gateway_vms,
             &self.ssh_client.private_key_path,
-            false,
         )?;
         generate_symmetric_private_node_static_environment_inventory(
             name,
@@ -231,13 +230,13 @@ impl DeploymentInventoryService {
             .ansible_provisioner
             .get_node_registries(&AnsibleInventoryType::PeerCacheNodes)?;
         let peer_cache_node_vms =
-            NodeVirtualMachine::from_list(&peer_cache_node_vms, &peer_cache_node_registries, None);
+            NodeVirtualMachine::from_list(&peer_cache_node_vms, &peer_cache_node_registries);
 
         let generic_node_registries = self
             .ansible_provisioner
             .get_node_registries(&AnsibleInventoryType::Nodes)?;
         let generic_node_vms =
-            NodeVirtualMachine::from_list(&generic_node_vms, &generic_node_registries, None);
+            NodeVirtualMachine::from_list(&generic_node_vms, &generic_node_registries);
 
         let symmetric_private_node_registries = self
             .ansible_provisioner
@@ -245,7 +244,6 @@ impl DeploymentInventoryService {
         let symmetric_private_node_vms = NodeVirtualMachine::from_list(
             &symmetric_private_node_vms,
             &symmetric_private_node_registries,
-            None,
         );
         let full_cone_private_node_registries = self
             .ansible_provisioner
@@ -260,13 +258,12 @@ impl DeploymentInventoryService {
         let full_cone_private_node_vms = NodeVirtualMachine::from_list(
             &full_cone_private_node_vms,
             &full_cone_private_node_registries,
-            Some(full_cone_private_node_gateway_vm_map),
         );
 
         let genesis_node_registry = self
             .ansible_provisioner
             .get_node_registries(&AnsibleInventoryType::Genesis)?;
-        let genesis_vm = NodeVirtualMachine::from_list(&genesis_vm, &genesis_node_registry, None);
+        let genesis_vm = NodeVirtualMachine::from_list(&genesis_vm, &genesis_node_registry);
         let genesis_vm = if !genesis_vm.is_empty() {
             Some(genesis_vm[0].clone())
         } else {
@@ -366,6 +363,7 @@ impl DeploymentInventoryService {
             uploaded_files: Vec::new(),
             uploader_vms,
         };
+        debug!("Inventory: {inventory:?}");
         Ok(inventory)
     }
 
@@ -413,7 +411,6 @@ impl DeploymentInventoryService {
             &full_cone_private_node_vms,
             &full_cone_nat_gateway_vms,
             &self.ssh_client.private_key_path,
-            false,
         )?;
 
         // Set up the SSH client to route through the NAT gateway if it exists. This updates all the client clones.
@@ -509,35 +506,26 @@ impl NodeVirtualMachine {
     pub fn from_list(
         vms: &[VirtualMachine],
         node_registries: &DeploymentNodeRegistries,
-        full_cone_private_node_gateway_map: Option<HashMap<VirtualMachine, VirtualMachine>>,
     ) -> Vec<Self> {
         let mut node_vms = Vec::new();
         for vm in vms {
             let node_registry = node_registries
                 .retrieved_registries
                 .iter()
-                .find(|(name, _)|
-                // for symmetric private nodes, DeploymentNodeRegistries::name = private_ip_addr
-                // for full cone private nodes, DeploymentNodeRegistries::name = gateway_public_ip_addr
-                if vm.name.contains("symmetric") {
-                    name == &vm.private_ip_addr.to_string()
-                } else if vm.name.contains("full-cone") {
-                    let corresponding_gateway_vm = full_cone_private_node_gateway_map
-                        .as_ref()
-                        .expect("Full cone private nodes should pass the full cone NAT gateway VM as an argument")
-                        .get(vm)
-                        .expect("Full cone private nodes should have a corresponding NAT gateway VM");
-                    debug!("Vm name: {name} is a full cone private node, corresponding gateway vm: {corresponding_gateway_vm:?}. Vm: {vm:?}");
-
-                    name == &corresponding_gateway_vm
-                        .public_ip_addr
-                        .to_string()
-                } 
-                else {
-                    name == &vm.name
+                .find(|(name, _)| {
+                    if vm.name.contains("private") {
+                        let result = name == &vm.private_ip_addr.to_string();
+                        debug!(
+                            "Vm name: {name} is a private node with result {result}. Vm: {vm:?}"
+                        );
+                        result
+                    } else {
+                        name == &vm.name
+                    }
                 })
                 .map(|(_, reg)| reg);
             let Some(node_registry) = node_registry else {
+                debug!("No node registry found for vm: {vm:?}. Skipping");
                 continue;
             };
 
@@ -577,6 +565,7 @@ impl NodeVirtualMachine {
             };
             node_vms.push(node_vm);
         }
+        debug!("Node VMs generated from NodeRegistries: {node_vms:?}");
         node_vms
     }
 

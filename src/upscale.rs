@@ -301,39 +301,50 @@ impl TestnetDeployer {
         )?;
 
         if private_node_inventory.should_provision_full_cone_private_nodes() {
-            // self.wait_for_ssh_availability_on_new_machines(
-            //     AnsibleInventoryType::FullConeNatGateway,
-            //     &options.current_inventory,
-            // )?;
-            // self.ansible_provisioner
-            //     .print_ansible_run_banner("Provision Full Cone NAT Gateway");
-            // self.ansible_provisioner
-            //     .provision_full_cone_nat_gateway(&provision_options, &private_node_inventory)
-            //     .map_err(|err| {
-            //         println!("Failed to provision full cone NAT gateway {err:?}");
-            //         err
-            //     })?;
+            let full_cone_nat_gateway_inventory = self
+                .ansible_provisioner
+                .ansible_runner
+                .get_inventory(AnsibleInventoryType::FullConeNatGateway, true)?;
 
-            // self.wait_for_ssh_availability_on_new_machines(
-            //     AnsibleInventoryType::FullConePrivateNodes,
-            //     &options.current_inventory,
-            // )?;
-            // self.ansible_provisioner
-            //     .print_ansible_run_banner("Provision Full Cone Private Nodes");
-            // match self.ansible_provisioner.provision_full_cone_private_nodes(
-            //     &mut provision_options,
-            //     Some(initial_multiaddr.clone()),
-            //     Some(initial_network_contacts_url.clone()),
-            //     &private_node_inventory,
-            // ) {
-            //     Ok(()) => {
-            //         println!("Provisioned full cone private nodes");
-            //     }
-            //     Err(err) => {
-            //         log::error!("Failed to provision full cone private nodes: {err}");
-            //         node_provision_failed = true;
-            //     }
-            // }
+            let full_cone_nat_gateway_new_vms: Vec<_> = full_cone_nat_gateway_inventory
+                .into_iter()
+                .filter(|item| {
+                    !options
+                        .current_inventory
+                        .full_cone_nat_gateway_vms
+                        .contains(item)
+                })
+                .collect();
+
+            for vm in full_cone_nat_gateway_new_vms.iter() {
+                self.ssh_client.wait_for_ssh_availability(
+                    &vm.public_ip_addr,
+                    &self.cloud_provider.get_ssh_user(),
+                )?;
+            }
+
+            let full_cone_nat_gateway_new_vms = if full_cone_nat_gateway_new_vms.is_empty() {
+                None
+            } else {
+                debug!("Full Cone NAT Gateway new VMs: {full_cone_nat_gateway_new_vms:?}");
+                Some(full_cone_nat_gateway_new_vms)
+            };
+
+            match self.ansible_provisioner.provision_full_cone(
+                &provision_options,
+                Some(initial_multiaddr.clone()),
+                Some(initial_network_contacts_url.clone()),
+                private_node_inventory.clone(),
+                full_cone_nat_gateway_new_vms,
+            ) {
+                Ok(()) => {
+                    println!("Provisioned Full Cone nodes and Gateway");
+                }
+                Err(err) => {
+                    log::error!("Failed to provision Full Cone nodes and Gateway: {err}");
+                    node_provision_failed = true;
+                }
+            }
         }
 
         if private_node_inventory.should_provision_symmetric_private_nodes() {

@@ -13,7 +13,10 @@ use super::{
     AnsibleInventoryType, AnsiblePlaybook, AnsibleRunner,
 };
 use crate::{
-    ansible::inventory::generate_custom_environment_inventory,
+    ansible::inventory::{
+        generate_custom_environment_inventory,
+        generate_full_cone_nat_gateway_static_environment_inventory,
+    },
     bootstrap::BootstrapOptions,
     deploy::DeployOptions,
     error::{Error, Result},
@@ -74,7 +77,7 @@ pub struct ProvisionOptions {
 }
 
 /// These are obtained by running the inventory playbook
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct PrivateNodeProvisionInventory {
     pub full_cone_nat_gateway_vms: Vec<VirtualMachine>,
     pub full_cone_private_node_vms: Vec<VirtualMachine>,
@@ -196,6 +199,7 @@ impl PrivateNodeProvisionInventory {
             private_node_vms.len(),
             nat_gateway_vms.len()
         );
+            error!("The number of private node VMs does not match the number of NAT Gateway VMs: Private VMs: {private_node_vms:?} Nat gateway VMs: {nat_gateway_vms:?}");
             return Err(Error::VmCountMismatch(None, None));
         }
 
@@ -213,6 +217,7 @@ impl PrivateNodeProvisionInventory {
                         "Failed to find a matching NAT Gateway for private node: {}",
                         private_vm.name
                     );
+                    error!("Failed to find a matching NAT Gateway for private node: {}. Private VMs: {private_node_vms:?} Nat gateway VMs: {nat_gateway_vms:?}", private_vm.name);
                     Error::VmCountMismatch(None, None)
                 })?;
 
@@ -487,12 +492,18 @@ impl AnsibleProvisioner {
         options: &ProvisionOptions,
         initial_contact_peer: Option<String>,
         initial_network_contacts_url: Option<String>,
-        private_node_inventory: &PrivateNodeProvisionInventory,
+        private_node_inventory: PrivateNodeProvisionInventory,
+        new_full_cone_nat_gateway_new_vms_for_upscale: Option<Vec<VirtualMachine>>,
     ) -> Result<()> {
         // Step 1 of Full Cone NAT Gateway
         let start = Instant::now();
         self.print_ansible_run_banner("Provision Full Cone NAT Gateway - Step 1");
-        for vm in &private_node_inventory.full_cone_nat_gateway_vms {
+
+        for vm in new_full_cone_nat_gateway_new_vms_for_upscale
+            .as_ref()
+            .unwrap_or(&private_node_inventory.full_cone_nat_gateway_vms)
+            .iter()
+        {
             println!(
                 "Checking SSH availability for Full Cone NAT Gateway: {}",
                 vm.public_ip_addr
@@ -508,10 +519,55 @@ impl AnsibleProvisioner {
                 })?;
         }
 
-        let private_node_ip_map = private_node_inventory
+        let mut modified_private_node_inventory = private_node_inventory.clone();
+
+        // If we are upscaling, then we cannot access the gateway VMs which are already deployed.
+        if let Some(new_full_cone_nat_gateway_new_vms_for_upscale) =
+            &new_full_cone_nat_gateway_new_vms_for_upscale
+        {
+            debug!("Removing existing full cone NAT Gateway and private node VMs from the inventory. Old inventory: {modified_private_node_inventory:?}");
+            let mut names_to_keep = Vec::new();
+
+            for vm in new_full_cone_nat_gateway_new_vms_for_upscale.iter() {
+                let nat_gateway_name = vm.name.split('-').last().unwrap();
+                names_to_keep.push(nat_gateway_name);
+            }
+
+            modified_private_node_inventory
+                .full_cone_nat_gateway_vms
+                .retain(|vm| {
+                    let nat_gateway_name = vm.name.split('-').last().unwrap();
+                    names_to_keep.contains(&nat_gateway_name)
+                });
+            modified_private_node_inventory
+                .full_cone_private_node_vms
+                .retain(|vm| {
+                    let nat_gateway_name = vm.name.split('-').last().unwrap();
+                    names_to_keep.contains(&nat_gateway_name)
+                });
+            debug!("New inventory after removing existing full cone NAT Gateway and private node VMs: {modified_private_node_inventory:?}");
+        }
+
+        if modified_private_node_inventory
+            .full_cone_nat_gateway_vms
+            .is_empty()
+        {
+            error!("There are no full cone NAT Gateway VMs available to upscale");
+            return Ok(());
+        }
+
+        let private_node_ip_map = modified_private_node_inventory
             .full_cone_private_node_and_gateway_map()?
             .into_iter()
-            .map(|(k, v)| (v.name.clone(), k.private_ip_addr))
+            .map(|(k, v)| {
+                let gateway_name = if new_full_cone_nat_gateway_new_vms_for_upscale.is_some() {
+                    debug!("Upscaling, using public IP address for gateway name");
+                    v.public_ip_addr.to_string()
+                } else {
+                    v.name.clone()
+                };
+                (gateway_name, k.private_ip_addr)
+            })
             .collect::<HashMap<String, IpAddr>>();
 
         if private_node_ip_map.is_empty() {
@@ -527,12 +583,23 @@ impl AnsibleProvisioner {
             "step1",
         );
         debug!("Provisioning Full Cone NAT Gateway - Step 1 with vars: {vars}");
+        let gateway_inventory = if new_full_cone_nat_gateway_new_vms_for_upscale.is_some() {
+            debug!("Upscaling, using static inventory for full cone nat gateway.");
+            generate_full_cone_nat_gateway_static_environment_inventory(
+                &modified_private_node_inventory.full_cone_nat_gateway_vms,
+                &options.name,
+                &options.output_inventory_dir_path,
+            )?;
+
+            AnsibleInventoryType::FullConeNatGatewayStatic
+        } else {
+            AnsibleInventoryType::FullConeNatGateway
+        };
         self.ansible_runner.run_playbook(
             AnsiblePlaybook::FullConeNatGateway,
-            AnsibleInventoryType::FullConeNatGateway,
+            gateway_inventory,
             Some(vars),
         )?;
-        print_duration(start.elapsed());
 
         // setup private node config
         self.print_ansible_run_banner("Provisioning Full Cone Private Node Config");
@@ -543,7 +610,6 @@ impl AnsibleProvisioner {
             &private_node_inventory.full_cone_private_node_vms,
             &private_node_inventory.full_cone_nat_gateway_vms,
             &self.ssh_client.private_key_path,
-            true,
         )
         .inspect_err(|err| {
             error!("Failed to generate full cone private node static inv with err: {err:?}")
@@ -578,7 +644,7 @@ impl AnsibleProvisioner {
             AnsibleInventoryType::FullConePrivateNodes,
             Some(
                 extra_vars::build_full_cone_private_node_config_extra_vars_docs(
-                    private_node_inventory,
+                    &private_node_inventory,
                 )?,
             ),
         )?;
@@ -595,7 +661,7 @@ impl AnsibleProvisioner {
         debug!("Provisioning Full Cone NAT Gateway - Step 2 with vars: {vars}");
         self.ansible_runner.run_playbook(
             AnsiblePlaybook::FullConeNatGateway,
-            AnsibleInventoryType::FullConeNatGateway,
+            gateway_inventory,
             Some(vars),
         )?;
 
@@ -615,17 +681,6 @@ impl AnsibleProvisioner {
         )?;
 
         self.print_ansible_run_banner("Provision Full Cone Private Nodes");
-        generate_full_cone_private_node_static_environment_inventory(
-            &options.name,
-            &options.output_inventory_dir_path,
-            &private_node_inventory.full_cone_private_node_vms,
-            &private_node_inventory.full_cone_nat_gateway_vms,
-            &self.ssh_client.private_key_path,
-            false,
-        )
-        .inspect_err(|err| {
-            error!("Failed to generate full cone private node static inv with err: {err:?}")
-        })?;
 
         self.ssh_client.set_full_cone_nat_routed_vms(
             &private_node_inventory.full_cone_private_node_vms,

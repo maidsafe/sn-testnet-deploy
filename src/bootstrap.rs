@@ -146,7 +146,8 @@ impl TestnetDeployer {
                 &provision_options,
                 options.bootstrap_peer.clone(),
                 options.bootstrap_network_contacts_url.clone(),
-                &private_node_inventory,
+                private_node_inventory.clone(),
+                None,
             ) {
                 Ok(()) => {
                     println!("Provisioned Full Cone nodes and Gateway");

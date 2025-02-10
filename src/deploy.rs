@@ -259,7 +259,8 @@ impl TestnetDeployer {
                 &provision_options,
                 Some(genesis_multiaddr.clone()),
                 Some(genesis_network_contacts.clone()),
-                &private_node_inventory,
+                private_node_inventory.clone(),
+                None,
             ) {
                 Ok(()) => {
                     println!("Provisioned Full Cone nodes and Gateway");

@@ -188,28 +188,28 @@ resource "digitalocean_volume_attachment" "node_volume_attachment" {
 }
 
 resource "digitalocean_volume" "full_cone_private_node_attached_volume" {
-  for_each = { for key in local.full_cone_private_node_volume_keys : key => key }
-  name        = lower("${terraform.workspace}-full-cone-private-node-${split("-", each.key)[0]}-volume-${split("-", each.key)[1]}")
-  size        = var.full_cone_private_node_volume_size
-  region      = var.region
+  for_each = var.full_cone_private_node_volume_size > 0 ? { for key in local.full_cone_private_node_volume_keys : key => key } : {}
+  name     = lower("${terraform.workspace}-full-cone-private-node-${split("-", each.key)[0]}-volume-${split("-", each.key)[1]}")
+  size     = var.full_cone_private_node_volume_size
+  region   = var.region
 }
 
 resource "digitalocean_volume_attachment" "full_cone_private_node_volume_attachment" {
-  for_each = { for key in local.full_cone_private_node_volume_keys : key => key }
-  droplet_id = digitalocean_droplet.full_cone_private_node[tonumber(split("-", each.key)[0]) -1 ].id
+  for_each = var.full_cone_private_node_volume_size > 0 ? { for key in local.full_cone_private_node_volume_keys : key => key } : {}
+  droplet_id = digitalocean_droplet.full_cone_private_node[tonumber(split("-", each.key)[0]) - 1].id
   volume_id  = digitalocean_volume.full_cone_private_node_attached_volume[each.key].id
 }
 
 
 resource "digitalocean_volume" "symmetric_private_node_attached_volume" {
-  for_each = { for key in local.symmetric_private_node_volume_keys : key => key }
-  name        = lower("${terraform.workspace}-symmetric-private-node-${split("-", each.key)[0]}-volume-${split("-", each.key)[1]}")
-  size        = var.symmetric_private_node_volume_size
-  region      = var.region
+  for_each = var.symmetric_private_node_volume_size > 0 ? { for key in local.symmetric_private_node_volume_keys : key => key } : {}
+  name     = lower("${terraform.workspace}-symmetric-private-node-${split("-", each.key)[0]}-volume-${split("-", each.key)[1]}")
+  size     = var.symmetric_private_node_volume_size
+  region   = var.region
 }
 
 resource "digitalocean_volume_attachment" "symmetric_private_node_volume_attachment" {
-  for_each = { for key in local.symmetric_private_node_volume_keys : key => key }
-  droplet_id = digitalocean_droplet.symmetric_private_node[tonumber(split("-", each.key)[0]) -1 ].id
+  for_each = var.symmetric_private_node_volume_size > 0 ? { for key in local.symmetric_private_node_volume_keys : key => key } : {}
+  droplet_id = digitalocean_droplet.symmetric_private_node[tonumber(split("-", each.key)[0]) - 1].id
   volume_id  = digitalocean_volume.symmetric_private_node_attached_volume[each.key].id
 }
