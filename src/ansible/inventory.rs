@@ -37,6 +37,8 @@ pub enum AnsibleInventoryType {
     EvmNodes,
     /// Use to run a playbook against the Full Cone NAT gateway.
     FullConeNatGateway,
+    /// Use to run a playbook against a static list of Full Cone NAT gateway.
+    FullConeNatGatewayStatic,
     /// Use to run a inventory against the Full Cone NAT private nodes. This does not route the ssh connection through
     /// the NAT gateway and hence cannot run playbooks. Use PrivateNodesStatic for playbooks.
     FullConePrivateNodes,
@@ -73,6 +75,7 @@ impl std::fmt::Display for AnsibleInventoryType {
             AnsibleInventoryType::Custom => "Custom",
             AnsibleInventoryType::EvmNodes => "EvmNodes",
             AnsibleInventoryType::FullConeNatGateway => "FullConeNatGateway",
+            AnsibleInventoryType::FullConeNatGatewayStatic => "FullConeNatGatewayStatic",
             AnsibleInventoryType::FullConePrivateNodes => "FullConePrivateNodes",
             AnsibleInventoryType::FullConePrivateNodesStatic => "FullConePrivateNodesStatic",
             AnsibleInventoryType::Genesis => "Genesis",
@@ -98,6 +101,9 @@ impl AnsibleInventoryType {
             Self::EvmNodes => PathBuf::from(format!(".{name}_evm_node_inventory_{provider}.yml")),
             Self::FullConeNatGateway => PathBuf::from(format!(
                 ".{name}_full_cone_nat_gateway_inventory_{provider}.yml"
+            )),
+            Self::FullConeNatGatewayStatic => PathBuf::from(format!(
+                ".{name}_full_cone_nat_gateway_static_inventory_{provider}.yml"
             )),
             Self::FullConePrivateNodes => PathBuf::from(format!(
                 ".{name}_full_cone_private_node_inventory_{provider}.yml"
@@ -128,6 +134,7 @@ impl AnsibleInventoryType {
             Self::Custom => "custom",
             Self::EvmNodes => "evm_node",
             Self::FullConeNatGateway => "full_cone_nat_gateway",
+            Self::FullConeNatGatewayStatic => "full_cone_nat_gateway",
             Self::FullConePrivateNodes => "full_cone_private_node",
             Self::FullConePrivateNodesStatic => "full_cone_private_node",
             Self::Genesis => "genesis",
@@ -332,6 +339,35 @@ pub fn generate_custom_environment_inventory(
     Ok(())
 }
 
+/// Generate the Full Cone NAT gateway static inventory for the environment.
+/// This is used during upscale of the Full Cone NAT gateway.
+pub fn generate_full_cone_nat_gateway_static_environment_inventory(
+    vm_list: &[VirtualMachine],
+    environment_name: &str,
+    output_inventory_dir_path: &Path,
+) -> Result<()> {
+    let dest_path = output_inventory_dir_path.join(
+        AnsibleInventoryType::FullConeNatGatewayStatic
+            .get_inventory_path(environment_name, "digital_ocean"),
+    );
+    debug!("Creating full cone nat gateway static inventory file at {dest_path:#?}");
+    let file = File::create(&dest_path)?;
+    let mut writer = BufWriter::new(file);
+
+    writeln!(writer, "[full_cone_nat_gateway]")?;
+    for vm in vm_list.iter() {
+        debug!(
+            "Adding VM to full cone nat gateway static inventory: {}",
+            vm.public_ip_addr
+        );
+        writeln!(writer, "{}", vm.public_ip_addr)?;
+    }
+
+    debug!("Created full cone nat gateway inventory file at {dest_path:#?}");
+
+    Ok(())
+}
+
 /// Generate the static inventory for the private node that are behind a Symmetric NAT gateway.
 /// This is just used during ansible-playbook.
 pub fn generate_symmetric_private_node_static_environment_inventory(
@@ -393,7 +429,6 @@ pub fn generate_full_cone_private_node_static_environment_inventory(
     full_cone_private_node_vms: &[VirtualMachine],
     full_cone_nat_gateway_vms: &[VirtualMachine],
     ssh_sk_path: &Path,
-    step1: bool,
 ) -> Result<()> {
     if full_cone_nat_gateway_vms.is_empty() {
         println!("No full cone NAT gateway VMs found. Skipping full cone private node static inventory generation.");
@@ -424,23 +459,19 @@ pub fn generate_full_cone_private_node_static_environment_inventory(
         let node_number = privat_node_vm.name.split('-').last().unwrap();
         writeln!(file, "[full_cone_private_node_{}]", node_number)?;
 
-        if step1 {
-            writeln!(file, "{}", privat_node_vm.private_ip_addr)?;
-        } else {
-            writeln!(file, "{} ansible_ssh_common_args='-o StrictHostKeyChecking=accept-new -o UserKnownHostsFile=/dev/null'", nat_gateway_vm.public_ip_addr)?;
-        }
+        writeln!(file, "{}", privat_node_vm.private_ip_addr)?;
 
-        if step1 {
-            writeln!(file, "[full_cone_private_node_{}:vars]", node_number)?;
-            writeln!(
-                file,
-                "ansible_ssh_common_args='-o ProxyCommand=\"ssh -p 22 -W %h:%p -q root@{} -i \"{}\" -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null\"'",
-                nat_gateway_vm.public_ip_addr,
-                ssh_sk_path.to_string_lossy()
+        writeln!(file, "[full_cone_private_node_{}:vars]", node_number)?;
+        writeln!(
+            file,
+            "ansible_ssh_common_args='-o ProxyCommand=\"ssh -p 22 -W %h:%p -q root@{} -i \"{}\" -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null\"'",
+            nat_gateway_vm.public_ip_addr,
+            ssh_sk_path.to_string_lossy()
 
-            )?;
-            writeln!(file, "ansible_host_key_checking=False")?;
-        }
+        )?;
+
+        writeln!(file, "ansible_ssh_extra_args='-o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no -i \"{}\"'", ssh_sk_path.to_string_lossy())?;
+        writeln!(file, "ansible_host_key_checking=False")?;
     }
 
     debug!("Created full cone private node inventory file with ssh proxy at {dest_path:?}");
