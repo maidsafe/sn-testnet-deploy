@@ -14,7 +14,6 @@ pub mod infra;
 pub mod inventory;
 pub mod logs;
 pub mod logstash;
-pub mod network_commands;
 pub mod reserved_ip;
 pub mod rpc_client;
 pub mod s3;
@@ -53,7 +52,7 @@ use serde_json::json;
 use std::{
     fs::File,
     io::{BufRead, BufReader, BufWriter, Write},
-    net::{IpAddr, SocketAddr},
+    net::IpAddr,
     path::{Path, PathBuf},
     process::{Command, Stdio},
     str::FromStr,
@@ -259,27 +258,6 @@ impl FromStr for EnvironmentType {
             _ => Err(Error::EnvironmentNameFromStringError(s.to_string())),
         }
     }
-}
-
-pub struct DeployOptions {
-    pub binary_option: BinaryOption,
-    pub current_inventory: DeploymentInventory,
-    pub env_variables: Option<Vec<(String, String)>>,
-    pub evm_network: EvmNetwork,
-    pub evm_node_vm_size: Option<String>,
-    pub log_format: Option<LogFormat>,
-    pub logstash_details: Option<(String, Vec<SocketAddr>)>,
-    pub name: String,
-    pub node_count: u16,
-    pub node_vm_count: Option<u16>,
-    pub node_vm_size: Option<String>,
-    pub peer_cache_node_count: u16,
-    pub peer_cache_node_vm_count: Option<u16>,
-    pub peer_cache_node_vm_size: Option<String>,
-    pub public_rpc: bool,
-    pub rewards_address: String,
-    pub uploader_vm_count: Option<u16>,
-    pub uploader_vm_size: Option<String>,
 }
 
 /// Specify the binary option for the deployment.

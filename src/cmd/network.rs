@@ -4,23 +4,115 @@
 // This SAFE Network Software is licensed under the BSD-3-Clause license.
 // Please see the LICENSE file for more details.
 
-use crate::DeploymentInventory;
+use super::*;
 use ant_service_management::{
     antctl_proto::{ant_ctl_client::AntCtlClient, GetStatusRequest, NodeServiceRestartRequest},
     rpc::{RpcActions, RpcClient},
     ServiceStatus,
 };
+use clap::Subcommand;
 use color_eyre::{
     eyre::{bail, eyre, Report},
-    Result,
+    Help, Result,
 };
 use futures::StreamExt;
 use libp2p::PeerId;
 use rand::Rng;
+use sn_testnet_deploy::{
+    inventory::{get_data_directory, DeploymentInventory},
+    CloudProvider,
+};
 use std::{collections::BTreeSet, net::SocketAddr, time::Duration};
 use tonic::{transport::Channel, Request};
 
 const MAX_CONCURRENT_RPC_REQUESTS: usize = 10;
+
+#[derive(Subcommand, Debug)]
+pub enum ChurnCommands {
+    /// Churn nodes at fixed intervals.
+    FixedInterval {
+        /// The number of time each node in the network is restarted.
+        #[clap(long, default_value_t = 1)]
+        churn_cycles: usize,
+        /// The number of nodes to restart concurrently per VM.
+        #[clap(long, short = 'c', default_value_t = 2)]
+        concurrent_churns: usize,
+        /// The interval between each node churn.
+        #[clap(long, value_parser = |t: &str| -> Result<Duration> { Ok(t.parse().map(Duration::from_secs)?)}, default_value = "60")]
+        interval: Duration,
+        /// The name of the environment.
+        #[arg(short = 'n', long)]
+        name: String,
+        /// The cloud provider that was used.
+        #[clap(long, default_value_t = CloudProvider::DigitalOcean, value_parser = parse_provider, verbatim_doc_comment)]
+        provider: CloudProvider,
+        /// Whether to retain the same PeerId on restart.
+        #[clap(long, default_value_t = false)]
+        retain_peer_id: bool,
+    },
+    /// Churn nodes at random intervals.
+    RandomInterval {
+        /// Number of nodes to restart in the given time frame.
+        #[clap(long, default_value_t = 10)]
+        churn_count: usize,
+        /// The number of time each node in the network is restarted.
+        #[clap(long, default_value_t = 1)]
+        churn_cycles: usize,
+        /// The name of the environment.
+        #[arg(short = 'n', long)]
+        name: String,
+        /// The cloud provider that was used.
+        #[clap(long, default_value_t = CloudProvider::DigitalOcean, value_parser = parse_provider, verbatim_doc_comment)]
+        provider: CloudProvider,
+        /// Whether to retain the same PeerId on restart.
+        #[clap(long, default_value_t = false)]
+        retain_peer_id: bool,
+        /// The time frame in which the churn_count nodes are restarted.
+        /// Nodes are restarted at a rate of churn_count/time_frame with random delays between each restart.
+        #[clap(long, value_parser = |t: &str| -> Result<Duration> { Ok(t.parse().map(Duration::from_secs)?)}, default_value = "600")]
+        time_frame: Duration,
+    },
+}
+
+// Administer or perform activities on a deployed network.
+#[derive(Subcommand, Debug)]
+pub enum NetworkCommands {
+    /// Restart nodes in the testnet to simulate the churn of nodes.
+    #[clap(name = "churn", subcommand)]
+    ChurnCommands(ChurnCommands),
+    /// Modifies the log levels for all the antnode services through RPC requests.
+    UpdateNodeLogLevel {
+        /// The number of nodes to update concurrently.
+        #[clap(long, short = 'c', default_value_t = 10)]
+        concurrent_updates: usize,
+        /// Change the log level of the antnode. This accepts a comma-separated list of log levels for different modules
+        /// or specific keywords like "all" or "v".
+        ///
+        /// Example: --level libp2p=DEBUG,tokio=INFO,all,sn_client=ERROR
+        #[clap(name = "level", long)]
+        log_level: String,
+        /// The name of the environment
+        #[arg(short = 'n', long)]
+        name: String,
+    },
+}
+
+pub async fn handle_update_node_log_level(
+    concurrent_updates: usize,
+    log_level: String,
+    name: String,
+) -> Result<()> {
+    let inventory_path = get_data_directory()?.join(format!("{name}-inventory.json"));
+    if !inventory_path.exists() {
+        return Err(eyre!("There is no inventory for the {name} testnet")
+            .suggestion("Please run the inventory command to generate it"));
+    }
+
+    let inventory = DeploymentInventory::read(&inventory_path)?;
+    update_node_log_levels(inventory, log_level, concurrent_updates).await?;
+
+    Ok(())
+}
 
 // Used internally for easier debugging
 struct DaemonRpcClient {
@@ -30,7 +122,7 @@ struct DaemonRpcClient {
 
 /// Perform fixed interval churn in the network by restarting nodes.
 /// This causes concurrent_churns nodes per vm to churn at a time.
-pub async fn perform_fixed_interval_network_churn(
+pub async fn handle_fixed_interval_network_churn(
     inventory: DeploymentInventory,
     sleep_interval: Duration,
     concurrent_churns: usize,
@@ -87,7 +179,7 @@ pub async fn perform_fixed_interval_network_churn(
     Ok(())
 }
 
-pub async fn perform_random_interval_network_churn(
+pub async fn handle_random_interval_network_churn(
     inventory: DeploymentInventory,
     time_frame: Duration,
     churn_count: usize,
