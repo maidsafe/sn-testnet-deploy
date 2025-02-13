@@ -701,9 +701,12 @@ impl TestnetDeployer {
         let generic_node_registries = self
             .ansible_provisioner
             .get_node_registries(&AnsibleInventoryType::Nodes)?;
-        let private_node_registries = self
+        let symmetric_private_node_registries = self
             .ansible_provisioner
             .get_node_registries(&AnsibleInventoryType::SymmetricPrivateNodes)?;
+        let full_cone_private_node_registries = self
+            .ansible_provisioner
+            .get_node_registries(&AnsibleInventoryType::FullConePrivateNodes)?;
         let genesis_node_registry = self
             .ansible_provisioner
             .get_node_registries(&AnsibleInventoryType::Genesis)?
@@ -711,13 +714,15 @@ impl TestnetDeployer {
 
         peer_cache_node_registries.print();
         generic_node_registries.print();
-        private_node_registries.print();
+        symmetric_private_node_registries.print();
+        full_cone_private_node_registries.print();
         genesis_node_registry.print();
 
         let all_registries = [
             &peer_cache_node_registries,
             &generic_node_registries,
-            &private_node_registries,
+            &symmetric_private_node_registries,
+            &full_cone_private_node_registries,
             &genesis_node_registry,
         ];
 
@@ -744,7 +749,8 @@ impl TestnetDeployer {
 
         let peer_cache_hosts = peer_cache_node_registries.retrieved_registries.len();
         let generic_hosts = generic_node_registries.retrieved_registries.len();
-        let private_hosts = private_node_registries.retrieved_registries.len();
+        let symmetric_private_hosts = symmetric_private_node_registries.retrieved_registries.len();
+        let full_cone_private_hosts = full_cone_private_node_registries.retrieved_registries.len();
 
         let peer_cache_nodes = peer_cache_node_registries
             .retrieved_registries
@@ -756,7 +762,12 @@ impl TestnetDeployer {
             .iter()
             .flat_map(|(_, n)| n.nodes.iter())
             .count();
-        let private_nodes = private_node_registries
+        let symmetric_private_nodes = symmetric_private_node_registries
+            .retrieved_registries
+            .iter()
+            .flat_map(|(_, n)| n.nodes.iter())
+            .count();
+        let full_cone_private_nodes = full_cone_private_node_registries
             .retrieved_registries
             .iter()
             .flat_map(|(_, n)| n.nodes.iter())
@@ -768,20 +779,42 @@ impl TestnetDeployer {
         println!(
             "Total peer cache nodes ({}x{}): {}",
             peer_cache_hosts,
-            peer_cache_nodes / peer_cache_hosts,
+            if peer_cache_hosts > 0 {
+                peer_cache_nodes / peer_cache_hosts
+            } else {
+                0
+            },
             peer_cache_nodes
         );
         println!(
             "Total generic nodes ({}x{}): {}",
             generic_hosts,
-            generic_nodes / generic_hosts,
+            if generic_hosts > 0 {
+                generic_nodes / generic_hosts
+            } else {
+                0
+            },
             generic_nodes
         );
         println!(
-            "Total private nodes ({}x{}): {}",
-            private_hosts,
-            private_nodes / private_hosts,
-            private_nodes
+            "Total symmetric private nodes ({}x{}): {}",
+            symmetric_private_hosts,
+            if symmetric_private_hosts > 0 {
+                symmetric_private_nodes / symmetric_private_hosts
+            } else {
+                0
+            },
+            symmetric_private_nodes
+        );
+        println!(
+            "Total full cone private nodes ({}x{}): {}",
+            full_cone_private_hosts,
+            if full_cone_private_hosts > 0 {
+                full_cone_private_nodes / full_cone_private_hosts
+            } else {
+                0
+            },
+            full_cone_private_nodes
         );
         println!("Total nodes: {}", total_nodes);
         println!("Running nodes: {}", running_nodes);
