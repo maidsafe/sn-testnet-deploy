@@ -4,7 +4,7 @@ name = "sn-testnet-deploy"
 description = "Tool for creating Autonomi networks"
 readme = "README.md"
 repository = "https://github.com/maidsafe/sn-testnet-deploy"
-version = "0.2.23"
+version = "0.2.24"
 edition = "2021"
 license = "BSD-3-Clause"
 
