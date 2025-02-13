@@ -625,6 +625,10 @@ pub struct DeploymentNodeRegistries {
 
 impl DeploymentNodeRegistries {
     pub fn print(&self) {
+        if self.retrieved_registries.is_empty() {
+            return;
+        }
+
         Self::print_banner(&self.inventory_type.to_string());
         for (vm_name, registry) in self.retrieved_registries.iter() {
             println!("{vm_name}:");
