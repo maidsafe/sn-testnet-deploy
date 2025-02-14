@@ -806,6 +806,8 @@ impl AnsibleProvisioner {
         let playbook = match node_type {
             NodeType::Generic => AnsiblePlaybook::Nodes,
             NodeType::PeerCache => AnsiblePlaybook::PeerCacheNodes,
+            NodeType::FullConePrivateNode => AnsiblePlaybook::Nodes,
+            NodeType::SymmetricPrivateNode => AnsiblePlaybook::Nodes,
             _ => return Err(Error::InvalidNodeType(node_type.clone())),
         };
         self.ansible_runner.run_playbook(
