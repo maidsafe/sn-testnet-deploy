@@ -160,6 +160,8 @@ impl DeploymentInventoryService {
         let full_cone_private_node_vms = self
             .ansible_runner
             .get_inventory(AnsibleInventoryType::FullConePrivateNodes, false)?;
+        debug!("full_cone_private_node_vms: {full_cone_private_node_vms:?}");
+        debug!("full_cone_nat_gateway_vms: {full_cone_nat_gateway_vms:?}");
 
         let symmetric_nat_gateway_vms = self
             .ansible_runner
@@ -167,6 +169,8 @@ impl DeploymentInventoryService {
         let symmetric_private_node_vms = self
             .ansible_runner
             .get_inventory(AnsibleInventoryType::SymmetricPrivateNodes, false)?;
+        debug!("symmetric_private_node_vms: {symmetric_private_node_vms:?}");
+        debug!("symmetric_nat_gateway_vms: {symmetric_nat_gateway_vms:?}");
 
         let generic_node_vms = self
             .ansible_runner
@@ -245,6 +249,8 @@ impl DeploymentInventoryService {
             &symmetric_private_node_vms,
             &symmetric_private_node_registries,
         );
+        debug!("symmetric_private_node_vms after conversion: {symmetric_private_node_vms:?}");
+
         let full_cone_private_node_registries = self
             .ansible_provisioner
             .get_node_registries(&AnsibleInventoryType::FullConePrivateNodes)?;
@@ -259,6 +265,7 @@ impl DeploymentInventoryService {
             &full_cone_private_node_vms,
             &full_cone_private_node_registries,
         );
+        debug!("full_cone_private_node_vms after conversion: {full_cone_private_node_vms:?}");
 
         let genesis_node_registry = self
             .ansible_provisioner
@@ -311,11 +318,8 @@ impl DeploymentInventoryService {
                 let random_uploader_vm = uploader_vms
                     .choose(&mut rand::thread_rng())
                     .ok_or_else(|| eyre!("No uploader VMs available to retrieve ant version"))?;
-                Some(self.get_bin_version(
-                    &random_uploader_vm.vm,
-                    "ant --version",
-                    "Autonomi Client v",
-                )?)
+                self.get_bin_version(&random_uploader_vm.vm, "ant --version", "Autonomi Client v")
+                    .ok()
             } else {
                 None
             };
@@ -936,74 +940,81 @@ impl DeploymentInventory {
         println!("SSH user: {}", self.ssh_user);
         println!();
 
-        println!("=================");
-        println!("Full Cone Private Node VMs");
-        println!("=================");
-        let full_cone_private_node_nat_gateway_map =
-            PrivateNodeProvisionInventory::match_private_node_vm_and_gateway_vm(
-                self.full_cone_private_node_vms
-                    .iter()
-                    .map(|node_vm| node_vm.vm.clone())
-                    .collect::<Vec<_>>()
-                    .as_slice(),
-                &self.full_cone_nat_gateway_vms,
-            )?;
+        if !self.full_cone_private_node_vms.is_empty() {
+            println!("=================");
+            println!("Full Cone Private Node VMs");
+            println!("=================");
+            let full_cone_private_node_nat_gateway_map =
+                PrivateNodeProvisionInventory::match_private_node_vm_and_gateway_vm(
+                    self.full_cone_private_node_vms
+                        .iter()
+                        .map(|node_vm| node_vm.vm.clone())
+                        .collect::<Vec<_>>()
+                        .as_slice(),
+                    &self.full_cone_nat_gateway_vms,
+                )?;
 
-        for (node_vm, nat_gateway_vm) in full_cone_private_node_nat_gateway_map.iter() {
-            println!(
-                "{}: {} ==routed through==> {}: {}",
-                node_vm.name,
-                node_vm.public_ip_addr,
-                nat_gateway_vm.name,
-                nat_gateway_vm.public_ip_addr
-            );
-            let ssh = if let Some(ssh_key_path) = self.ssh_private_key_path.to_str() {
-                format!(
-                    "ssh -i {ssh_key_path} root@{}",
-                    nat_gateway_vm.public_ip_addr,
-                )
-            } else {
-                format!("ssh root@{}", nat_gateway_vm.public_ip_addr,)
-            };
-            println!("SSH using NAT gateway: {ssh}");
+            for (node_vm, nat_gateway_vm) in full_cone_private_node_nat_gateway_map.iter() {
+                println!(
+                    "{}: {} ==routed through==> {}: {}",
+                    node_vm.name,
+                    node_vm.public_ip_addr,
+                    nat_gateway_vm.name,
+                    nat_gateway_vm.public_ip_addr
+                );
+                let ssh = if let Some(ssh_key_path) = self.ssh_private_key_path.to_str() {
+                    format!(
+                        "ssh -i {ssh_key_path} root@{}",
+                        nat_gateway_vm.public_ip_addr,
+                    )
+                } else {
+                    format!("ssh root@{}", nat_gateway_vm.public_ip_addr,)
+                };
+                println!("SSH using NAT gateway: {ssh}");
+            }
+            println!("Nodes per VM: {}", self.full_cone_private_node_count());
+            println!("SSH user: {}", self.ssh_user);
+            println!();
         }
-        println!("Nodes per VM: {}", self.node_count());
-        println!("SSH user: {}", self.ssh_user);
-        println!();
 
-        println!("=================");
-        println!("Symmetric Private Node VMs");
-        println!("=================");
-        let symmetric_private_node_nat_gateway_map =
-            PrivateNodeProvisionInventory::match_private_node_vm_and_gateway_vm(
-                self.symmetric_private_node_vms
-                    .iter()
-                    .map(|node_vm| node_vm.vm.clone())
-                    .collect::<Vec<_>>()
-                    .as_slice(),
-                &self.symmetric_nat_gateway_vms,
-            )?;
+        if !self.symmetric_private_node_vms.is_empty() {
+            println!("=================");
+            println!("Symmetric Private Node VMs");
+            println!("=================");
+            let symmetric_private_node_nat_gateway_map =
+                PrivateNodeProvisionInventory::match_private_node_vm_and_gateway_vm(
+                    self.symmetric_private_node_vms
+                        .iter()
+                        .map(|node_vm| node_vm.vm.clone())
+                        .collect::<Vec<_>>()
+                        .as_slice(),
+                    &self.symmetric_nat_gateway_vms,
+                )?;
 
-        for (node_vm, nat_gateway_vm) in symmetric_private_node_nat_gateway_map.iter() {
-            println!(
-                "{}: {} ==routed through==> {}: {}",
-                node_vm.name,
-                node_vm.public_ip_addr,
-                nat_gateway_vm.name,
-                nat_gateway_vm.public_ip_addr
-            );
-            let ssh = if let Some(ssh_key_path) = self.ssh_private_key_path.to_str() {
-                format!(
+            for (node_vm, nat_gateway_vm) in symmetric_private_node_nat_gateway_map.iter() {
+                println!(
+                    "{}: {} ==routed through==> {}: {}",
+                    node_vm.name,
+                    node_vm.public_ip_addr,
+                    nat_gateway_vm.name,
+                    nat_gateway_vm.public_ip_addr
+                );
+                let ssh = if let Some(ssh_key_path) = self.ssh_private_key_path.to_str() {
+                    format!(
                         "ssh -i {ssh_key_path} -o ProxyCommand=\"ssh -W %h:%p root@{} -i {ssh_key_path}\" root@{}",
                         nat_gateway_vm.public_ip_addr, node_vm.private_ip_addr
                     )
-            } else {
-                format!(
-                    "ssh -o ProxyCommand=\"ssh -W %h:%p root@{}\" root@{}",
-                    nat_gateway_vm.public_ip_addr, node_vm.private_ip_addr
-                )
-            };
-            println!("SSH using NAT gateway: {ssh}");
+                } else {
+                    format!(
+                        "ssh -o ProxyCommand=\"ssh -W %h:%p root@{}\" root@{}",
+                        nat_gateway_vm.public_ip_addr, node_vm.private_ip_addr
+                    )
+                };
+                println!("SSH using NAT gateway: {ssh}");
+            }
+            println!("Nodes per VM: {}", self.symmetric_private_node_count());
+            println!("SSH user: {}", self.ssh_user);
+            println!();
         }
 
         if !self.uploader_vms.is_empty() {
