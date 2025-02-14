@@ -803,8 +803,13 @@ impl AnsibleProvisioner {
 
         println!("SSH is available on all nodes. Proceeding with provisioning...");
 
+        let playbook = match node_type {
+            NodeType::Generic => AnsiblePlaybook::Nodes,
+            NodeType::PeerCache => AnsiblePlaybook::PeerCacheNodes,
+            _ => return Err(Error::InvalidNodeType(node_type.clone())),
+        };
         self.ansible_runner.run_playbook(
-            AnsiblePlaybook::Nodes,
+            playbook,
             inventory_type,
             Some(extra_vars::build_node_extra_vars_doc(
                 &self.cloud_provider.to_string(),
