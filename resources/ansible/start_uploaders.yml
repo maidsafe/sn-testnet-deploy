@@ -13,5 +13,9 @@
         name: "ant_uploader_{{ item | regex_replace('ant([0-9]+)', '\\1') }}"
         state: started
         enabled: yes
+      register: uploader_start
+      retries: 3
+      delay: 5
+      until: uploader_start is not failed
       become: true
       loop: "{{ ant_users.stdout_lines }}"
