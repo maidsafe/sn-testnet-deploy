@@ -239,6 +239,7 @@ pub async fn handle_deploy(
     public_rpc: bool,
     repo_owner: Option<String>,
     rewards_address: String,
+    to_genesis: bool,
     uploader_vm_count: Option<u16>,
     uploader_vm_size: Option<String>,
     uploaders_count: u16,
@@ -334,68 +335,72 @@ pub async fn handle_deploy(
     let full_cone_private_node_count = full_cone_private_node_count
         .unwrap_or(environment_type.get_default_full_cone_private_node_count());
 
-    testnet_deployer
-        .deploy(&DeployOptions {
-            binary_option: binary_option.clone(),
-            chunk_size,
-            current_inventory: inventory,
-            downloaders_count,
-            env_variables,
-            environment_type: environment_type.clone(),
-            evm_data_payments_address,
-            evm_network: evm_network_type,
-            evm_node_vm_size,
-            evm_payment_token_address,
-            evm_rpc_url,
-            funding_wallet_secret_key,
-            full_cone_nat_gateway_vm_size,
-            full_cone_private_node_count,
-            full_cone_private_node_vm_count,
-            full_cone_private_node_volume_size: full_cone_private_node_volume_size.or_else(|| {
-                Some(calculate_size_per_attached_volume(
-                    full_cone_private_node_count,
-                ))
-            }),
-            genesis_node_volume_size: genesis_node_volume_size
-                .or_else(|| Some(calculate_size_per_attached_volume(1))),
-            initial_gas,
-            initial_tokens,
-            interval,
-            log_format,
-            logstash_details,
-            max_archived_log_files,
-            max_log_files,
-            name: name.clone(),
-            network_id,
-            node_count,
-            node_vm_count,
-            node_vm_size,
-            node_volume_size: node_volume_size
-                .or_else(|| Some(calculate_size_per_attached_volume(node_count))),
-            output_inventory_dir_path: inventory_service
-                .working_directory_path
-                .join("ansible")
-                .join("inventory"),
-            peer_cache_node_count,
-            peer_cache_node_vm_count,
-            peer_cache_node_vm_size,
-            peer_cache_node_volume_size: peer_cache_node_volume_size
-                .or_else(|| Some(calculate_size_per_attached_volume(peer_cache_node_count))),
-            symmetric_nat_gateway_vm_size,
-            symmetric_private_node_count,
-            symmetric_private_node_vm_count,
-            symmetric_private_node_volume_size: symmetric_private_node_volume_size.or_else(|| {
-                Some(calculate_size_per_attached_volume(
-                    symmetric_private_node_count,
-                ))
-            }),
-            public_rpc,
-            rewards_address,
-            uploader_vm_count,
-            uploader_vm_size,
-            uploaders_count,
-        })
-        .await?;
+    let deploy_options = DeployOptions {
+        binary_option: binary_option.clone(),
+        chunk_size,
+        current_inventory: inventory,
+        downloaders_count,
+        env_variables,
+        environment_type: environment_type.clone(),
+        evm_data_payments_address,
+        evm_network: evm_network_type,
+        evm_node_vm_size,
+        evm_payment_token_address,
+        evm_rpc_url,
+        funding_wallet_secret_key,
+        full_cone_nat_gateway_vm_size,
+        full_cone_private_node_count,
+        full_cone_private_node_vm_count,
+        full_cone_private_node_volume_size: full_cone_private_node_volume_size.or_else(|| {
+            Some(calculate_size_per_attached_volume(
+                full_cone_private_node_count,
+            ))
+        }),
+        genesis_node_volume_size: genesis_node_volume_size
+            .or_else(|| Some(calculate_size_per_attached_volume(1))),
+        initial_gas,
+        initial_tokens,
+        interval,
+        log_format,
+        logstash_details,
+        max_archived_log_files,
+        max_log_files,
+        name: name.clone(),
+        network_id,
+        node_count,
+        node_vm_count,
+        node_vm_size,
+        node_volume_size: node_volume_size
+            .or_else(|| Some(calculate_size_per_attached_volume(node_count))),
+        output_inventory_dir_path: inventory_service
+            .working_directory_path
+            .join("ansible")
+            .join("inventory"),
+        peer_cache_node_count,
+        peer_cache_node_vm_count,
+        peer_cache_node_vm_size,
+        peer_cache_node_volume_size: peer_cache_node_volume_size
+            .or_else(|| Some(calculate_size_per_attached_volume(peer_cache_node_count))),
+        symmetric_nat_gateway_vm_size,
+        symmetric_private_node_count,
+        symmetric_private_node_vm_count,
+        symmetric_private_node_volume_size: symmetric_private_node_volume_size.or_else(|| {
+            Some(calculate_size_per_attached_volume(
+                symmetric_private_node_count,
+            ))
+        }),
+        public_rpc,
+        rewards_address,
+        uploader_vm_count,
+        uploader_vm_size,
+        uploaders_count,
+    };
+
+    if to_genesis {
+        testnet_deployer.deploy_to_genesis(&deploy_options).await?;
+    } else {
+        testnet_deployer.deploy(&deploy_options).await?;
+    }
 
     let max_retries = 3;
     let mut retries = 0;

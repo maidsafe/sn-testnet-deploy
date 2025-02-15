@@ -66,7 +66,10 @@ pub struct DeployOptions {
 }
 
 impl TestnetDeployer {
-    pub async fn deploy(&self, options: &DeployOptions) -> Result<()> {
+    pub async fn deploy_to_genesis(
+        &self,
+        options: &DeployOptions,
+    ) -> Result<(ProvisionOptions, (String, String))> {
         let build_custom_binaries = {
             match &options.binary_option {
                 BinaryOption::BuildFromSource { .. } => true,
@@ -203,6 +206,7 @@ impl TestnetDeployer {
                 println!("Failed to provision genesis node {err:?}");
                 err
             })?;
+
         let (genesis_multiaddr, genesis_ip) =
             get_genesis_multiaddr(&self.ansible_provisioner.ansible_runner, &self.ssh_client)
                 .map_err(|err| {
@@ -210,7 +214,16 @@ impl TestnetDeployer {
                     err
                 })?;
 
-        let genesis_network_contacts = get_bootstrap_cache_url(&genesis_ip);
+        Ok((
+            provision_options,
+            (genesis_multiaddr, get_bootstrap_cache_url(&genesis_ip)),
+        ))
+    }
+
+    pub async fn deploy(&self, options: &DeployOptions) -> Result<()> {
+        let (mut provision_options, (genesis_multiaddr, genesis_network_contacts)) =
+            self.deploy_to_genesis(options).await?;
+
         println!("Obtained multiaddr for genesis node: {genesis_multiaddr}, network contact: {genesis_network_contacts}");
 
         let mut node_provision_failed = false;
