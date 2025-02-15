@@ -553,6 +553,11 @@ pub enum Commands {
         /// Override the size of the uploader VMs.
         #[clap(long)]
         uploader_vm_size: Option<String>,
+        /// Set to only deploy up to the genesis node.
+        ///
+        /// This will provision all infrastructure but only deploy and start the genesis node.
+        #[clap(long, default_value_t = false)]
+        to_genesis: bool,
     },
     ExtendVolumeSize {
         /// Set to run Ansible with more verbose output.
