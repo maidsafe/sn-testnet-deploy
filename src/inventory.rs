@@ -528,46 +528,51 @@ impl NodeVirtualMachine {
                     }
                 })
                 .map(|(_, reg)| reg);
-            let Some(node_registry) = node_registry else {
-                debug!("No node registry found for vm: {vm:?}. Skipping");
-                continue;
-            };
 
+            // We want to accommodate cases where the node registry is empty because the machine
+            // may not have been provisioned yet.
             let node_vm = Self {
-                node_count: node_registry.nodes.len(),
-                node_listen_addresses: node_registry
-                    .nodes
-                    .iter()
-                    .map(|node| {
-                        if let Some(listen_addresses) = &node.listen_addr {
-                            listen_addresses
+                node_count: node_registry.map_or(0, |reg| reg.nodes.len()),
+                node_listen_addresses: node_registry.map_or_else(
+                    || Vec::new(),
+                    |reg| {
+                        if reg.nodes.is_empty() {
+                            Vec::new()
+                        } else {
+                            reg.nodes
                                 .iter()
-                                .map(|addr| addr.to_string())
+                                .map(|node| {
+                                    node.listen_addr
+                                        .as_ref()
+                                        .map(|addrs| {
+                                            addrs.iter().map(|addr| addr.to_string()).collect()
+                                        })
+                                        .unwrap_or_default()
+                                })
                                 .collect()
-                        } else {
-                            vec![UNAVAILABLE_NODE.to_string()]
                         }
-                    })
-                    .collect(),
-                rpc_endpoint: node_registry
-                    .nodes
-                    .iter()
-                    .map(|node| {
-                        let id = if let Some(peer_id) = node.peer_id {
-                            peer_id.to_string().clone()
-                        } else {
-                            UNAVAILABLE_NODE.to_string()
-                        };
-                        (id, node.rpc_socket_addr)
-                    })
-                    .collect(),
+                    },
+                ),
+                rpc_endpoint: node_registry.map_or_else(
+                    || HashMap::new(),
+                    |reg| {
+                        reg.nodes
+                            .iter()
+                            .filter_map(|node| {
+                                node.peer_id.map(|peer_id| {
+                                    (peer_id.to_string(), node.rpc_socket_addr)
+                                })
+                            })
+                            .collect()
+                    },
+                ),
                 safenodemand_endpoint: node_registry
-                    .daemon
-                    .as_ref()
+                    .and_then(|reg| reg.daemon.as_ref())
                     .and_then(|daemon| daemon.endpoint),
                 vm: vm.clone(),
             };
-            node_vms.push(node_vm);
+            node_vms.push(node_vm.clone());
+            debug!("Added node VM: {node_vm:?}");
         }
         debug!("Node VMs generated from NodeRegistries: {node_vms:?}");
         node_vms
