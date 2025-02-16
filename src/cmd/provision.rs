@@ -6,7 +6,7 @@ use sn_testnet_deploy::{
     TestnetDeployBuilder,
 };
 
-pub async fn handle_provision_peer_cache_nodes(name: String) -> Result<()> {
+async fn handle_provision_nodes(name: String, node_type: NodeType) -> Result<()> {
     println!("Retrieving deployment options for {}", name);
 
     let deploy_options: DeployOptions = get_options_from_s3(&name, OptionsType::Deploy).await?;
@@ -36,13 +36,21 @@ pub async fn handle_provision_peer_cache_nodes(name: String) -> Result<()> {
         })?;
     let genesis_network_contacts = get_bootstrap_cache_url(&genesis_ip);
 
-    provisoner.print_ansible_run_banner("Provision Peer Cache Nodes");
+    provisoner.print_ansible_run_banner(&format!("Provision {} Nodes", node_type));
     provisoner.provision_nodes(
         &provision_options,
         Some(genesis_multiaddr.clone()),
         Some(genesis_network_contacts.clone()),
-        NodeType::PeerCache,
+        node_type,
     )?;
 
     Ok(())
+}
+
+pub async fn handle_provision_peer_cache_nodes(name: String) -> Result<()> {
+    handle_provision_nodes(name, NodeType::PeerCache).await
+}
+
+pub async fn handle_provision_generic_nodes(name: String) -> Result<()> {
+    handle_provision_nodes(name, NodeType::Generic).await
 }
