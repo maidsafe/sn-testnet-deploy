@@ -559,9 +559,8 @@ impl NodeVirtualMachine {
                         reg.nodes
                             .iter()
                             .filter_map(|node| {
-                                node.peer_id.map(|peer_id| {
-                                    (peer_id.to_string(), node.rpc_socket_addr)
-                                })
+                                node.peer_id
+                                    .map(|peer_id| (peer_id.to_string(), node.rpc_socket_addr))
                             })
                             .collect()
                     },

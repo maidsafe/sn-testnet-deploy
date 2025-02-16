@@ -29,6 +29,7 @@ use ant_service_management::NodeRegistry;
 use evmlib::common::U256;
 use log::{debug, error, trace};
 use semver::Version;
+use serde::{Deserialize, Serialize};
 use std::{
     collections::HashMap,
     net::{IpAddr, SocketAddr},
@@ -42,7 +43,7 @@ use crate::ansible::extra_vars;
 pub const DEFAULT_BETA_ENCRYPTION_KEY: &str =
     "49113d2083f57a976076adbe85decb75115820de1e6e74b47e0429338cef124a";
 
-#[derive(Clone)]
+#[derive(Clone, Serialize, Deserialize)]
 pub struct ProvisionOptions {
     /// The safe version is also in the binary option, but only for an initial deployment.
     /// For the upscale, it needs to be provided explicitly, because currently it is not

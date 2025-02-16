@@ -15,9 +15,10 @@ use crate::{
 use alloy::{hex::ToHexExt, primitives::U256};
 use colored::Colorize;
 use log::error;
+use serde::{Deserialize, Serialize};
 use std::{net::SocketAddr, path::PathBuf, time::Duration};
 
-#[derive(Clone)]
+#[derive(Clone, Serialize, Deserialize)]
 pub struct DeployOptions {
     pub binary_option: BinaryOption,
     pub chunk_size: Option<u64>,

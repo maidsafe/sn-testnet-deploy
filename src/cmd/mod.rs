@@ -10,6 +10,7 @@ pub mod logs;
 pub mod misc;
 pub mod network;
 pub mod nodes;
+pub mod provision;
 pub mod telegraf;
 pub mod upgrade;
 pub mod uploaders;
@@ -28,6 +29,7 @@ use log::debug;
 use semver::Version;
 use sn_testnet_deploy::{
     inventory::{DeploymentInventory, VirtualMachine},
+    s3::S3Repository,
     BinaryOption, CloudProvider, EnvironmentType, EvmNetwork, LogFormat, NodeType,
 };
 use std::time::Duration;
@@ -642,6 +644,9 @@ pub enum Commands {
         #[arg(short = 'n', long)]
         name: String,
     },
+    /// Run Ansible provisions for existing infrastructure
+    #[clap(name = "provision", subcommand)]
+    Provision(ProvisionCommands),
     Setup {},
     /// Start all nodes in an environment.
     ///
@@ -1120,6 +1125,86 @@ pub enum Commands {
         #[arg(long)]
         version: Option<String>,
     },
+}
+
+#[derive(Subcommand, Debug)]
+pub enum ProvisionCommands {
+    /// Provision peer cache nodes for an environment
+    #[clap(name = "peer-cache-nodes")]
+    PeerCacheNodes {
+        /// The name of the environment
+        #[arg(short = 'n', long)]
+        name: String,
+    },
+}
+
+#[derive(Debug)]
+pub enum OptionsType {
+    Deploy,
+    Provision,
+}
+
+impl OptionsType {
+    fn file_name(&self, environment_name: &str) -> String {
+        match self {
+            Self::Deploy => format!("{}-deploy.json", environment_name),
+            Self::Provision => format!("{}-provision.json", environment_name),
+        }
+    }
+}
+
+pub async fn get_options_from_s3<T: serde::de::DeserializeOwned>(
+    name: &str,
+    options_type: OptionsType,
+) -> Result<T> {
+    let s3_repo = S3Repository {};
+    let temp_dir = tempfile::tempdir()?.into_path();
+    let options_path = temp_dir.join(options_type.file_name(name));
+
+    s3_repo
+        .download_object(
+            "ant-testnet-deploy-options",
+            &options_type.file_name(name),
+            &options_path,
+        )
+        .await
+        .map_err(|e| {
+            eyre!(
+                "Failed to download {:?} options from S3: {}",
+                options_type,
+                e
+            )
+        })?;
+
+    let options_str = tokio::fs::read_to_string(&options_path)
+        .await
+        .map_err(|e| eyre!("Failed to read {:?} options file: {}", options_type, e))?;
+
+    serde_json::from_str(&options_str)
+        .map_err(|e| eyre!("Failed to deserialize {:?} options: {}", options_type, e))
+}
+
+pub async fn upload_options_to_s3<T: serde::Serialize>(
+    name: &str,
+    options: &T,
+    options_type: OptionsType,
+) -> Result<()> {
+    let s3_repo = S3Repository {};
+    let json = serde_json::to_string(options)
+        .map_err(|e| eyre!("Failed to serialize {:?} options: {}", options_type, e))?;
+
+    let temp_dir =
+        tempfile::tempdir().map_err(|e| eyre!("Failed to create temporary directory: {}", e))?;
+    let file_path = temp_dir.path().join(options_type.file_name(name));
+    tokio::fs::write(&file_path, json)
+        .await
+        .map_err(|e| eyre!("Failed to write {:?} options to file: {}", options_type, e))?;
+
+    s3_repo
+        .upload_file("ant-testnet-deploy-options", &file_path, false)
+        .await
+        .map_err(|e| eyre!("Failed to upload {:?} options to S3: {}", options_type, e))?;
+    Ok(())
 }
 
 /// Get the binary option for the deployment.

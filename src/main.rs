@@ -7,7 +7,7 @@ mod cmd;
 
 use crate::cmd::{
     network::{ChurnCommands, NetworkCommands},
-    nodes, telegraf, Commands,
+    nodes, telegraf, Commands, ProvisionCommands,
 };
 use clap::Parser;
 use color_eyre::Result;
@@ -599,5 +599,11 @@ async fn main() -> Result<()> {
             .await?;
             Ok(())
         }
+        Commands::Provision(provision_cmd) => match provision_cmd {
+            ProvisionCommands::PeerCacheNodes { name } => {
+                cmd::provision::handle_provision_peer_cache_nodes(name).await?;
+                Ok(())
+            }
+        },
     }
 }
