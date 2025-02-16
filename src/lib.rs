@@ -345,7 +345,7 @@ impl CloudProvider {
     }
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
 pub enum LogFormat {
     Default,
     Json,

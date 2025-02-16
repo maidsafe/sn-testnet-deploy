@@ -4,7 +4,7 @@
 // This SAFE Network Software is licensed under the BSD-3-Clause license.
 // Please see the LICENSE file for more details.
 
-use super::get_binary_option;
+use super::{get_binary_option, upload_options_to_s3, OptionsType};
 
 use alloy::primitives::U256;
 use color_eyre::{eyre::eyre, Help, Result};
@@ -397,7 +397,10 @@ pub async fn handle_deploy(
     };
 
     if to_genesis {
-        testnet_deployer.deploy_to_genesis(&deploy_options).await?;
+        let (provision_options, _) = testnet_deployer.deploy_to_genesis(&deploy_options).await?;
+
+        upload_options_to_s3(&name, &deploy_options, OptionsType::Deploy).await?;
+        upload_options_to_s3(&name, &provision_options, OptionsType::Provision).await?;
     } else {
         testnet_deployer.deploy(&deploy_options).await?;
     }
