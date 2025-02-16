@@ -604,6 +604,10 @@ async fn main() -> Result<()> {
                 cmd::provision::handle_provision_peer_cache_nodes(name).await?;
                 Ok(())
             }
+            ProvisionCommands::GenericNodes { name } => {
+                cmd::provision::handle_provision_generic_nodes(name).await?;
+                Ok(())
+            }
         },
     }
 }

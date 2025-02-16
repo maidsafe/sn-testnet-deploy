@@ -1129,6 +1129,13 @@ pub enum Commands {
 
 #[derive(Subcommand, Debug)]
 pub enum ProvisionCommands {
+    /// Provision generic nodes for an environment
+    #[clap(name = "generic-nodes")]
+    GenericNodes {
+        /// The name of the environment
+        #[arg(short = 'n', long)]
+        name: String,
+    },
     /// Provision peer cache nodes for an environment
     #[clap(name = "peer-cache-nodes")]
     PeerCacheNodes {
