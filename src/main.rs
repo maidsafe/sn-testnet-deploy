@@ -7,7 +7,9 @@ mod cmd;
 
 use crate::cmd::{
     network::{ChurnCommands, NetworkCommands},
-    nodes, telegraf, Commands, ProvisionCommands,
+    nodes,
+    provision::ProvisionCommands,
+    telegraf, Commands,
 };
 use clap::Parser;
 use color_eyre::Result;
@@ -600,12 +602,20 @@ async fn main() -> Result<()> {
             Ok(())
         }
         Commands::Provision(provision_cmd) => match provision_cmd {
+            ProvisionCommands::FullConePrivateNodes { name } => {
+                cmd::provision::handle_provision_full_cone_private_nodes(name).await?;
+                Ok(())
+            }
             ProvisionCommands::PeerCacheNodes { name } => {
                 cmd::provision::handle_provision_peer_cache_nodes(name).await?;
                 Ok(())
             }
             ProvisionCommands::GenericNodes { name } => {
                 cmd::provision::handle_provision_generic_nodes(name).await?;
+                Ok(())
+            }
+            ProvisionCommands::SymmetricPrivateNodes { name } => {
+                cmd::provision::handle_provision_symmetric_private_nodes(name).await?;
                 Ok(())
             }
         },
