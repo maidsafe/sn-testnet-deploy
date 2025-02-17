@@ -16,7 +16,8 @@ pub mod upgrade;
 pub mod uploaders;
 
 use crate::cmd::{
-    funds::FundsCommand, logs::LogCommands, network::NetworkCommands, uploaders::UploadersCommands,
+    funds::FundsCommand, logs::LogCommands, network::NetworkCommands, provision::ProvisionCommands,
+    uploaders::UploadersCommands,
 };
 use alloy::primitives::U256;
 use ant_releases::{AntReleaseRepoActions, ReleaseType};
@@ -1124,24 +1125,6 @@ pub enum Commands {
         /// If not provided, the latest version will be used.
         #[arg(long)]
         version: Option<String>,
-    },
-}
-
-#[derive(Subcommand, Debug)]
-pub enum ProvisionCommands {
-    /// Provision generic nodes for an environment
-    #[clap(name = "generic-nodes")]
-    GenericNodes {
-        /// The name of the environment
-        #[arg(short = 'n', long)]
-        name: String,
-    },
-    /// Provision peer cache nodes for an environment
-    #[clap(name = "peer-cache-nodes")]
-    PeerCacheNodes {
-        /// The name of the environment
-        #[arg(short = 'n', long)]
-        name: String,
     },
 }
 

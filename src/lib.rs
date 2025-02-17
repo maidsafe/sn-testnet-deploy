@@ -113,7 +113,7 @@ impl std::fmt::Display for NodeType {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             NodeType::FullConePrivateNode => write!(f, "full-cone-private"),
-            NodeType::Generic => write!(f, "generic"), 
+            NodeType::Generic => write!(f, "generic"),
             NodeType::Genesis => write!(f, "genesis"),
             NodeType::PeerCache => write!(f, "peer-cache"),
             NodeType::SymmetricPrivateNode => write!(f, "symmetric-private"),
