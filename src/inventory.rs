@@ -533,38 +533,32 @@ impl NodeVirtualMachine {
             // may not have been provisioned yet.
             let node_vm = Self {
                 node_count: node_registry.map_or(0, |reg| reg.nodes.len()),
-                node_listen_addresses: node_registry.map_or_else(
-                    || Vec::new(),
-                    |reg| {
-                        if reg.nodes.is_empty() {
-                            Vec::new()
-                        } else {
-                            reg.nodes
-                                .iter()
-                                .map(|node| {
-                                    node.listen_addr
-                                        .as_ref()
-                                        .map(|addrs| {
-                                            addrs.iter().map(|addr| addr.to_string()).collect()
-                                        })
-                                        .unwrap_or_default()
-                                })
-                                .collect()
-                        }
-                    },
-                ),
-                rpc_endpoint: node_registry.map_or_else(
-                    || HashMap::new(),
-                    |reg| {
+                node_listen_addresses: node_registry.map_or_else(Vec::new, |reg| {
+                    if reg.nodes.is_empty() {
+                        Vec::new()
+                    } else {
                         reg.nodes
                             .iter()
-                            .filter_map(|node| {
-                                node.peer_id
-                                    .map(|peer_id| (peer_id.to_string(), node.rpc_socket_addr))
+                            .map(|node| {
+                                node.listen_addr
+                                    .as_ref()
+                                    .map(|addrs| {
+                                        addrs.iter().map(|addr| addr.to_string()).collect()
+                                    })
+                                    .unwrap_or_default()
                             })
                             .collect()
-                    },
-                ),
+                    }
+                }),
+                rpc_endpoint: node_registry.map_or_else(HashMap::new, |reg| {
+                    reg.nodes
+                        .iter()
+                        .filter_map(|node| {
+                            node.peer_id
+                                .map(|peer_id| (peer_id.to_string(), node.rpc_socket_addr))
+                        })
+                        .collect()
+                }),
                 safenodemand_endpoint: node_registry
                     .and_then(|reg| reg.daemon.as_ref())
                     .and_then(|daemon| daemon.endpoint),
