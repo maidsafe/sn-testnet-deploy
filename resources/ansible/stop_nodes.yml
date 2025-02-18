@@ -10,6 +10,13 @@
         {% if delay is defined %}
         sleep {{ delay | default(0) }}
         {% endif %}
+        {% if service_names is defined %}
+        {% for service in service_names %}
+        antctl stop --service-name {{ service }}
+        sleep $(( {{ interval }} / 1000 ))
+        {% endfor %}
+        {% else %}
         antctl stop --interval {{ interval }}
+        {% endif %}
       args:
         executable: /bin/bash

@@ -1045,11 +1045,15 @@ impl AnsibleProvisioner {
         node_type: Option<NodeType>,
         custom_inventory: Option<Vec<VirtualMachine>>,
         delay: Option<u64>,
+        service_names: Option<Vec<String>>,
     ) -> Result<()> {
         let mut extra_vars = ExtraVarsDocBuilder::default();
         extra_vars.add_variable("interval", &interval.as_millis().to_string());
         if let Some(delay) = delay {
             extra_vars.add_variable("delay", &delay.to_string());
+        }
+        if let Some(service_names) = service_names {
+            extra_vars.add_list_variable("service_names", service_names);
         }
         let extra_vars = extra_vars.build();
 

@@ -65,6 +65,7 @@ pub async fn handle_stop_command(
     name: String,
     node_type: Option<NodeType>,
     provider: CloudProvider,
+    service_names: Option<Vec<String>>,
 ) -> Result<()> {
     // Use a large number of forks for retrieving the inventory from a large deployment.
     // Then if a smaller number of forks is specified, we will recreate the deployer
@@ -94,7 +95,7 @@ pub async fn handle_stop_command(
         None
     };
 
-    testnet_deployer.stop(interval, node_type, custom_inventory, delay)?;
+    testnet_deployer.stop(interval, node_type, custom_inventory, delay, service_names)?;
 
     Ok(())
 }

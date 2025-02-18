@@ -395,6 +395,7 @@ async fn main() -> Result<()> {
             name,
             node_type,
             provider,
+            service_name,
         } => {
             nodes::handle_stop_command(
                 custom_inventory,
@@ -404,6 +405,7 @@ async fn main() -> Result<()> {
                 name,
                 node_type,
                 provider,
+                service_name,
             )
             .await?;
             Ok(())

@@ -737,6 +737,9 @@ pub enum Commands {
         /// The cloud provider for the environment.
         #[clap(long, value_parser = parse_provider, verbatim_doc_comment, default_value_t = CloudProvider::DigitalOcean)]
         provider: CloudProvider,
+        /// The service names to stop.
+        #[clap(long)]
+        service_name: Option<Vec<String>>,
     },
     /// Stop the Telegraf service on all machines in the environment.
     ///

@@ -849,6 +849,7 @@ impl TestnetDeployer {
         node_type: Option<NodeType>,
         custom_inventory: Option<Vec<VirtualMachine>>,
         delay: Option<u64>,
+        service_names: Option<Vec<String>>,
     ) -> Result<()> {
         self.ansible_provisioner.stop_nodes(
             &self.environment_name,
@@ -856,6 +857,7 @@ impl TestnetDeployer {
             node_type,
             custom_inventory,
             delay,
+            service_names
         )?;
         Ok(())
     }
