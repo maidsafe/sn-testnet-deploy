@@ -857,7 +857,7 @@ impl TestnetDeployer {
             node_type,
             custom_inventory,
             delay,
-            service_names
+            service_names,
         )?;
         Ok(())
     }

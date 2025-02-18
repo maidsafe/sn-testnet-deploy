@@ -57,6 +57,7 @@ pub async fn handle_start_command(
     Ok(())
 }
 
+#[allow(clippy::too_many_arguments)]
 pub async fn handle_stop_command(
     custom_inventory: Option<Vec<String>>,
     delay: Option<u64>,
