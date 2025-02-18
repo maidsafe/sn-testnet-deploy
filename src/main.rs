@@ -618,6 +618,10 @@ async fn main() -> Result<()> {
                 cmd::provision::handle_provision_symmetric_private_nodes(name).await?;
                 Ok(())
             }
+            ProvisionCommands::Uploaders { name } => {
+                cmd::provision::handle_provision_uploaders(name).await?;
+                Ok(())
+            }
         },
     }
 }
