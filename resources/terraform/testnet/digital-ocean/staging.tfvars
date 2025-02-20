@@ -1,7 +1,7 @@
 evm_node_droplet_size = "s-4vcpu-8gb"
 evm_node_droplet_image_id = 172723723
 evm_node_vm_count = 1
-full_cone_private_node_vm_count = 1
+full_cone_private_node_vm_count = 0
 nat_gateway_droplet_image_id = 178052140
 node_droplet_size = "s-2vcpu-4gb"
 node_droplet_image_id = 173265007
