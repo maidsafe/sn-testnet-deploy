@@ -5890,7 +5890,7 @@ dependencies = [
 
 [[package]]
 name = "sn-testnet-deploy"
-version = "0.2.30"
+version = "0.2.31"
 dependencies = [
  "alloy",
  "ant-releases",
