@@ -295,7 +295,7 @@ pub fn build_node_extra_vars_doc(
     network_contacts_url: Option<String>,
     node_instance_count: u16,
     evm_network: EvmNetwork,
-    home_network_flag: bool,
+    relay: bool,
 ) -> Result<String> {
     let mut extra_vars = ExtraVarsDocBuilder::default();
     extra_vars.add_variable("provider", cloud_provider);
@@ -325,8 +325,8 @@ pub fn build_node_extra_vars_doc(
         extra_vars.add_variable("public_rpc", "true");
     }
 
-    if home_network_flag {
-        extra_vars.add_variable("home_network", "true");
+    if relay {
+        extra_vars.add_variable("relay", "true");
     }
 
     if let Some(network_id) = options.network_id {

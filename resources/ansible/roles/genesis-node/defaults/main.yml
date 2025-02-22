@@ -1,6 +1,6 @@
 ---
 public_rpc: False
-home_network: False
+relay: False
 node_rpc_ip: "127.0.0.1"
 binary_dir: /usr/local/bin
 # If a custom branch / version is specified, this value must be overwritten.

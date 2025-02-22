@@ -55,12 +55,12 @@
   when: use_port_range
 
 #
-# Obtain private IP if home_network is set
+# Obtain private IP if relay is set
 #
 - name: get private ip of eth1
   shell: ip -4 addr show dev eth1 | grep inet | awk '{print $2}' | cut -d/ -f1
   register: private_ip_eth1
-  when: home_network | bool
+  when: relay | bool
 
 #
 # Add the nodes
@@ -85,8 +85,8 @@
       - "--rewards-address={{ rewards_address }}"
       - "--max-archived-log-files={{ max_archived_log_files }}"
       - "--max-log-files={{ max_log_files }}"
-      - "{{ ('--node-ip=' + private_ip_eth1.stdout) if home_network | bool else omit }}"
-      - "{{ '--home-network' if home_network | bool else omit }}"
+      - "{{ ('--node-ip=' + private_ip_eth1.stdout) if relay | bool else omit }}"
+      - "{{ '--relay' if relay | bool else omit }}"
       - "{{ ('--rpc-port=' + rpc_port) if not use_port_range else omit }}"
       - "{{ ('--rpc-port=' + rpc_start_port + '-' + rpc_end_port) if use_port_range else omit }}"
       - "{{ ('--metrics-port=' + metrics_port) if not use_port_range else omit }}"
