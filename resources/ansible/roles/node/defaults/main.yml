@@ -1,6 +1,6 @@
 ---
 public_rpc: False
-home_network: False
+relay: False
 node_rpc_ip: "127.0.0.1"
 node_instance_count: 20
 binary_dir: /usr/local/bin

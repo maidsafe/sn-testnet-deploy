@@ -757,10 +757,10 @@ impl AnsibleProvisioner {
         node_type: NodeType,
     ) -> Result<()> {
         let start = Instant::now();
-        let mut home_network_flag = false;
+        let mut relay = false;
         let (inventory_type, node_count) = match &node_type {
             NodeType::FullConePrivateNode => {
-                home_network_flag = true;
+                relay = true;
                 (
                     node_type.to_ansible_inventory_type(),
                     options.full_cone_private_node_count,
@@ -774,7 +774,7 @@ impl AnsibleProvisioner {
                 options.peer_cache_node_count,
             ),
             NodeType::SymmetricPrivateNode => {
-                home_network_flag = true;
+                relay = true;
                 (
                     node_type.to_ansible_inventory_type(),
                     options.symmetric_private_node_count,
@@ -822,7 +822,7 @@ impl AnsibleProvisioner {
                 initial_network_contacts_url,
                 node_count,
                 options.evm_network.clone(),
-                home_network_flag,
+                relay,
             )?),
         )?;
 
