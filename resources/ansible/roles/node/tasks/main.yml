@@ -74,6 +74,7 @@
       - "{{ binary_dir }}/antctl"
       - -v
       - add
+      - --no-upnp
       - --data-dir-path=/mnt/antnode-storage/data
       - --log-dir-path=/mnt/antnode-storage/log
       - "--count={{ nodes_to_add }}"
