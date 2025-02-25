@@ -24,6 +24,7 @@ pub struct DeployOptions {
     pub chunk_size: Option<u64>,
     pub current_inventory: DeploymentInventory,
     pub downloaders_count: u16,
+    pub enable_telegraf: bool,
     pub environment_type: EnvironmentType,
     pub env_variables: Option<Vec<(String, String)>>,
     pub evm_data_payments_address: Option<String>,

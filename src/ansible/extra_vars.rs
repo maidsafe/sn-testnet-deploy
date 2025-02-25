@@ -40,6 +40,11 @@ impl ExtraVarsDocBuilder {
         self
     }
 
+    pub fn add_boolean_variable(&mut self, name: &str, value: bool) -> &mut Self {
+        self.map.insert(name.to_owned(), Value::Bool(value));
+        self
+    }
+
     pub fn add_list_variable(&mut self, name: &str, values: Vec<String>) -> &mut Self {
         if let Some(list) = self.map.get_mut(name) {
             if let Value::Array(list) = list {
@@ -333,6 +338,8 @@ pub fn build_node_extra_vars_doc(
         extra_vars.add_variable("network_id", &network_id.to_string());
     }
 
+    extra_vars.add_boolean_variable("enable_telegraf", options.enable_telegraf);
+
     extra_vars.add_node_url_or_version(&options.name, &options.binary_option);
     extra_vars.add_antctl_url(&options.name, &options.binary_option);
     extra_vars.add_antctld_url(&options.name, &options.binary_option);
@@ -468,6 +475,8 @@ pub fn build_uploaders_extra_vars_doc(
     if let Some(network_id) = options.network_id {
         extra_vars.add_variable("network_id", &network_id.to_string());
     }
+
+    extra_vars.add_variable("enable_telegraf", &options.enable_telegraf.to_string());
 
     let mut serde_map = serde_json::Map::new();
     for (k, v) in sk_map {

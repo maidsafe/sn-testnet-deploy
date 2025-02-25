@@ -111,9 +111,13 @@
     dest: /etc/systemd/system/telegraf-elasticsearch.service
     remote_src: yes
 
-- name: reload the configuration files for systemctl daemon
-  become: True
-  command: systemctl daemon-reload
+- name: reload systemd to apply service file changes
+  systemd:
+    daemon_reload: yes
+  register: systemd_reload
+  retries: 3
+  delay: 5
+  until: systemd_reload is success
 
 - name: start telegraf-elasticsearch service
   systemd:
@@ -124,6 +128,7 @@
   retries: 3
   delay: 5
   until: telegraf_elasticsearch_start is not failed
+  when: enable_telegraf | bool
 
 - name: start telegraf service
   systemd:
@@ -134,3 +139,4 @@
   retries: 3
   delay: 5
   until: telegraf_start is not failed
+  when: enable_telegraf | bool

@@ -183,6 +183,7 @@ impl TestnetDeployer {
             binary_option: options.current_inventory.binary_option.clone(),
             chunk_size: None,
             downloaders_count: 0,
+            enable_telegraf: true,
             env_variables: None,
             evm_network: options
                 .current_inventory
@@ -479,6 +480,7 @@ impl TestnetDeployer {
             binary_option: options.current_inventory.binary_option.clone(),
             chunk_size: None,
             downloaders_count: 0,
+            enable_telegraf: true,
             env_variables: None,
             evm_data_payments_address: options
                 .current_inventory
@@ -515,7 +517,6 @@ impl TestnetDeployer {
                 .join("ansible")
                 .join("inventory"),
             peer_cache_node_count: 0,
-
             public_rpc: options.public_rpc,
             rewards_address: options
                 .current_inventory
