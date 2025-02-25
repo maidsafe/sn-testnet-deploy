@@ -105,9 +105,14 @@
 - name: reload systemd to apply service file changes
   systemd:
     daemon_reload: yes
+  register: systemd_reload
+  retries: 3
+  delay: 5
+  until: systemd_reload is success
 
-# - name: start telegraf service
-#   systemd:
-#     name: telegraf
-#     enabled: yes
-#     state: started
+- name: start telegraf service
+  systemd:
+    name: telegraf
+    enabled: yes
+    state: started
+  when: enable_telegraf | bool

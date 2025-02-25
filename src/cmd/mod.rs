@@ -561,6 +561,9 @@ pub enum Commands {
         /// This will provision all infrastructure but only deploy and start the genesis node.
         #[clap(long, default_value_t = false)]
         to_genesis: bool,
+        /// Set to disable Telegraf metrics collection on all nodes.
+        #[clap(long)]
+        disable_telegraf: bool,
     },
     ExtendVolumeSize {
         /// Set to run Ansible with more verbose output.

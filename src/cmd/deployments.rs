@@ -198,6 +198,7 @@ pub async fn handle_deploy(
     antnode_version: Option<String>,
     branch: Option<String>,
     chunk_size: Option<u64>,
+    disable_telegraf: bool,
     downloaders_count: u16,
     env_variables: Option<Vec<(String, String)>>,
     environment_type: crate::EnvironmentType,
@@ -394,6 +395,7 @@ pub async fn handle_deploy(
         uploader_vm_count,
         uploader_vm_size,
         uploaders_count,
+        enable_telegraf: !disable_telegraf,
     };
 
     if to_genesis {
