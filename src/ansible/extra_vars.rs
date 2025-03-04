@@ -348,6 +348,10 @@ pub fn build_node_extra_vars_doc(
         extra_vars.add_env_variable_list("node_env_variables", env_vars.clone());
     }
 
+    if let Some(client_env_vars) = &options.client_env_variables {
+        extra_vars.add_env_variable_list("client_env_variables", client_env_vars.clone());
+    }
+
     if let Some((logstash_stack_name, logstash_hosts)) = &options.logstash_details {
         extra_vars.add_variable("logstash_stack_name", logstash_stack_name);
         extra_vars.add_list_variable(
@@ -474,6 +478,9 @@ pub fn build_uploaders_extra_vars_doc(
     }
     if let Some(network_id) = options.network_id {
         extra_vars.add_variable("network_id", &network_id.to_string());
+    }
+    if let Some(client_env_variables) = &options.client_env_variables {
+        extra_vars.add_env_variable_list("client_env_variables", client_env_variables.clone());
     }
 
     extra_vars.add_variable("enable_telegraf", &options.enable_telegraf.to_string());

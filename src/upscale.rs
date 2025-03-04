@@ -182,9 +182,9 @@ impl TestnetDeployer {
         let mut provision_options = ProvisionOptions {
             binary_option: options.current_inventory.binary_option.clone(),
             chunk_size: None,
+            client_env_variables: None,
             downloaders_count: 0,
             enable_telegraf: true,
-            node_env_variables: None,
             evm_network: options
                 .current_inventory
                 .environment_details
@@ -213,6 +213,7 @@ impl TestnetDeployer {
             name: options.current_inventory.name.clone(),
             network_id: options.current_inventory.environment_details.network_id,
             node_count: desired_node_count,
+            node_env_variables: None,
             max_archived_log_files: options.max_archived_log_files,
             max_log_files: options.max_log_files,
             output_inventory_dir_path: self
@@ -479,9 +480,9 @@ impl TestnetDeployer {
         let provision_options = ProvisionOptions {
             binary_option: options.current_inventory.binary_option.clone(),
             chunk_size: None,
+            client_env_variables: None,
             downloaders_count: 0,
             enable_telegraf: true,
-            node_env_variables: None,
             evm_data_payments_address: options
                 .current_inventory
                 .environment_details
@@ -510,6 +511,7 @@ impl TestnetDeployer {
             name: options.current_inventory.name.clone(),
             network_id: options.current_inventory.environment_details.network_id,
             node_count: 0,
+            node_env_variables: None,
             max_archived_log_files: options.max_archived_log_files,
             max_log_files: options.max_log_files,
             output_inventory_dir_path: self

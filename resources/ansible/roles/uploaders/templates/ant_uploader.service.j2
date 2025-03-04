@@ -13,6 +13,9 @@ Environment="EVM_NETWORK=arbitrum-sepolia"
 {% elif evm_network_type == "evm-arbitrum-one" %}
 Environment="EVM_NETWORK=arbitrum-one"
 {% endif %}
+{% if client_env_variables is defined %}
+Environment="{{ client_env_variables }}"
+{% endif %}
 User=ant{{ count }}
 {% if testnet_name.startswith('PROD-') %}
 ExecStart=/home/ant{{ count }}/upload-random-data.sh

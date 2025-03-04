@@ -198,9 +198,9 @@ pub async fn handle_deploy(
     antnode_version: Option<String>,
     branch: Option<String>,
     chunk_size: Option<u64>,
+    client_env_variables: Option<Vec<(String, String)>>,
     disable_telegraf: bool,
     downloaders_count: u16,
-    env_variables: Option<Vec<(String, String)>>,
     environment_type: crate::EnvironmentType,
     evm_data_payments_address: Option<String>,
     evm_network_type: EvmNetwork,
@@ -225,6 +225,7 @@ pub async fn handle_deploy(
     network_id: Option<u8>,
     network_contacts_file_name: Option<String>,
     node_count: Option<u16>,
+    node_env_variables: Option<Vec<(String, String)>>,
     node_vm_count: Option<u16>,
     node_vm_size: Option<String>,
     node_volume_size: Option<u16>,
@@ -339,16 +340,16 @@ pub async fn handle_deploy(
     let deploy_options = DeployOptions {
         binary_option: binary_option.clone(),
         chunk_size,
+        client_env_variables,
         current_inventory: inventory,
         downloaders_count,
-        env_variables,
+        enable_telegraf: !disable_telegraf,
         environment_type: environment_type.clone(),
         evm_data_payments_address,
         evm_network: evm_network_type,
         evm_node_vm_size,
         evm_payment_token_address,
         evm_rpc_url,
-        funding_wallet_secret_key,
         full_cone_nat_gateway_vm_size,
         full_cone_private_node_count,
         full_cone_private_node_vm_count,
@@ -357,6 +358,7 @@ pub async fn handle_deploy(
                 full_cone_private_node_count,
             ))
         }),
+        funding_wallet_secret_key,
         genesis_node_volume_size: genesis_node_volume_size
             .or_else(|| Some(calculate_size_per_attached_volume(1))),
         initial_gas,
@@ -369,6 +371,7 @@ pub async fn handle_deploy(
         name: name.clone(),
         network_id,
         node_count,
+        node_env_variables,
         node_vm_count,
         node_vm_size,
         node_volume_size: node_volume_size
@@ -382,6 +385,8 @@ pub async fn handle_deploy(
         peer_cache_node_vm_size,
         peer_cache_node_volume_size: peer_cache_node_volume_size
             .or_else(|| Some(calculate_size_per_attached_volume(peer_cache_node_count))),
+        public_rpc,
+        rewards_address,
         symmetric_nat_gateway_vm_size,
         symmetric_private_node_count,
         symmetric_private_node_vm_count,
@@ -390,12 +395,9 @@ pub async fn handle_deploy(
                 symmetric_private_node_count,
             ))
         }),
-        public_rpc,
-        rewards_address,
         uploader_vm_count,
         uploader_vm_size,
         uploaders_count,
-        enable_telegraf: !disable_telegraf,
     };
 
     if to_genesis {
