@@ -94,6 +94,7 @@
       - "{{ ('--log-format=' + log_format) if log_format is defined else omit }}"
       - "{{ ('--env=' + node_env_variables) if node_env_variables is defined else omit }}"
       - "{{ ('--version=' + version) if version is defined else ('--url=' + node_archive_url) }}"
+      - "{{ '--write-older-cache-files' if write_older_cache_files | bool else omit }}"
       - "{{ evm_network_type }}"
       - "{{ ('--rpc-url=' + evm_rpc_url) if evm_network_type == 'evm-custom' else omit }}"
       - "{{ ('--payment-token-address=' + evm_payment_token_address) if evm_network_type == 'evm-custom' else omit }}"
