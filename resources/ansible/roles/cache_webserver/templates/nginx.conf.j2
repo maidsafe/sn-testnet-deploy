@@ -1,13 +1,29 @@
+{# Map to determine if the version is supported #}
+map $http_cache_version $valid_version {
+  default "1";
+  "0" "1";
+  "1" "1";
+  "~." "0";
+}
+
+{# Map to get the file path for valid versions #}
+map $http_cache_version $bootstrap_file {
+  default "{{ version_files.version0 }}";
+  "1" "{{ version_files.version1 }}";
+}
+
 server {
-    listen 80;
-
-    location / {
-        access_log off;
-        log_not_found off;
-        return 404;
+  listen 80;
+  location / {
+    access_log off;
+    log_not_found off;
+    return 404;
+  }
+  location /bootstrap_cache.json {
+    if ($valid_version = "0") {
+      return 400;
     }
-
-    location /bootstrap_cache.json {
-        alias {{ bootstrap_cache_dir }}/{{ json_files.files[0].path | basename }};
-    }
+    
+    alias $bootstrap_file;
+  }
 }
