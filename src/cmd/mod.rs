@@ -106,7 +106,7 @@ pub enum Commands {
         /// This is useful to set the antnode's log levels. Each variable should be comma
         /// separated without any space.
         ///
-        /// Example: --node-env SN_LOG=all,RUST_LOG=libp2p=debug
+        /// Example: --node-env ANT_LOG=all,RUST_LOG=libp2p=debug
         #[clap(name = "node-env", long, use_value_delimiter = true, value_parser = parse_environment_variables, verbatim_doc_comment)]
         node_env_variables: Option<Vec<(String, String)>>,
         /// The address of the data payments contract.
@@ -355,9 +355,17 @@ pub enum Commands {
         /// This is useful to set the antnode's log levels. Each variable should be comma
         /// separated without any space.
         ///
-        /// Example: --node-env SN_LOG=all,RUST_LOG=libp2p=debug
+        /// Example: --node-env ANT_LOG=all,RUST_LOG=libp2p=debug
         #[clap(name = "node-env", long, use_value_delimiter = true, value_parser = parse_environment_variables, verbatim_doc_comment)]
         node_env_variables: Option<Vec<(String, String)>>,
+        /// Provide environment variables for the antnode RPC client.
+        ///
+        /// This is useful to set the client's log levels. Each variable should be comma
+        /// separated without any space.
+        ///
+        /// Example: --client-env CLIENT_LOG=all,RUST_LOG=debug
+        #[clap(name = "client-env", long, use_value_delimiter = true, value_parser = parse_environment_variables, verbatim_doc_comment)]
+        client_env_variables: Option<Vec<(String, String)>>,
         /// The type of deployment.
         ///
         /// Possible values are 'development', 'production' or 'staging'. The value used will
@@ -815,7 +823,7 @@ pub enum Commands {
         /// This is useful to set antnode's log levels. Each variable should be comma separated
         /// without any space.
         ///
-        /// Example: --node-env SN_LOG=all,RUST_LOG=libp2p=debug
+        /// Example: --node-env ANT_LOG=all,RUST_LOG=libp2p=debug
         #[clap(name = "node-env", long, use_value_delimiter = true, value_parser = parse_environment_variables)]
         node_env_variables: Option<Vec<(String, String)>>,
         /// Specify the type of node VM to upgrade the antnode services on. If not provided, the antnode services on

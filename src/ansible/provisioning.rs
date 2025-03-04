@@ -51,6 +51,7 @@ pub struct ProvisionOptions {
     pub ant_version: Option<String>,
     pub binary_option: BinaryOption,
     pub chunk_size: Option<u64>,
+    pub client_env_variables: Option<Vec<(String, String)>>,
     pub downloaders_count: u16,
     pub enable_telegraf: bool,
     pub evm_data_payments_address: Option<String>,
@@ -261,6 +262,7 @@ impl From<BootstrapOptions> for ProvisionOptions {
             rewards_address: bootstrap_options.rewards_address,
             token_amount: None,
             uploaders_count: None,
+            client_env_variables: None,
         }
     }
 }
@@ -273,7 +275,7 @@ impl From<DeployOptions> for ProvisionOptions {
             chunk_size: deploy_options.chunk_size,
             downloaders_count: deploy_options.downloaders_count,
             enable_telegraf: deploy_options.enable_telegraf,
-            node_env_variables: deploy_options.env_variables,
+            node_env_variables: deploy_options.node_env_variables,
             evm_data_payments_address: deploy_options.evm_data_payments_address,
             evm_network: deploy_options.evm_network,
             evm_payment_token_address: deploy_options.evm_payment_token_address,
@@ -296,6 +298,7 @@ impl From<DeployOptions> for ProvisionOptions {
             rewards_address: deploy_options.rewards_address,
             token_amount: deploy_options.initial_tokens,
             uploaders_count: Some(deploy_options.uploaders_count),
+            client_env_variables: deploy_options.client_env_variables,
         }
     }
 }
