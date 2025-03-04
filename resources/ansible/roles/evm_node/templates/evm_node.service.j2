@@ -5,6 +5,7 @@ After=network.target
 [Service]
 User=ant
 Environment=ANVIL_IP_ADDR={{ ansible_default_ipv4.address }}
+Environment=ANVIL_PORT=4343
 ExecStart=/usr/local/bin/{{ bin_name }}
 Restart=always
 
