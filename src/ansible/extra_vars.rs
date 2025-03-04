@@ -344,8 +344,8 @@ pub fn build_node_extra_vars_doc(
     extra_vars.add_antctl_url(&options.name, &options.binary_option);
     extra_vars.add_antctld_url(&options.name, &options.binary_option);
 
-    if let Some(env_vars) = &options.env_variables {
-        extra_vars.add_env_variable_list("env_variables", env_vars.clone());
+    if let Some(env_vars) = &options.node_env_variables {
+        extra_vars.add_env_variable_list("node_env_variables", env_vars.clone());
     }
 
     if let Some((logstash_stack_name, logstash_hosts)) = &options.logstash_details {
