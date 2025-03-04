@@ -299,6 +299,7 @@ pub fn build_node_extra_vars_doc(
     network_contacts_url: Option<String>,
     node_instance_count: u16,
     evm_network: EvmNetwork,
+    write_older_cache_files: bool,
 ) -> Result<String> {
     let mut extra_vars = ExtraVarsDocBuilder::default();
     extra_vars.add_variable("provider", cloud_provider);
@@ -341,6 +342,10 @@ pub fn build_node_extra_vars_doc(
             extra_vars.add_variable("relay", "true");
         }
         _ => {}
+    }
+
+    if write_older_cache_files {
+        extra_vars.add_variable("write_older_cache_files", "true");
     }
 
     if let Some(network_id) = options.network_id {
