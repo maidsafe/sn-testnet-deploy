@@ -532,9 +532,22 @@ pub fn build_uploader_telegraf_upgrade(name: &str) -> Result<String> {
     Ok(extra_vars.build())
 }
 
-pub fn build_evm_nodes_extra_vars_doc(name: &str, cloud_provider: &CloudProvider) -> String {
+pub fn build_evm_nodes_extra_vars_doc(
+    name: &str,
+    cloud_provider: &CloudProvider,
+    binary_options: &BinaryOption,
+) -> String {
     let mut extra_vars = ExtraVarsDocBuilder::default();
     extra_vars.add_variable("testnet_name", name);
     extra_vars.add_variable("provider", &cloud_provider.to_string());
+
+    if let BinaryOption::BuildFromSource {
+        branch, repo_owner, ..
+    } = binary_options
+    {
+        extra_vars.add_variable("org", repo_owner);
+        extra_vars.add_variable("branch", branch);
+    }
+
     extra_vars.build()
 }
