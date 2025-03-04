@@ -457,6 +457,7 @@ impl AnsibleProvisioner {
             Some(extra_vars::build_evm_nodes_extra_vars_doc(
                 &options.name,
                 &self.cloud_provider,
+                &options.binary_option,
             )),
         )?;
         print_duration(start.elapsed());
