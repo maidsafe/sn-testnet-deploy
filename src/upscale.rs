@@ -184,7 +184,7 @@ impl TestnetDeployer {
             chunk_size: None,
             downloaders_count: 0,
             enable_telegraf: true,
-            env_variables: None,
+            node_env_variables: None,
             evm_network: options
                 .current_inventory
                 .environment_details
@@ -481,7 +481,7 @@ impl TestnetDeployer {
             chunk_size: None,
             downloaders_count: 0,
             enable_telegraf: true,
-            env_variables: None,
+            node_env_variables: None,
             evm_data_payments_address: options
                 .current_inventory
                 .environment_details

@@ -22,7 +22,6 @@ pub struct BootstrapOptions {
     pub bootstrap_peer: Option<String>,
     pub chunk_size: Option<u64>,
     pub environment_type: EnvironmentType,
-    pub env_variables: Option<Vec<(String, String)>>,
     pub evm_data_payments_address: Option<String>,
     pub evm_network: EvmNetwork,
     pub evm_payment_token_address: Option<String>,
@@ -37,14 +36,15 @@ pub struct BootstrapOptions {
     pub name: String,
     pub network_id: Option<u8>,
     pub node_count: u16,
+    pub node_env_variables: Option<Vec<(String, String)>>,
     pub node_vm_count: Option<u16>,
+    pub node_vm_size: Option<String>,
     pub node_volume_size: Option<u16>,
     pub output_inventory_dir_path: PathBuf,
     pub rewards_address: String,
     pub symmetric_private_node_count: u16,
     pub symmetric_private_node_vm_count: Option<u16>,
     pub symmetric_private_node_volume_size: Option<u16>,
-    pub node_vm_size: Option<String>,
 }
 
 impl TestnetDeployer {

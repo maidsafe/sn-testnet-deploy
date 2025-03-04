@@ -141,7 +141,7 @@ pub async fn handle_bootstrap(
             bootstrap_network_contacts_url,
             bootstrap_peer,
             environment_type: environment_type.clone(),
-            env_variables,
+            node_env_variables: env_variables,
             evm_data_payments_address,
             evm_network: evm_network_type,
             evm_payment_token_address,
