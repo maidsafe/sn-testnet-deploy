@@ -1,29 +1,34 @@
 {# Map to determine if the version is supported #}
 map $http_cache_version $valid_version {
-  default "1";
-  "0" "1";
-  "1" "1";
-  "~." "0";
+    {# Empty/missing header is valid (for old users) #}
+    "" "1";
+    {# Version 1 is valid #}
+    "1" "1";
+    {# Everything else is invalid #}
+    default "0";
 }
 
 {# Map to get the file path for valid versions #}
 map $http_cache_version $bootstrap_file {
-  default "{{ version_files.version0 }}";
-  "1" "{{ version_files.version1 }}";
+    {# Old users (no header) get version0 #}
+    "" "{{ version_files.version0 }}";
+    {# Users with version 1 get version1 #}
+    "1" "{{ version_files.version1 }}";
+    {# Default fallback (though this shouldn't be reached due to the 400 response) #}
+    default "{{ version_files.version0 }}";
 }
 
 server {
-  listen 80;
-  location / {
-    access_log off;
-    log_not_found off;
-    return 404;
-  }
-  location /bootstrap_cache.json {
-    if ($valid_version = "0") {
-      return 400;
+    listen 80;
+    location / {
+        access_log off;
+        log_not_found off;
+        return 404;
     }
-    
-    alias $bootstrap_file;
-  }
+    location /bootstrap_cache.json {
+        if ($valid_version = "0") {
+            return 400;
+        }
+        alias $bootstrap_file;
+    }
 }
