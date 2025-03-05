@@ -171,7 +171,11 @@ impl AnsibleRunner {
         let mut inventory = Vec::new();
 
         while count <= retry_count {
-            debug!("Running inventory list. retry attempts {count}/{retry_count}");
+            if count > 0 {
+                debug!("Running inventory list. Retry attempts {count}/{retry_count}");
+            } else {
+                debug!("Running inventory list.");
+            }
             let output = run_external_command(
                 AnsibleBinary::AnsibleInventory.get_binary_path()?,
                 self.working_directory_path.clone(),
@@ -225,8 +229,10 @@ impl AnsibleRunner {
             if !inventory.is_empty() {
                 break;
             }
-            debug!("Inventory list is empty, re-running after a few seconds.");
-            std::thread::sleep(Duration::from_secs(3));
+            if count <= retry_count && re_attempt {
+                debug!("Inventory list is empty, re-running after a few seconds.");
+                std::thread::sleep(Duration::from_secs(3));
+            }
         }
         if inventory.is_empty() {
             warn!("Inventory list is empty after {retry_count} retries");

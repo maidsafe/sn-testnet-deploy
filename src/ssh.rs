@@ -25,7 +25,7 @@ pub struct RoutedVms {
 }
 
 impl RoutedVms {
-    fn find_symmetric_nat_routed_node(
+    pub fn find_symmetric_nat_routed_node(
         &self,
         ip_address: &IpAddr,
     ) -> Option<(&VirtualMachine, &IpAddr)> {
@@ -44,7 +44,7 @@ impl RoutedVms {
             })
     }
 
-    fn find_full_cone_nat_routed_node(
+    pub fn find_full_cone_nat_routed_node(
         &self,
         ip_address: &IpAddr,
     ) -> Option<(&VirtualMachine, &IpAddr)> {
