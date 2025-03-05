@@ -232,7 +232,7 @@ impl AnsibleProvisioner {
     }
 
     /// Return the (vm name, uploader count) for all uploader VMs
-    fn get_current_uploader_count(&self) -> Result<HashMap<VirtualMachine, usize>> {
+    pub fn get_current_uploader_count(&self) -> Result<HashMap<VirtualMachine, usize>> {
         let uploader_inventories = self
             .ansible_runner
             .get_inventory(AnsibleInventoryType::Uploaders, true)?;
