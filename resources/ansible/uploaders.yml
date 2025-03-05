@@ -4,6 +4,10 @@
   become: False
   ignore_unreachable: yes
   roles:
+    - role: setup_striped_storage
+      become: True
+      vars:
+        mount_base: /mnt/client-logs
     - role: uploader-metrics
       become: True
     - role: uploaders
