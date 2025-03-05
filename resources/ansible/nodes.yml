@@ -26,6 +26,10 @@
         name: systemd-journald
         state: restarted
         enabled: yes
+      register: journald_restart
+      retries: 3
+      delay: 5
+      until: journald_restart is success
     - name: restart telegraf
       become: True
       ansible.builtin.systemd:
@@ -33,3 +37,7 @@
         state: restarted
         enabled: yes
       when: enable_telegraf | bool
+      register: telegraf_restart
+      retries: 3
+      delay: 5
+      until: telegraf_restart is success
