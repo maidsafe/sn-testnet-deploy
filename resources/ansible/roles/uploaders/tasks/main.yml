@@ -18,19 +18,36 @@
   become: true
   when: not ant_binary.stat.exists
 
+- name: create ant group
+  ansible.builtin.group:
+    name: ant
+    state: present
+  become: true
+
 - name: create ant users
   ansible.builtin.user:
     name: "ant{{ item }}"
     shell: /bin/bash
+    group: ant
     state: present
   loop: "{{ range(1, ant_uploader_instances | int + 1) | list }}"
+  become: true
+
+- name: ensure the ant users can write to the log output destination
+  ansible.builtin.file:
+    path: "{{ log_output_dest }}"
+    state: directory
+    mode: '0775'
+    owner: root
+    group: ant
+  become: true
 
 - name: copy upload-random-data.sh to remote for each ant user
   ansible.builtin.template:
     src: upload-random-data.sh.j2
     dest: "/home/ant{{ item }}/upload-random-data.sh"
     owner: "ant{{ item }}"
-    group: "ant{{ item }}"
+    group: "ant"
     mode: '0744'
   become: true
   become_user: "ant{{ item }}"
@@ -51,7 +68,7 @@
     src: ant_uploader.service.j2
     dest: "/etc/systemd/system/ant_uploader_{{ item.0 }}.service"
     owner: "ant{{ item.0 }}"
-    group: "ant{{ item.0 }}"
+    group: "ant"
     mode: '0644'
   become: true
   when: not service_file_stat.results[item.0 - 1].stat.exists

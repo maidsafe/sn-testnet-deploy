@@ -135,6 +135,12 @@ locals {
     ]
   ])
 
+  uploader_volume_keys = flatten([
+    for node_index in range(var.uploader_vm_count) : [
+      for volume_index in range(var.volumes_per_node) : "${node_index+1}-${volume_index+1}"
+    ]
+  ])
+
   full_cone_private_node_volume_keys = flatten([
     for node_index in range(var.full_cone_private_node_vm_count) : [
       for volume_index in range(var.volumes_per_node) : "${node_index+1}-${volume_index+1}"
@@ -212,4 +218,17 @@ resource "digitalocean_volume_attachment" "symmetric_private_node_volume_attachm
   for_each = var.symmetric_private_node_volume_size > 0 ? { for key in local.symmetric_private_node_volume_keys : key => key } : {}
   droplet_id = digitalocean_droplet.symmetric_private_node[tonumber(split("-", each.key)[0]) - 1].id
   volume_id  = digitalocean_volume.symmetric_private_node_attached_volume[each.key].id
+}
+
+resource "digitalocean_volume" "uploader_attached_volume" {
+  for_each = var.uploader_volume_size > 0 ? { for key in local.uploader_volume_keys : key => key } : {}
+  name     = lower("${terraform.workspace}-uploader-${split("-", each.key)[0]}-volume-${split("-", each.key)[1]}")
+  size     = var.uploader_volume_size
+  region   = var.region
+}
+
+resource "digitalocean_volume_attachment" "uploader_volume_attachment" {
+  for_each = var.uploader_volume_size > 0 ? { for key in local.uploader_volume_keys : key => key } : {}
+  droplet_id = digitalocean_droplet.uploader[tonumber(split("-", each.key)[0]) - 1].id
+  volume_id  = digitalocean_volume.uploader_attached_volume[each.key].id
 }

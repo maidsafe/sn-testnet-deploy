@@ -50,6 +50,8 @@ if [ -n "$NETWORK_ID" ]; then
   NETWORK_ID_ARG="--network-id $NETWORK_ID"
 fi
 
+LOG_OUTPUT_DEST="{{ log_output_dest }}"
+
 if ! command -v ant &> /dev/null; then
   echo "Error: 'ant' not found in PATH."
   exit 1
@@ -85,10 +87,20 @@ generate_random_data_file_and_upload() {
   echo "Generated random data file at $tmpfile"
   file_size_kb=$(du -k "$tmpfile" | cut -f1)
 
-  now=$(date +"%s")
-  stdout=$(ant $CONTACT_PEER_ARG $NETWORK_CONTACTS_URL_ARG $TESTNET_ARG $NETWORK_ID_ARG file upload "$tmpfile" 2>&1)
+  timestamp=$(date +"%Y%m%d_%H%M%S")
+  log_file_path="${LOG_OUTPUT_DEST}/${timestamp}"
+  LOG_OUTPUT_ARG="--log-output-dest $log_file_path"
+  
+  stdout=$(ant \
+    $CONTACT_PEER_ARG \
+    $NETWORK_CONTACTS_URL_ARG \
+    $TESTNET_ARG \
+    $NETWORK_ID_ARG \
+    $LOG_OUTPUT_ARG \
+    file upload "$tmpfile" 2>&1)
   echo "$stdout"
 
+  now=$(date +"%s")
   if [ $? -eq 0 ]; then
     echo "Successfully uploaded $tmpfile using SAFE CLI"
 

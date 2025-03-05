@@ -159,3 +159,9 @@ variable "peer_cache_reserved_ips" {
   description = "List of reserved IPs for the peer nodes"
   default = []
 }
+
+variable "uploader_volume_size" {
+  description = "Size of each volume in GB for uploader nodes"
+  type        = number
+  default     = 70
+}
