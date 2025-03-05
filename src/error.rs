@@ -4,6 +4,8 @@
 // This SAFE Network Software is licensed under the BSD-3-Clause license.
 // Please see the LICENSE file for more details.
 
+use std::net::IpAddr;
+
 use crate::{ansible::inventory::AnsibleInventoryType, NodeType};
 use evmlib::contract::network_token;
 use thiserror::Error;
@@ -143,6 +145,8 @@ pub enum Error {
     RegexError(#[from] regex::Error),
     #[error(transparent)]
     ReqwestError(#[from] reqwest::Error),
+    #[error("Routed VM for IP {0} not found")]
+    RoutedVmNotFound(IpAddr),
     #[error("Safe client command failed: {0}")]
     SafeCmdError(String),
     #[error("Failed to download the safe or safenode binary")]

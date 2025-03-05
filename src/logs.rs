@@ -18,9 +18,21 @@ use rayon::iter::{IntoParallelIterator, IntoParallelRefIterator, ParallelIterato
 use std::{
     fs::File,
     io::{Cursor, Read, Write},
-    net::IpAddr,
     path::{Path, PathBuf},
 };
+
+const DEFAULT_RSYNC_ARGS: [&str; 8] = [
+    "--compress",
+    "--archive",
+    "--prune-empty-dirs",
+    "--verbose",
+    "--verbose",
+    "--filter=+ */",     // Include all directories for traversal
+    "--filter=+ *.log*", // Include all *.log* files
+    "--filter=- *",      // Exclude all other files
+];
+
+const NODE_LOG_DIR: &str = "/mnt/antnode-storage/log/";
 
 impl TestnetDeployer {
     pub fn rsync_logs(&self, name: &str, vm_filter: Option<String>) -> Result<()> {
@@ -36,96 +48,56 @@ impl TestnetDeployer {
             all_node_inventory
         };
 
-        let log_abs_dest = create_initial_log_dir_setup(&root_dir, name, &all_node_inventory)?;
-
-        // Rsync args
-        let rsync_args = vec![
-            "--compress".to_string(),
-            "--archive".to_string(),
-            "--prune-empty-dirs".to_string(),
-            "--verbose".to_string(),
-            "--verbose".to_string(),
-            "--filter=+ */".to_string(), // Include all directories for traversal
-            "--filter=+ *.log*".to_string(), // Include all *.log* files
-            "--filter=- *".to_string(),  // Exclude all other files
-        ];
-
-        let mut public_rsync_args = rsync_args.clone();
-        // Add the ssh details
-        // TODO: SSH limits the connections/instances to 10 at a time. Changing /etc/ssh/sshd_config, doesn't work?
-        // How to bypass this?
-        public_rsync_args.extend(vec![
-            "-e".to_string(),
-            format!(
-                "ssh -i {} -q -o StrictHostKeyChecking=no -o BatchMode=yes -o ConnectTimeout=30",
-                self.ssh_client
-                    .get_private_key_path()
-                    .to_string_lossy()
-                    .as_ref()
-            ),
-        ]);
-
-        // let symmetric_nat_gateway_inventory = self.get_symmetric_nat_gateway_inventory(name)?;
-        // let private_rsync_args = if !nat_gateway_inventory.is_empty() {
-        //     let nat_gateway_inventory = nat_gateway_inventory.first().unwrap();
-        //     let mut private_rsync_args = rsync_args.clone();
-        //     private_rsync_args.extend(vec![
-        //         "-e".to_string(),
-        //         format!(
-        //             "ssh -i {} -q -o StrictHostKeyChecking=no -o BatchMode=yes -o ConnectTimeout=30 -o ProxyCommand='ssh root@{} -W %h:%p -i {}'",
-        //             self.ssh_client
-        //                 .get_private_key_path()
-        //                 .to_string_lossy()
-        //                 .as_ref(),
-        //                 nat_gateway_inventory.public_ip_addr,
-        //             self.ssh_client
-        //                 .get_private_key_path()
-        //                 .to_string_lossy()
-        //                 .as_ref(),
-        //         ),
-        //     ]);
-        //     Some(private_rsync_args)
-        // } else {
-        //     None
-        // };
+        let log_base_dir = create_initial_log_dir_setup(&root_dir, name, &all_node_inventory)?;
 
         // We might use the script, so goto the resource dir.
         std::env::set_current_dir(self.working_directory_path.clone())?;
         println!("Starting to rsync the log files");
         let progress_bar = get_progress_bar(all_node_inventory.len() as u64)?;
 
-        let failed_inventory = all_node_inventory.par_iter().filter_map(|vm| {
-            let args = if vm.name.contains("private") {
-                // if let Some(private_rsync_args) = &private_rsync_args {
-                //     debug!("Using private rsync args for {:?}", vm.name);
-                //     private_rsync_args
-                // } else {
-                debug!(
-                    "Fallback to public rsync args for private node {:?}",
-                    vm.name
-                );
-                &public_rsync_args
-                // }
-            } else {
-                debug!("Using public rsync args for {:?}", vm.name);
-                &public_rsync_args
-            };
+        let rsync_args = all_node_inventory
+            .iter()
+            .map(|vm| {
+                let args = if vm.name.contains("symmetric") {
+                    let args = self.construct_symmetric_private_node_args(vm, &log_base_dir)?;
+                    debug!("Using symmetric rsync args for {:?}", vm.name);
+                    debug!("Args for {}: {:?}", vm.name, args);
+                    args
+                } else if vm.name.contains("full-cone") {
+                    let args = self.construct_full_cone_private_node_args(vm, &log_base_dir)?;
+                    debug!("Using symmetric rsync args for {:?}", vm.name);
+                    debug!("Args for {}: {:?}", vm.name, args);
+                    args
+                } else {
+                    let args = self.construct_default_args(vm, &log_base_dir);
+                    debug!("Using public rsync args for {:?}", vm.name);
+                    debug!("Args for {}: {:?}", vm.name, args);
+                    args
+                };
 
-            if let Err(err) = Self::run_rsync(&vm.name, &vm.public_ip_addr, &log_abs_dest, args) {
-                println!(
-                    "Failed to rsync. Retrying it after ssh-keygen {:?} : {} with err: {err:?}",
-                    vm.name, vm.public_ip_addr
-                );
-                return Some(vm.clone());
-            }
-            progress_bar.inc(1);
-            None
-        });
+                Ok((vm.clone(), args))
+            })
+            .collect::<Result<Vec<_>>>()?;
+
+        let failed_inventory = rsync_args
+            .par_iter()
+            .filter_map(|(vm, args)| {
+                if let Err(err) = Self::run_rsync(vm, args) {
+                    println!(
+                        "Failed to rsync. Retrying it after ssh-keygen {:?} : {} with err: {err:?}",
+                        vm.name, vm.public_ip_addr
+                    );
+                    return Some((vm.clone(), args.clone()));
+                }
+                progress_bar.inc(1);
+                None
+            })
+            .collect::<Vec<_>>();
 
         // try ssh-keygen for the failed inventory and try to rsync again
         failed_inventory
             .into_par_iter()
-            .for_each(|vm| {
+            .for_each(|(vm, args)| {
                 debug!("Trying to ssh-keygen for {:?} : {}", vm.name, vm.public_ip_addr);
                 if let Err(err) = run_external_command(
                     PathBuf::from("ssh-keygen"),
@@ -136,7 +108,7 @@ impl TestnetDeployer {
                 ) {
                     println!("Failed to ssh-keygen {:?} : {} with err: {err:?}", vm.name, vm.public_ip_addr);
                 } else if let Err(err) =
-                    Self::run_rsync(&vm.name, &vm.public_ip_addr, &log_abs_dest, &rsync_args)
+                    Self::run_rsync(&vm, &args)
                 {
                     println!("Failed to rsync even after ssh-keygen. Could not obtain logs for {:?} : {} with err: {err:?}", vm.name, vm.public_ip_addr);
                 }
@@ -147,28 +119,130 @@ impl TestnetDeployer {
         Ok(())
     }
 
-    fn run_rsync(
-        vm_name: &String,
-        ip_address: &IpAddr,
-        log_abs_dest: &Path,
-        rsync_args: &[String],
-    ) -> Result<()> {
-        let vm_path = log_abs_dest.join(vm_name);
-        let mut rsync_args_clone = rsync_args.to_vec();
+    fn construct_default_args(&self, vm: &VirtualMachine, log_base_dir: &Path) -> Vec<String> {
+        let vm_path = log_base_dir.join(&vm.name);
+        let mut rsync_args = DEFAULT_RSYNC_ARGS
+            .iter()
+            .map(|str| str.to_string())
+            .collect::<Vec<String>>();
 
-        rsync_args_clone.push(format!("root@{ip_address}:/mnt/antnode-storage/log/"));
-        rsync_args_clone.push(vm_path.to_string_lossy().to_string());
+        // TODO: SSH limits the connections/instances to 10 at a time. Changing /etc/ssh/sshd_config, doesn't work?
+        // How to bypass this?
+        rsync_args.extend(vec![
+            "-e".to_string(),
+            format!(
+                "ssh -i {} -q -o StrictHostKeyChecking=no -o BatchMode=yes -o ConnectTimeout=30",
+                self.ssh_client
+                    .get_private_key_path()
+                    .to_string_lossy()
+                    .as_ref()
+            ),
+            format!("root@{}:{NODE_LOG_DIR}", vm.public_ip_addr),
+            vm_path.to_string_lossy().to_string(),
+        ]);
 
-        debug!("Rsync logs to our machine for {vm_name:?} : {ip_address}");
+        rsync_args
+    }
+
+    fn construct_full_cone_private_node_args(
+        &self,
+        private_vm: &VirtualMachine,
+        log_base_dir: &Path,
+    ) -> Result<Vec<String>> {
+        let vm_path = log_base_dir.join(&private_vm.name);
+
+        let mut rsync_args = DEFAULT_RSYNC_ARGS
+            .iter()
+            .map(|str| str.to_string())
+            .collect::<Vec<String>>();
+
+        let read_lock = self.ssh_client.routed_vms.read().map_err(|err| {
+            log::error!("Failed to set routed VMs: {err}");
+            Error::SshSettingsRwLockError
+        })?;
+        let (_, gateway_ip) = read_lock
+            .as_ref()
+            .and_then(|routed_vms| {
+                routed_vms.find_full_cone_nat_routed_node(&private_vm.public_ip_addr)
+            })
+            .ok_or(Error::RoutedVmNotFound(private_vm.public_ip_addr))?;
+
+        rsync_args.extend(vec![
+            "-e".to_string(),
+            format!(
+                "ssh -i {} -q -o StrictHostKeyChecking=no -o BatchMode=yes -o ConnectTimeout=30",
+                self.ssh_client
+                    .get_private_key_path()
+                    .to_string_lossy()
+                    .as_ref()
+            ),
+            format!("root@{}:{NODE_LOG_DIR}", gateway_ip),
+            vm_path.to_string_lossy().to_string(),
+        ]);
+
+        Ok(rsync_args)
+    }
+
+    fn construct_symmetric_private_node_args(
+        &self,
+        private_vm: &VirtualMachine,
+        log_base_dir: &Path,
+    ) -> Result<Vec<String>> {
+        let vm_path = log_base_dir.join(&private_vm.name);
+
+        let mut rsync_args = DEFAULT_RSYNC_ARGS
+            .iter()
+            .map(|str| str.to_string())
+            .collect::<Vec<String>>();
+
+        let read_lock = self.ssh_client.routed_vms.read().map_err(|err| {
+            log::error!("Failed to set routed VMs: {err}");
+            Error::SshSettingsRwLockError
+        })?;
+        let (_, gateway_ip) = read_lock
+            .as_ref()
+            .and_then(|routed_vms| {
+                routed_vms.find_symmetric_nat_routed_node(&private_vm.public_ip_addr)
+            })
+            .ok_or(Error::RoutedVmNotFound(private_vm.public_ip_addr))?;
+
+        rsync_args.extend(vec![
+                "-e".to_string(),
+                format!(
+                    "ssh -i {} -q -o StrictHostKeyChecking=no -o BatchMode=yes -o ConnectTimeout=30 -o ProxyCommand='ssh root@{gateway_ip} -W %h:%p -i {}'",
+                    self.ssh_client
+                        .get_private_key_path()
+                        .to_string_lossy()
+                        .as_ref(),
+                    self.ssh_client
+                        .get_private_key_path()
+                        .to_string_lossy()
+                        .as_ref(),
+                ),
+                format!("root@{}:{NODE_LOG_DIR}", private_vm.private_ip_addr),
+                vm_path.to_string_lossy().to_string(),
+            ]);
+
+        Ok(rsync_args)
+    }
+
+    fn run_rsync(vm: &VirtualMachine, rsync_args: &[String]) -> Result<()> {
+        debug!(
+            "Rsync logs to our machine for {:?} : {}",
+            vm.name, vm.public_ip_addr
+        );
         run_external_command(
             PathBuf::from("rsync"),
             PathBuf::from("."),
-            rsync_args_clone.clone(),
+            rsync_args.to_vec(),
             true,
             false,
         )?;
 
-        debug!("Finished rsync for for {vm_name:?} : {ip_address}");
+        debug!(
+            "Finished rsync for for {:?} : {}",
+            vm.name, vm.public_ip_addr
+        );
         Ok(())
     }
 
@@ -307,24 +381,6 @@ impl TestnetDeployer {
         }
         self.ansible_provisioner.get_all_node_inventory()
     }
-
-    // fn get_symmetric_nat_gateway_inventory(&self, name: &str) -> Result<Vec<VirtualMachine>> {
-    //     let environments = self.terraform_runner.workspace_list()?;
-    //     if !environments.contains(&name.to_string()) {
-    //         return Err(Error::EnvironmentDoesNotExist(name.to_string()));
-    //     }
-    //     self.ansible_provisioner
-    //         .get_symmetric_nat_gateway_inventory()
-    // }
-
-    // fn get_full_cone_nat_gateway_inventory(&self, name: &str) -> Result<Vec<VirtualMachine>> {
-    //     let environments = self.terraform_runner.workspace_list()?;
-    //     if !environments.contains(&name.to_string()) {
-    //         return Err(Error::EnvironmentDoesNotExist(name.to_string()));
-    //     }
-    //     self.ansible_provisioner
-    //         .get_full_cone_nat_gateway_inventory()
-    // }
 }
 
 pub async fn get_logs(name: &str) -> Result<()> {
