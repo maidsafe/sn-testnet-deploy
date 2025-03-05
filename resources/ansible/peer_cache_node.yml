@@ -9,16 +9,8 @@
   roles:
     - role: ant_user
       become: True
-    - role: attach_volume
+    - role: setup_striped_storage
       become: True
-    - {
-        role: format_disk,
-        become: True,
-        block_device: "{{ block_device }}",
-        mount_info:
-          { name: "{{ node_data_mount_path }}", owner: "root", group: "root", mode: 0755 },
-        when: provider == "aws"
-      }
     - antctl
     - role: telegraf-configuration
       become: True
