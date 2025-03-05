@@ -89,6 +89,9 @@ pub enum LogCommands {
     ///
     /// This will write the logs to 'logs/<name>', relative to the current directory.
     Rsync {
+        /// Do not sync the client logs.
+        #[arg(long, default_value = "false")]
+        disable_client_logs: bool,
         /// The name of the environment
         #[arg(short = 'n', long)]
         name: String,
@@ -164,6 +167,7 @@ pub async fn handle_logs_command(log_cmd: LogCommands) -> Result<()> {
             Ok(())
         }
         LogCommands::Rsync {
+            disable_client_logs,
             name,
             provider,
             vm_filter,
@@ -176,7 +180,7 @@ pub async fn handle_logs_command(log_cmd: LogCommands) -> Result<()> {
             let inventory_service = DeploymentInventoryService::from(&testnet_deployer);
             inventory_service.setup_environment_inventory(&name)?;
 
-            testnet_deployer.rsync_logs(&name, vm_filter)?;
+            testnet_deployer.rsync_logs(&name, vm_filter, disable_client_logs)?;
             Ok(())
         }
     }
