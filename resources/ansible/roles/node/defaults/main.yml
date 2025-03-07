@@ -1,6 +1,7 @@
 ---
 public_rpc: False
 relay: False
+write_older_cache_files: False
 private_ip: False
 node_rpc_ip: "127.0.0.1"
 node_instance_count: 20
