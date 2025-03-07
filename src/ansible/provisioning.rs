@@ -388,6 +388,11 @@ impl AnsibleProvisioner {
             .get_inventory(AnsibleInventoryType::FullConeNatGateway, false)
     }
 
+    pub fn get_uploader_inventory(&self) -> Result<Vec<VirtualMachine>> {
+        self.ansible_runner
+            .get_inventory(AnsibleInventoryType::Uploaders, false)
+    }
+
     pub fn get_node_registries(
         &self,
         inventory_type: &AnsibleInventoryType,
