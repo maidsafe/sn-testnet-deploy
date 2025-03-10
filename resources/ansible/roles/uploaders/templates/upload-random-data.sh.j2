@@ -91,6 +91,7 @@ generate_random_data_file_and_upload() {
   log_file_path="${LOG_OUTPUT_DEST}/${timestamp}"
   LOG_OUTPUT_ARG="--log-output-dest $log_file_path"
   
+  now=$(date +"%s")
   stdout=$(ant \
     $CONTACT_PEER_ARG \
     $NETWORK_CONTACTS_URL_ARG \
@@ -100,7 +101,6 @@ generate_random_data_file_and_upload() {
     file upload "$tmpfile" 2>&1)
   echo "$stdout"
 
-  now=$(date +"%s")
   if [ $? -eq 0 ]; then
     echo "Successfully uploaded $tmpfile using SAFE CLI"
 
