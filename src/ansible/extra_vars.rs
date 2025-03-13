@@ -358,16 +358,6 @@ pub fn build_node_extra_vars_doc(
         extra_vars.add_env_variable_list("client_env_variables", client_env_vars.clone());
     }
 
-    if let Some((logstash_stack_name, logstash_hosts)) = &options.logstash_details {
-        extra_vars.add_variable("logstash_stack_name", logstash_stack_name);
-        extra_vars.add_list_variable(
-            "logstash_hosts",
-            logstash_hosts
-                .iter()
-                .map(|s| s.to_string())
-                .collect::<Vec<String>>(),
-        );
-    }
 
     extra_vars.add_variable("rewards_address", &options.rewards_address);
     extra_vars.add_variable("evm_network_type", &evm_network.to_string());

@@ -457,9 +457,6 @@ pub enum Commands {
         /// If the argument is not used, the default format will be applied.
         #[clap(long, value_parser = LogFormat::parse_from_str, verbatim_doc_comment)]
         log_format: Option<LogFormat>,
-        /// The name of the Logstash stack to forward logs to.
-        #[clap(long, default_value = "main")]
-        logstash_stack_name: String,
         /// The maximum of archived log files to keep. After reaching this limit, the older files are deleted.
         #[clap(long, default_value = "5")]
         max_archived_log_files: u16,

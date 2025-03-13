@@ -10,7 +10,7 @@ use alloy::primitives::U256;
 use color_eyre::{eyre::eyre, Help, Result};
 use sn_testnet_deploy::{
     bootstrap::BootstrapOptions, calculate_size_per_attached_volume, deploy::DeployOptions,
-    error::Error, inventory::DeploymentInventoryService, logstash::LogstashDeployBuilder,
+    error::Error, inventory::DeploymentInventoryService,
     upscale::UpscaleOptions, BinaryOption, CloudProvider, EnvironmentType, EvmNetwork, LogFormat,
     TestnetDeployBuilder,
 };
@@ -218,7 +218,6 @@ pub async fn handle_deploy(
     initial_tokens: Option<U256>,
     interval: std::time::Duration,
     log_format: Option<LogFormat>,
-    logstash_stack_name: String,
     max_archived_log_files: u16,
     max_log_files: u16,
     name: String,
@@ -314,20 +313,6 @@ pub async fn handle_deploy(
         }
     }
 
-    let logstash_details = {
-        let logstash_deploy = LogstashDeployBuilder::default()
-            .environment_name(&name)
-            .provider(provider)
-            .build()?;
-        let stack_hosts = logstash_deploy
-            .get_stack_hosts(&logstash_stack_name)
-            .await?;
-        if stack_hosts.is_empty() {
-            None
-        } else {
-            Some((logstash_stack_name, stack_hosts))
-        }
-    };
 
     let peer_cache_node_count =
         peer_cache_node_count.unwrap_or(environment_type.get_default_peer_cache_node_count());
