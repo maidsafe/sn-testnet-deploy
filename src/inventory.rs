@@ -311,7 +311,7 @@ impl DeploymentInventoryService {
                     "antctl --version",
                     "Autonomi Node Manager v",
                 )?;
-                (antnode_version, antctl_version)
+                (Some(antnode_version), Some(antctl_version))
             };
 
             let ant_version = if environment_details.deployment_type != DeploymentType::Bootstrap {
@@ -325,8 +325,12 @@ impl DeploymentInventoryService {
             };
 
             println!("Retrieved binary versions from previous deployment:");
-            println!("  antnode: {}", antnode_version);
-            println!("  antctl: {}", antctl_version);
+            if let Some(version) = &antnode_version {
+                println!("  antnode: {}", version);
+            }
+            if let Some(version) = &antctl_version {
+                println!("  antctl: {}", version);
+            }
             if let Some(version) = &ant_version {
                 println!("  ant: {}", version);
             }
@@ -892,21 +896,31 @@ impl DeploymentInventory {
                 println!();
             }
             BinaryOption::Versioned {
-                ant_version: safe_version,
-                antnode_version: safenode_version,
-                antctl_version: safenode_manager_version,
+                ant_version,
+                antnode_version,
+                antctl_version,
             } => {
                 println!("===============");
                 println!("Version Details");
                 println!("===============");
                 println!(
-                    "safe version: {}",
-                    safe_version
+                    "ant version: {}",
+                    ant_version
                         .as_ref()
                         .map_or("N/A".to_string(), |v| v.to_string())
                 );
-                println!("safenode version: {}", safenode_version);
-                println!("safenode-manager version: {}", safenode_manager_version);
+                println!(
+                    "antnode version: {}",
+                    antnode_version
+                        .as_ref()
+                        .map_or("N/A".to_string(), |v| v.to_string())
+                );
+                println!(
+                    "antctl version: {}",
+                    antctl_version
+                        .as_ref()
+                        .map_or("N/A".to_string(), |v| v.to_string())
+                );
                 println!();
             }
         }

@@ -151,7 +151,9 @@ impl ExtraVarsDocBuilder {
             BinaryOption::Versioned {
                 antnode_version, ..
             } => {
-                let _ = self.add_variable("version", &antnode_version.to_string());
+                // An unwrap would be justified here because the antnode version must be set for the
+                // type of deployment where this will apply.
+                self.add_variable("version", &antnode_version.as_ref().unwrap().to_string());
             }
         }
     }
@@ -172,11 +174,13 @@ impl ExtraVarsDocBuilder {
                 );
             }
             BinaryOption::Versioned { antctl_version, .. } => {
+                // An unwrap would be justified here because the antctl version must be set for the
+                // type of deployment where this will apply.
                 self.add_variable(
                     "antctl_archive_url",
                     &format!(
                         "{}/antctl-{}-x86_64-unknown-linux-musl.tar.gz",
-                        ANTCTL_S3_BUCKET_URL, antctl_version
+                        ANTCTL_S3_BUCKET_URL, antctl_version.as_ref().unwrap()
                     ),
                 );
             }
@@ -199,11 +203,13 @@ impl ExtraVarsDocBuilder {
                 );
             }
             BinaryOption::Versioned { antctl_version, .. } => {
+                // An unwrap would be justified here because the antctl version must be set for the
+                // type of deployment where this will apply.
                 self.add_variable(
                     "antctld_archive_url",
                     &format!(
                         "{}/antctld-{}-x86_64-unknown-linux-musl.tar.gz",
-                        ANTCTL_S3_BUCKET_URL, antctl_version
+                        ANTCTL_S3_BUCKET_URL, antctl_version.as_ref().unwrap()
                     ),
                 );
             }

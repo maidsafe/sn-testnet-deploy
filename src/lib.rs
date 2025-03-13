@@ -21,6 +21,7 @@ pub mod safe;
 pub mod setup;
 pub mod ssh;
 pub mod terraform;
+pub mod uploaders;
 pub mod upscale;
 
 const STORAGE_REQUIRED_PER_NODE: u16 = 7;
@@ -302,8 +303,8 @@ pub enum BinaryOption {
     /// Pre-built, versioned binaries will be fetched from S3.
     Versioned {
         ant_version: Option<Version>,
-        antctl_version: Version,
-        antnode_version: Version,
+        antctl_version: Option<Version>,
+        antnode_version: Option<Version>,
     },
 }
 
@@ -331,8 +332,12 @@ impl BinaryOption {
                 if let Some(version) = ant_version {
                     println!("  ant version: {}", version);
                 }
-                println!("  antctl version: {}", antctl_version);
-                println!("  antnode version: {}", antnode_version);
+                if let Some(version) = antctl_version {
+                    println!("  antctl version: {}", version);
+                }
+                if let Some(version) = antnode_version {
+                    println!("  antnode version: {}", version);
+                }
             }
         }
     }
@@ -1330,8 +1335,18 @@ pub async fn notify_slack(inventory: DeploymentInventory) -> Result<()> {
                     .as_ref()
                     .map_or("None".to_string(), |v| v.to_string())
             ));
-            message.push_str(&format!("safenode version: {}\n", safenode_version));
-            message.push_str(&format!("antctl version: {}\n", safenode_manager_version));
+            message.push_str(&format!(
+                "safenode version: {}\n",
+                safenode_version
+                    .as_ref()
+                    .map_or("None".to_string(), |v| v.to_string())
+            ));
+            message.push_str(&format!(
+                "antctl version: {}\n",
+                safenode_manager_version
+                    .as_ref()
+                    .map_or("None".to_string(), |v| v.to_string())
+            ));
         }
     }
 

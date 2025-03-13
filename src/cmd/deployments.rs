@@ -523,12 +523,19 @@ pub async fn handle_upscale(
                 antnode_version: existing_antnode_version,
                 antctl_version: existing_antctl_version,
             } => {
+                let existing_antnode_version = existing_antnode_version.as_ref().ok_or_else(|| {
+                    eyre!("The existing deployment must have an antnode version to override it")
+                })?;
+                let existing_antctl_version = existing_antctl_version.as_ref().ok_or_else(|| {
+                    eyre!("The existing deployment must have an antctl version to override it") 
+                })?;
+
                 let new_antnode_version = antnode_version
                     .map(|v| v.parse().expect("Invalid antnode version"))
-                    .unwrap_or(existing_antnode_version.clone());
+                    .unwrap_or_else(|| existing_antnode_version.clone());
                 let new_antctl_version = antctl_version
                     .map(|v| v.parse().expect("Invalid antctl version"))
-                    .unwrap_or(existing_antctl_version.clone());
+                    .unwrap_or_else(|| existing_antctl_version.clone());
 
                 println!("The upscale will use the following override binary versions:");
                 println!("antnode: {}", new_antnode_version);
@@ -536,8 +543,8 @@ pub async fn handle_upscale(
 
                 inventory.binary_option = BinaryOption::Versioned {
                     ant_version: None,
-                    antnode_version: new_antnode_version,
-                    antctl_version: new_antctl_version,
+                    antnode_version: Some(new_antnode_version),
+                    antctl_version: Some(new_antctl_version),
                 };
             }
             BinaryOption::BuildFromSource { .. } => {

@@ -1263,8 +1263,8 @@ async fn get_binary_option(
         let antctl_version = get_version_from_option(antctl_version, &ReleaseType::AntCtl).await?;
         BinaryOption::Versioned {
             ant_version: Some(ant_version),
-            antnode_version,
-            antctl_version,
+            antnode_version: Some(antnode_version),
+            antctl_version: Some(antctl_version),
         }
     } else {
         // Unwraps are justified here because it's already been asserted that both must have
