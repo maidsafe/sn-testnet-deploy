@@ -10,7 +10,7 @@ use crate::{
     funding::get_address_from_sk,
     get_anvil_node_data, get_bootstrap_cache_url, get_genesis_multiaddr, write_environment_details,
     BinaryOption, DeploymentInventory, DeploymentType, EnvironmentDetails, EnvironmentType,
-    EvmNetwork, InfraRunOptions, LogFormat, NodeType, TestnetDeployer,
+    EvmDetails, EvmNetwork, InfraRunOptions, LogFormat, NodeType, TestnetDeployer,
 };
 use alloy::{hex::ToHexExt, primitives::U256};
 use colored::Colorize;
@@ -119,10 +119,12 @@ impl TestnetDeployer {
             &EnvironmentDetails {
                 deployment_type: DeploymentType::New,
                 environment_type: options.environment_type.clone(),
-                evm_network: options.evm_network.clone(),
-                evm_data_payments_address: options.evm_data_payments_address.clone(),
-                evm_payment_token_address: options.evm_payment_token_address.clone(),
-                evm_rpc_url: options.evm_rpc_url.clone(),
+                evm_details: EvmDetails {
+                    network: options.evm_network.clone(),
+                    data_payments_address: options.evm_data_payments_address.clone(),
+                    payment_token_address: options.evm_payment_token_address.clone(),
+                    rpc_url: options.evm_rpc_url.clone(),
+                },
                 funding_wallet_address: None,
                 network_id: options.network_id,
                 rewards_address: options.rewards_address.clone(),
@@ -179,10 +181,12 @@ impl TestnetDeployer {
             &EnvironmentDetails {
                 deployment_type: DeploymentType::New,
                 environment_type: options.environment_type.clone(),
-                evm_network: options.evm_network.clone(),
-                evm_data_payments_address: provision_options.evm_data_payments_address.clone(),
-                evm_payment_token_address: provision_options.evm_payment_token_address.clone(),
-                evm_rpc_url: provision_options.evm_rpc_url.clone(),
+                evm_details: EvmDetails {
+                    network: options.evm_network.clone(),
+                    data_payments_address: provision_options.evm_data_payments_address.clone(),
+                    payment_token_address: provision_options.evm_payment_token_address.clone(),
+                    rpc_url: provision_options.evm_rpc_url.clone(),
+                },
                 funding_wallet_address,
                 network_id: options.network_id,
                 rewards_address: options.rewards_address.clone(),

@@ -188,22 +188,26 @@ impl TestnetDeployer {
             evm_network: options
                 .current_inventory
                 .environment_details
-                .evm_network
+                .evm_details
+                .network
                 .clone(),
             evm_data_payments_address: options
                 .current_inventory
                 .environment_details
-                .evm_data_payments_address
+                .evm_details
+                .data_payments_address
                 .clone(),
             evm_payment_token_address: options
                 .current_inventory
                 .environment_details
-                .evm_payment_token_address
+                .evm_details
+                .payment_token_address
                 .clone(),
             evm_rpc_url: options
                 .current_inventory
                 .environment_details
-                .evm_rpc_url
+                .evm_details
+                .rpc_url
                 .clone(),
             full_cone_private_node_count: desired_full_cone_private_node_count,
             funding_wallet_secret_key: options.funding_wallet_secret_key.clone(),
@@ -486,22 +490,26 @@ impl TestnetDeployer {
             evm_data_payments_address: options
                 .current_inventory
                 .environment_details
-                .evm_data_payments_address
+                .evm_details
+                .data_payments_address
                 .clone(),
             evm_network: options
                 .current_inventory
                 .environment_details
-                .evm_network
+                .evm_details
+                .network
                 .clone(),
             evm_payment_token_address: options
                 .current_inventory
                 .environment_details
-                .evm_payment_token_address
+                .evm_details
+                .payment_token_address
                 .clone(),
             evm_rpc_url: options
                 .current_inventory
                 .environment_details
-                .evm_rpc_url
+                .evm_details
+                .rpc_url
                 .clone(),
             full_cone_private_node_count: 0,
             funding_wallet_secret_key: options.funding_wallet_secret_key.clone(),
