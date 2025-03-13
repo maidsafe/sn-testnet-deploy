@@ -1129,9 +1129,9 @@ impl DeploymentInventory {
             }
         }
 
-        if self.environment_details.evm_data_payments_address.is_some()
-            || self.environment_details.evm_payment_token_address.is_some()
-            || self.environment_details.evm_rpc_url.is_some()
+        if self.environment_details.evm_details.data_payments_address.is_some()
+            || self.environment_details.evm_details.payment_token_address.is_some()
+            || self.environment_details.evm_details.rpc_url.is_some()
         {
             println!("===========");
             println!("EVM Details");
@@ -1139,21 +1139,24 @@ impl DeploymentInventory {
             println!(
                 "EVM data payments address: {}",
                 self.environment_details
-                    .evm_data_payments_address
+                    .evm_details
+                    .data_payments_address
                     .as_ref()
                     .map_or("N/A", |addr| addr)
             );
             println!(
                 "EVM payment token address: {}",
                 self.environment_details
-                    .evm_payment_token_address
+                    .evm_details
+                    .payment_token_address
                     .as_ref()
                     .map_or("N/A", |addr| addr)
             );
             println!(
                 "EVM RPC URL: {}",
                 self.environment_details
-                    .evm_rpc_url
+                    .evm_details
+                    .rpc_url
                     .as_ref()
                     .map_or("N/A", |addr| addr)
             );

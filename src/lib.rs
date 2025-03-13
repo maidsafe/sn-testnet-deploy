@@ -193,13 +193,18 @@ impl std::str::FromStr for EvmNetwork {
 }
 
 #[derive(Clone, Debug, Default, Serialize, Deserialize)]
+pub struct EvmDetails {
+    pub network: EvmNetwork,
+    pub data_payments_address: Option<String>,
+    pub payment_token_address: Option<String>,
+    pub rpc_url: Option<String>,
+}
+
+#[derive(Clone, Debug, Default, Serialize, Deserialize)]
 pub struct EnvironmentDetails {
     pub deployment_type: DeploymentType,
     pub environment_type: EnvironmentType,
-    pub evm_network: EvmNetwork,
-    pub evm_data_payments_address: Option<String>,
-    pub evm_payment_token_address: Option<String>,
-    pub evm_rpc_url: Option<String>,
+    pub evm_details: EvmDetails,
     pub funding_wallet_address: Option<String>,
     pub network_id: Option<u8>,
     pub rewards_address: String,
@@ -921,16 +926,18 @@ impl TestnetDeployer {
         let environment_details =
             get_environment_details(&self.environment_name, &self.s3_repository).await?;
 
-        let evm_network = match environment_details.evm_network {
+        let evm_network = match environment_details.evm_details.network {
             EvmNetwork::Anvil => None,
             EvmNetwork::Custom => Some(Network::new_custom(
-                environment_details.evm_rpc_url.as_ref().unwrap(),
+                environment_details.evm_details.rpc_url.as_ref().unwrap(),
                 environment_details
-                    .evm_payment_token_address
+                    .evm_details
+                    .payment_token_address
                     .as_ref()
                     .unwrap(),
                 environment_details
-                    .evm_data_payments_address
+                    .evm_details
+                    .data_payments_address
                     .as_ref()
                     .unwrap(),
             )),
