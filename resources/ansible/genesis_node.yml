@@ -1,16 +1,5 @@
 ---
-- name: copy logstash certificate to nodes
-  hosts: all
-  become: False
-  tasks:
-    - name: copy logstash-public.crt to node
-      copy:
-        src: logstash-{{ logstash_stack_name }}-public.crt
-        dest: /tmp/logstash-{{ logstash_stack_name }}-public.crt
-        mode: 0644
-      when: logstash_stack_name is defined and logstash_stack_name | length > 0
-
-- name: deploy safenode to genesis node
+- name: deploy antnode to genesis node
   hosts: all
   become: False
   vars:

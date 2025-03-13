@@ -1,4 +1,0 @@
----
-ssl_private_key_path: /etc/ssl/private
-ssl_public_certs_path: /etc/ssl/certs
-debug_log_output: false

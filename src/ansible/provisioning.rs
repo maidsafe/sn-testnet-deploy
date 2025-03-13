@@ -32,7 +32,7 @@ use semver::Version;
 use serde::{Deserialize, Serialize};
 use std::{
     collections::HashMap,
-    net::{IpAddr, SocketAddr},
+    net::IpAddr,
     path::PathBuf,
     time::{Duration, Instant},
 };
@@ -63,7 +63,6 @@ pub struct ProvisionOptions {
     pub gas_amount: Option<U256>,
     pub interval: Duration,
     pub log_format: Option<LogFormat>,
-    pub logstash_details: Option<(String, Vec<SocketAddr>)>,
     pub max_archived_log_files: u16,
     pub max_log_files: u16,
     pub name: String,
@@ -249,7 +248,6 @@ impl From<BootstrapOptions> for ProvisionOptions {
             gas_amount: None,
             interval: bootstrap_options.interval,
             log_format: bootstrap_options.log_format,
-            logstash_details: None,
             max_archived_log_files: bootstrap_options.max_archived_log_files,
             max_log_files: bootstrap_options.max_log_files,
             name: bootstrap_options.name,
@@ -285,7 +283,6 @@ impl From<DeployOptions> for ProvisionOptions {
             gas_amount: deploy_options.initial_gas,
             interval: deploy_options.interval,
             log_format: deploy_options.log_format,
-            logstash_details: deploy_options.logstash_details,
             max_archived_log_files: deploy_options.max_archived_log_files,
             max_log_files: deploy_options.max_log_files,
             name: deploy_options.name,

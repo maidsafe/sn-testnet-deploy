@@ -16,7 +16,10 @@ use alloy::{hex::ToHexExt, primitives::U256};
 use colored::Colorize;
 use log::error;
 use serde::{Deserialize, Serialize};
-use std::{net::SocketAddr, path::PathBuf, time::Duration};
+use std::{
+    path::PathBuf,
+    time::Duration
+};
 
 #[derive(Clone, Serialize, Deserialize)]
 pub struct DeployOptions {
@@ -42,7 +45,6 @@ pub struct DeployOptions {
     pub initial_tokens: Option<U256>,
     pub interval: Duration,
     pub log_format: Option<LogFormat>,
-    pub logstash_details: Option<(String, Vec<SocketAddr>)>,
     pub max_archived_log_files: u16,
     pub max_log_files: u16,
     pub name: String,
