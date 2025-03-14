@@ -71,8 +71,12 @@ pub enum Error {
     GetS3ObjectError(String, String),
     #[error(transparent)]
     InquireError(#[from] inquire::InquireError),
+    #[error("'{0}' is not a valid binary to build")]
+    InvalidBinaryName(String),
     #[error("The node type '{0:?}' is not supported")]
     InvalidNodeType(NodeType),
+    #[error("The number of wallet secret keys ({0}) does not match the number of uploaders ({1})")]
+    InvalidWalletCount(usize, usize),
     #[error(
         "The '{0}' deployment type for the environment is not supported for upscaling uploaders"
     )]
@@ -145,6 +149,8 @@ pub enum Error {
     RegexError(#[from] regex::Error),
     #[error(transparent)]
     ReqwestError(#[from] reqwest::Error),
+    #[error("The rewards address must be supplied")]
+    RewardsAddressNotSet,
     #[error("Routed VM for IP {0} not found")]
     RoutedVmNotFound(IpAddr),
     #[error("Safe client command failed: {0}")]

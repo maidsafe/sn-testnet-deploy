@@ -10,9 +10,8 @@ use alloy::primitives::U256;
 use color_eyre::{eyre::eyre, Help, Result};
 use sn_testnet_deploy::{
     bootstrap::BootstrapOptions, calculate_size_per_attached_volume, deploy::DeployOptions,
-    error::Error, inventory::DeploymentInventoryService, logstash::LogstashDeployBuilder,
-    upscale::UpscaleOptions, BinaryOption, CloudProvider, EnvironmentType, EvmNetwork, LogFormat,
-    TestnetDeployBuilder,
+    error::Error, inventory::DeploymentInventoryService, upscale::UpscaleOptions, BinaryOption,
+    CloudProvider, EnvironmentType, EvmNetwork, LogFormat, TestnetDeployBuilder,
 };
 use std::time::Duration;
 
@@ -218,7 +217,6 @@ pub async fn handle_deploy(
     initial_tokens: Option<U256>,
     interval: std::time::Duration,
     log_format: Option<LogFormat>,
-    logstash_stack_name: String,
     max_archived_log_files: u16,
     max_log_files: u16,
     name: String,
@@ -314,21 +312,6 @@ pub async fn handle_deploy(
         }
     }
 
-    let logstash_details = {
-        let logstash_deploy = LogstashDeployBuilder::default()
-            .environment_name(&name)
-            .provider(provider)
-            .build()?;
-        let stack_hosts = logstash_deploy
-            .get_stack_hosts(&logstash_stack_name)
-            .await?;
-        if stack_hosts.is_empty() {
-            None
-        } else {
-            Some((logstash_stack_name, stack_hosts))
-        }
-    };
-
     let peer_cache_node_count =
         peer_cache_node_count.unwrap_or(environment_type.get_default_peer_cache_node_count());
     let node_count = node_count.unwrap_or(environment_type.get_default_node_count());
@@ -365,7 +348,6 @@ pub async fn handle_deploy(
         initial_tokens,
         interval,
         log_format,
-        logstash_details,
         max_archived_log_files,
         max_log_files,
         name: name.clone(),
@@ -523,12 +505,21 @@ pub async fn handle_upscale(
                 antnode_version: existing_antnode_version,
                 antctl_version: existing_antctl_version,
             } => {
+                let existing_antnode_version =
+                    existing_antnode_version.as_ref().ok_or_else(|| {
+                        eyre!("The existing deployment must have an antnode version to override it")
+                    })?;
+                let existing_antctl_version =
+                    existing_antctl_version.as_ref().ok_or_else(|| {
+                        eyre!("The existing deployment must have an antctl version to override it")
+                    })?;
+
                 let new_antnode_version = antnode_version
                     .map(|v| v.parse().expect("Invalid antnode version"))
-                    .unwrap_or(existing_antnode_version.clone());
+                    .unwrap_or_else(|| existing_antnode_version.clone());
                 let new_antctl_version = antctl_version
                     .map(|v| v.parse().expect("Invalid antctl version"))
-                    .unwrap_or(existing_antctl_version.clone());
+                    .unwrap_or_else(|| existing_antctl_version.clone());
 
                 println!("The upscale will use the following override binary versions:");
                 println!("antnode: {}", new_antnode_version);
@@ -536,8 +527,8 @@ pub async fn handle_upscale(
 
                 inventory.binary_option = BinaryOption::Versioned {
                     ant_version: None,
-                    antnode_version: new_antnode_version,
-                    antctl_version: new_antctl_version,
+                    antnode_version: Some(new_antnode_version),
+                    antctl_version: Some(new_antctl_version),
                 };
             }
             BinaryOption::BuildFromSource { .. } => {

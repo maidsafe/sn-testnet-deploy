@@ -80,10 +80,10 @@ pub async fn handle_funds_command(cmd: FundsCommand) -> Result<()> {
                 get_environment_details(&name, &inventory_services.s3_repository).await?;
 
             let options = FundingOptions {
-                evm_data_payments_address: environment_details.evm_data_payments_address,
-                evm_payment_token_address: environment_details.evm_payment_token_address,
-                evm_rpc_url: environment_details.evm_rpc_url,
-                evm_network: environment_details.evm_network,
+                evm_data_payments_address: environment_details.evm_details.data_payments_address,
+                evm_payment_token_address: environment_details.evm_details.payment_token_address,
+                evm_rpc_url: environment_details.evm_details.rpc_url,
+                evm_network: environment_details.evm_details.network,
                 funding_wallet_secret_key,
                 uploaders_count: None,
                 token_amount: tokens_to_transfer,
@@ -124,7 +124,7 @@ pub async fn handle_funds_command(cmd: FundsCommand) -> Result<()> {
                 ));
             };
 
-            let network = match environment_details.evm_network {
+            let network = match environment_details.evm_details.network {
                 EvmNetwork::Anvil => {
                     return Err(eyre!(
                         "Draining funds from uploaders is not supported for an Anvil network"
@@ -138,9 +138,9 @@ pub async fn handle_funds_command(cmd: FundsCommand) -> Result<()> {
                         Some(evm_payment_token_address),
                         Some(evm_rpc_url),
                     ) = (
-                        environment_details.evm_data_payments_address,
-                        environment_details.evm_payment_token_address,
-                        environment_details.evm_rpc_url,
+                        environment_details.evm_details.data_payments_address,
+                        environment_details.evm_details.payment_token_address,
+                        environment_details.evm_details.rpc_url,
                     ) {
                         Network::new_custom(
                             &evm_rpc_url,

@@ -49,8 +49,6 @@ pub enum AnsibleInventoryType {
     ///
     /// Only one machine will be returned in this inventory.
     Genesis,
-    /// Use to run a playbook against the Logstash servers.
-    Logstash,
     /// Use to run a playbook against all nodes except the genesis node.
     Nodes,
     /// Use to run a playbook against all Peer Cache nodes.
@@ -79,7 +77,6 @@ impl std::fmt::Display for AnsibleInventoryType {
             AnsibleInventoryType::FullConePrivateNodes => "FullConePrivateNodes",
             AnsibleInventoryType::FullConePrivateNodesStatic => "FullConePrivateNodesStatic",
             AnsibleInventoryType::Genesis => "Genesis",
-            AnsibleInventoryType::Logstash => "Logstash",
             AnsibleInventoryType::Nodes => "Nodes",
             AnsibleInventoryType::SymmetricNatGateway => "SymmetricNatGateway",
             AnsibleInventoryType::SymmetricPrivateNodes => "SymmetricPrivateNodes",
@@ -112,7 +109,6 @@ impl AnsibleInventoryType {
                 ".{name}_full_cone_private_node_static_inventory_{provider}.yml"
             )),
             Self::Genesis => PathBuf::from(format!(".{name}_genesis_inventory_{provider}.yml")),
-            Self::Logstash => PathBuf::from(format!(".{name}_logstash_inventory_{provider}.yml")),
             Self::Nodes => PathBuf::from(format!(".{name}_node_inventory_{provider}.yml")),
             Self::SymmetricNatGateway => PathBuf::from(format!(
                 ".{name}_symmetric_nat_gateway_inventory_{provider}.yml"
@@ -138,7 +134,6 @@ impl AnsibleInventoryType {
             Self::FullConePrivateNodes => "full_cone_private_node",
             Self::FullConePrivateNodesStatic => "full_cone_private_node",
             Self::Genesis => "genesis",
-            Self::Logstash => "logstash",
             Self::Nodes => "node",
             Self::SymmetricNatGateway => "symmetric_nat_gateway",
             Self::SymmetricPrivateNodes => "symmetric_private_node",

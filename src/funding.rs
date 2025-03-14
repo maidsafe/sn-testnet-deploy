@@ -9,7 +9,7 @@ use crate::{
     ansible::{inventory::AnsibleInventoryType, provisioning::AnsibleProvisioner},
     error::Error,
     inventory::VirtualMachine,
-    EvmNetwork,
+    EnvironmentDetails, EvmNetwork,
 };
 use alloy::primitives::Address;
 use alloy::{network::EthereumWallet, signers::local::PrivateKeySigner};
@@ -77,6 +77,10 @@ impl AnsibleProvisioner {
         &self,
         options: &FundingOptions,
     ) -> Result<HashMap<VirtualMachine, Vec<PrivateKeySigner>>> {
+        debug!(
+            "Funding secret key: {:?}",
+            options.funding_wallet_secret_key
+        );
         debug!("Funding all the uploader wallets");
         let mut uploader_secret_keys = self.get_uploader_secret_keys()?;
 
@@ -399,7 +403,7 @@ impl AnsibleProvisioner {
                 Wallet::new(network.clone(), EthereumWallet::new(funding_wallet_sk))
             }
         };
-        debug!("Using emv network: {:?}", options.evm_network);
+        debug!("Using EVM network: {:?}", options.evm_network);
 
         let token_balance = from_wallet.balance_of_tokens().await?;
         let gas_balance = from_wallet.balance_of_gas_tokens().await?;
@@ -460,4 +464,47 @@ impl AnsibleProvisioner {
 pub fn get_address_from_sk(secret_key: &str) -> Result<Address> {
     let sk: PrivateKeySigner = secret_key.parse().map_err(|_| Error::FailedToParseKey)?;
     Ok(sk.address())
+}
+
+pub async fn drain_funds(
+    ansible_provisioner: &AnsibleProvisioner,
+    environment_details: &EnvironmentDetails,
+) -> Result<()> {
+    let evm_network = match environment_details.evm_details.network {
+        EvmNetwork::Anvil => None,
+        EvmNetwork::Custom => Some(Network::new_custom(
+            environment_details.evm_details.rpc_url.as_ref().unwrap(),
+            environment_details
+                .evm_details
+                .payment_token_address
+                .as_ref()
+                .unwrap(),
+            environment_details
+                .evm_details
+                .data_payments_address
+                .as_ref()
+                .unwrap(),
+        )),
+        EvmNetwork::ArbitrumOne => Some(Network::ArbitrumOne),
+        EvmNetwork::ArbitrumSepolia => Some(Network::ArbitrumSepolia),
+    };
+
+    if let (Some(network), Some(address)) =
+        (evm_network, &environment_details.funding_wallet_address)
+    {
+        ansible_provisioner
+            .drain_funds_from_uploaders(
+                Address::from_str(address).map_err(|err| {
+                    log::error!("Invalid funding wallet public key: {err:?}");
+                    Error::FailedToParseKey
+                })?,
+                network,
+            )
+            .await?;
+        Ok(())
+    } else {
+        println!("Custom network provided. Not draining funds.");
+        log::info!("Custom network provided. Not draining funds.");
+        Ok(())
+    }
 }

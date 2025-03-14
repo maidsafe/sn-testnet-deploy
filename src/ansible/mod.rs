@@ -102,10 +102,6 @@ pub enum AnsiblePlaybook {
     ///
     /// Use in combination with `AnsibleInventoryType::Genesis`.
     Genesis,
-    /// The Logstash playbook will provision machines to run Logstash.
-    ///
-    /// Use in combination with `AnsibleInventoryType::Logstash`.
-    Logstash,
     /// The node playbook will setup any nodes except the genesis node. These nodes will bootstrap
     /// using genesis as a peer reference.
     ///
@@ -206,7 +202,6 @@ impl AnsiblePlaybook {
             AnsiblePlaybook::FullConeNatGateway => "full_cone_nat_gateway.yml".to_string(),
             AnsiblePlaybook::FundUploaders => "fund_uploaders.yml".to_string(),
             AnsiblePlaybook::Genesis => "genesis_node.yml".to_string(),
-            AnsiblePlaybook::Logstash => "logstash.yml".to_string(),
             AnsiblePlaybook::Nodes => "nodes.yml".to_string(),
             AnsiblePlaybook::PeerCacheNodes => "peer_cache_node.yml".to_string(),
             AnsiblePlaybook::PrivateNodeConfig => "private_node_config.yml".to_string(),

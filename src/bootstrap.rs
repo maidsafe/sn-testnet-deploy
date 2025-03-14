@@ -10,7 +10,7 @@ use crate::{
     ansible::provisioning::{PrivateNodeProvisionInventory, ProvisionOptions},
     error::Result,
     write_environment_details, BinaryOption, DeploymentType, EnvironmentDetails, EnvironmentType,
-    EvmNetwork, InfraRunOptions, LogFormat, NodeType, TestnetDeployer,
+    EvmDetails, EvmNetwork, InfraRunOptions, LogFormat, NodeType, TestnetDeployer,
 };
 use colored::Colorize;
 use log::error;
@@ -62,13 +62,15 @@ impl TestnetDeployer {
             &EnvironmentDetails {
                 deployment_type: DeploymentType::Bootstrap,
                 environment_type: options.environment_type.clone(),
-                evm_network: options.evm_network.clone(),
-                evm_data_payments_address: options.evm_data_payments_address.clone(),
-                evm_payment_token_address: options.evm_payment_token_address.clone(),
-                evm_rpc_url: options.evm_rpc_url.clone(),
+                evm_details: EvmDetails {
+                    network: options.evm_network.clone(),
+                    data_payments_address: options.evm_data_payments_address.clone(),
+                    payment_token_address: options.evm_payment_token_address.clone(),
+                    rpc_url: options.evm_rpc_url.clone(),
+                },
                 funding_wallet_address: None,
                 network_id: options.network_id,
-                rewards_address: options.rewards_address.clone(),
+                rewards_address: Some(options.rewards_address.clone()),
             },
         )
         .await?;
@@ -109,7 +111,7 @@ impl TestnetDeployer {
             self.ansible_provisioner
                 .print_ansible_run_banner("Build Custom Binaries");
             self.ansible_provisioner
-                .build_safe_network_binaries(&provision_options)
+                .build_safe_network_binaries(&provision_options, None)
                 .map_err(|err| {
                     println!("Failed to build safe network binaries {err:?}");
                     err

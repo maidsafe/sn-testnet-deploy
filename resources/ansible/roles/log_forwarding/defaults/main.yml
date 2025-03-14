@@ -1,5 +1,0 @@
----
-aws_region: "eu-west-2"
-aws_bucket: "sn-testnet"
-ssl_private_key_path: /etc/ssl/private
-ssl_public_certs_path: /etc/ssl/certs

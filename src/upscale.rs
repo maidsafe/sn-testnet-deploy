@@ -188,28 +188,31 @@ impl TestnetDeployer {
             evm_network: options
                 .current_inventory
                 .environment_details
-                .evm_network
+                .evm_details
+                .network
                 .clone(),
             evm_data_payments_address: options
                 .current_inventory
                 .environment_details
-                .evm_data_payments_address
+                .evm_details
+                .data_payments_address
                 .clone(),
             evm_payment_token_address: options
                 .current_inventory
                 .environment_details
-                .evm_payment_token_address
+                .evm_details
+                .payment_token_address
                 .clone(),
             evm_rpc_url: options
                 .current_inventory
                 .environment_details
-                .evm_rpc_url
+                .evm_details
+                .rpc_url
                 .clone(),
             full_cone_private_node_count: desired_full_cone_private_node_count,
             funding_wallet_secret_key: options.funding_wallet_secret_key.clone(),
-            interval: options.interval,
+            interval: Some(options.interval),
             log_format: None,
-            logstash_details: None,
             name: options.current_inventory.name.clone(),
             network_id: options.current_inventory.environment_details.network_id,
             node_count: desired_node_count,
@@ -232,6 +235,8 @@ impl TestnetDeployer {
             uploaders_count: options.desired_uploaders_count,
             gas_amount: options.gas_amount,
             token_amount: None,
+            wallet_secret_keys: None,
+            max_uploads: None,
         };
         let mut node_provision_failed = false;
 
@@ -478,6 +483,7 @@ impl TestnetDeployer {
         debug!("Retrieved initial peer {initial_multiaddr} and initial network contacts {initial_network_contacts_url}");
 
         let provision_options = ProvisionOptions {
+            ant_version: options.ant_version.clone(),
             binary_option: options.current_inventory.binary_option.clone(),
             chunk_size: None,
             client_env_variables: None,
@@ -486,34 +492,39 @@ impl TestnetDeployer {
             evm_data_payments_address: options
                 .current_inventory
                 .environment_details
-                .evm_data_payments_address
+                .evm_details
+                .data_payments_address
                 .clone(),
             evm_network: options
                 .current_inventory
                 .environment_details
-                .evm_network
+                .evm_details
+                .network
                 .clone(),
             evm_payment_token_address: options
                 .current_inventory
                 .environment_details
-                .evm_payment_token_address
+                .evm_details
+                .payment_token_address
                 .clone(),
             evm_rpc_url: options
                 .current_inventory
                 .environment_details
-                .evm_rpc_url
+                .evm_details
+                .rpc_url
                 .clone(),
             full_cone_private_node_count: 0,
             funding_wallet_secret_key: options.funding_wallet_secret_key.clone(),
-            interval: options.interval,
+            gas_amount: options.gas_amount,
+            interval: Some(options.interval),
             log_format: None,
-            logstash_details: None,
+            max_archived_log_files: options.max_archived_log_files,
+            max_log_files: options.max_log_files,
+            max_uploads: None,
             name: options.current_inventory.name.clone(),
             network_id: options.current_inventory.environment_details.network_id,
             node_count: 0,
             node_env_variables: None,
-            max_archived_log_files: options.max_archived_log_files,
-            max_log_files: options.max_log_files,
             output_inventory_dir_path: self
                 .working_directory_path
                 .join("ansible")
@@ -526,10 +537,9 @@ impl TestnetDeployer {
                 .rewards_address
                 .clone(),
             symmetric_private_node_count: 0,
-            ant_version: options.ant_version.clone(),
-            uploaders_count: options.desired_uploaders_count,
-            gas_amount: options.gas_amount,
             token_amount: options.token_amount,
+            uploaders_count: options.desired_uploaders_count,
+            wallet_secret_keys: None,
         };
 
         self.wait_for_ssh_availability_on_new_machines(

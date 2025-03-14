@@ -13,7 +13,6 @@ pub mod funding;
 pub mod infra;
 pub mod inventory;
 pub mod logs;
-pub mod logstash;
 pub mod reserved_ip;
 pub mod rpc_client;
 pub mod s3;
@@ -21,6 +20,7 @@ pub mod safe;
 pub mod setup;
 pub mod ssh;
 pub mod terraform;
+pub mod uploaders;
 pub mod upscale;
 
 const STORAGE_REQUIRED_PER_NODE: u16 = 7;
@@ -39,9 +39,7 @@ use crate::{
     ssh::SshClient,
     terraform::TerraformRunner,
 };
-use alloy::primitives::Address;
 use ant_service_management::ServiceStatus;
-use evmlib::Network;
 use flate2::read::GzDecoder;
 use indicatif::{ProgressBar, ProgressStyle};
 use infra::{build_terraform_args, InfraRunOptions};
@@ -69,6 +67,7 @@ pub enum DeploymentType {
     /// The deployment is a new network.
     #[default]
     New,
+    Uploaders,
 }
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
@@ -84,6 +83,7 @@ impl std::fmt::Display for DeploymentType {
         match self {
             DeploymentType::Bootstrap => write!(f, "bootstrap"),
             DeploymentType::New => write!(f, "new"),
+            DeploymentType::Uploaders => write!(f, "uploaders"),
         }
     }
 }
@@ -95,6 +95,7 @@ impl std::str::FromStr for DeploymentType {
         match s.to_lowercase().as_str() {
             "bootstrap" => Ok(DeploymentType::Bootstrap),
             "new" => Ok(DeploymentType::New),
+            "uploaders" => Ok(DeploymentType::Uploaders),
             _ => Err(format!("Invalid deployment type: {}", s)),
         }
     }
@@ -193,16 +194,21 @@ impl std::str::FromStr for EvmNetwork {
 }
 
 #[derive(Clone, Debug, Default, Serialize, Deserialize)]
+pub struct EvmDetails {
+    pub network: EvmNetwork,
+    pub data_payments_address: Option<String>,
+    pub payment_token_address: Option<String>,
+    pub rpc_url: Option<String>,
+}
+
+#[derive(Clone, Debug, Default, Serialize, Deserialize)]
 pub struct EnvironmentDetails {
     pub deployment_type: DeploymentType,
     pub environment_type: EnvironmentType,
-    pub evm_network: EvmNetwork,
-    pub evm_data_payments_address: Option<String>,
-    pub evm_payment_token_address: Option<String>,
-    pub evm_rpc_url: Option<String>,
+    pub evm_details: EvmDetails,
     pub funding_wallet_address: Option<String>,
     pub network_id: Option<u8>,
-    pub rewards_address: String,
+    pub rewards_address: Option<String>,
 }
 
 #[derive(Clone, Debug, Default, Eq, PartialEq, Serialize, Deserialize)]
@@ -297,8 +303,8 @@ pub enum BinaryOption {
     /// Pre-built, versioned binaries will be fetched from S3.
     Versioned {
         ant_version: Option<Version>,
-        antctl_version: Version,
-        antnode_version: Version,
+        antctl_version: Option<Version>,
+        antnode_version: Option<Version>,
     },
 }
 
@@ -326,8 +332,12 @@ impl BinaryOption {
                 if let Some(version) = ant_version {
                     println!("  ant version: {}", version);
                 }
-                println!("  antctl version: {}", antctl_version);
-                println!("  antnode version: {}", antnode_version);
+                if let Some(version) = antctl_version {
+                    println!("  antctl version: {}", version);
+                }
+                if let Some(version) = antnode_version {
+                    println!("  antnode version: {}", version);
+                }
             }
         }
     }
@@ -920,55 +930,79 @@ impl TestnetDeployer {
     pub async fn clean(&self) -> Result<()> {
         let environment_details =
             get_environment_details(&self.environment_name, &self.s3_repository).await?;
+        funding::drain_funds(&self.ansible_provisioner, &environment_details).await?;
 
-        let evm_network = match environment_details.evm_network {
-            EvmNetwork::Anvil => None,
-            EvmNetwork::Custom => Some(Network::new_custom(
-                environment_details.evm_rpc_url.as_ref().unwrap(),
-                environment_details
-                    .evm_payment_token_address
-                    .as_ref()
-                    .unwrap(),
-                environment_details
-                    .evm_data_payments_address
-                    .as_ref()
-                    .unwrap(),
-            )),
-            EvmNetwork::ArbitrumOne => Some(Network::ArbitrumOne),
-            EvmNetwork::ArbitrumSepolia => Some(Network::ArbitrumSepolia),
-        };
-        if let (Some(network), Some(address)) =
-            (evm_network, &environment_details.funding_wallet_address)
-        {
-            if let Err(err) = self
-                .ansible_provisioner
-                .drain_funds_from_uploaders(
-                    Address::from_str(address).map_err(|err| {
-                        log::error!("Invalid funding wallet public key: {err:?}");
-                        Error::FailedToParseKey
-                    })?,
-                    network,
-                )
-                .await
-            {
-                log::error!("Failed to drain funds from uploaders: {err:?}");
-            }
-        } else {
-            println!("Custom network provided. Not draining funds.");
-            log::info!("Custom network provided. Not draining funds.");
-        }
+        self.destroy_infra(&environment_details).await?;
 
-        do_clean(
+        cleanup_environment_inventory(
             &self.environment_name,
-            Some(environment_details),
-            self.working_directory_path.clone(),
-            &self.terraform_runner,
+            &self
+                .working_directory_path
+                .join("ansible")
+                .join("inventory"),
             None,
-        )
-        .await?;
+        )?;
+
+        println!("Deleted Ansible inventory for {}", self.environment_name);
+
         self.s3_repository
             .delete_object("sn-environment-type", &self.environment_name)
             .await?;
+        Ok(())
+    }
+
+    async fn destroy_infra(&self, environment_details: &EnvironmentDetails) -> Result<()> {
+        infra::select_workspace(&self.terraform_runner, &self.environment_name)?;
+
+        let options = InfraRunOptions::generate_existing(
+            &self.environment_name,
+            &self.terraform_runner,
+            environment_details,
+        )
+        .await?;
+
+        let mut args = Vec::new();
+        if let Some(full_cone_private_node_volume_size) = options.full_cone_private_node_volume_size
+        {
+            args.push((
+                "full_cone_private_node_volume_size".to_string(),
+                full_cone_private_node_volume_size.to_string(),
+            ));
+        }
+        if let Some(genesis_node_volume_size) = options.genesis_node_volume_size {
+            args.push((
+                "genesis_node_volume_size".to_string(),
+                genesis_node_volume_size.to_string(),
+            ));
+        }
+        if let Some(node_volume_size) = options.node_volume_size {
+            args.push(("node_volume_size".to_string(), node_volume_size.to_string()));
+        }
+        if let Some(peer_cache_node_volume_size) = options.peer_cache_node_volume_size {
+            args.push((
+                "peer_cache_node_volume_size".to_string(),
+                peer_cache_node_volume_size.to_string(),
+            ));
+        }
+        if let Some(symmetric_private_node_volume_size) = options.symmetric_private_node_volume_size
+        {
+            args.push((
+                "symmetric_private_node_volume_size".to_string(),
+                symmetric_private_node_volume_size.to_string(),
+            ));
+        }
+
+        self.terraform_runner.destroy(
+            Some(args),
+            Some(
+                environment_details
+                    .environment_type
+                    .get_tfvars_filename(&self.environment_name),
+            ),
+        )?;
+
+        infra::delete_workspace(&self.terraform_runner, &self.environment_name)?;
+
         Ok(())
     }
 }
@@ -1207,82 +1241,6 @@ pub fn is_binary_on_path(binary_name: &str) -> bool {
     false
 }
 
-pub async fn do_clean(
-    name: &str,
-    environment_details: Option<EnvironmentDetails>,
-    working_directory_path: PathBuf,
-    terraform_runner: &TerraformRunner,
-    inventory_types: Option<Vec<AnsibleInventoryType>>,
-) -> Result<()> {
-    terraform_runner.init()?;
-    let workspaces = terraform_runner.workspace_list()?;
-    if !workspaces.contains(&name.to_string()) {
-        return Err(Error::EnvironmentDoesNotExist(name.to_string()));
-    }
-    terraform_runner.workspace_select(name)?;
-    println!("Selected {name} workspace");
-
-    let environment_details = environment_details.ok_or(Error::EnvironmentDetailsNotFound(
-        "Should be provided during do_clean".to_string(),
-    ))?;
-
-    let options =
-        InfraRunOptions::generate_existing(name, terraform_runner, &environment_details).await?;
-    let mut args = Vec::new();
-    if let Some(full_cone_private_node_volume_size) = options.full_cone_private_node_volume_size {
-        args.push((
-            "full_cone_private_node_volume_size".to_string(),
-            full_cone_private_node_volume_size.to_string(),
-        ));
-    }
-    if let Some(genesis_node_volume_size) = options.genesis_node_volume_size {
-        args.push((
-            "genesis_node_volume_size".to_string(),
-            genesis_node_volume_size.to_string(),
-        ));
-    }
-    if let Some(node_volume_size) = options.node_volume_size {
-        args.push(("node_volume_size".to_string(), node_volume_size.to_string()));
-    }
-    if let Some(peer_cache_node_volume_size) = options.peer_cache_node_volume_size {
-        args.push((
-            "peer_cache_node_volume_size".to_string(),
-            peer_cache_node_volume_size.to_string(),
-        ));
-    }
-    if let Some(symmetric_private_node_volume_size) = options.symmetric_private_node_volume_size {
-        args.push((
-            "symmetric_private_node_volume_size".to_string(),
-            symmetric_private_node_volume_size.to_string(),
-        ));
-    }
-
-    terraform_runner.destroy(
-        Some(args),
-        Some(
-            environment_details
-                .environment_type
-                .get_tfvars_filename(name),
-        ),
-    )?;
-
-    // The 'dev' workspace is one we always expect to exist, for admin purposes.
-    // You can't delete a workspace while it is selected, so we select 'dev' before we delete
-    // the current workspace.
-    terraform_runner.workspace_select("dev")?;
-    terraform_runner.workspace_delete(name)?;
-    println!("Deleted {name} workspace");
-
-    cleanup_environment_inventory(
-        name,
-        &working_directory_path.join("ansible").join("inventory"),
-        inventory_types,
-    )?;
-
-    println!("Deleted Ansible inventory for {name}");
-    Ok(())
-}
-
 pub fn get_wallet_directory() -> Result<PathBuf> {
     Ok(dirs_next::data_dir()
         .ok_or_else(|| Error::CouldNotRetrieveDataDirectory)?
@@ -1323,8 +1281,18 @@ pub async fn notify_slack(inventory: DeploymentInventory) -> Result<()> {
                     .as_ref()
                     .map_or("None".to_string(), |v| v.to_string())
             ));
-            message.push_str(&format!("safenode version: {}\n", safenode_version));
-            message.push_str(&format!("antctl version: {}\n", safenode_manager_version));
+            message.push_str(&format!(
+                "safenode version: {}\n",
+                safenode_version
+                    .as_ref()
+                    .map_or("None".to_string(), |v| v.to_string())
+            ));
+            message.push_str(&format!(
+                "antctl version: {}\n",
+                safenode_manager_version
+                    .as_ref()
+                    .map_or("None".to_string(), |v| v.to_string())
+            ));
         }
     }
 
@@ -1371,6 +1339,7 @@ pub fn get_progress_bar(length: u64) -> Result<ProgressBar> {
     progress_bar.enable_steady_tick(Duration::from_millis(100));
     Ok(progress_bar)
 }
+
 pub async fn get_environment_details(
     environment_name: &str,
     s3_repository: &S3Repository,
@@ -1469,4 +1438,51 @@ pub fn calculate_size_per_attached_volume(node_count: u16) -> u16 {
 
 pub fn get_bootstrap_cache_url(ip_addr: &IpAddr) -> String {
     format!("http://{ip_addr}/bootstrap_cache.json")
+}
+
+pub async fn destroy_infra(
+    name: &str,
+    terraform_runner: &TerraformRunner,
+    environment_details: &EnvironmentDetails,
+) -> Result<()> {
+    let options =
+        InfraRunOptions::generate_existing(name, terraform_runner, environment_details).await?;
+
+    let mut args = Vec::new();
+    if let Some(full_cone_private_node_volume_size) = options.full_cone_private_node_volume_size {
+        args.push((
+            "full_cone_private_node_volume_size".to_string(),
+            full_cone_private_node_volume_size.to_string(),
+        ));
+    }
+    if let Some(genesis_node_volume_size) = options.genesis_node_volume_size {
+        args.push((
+            "genesis_node_volume_size".to_string(),
+            genesis_node_volume_size.to_string(),
+        ));
+    }
+    if let Some(node_volume_size) = options.node_volume_size {
+        args.push(("node_volume_size".to_string(), node_volume_size.to_string()));
+    }
+    if let Some(peer_cache_node_volume_size) = options.peer_cache_node_volume_size {
+        args.push((
+            "peer_cache_node_volume_size".to_string(),
+            peer_cache_node_volume_size.to_string(),
+        ));
+    }
+    if let Some(symmetric_private_node_volume_size) = options.symmetric_private_node_volume_size {
+        args.push((
+            "symmetric_private_node_volume_size".to_string(),
+            symmetric_private_node_volume_size.to_string(),
+        ));
+    }
+
+    terraform_runner.destroy(
+        Some(args),
+        Some(
+            environment_details
+                .environment_type
+                .get_tfvars_filename(name),
+        ),
+    )
 }

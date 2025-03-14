@@ -151,7 +151,9 @@ impl ExtraVarsDocBuilder {
             BinaryOption::Versioned {
                 antnode_version, ..
             } => {
-                let _ = self.add_variable("version", &antnode_version.to_string());
+                // An unwrap would be justified here because the antnode version must be set for the
+                // type of deployment where this will apply.
+                self.add_variable("version", &antnode_version.as_ref().unwrap().to_string());
             }
         }
     }
@@ -172,11 +174,14 @@ impl ExtraVarsDocBuilder {
                 );
             }
             BinaryOption::Versioned { antctl_version, .. } => {
+                // An unwrap would be justified here because the antctl version must be set for the
+                // type of deployment where this will apply.
                 self.add_variable(
                     "antctl_archive_url",
                     &format!(
                         "{}/antctl-{}-x86_64-unknown-linux-musl.tar.gz",
-                        ANTCTL_S3_BUCKET_URL, antctl_version
+                        ANTCTL_S3_BUCKET_URL,
+                        antctl_version.as_ref().unwrap()
                     ),
                 );
             }
@@ -199,11 +204,14 @@ impl ExtraVarsDocBuilder {
                 );
             }
             BinaryOption::Versioned { antctl_version, .. } => {
+                // An unwrap would be justified here because the antctl version must be set for the
+                // type of deployment where this will apply.
                 self.add_variable(
                     "antctld_archive_url",
                     &format!(
                         "{}/antctld-{}-x86_64-unknown-linux-musl.tar.gz",
-                        ANTCTL_S3_BUCKET_URL, antctl_version
+                        ANTCTL_S3_BUCKET_URL,
+                        antctl_version.as_ref().unwrap()
                     ),
                 );
             }
@@ -314,7 +322,9 @@ pub fn build_node_extra_vars_doc(
     }
 
     extra_vars.add_variable("node_instance_count", &node_instance_count.to_string());
-    extra_vars.add_variable("interval", &options.interval.as_millis().to_string());
+    if let Some(interval) = options.interval {
+        extra_vars.add_variable("interval", &interval.as_millis().to_string());
+    }
     if let Some(log_format) = options.log_format {
         extra_vars.add_variable("log_format", log_format.as_str());
     } else {
@@ -352,18 +362,13 @@ pub fn build_node_extra_vars_doc(
         extra_vars.add_env_variable_list("client_env_variables", client_env_vars.clone());
     }
 
-    if let Some((logstash_stack_name, logstash_hosts)) = &options.logstash_details {
-        extra_vars.add_variable("logstash_stack_name", logstash_stack_name);
-        extra_vars.add_list_variable(
-            "logstash_hosts",
-            logstash_hosts
-                .iter()
-                .map(|s| s.to_string())
-                .collect::<Vec<String>>(),
-        );
-    }
-
-    extra_vars.add_variable("rewards_address", &options.rewards_address);
+    extra_vars.add_variable(
+        "rewards_address",
+        options
+            .rewards_address
+            .as_ref()
+            .ok_or_else(|| Error::RewardsAddressNotSet)?,
+    );
     extra_vars.add_variable("evm_network_type", &evm_network.to_string());
     if let Some(evm_data_payment_token_address) = &options.evm_data_payments_address {
         extra_vars.add_variable("evm_data_payments_address", evm_data_payment_token_address);
@@ -443,7 +448,7 @@ pub fn build_uploaders_extra_vars_doc(
     genesis_network_contacts_url: Option<String>,
     sk_map: &HashMap<VirtualMachine, Vec<PrivateKeySigner>>,
 ) -> Result<String> {
-    let mut extra_vars: ExtraVarsDocBuilder = ExtraVarsDocBuilder::default();
+    let mut extra_vars = ExtraVarsDocBuilder::default();
     extra_vars.add_variable("provider", cloud_provider);
     extra_vars.add_variable("testnet_name", &options.name);
     if let Some(genesis_multiaddr) = genesis_multiaddr {
@@ -497,6 +502,10 @@ pub fn build_uploaders_extra_vars_doc(
     let serde_map = Value::Object(serde_map);
 
     extra_vars.add_serde_value("ant_secret_key_map", serde_map);
+
+    if let Some(max_uploads) = options.max_uploads {
+        extra_vars.add_variable("max_uploads", &max_uploads.to_string());
+    }
 
     Ok(extra_vars.build())
 }
