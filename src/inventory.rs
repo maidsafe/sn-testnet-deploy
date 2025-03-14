@@ -18,7 +18,9 @@ use crate::{
     s3::S3Repository,
     ssh::SshClient,
     terraform::TerraformRunner,
-    BinaryOption, CloudProvider, DeploymentType, EnvironmentDetails, Error, TestnetDeployer,
+    uploaders::UploaderDeployer,
+    BinaryOption, CloudProvider, DeploymentType, EnvironmentDetails, EnvironmentType, Error,
+    EvmDetails, TestnetDeployer,
 };
 use alloy::hex::ToHexExt;
 use ant_service_management::{NodeRegistry, ServiceStatus};
@@ -56,6 +58,29 @@ pub struct DeploymentInventoryService {
 
 impl From<&TestnetDeployer> for DeploymentInventoryService {
     fn from(item: &TestnetDeployer) -> Self {
+        let provider = match item.cloud_provider {
+            CloudProvider::Aws => "aws",
+            CloudProvider::DigitalOcean => "digital_ocean",
+        };
+        DeploymentInventoryService {
+            ansible_runner: item.ansible_provisioner.ansible_runner.clone(),
+            ansible_provisioner: item.ansible_provisioner.clone(),
+            cloud_provider: item.cloud_provider,
+            inventory_file_path: item
+                .working_directory_path
+                .join("ansible")
+                .join("inventory")
+                .join(format!("dev_inventory_{}.yml", provider)),
+            s3_repository: item.s3_repository.clone(),
+            ssh_client: item.ssh_client.clone(),
+            terraform_runner: item.terraform_runner.clone(),
+            working_directory_path: item.working_directory_path.clone(),
+        }
+    }
+}
+
+impl From<&UploaderDeployer> for DeploymentInventoryService {
+    fn from(item: &UploaderDeployer) -> Self {
         let provider = match item.cloud_provider {
             CloudProvider::Aws => "aws",
             CloudProvider::DigitalOcean => "digital_ocean",
@@ -507,6 +532,122 @@ impl DeploymentInventoryService {
             .strip_prefix(prefix)
             .ok_or_else(|| eyre!("Unexpected output format from {} command", command))?;
         Version::parse(version_str).map_err(|e| eyre!("Failed to parse {} version: {}", command, e))
+    }
+
+    /// Generate or retrieve the uploader inventory for the deployment.
+    ///
+    /// If we're creating a new environment and there is no inventory yet, an empty inventory will
+    /// be returned; otherwise the inventory will represent what is deployed currently.
+    ///
+    /// The `force` flag is used when the `deploy` command runs, to make sure that a new inventory
+    /// is generated, because it's possible that an old one with the same environment name has been
+    /// cached.
+    pub async fn generate_or_retrieve_uploader_inventory(
+        &self,
+        name: &str,
+        force: bool,
+        binary_option: Option<BinaryOption>,
+    ) -> Result<UploaderDeploymentInventory> {
+        println!("===============================================");
+        println!("  Generating or Retrieving Uploader Inventory  ");
+        println!("===============================================");
+        let inventory_path = get_data_directory()?.join(format!("{name}-uploader-inventory.json"));
+        if inventory_path.exists() && !force {
+            let inventory = UploaderDeploymentInventory::read(&inventory_path)?;
+            return Ok(inventory);
+        }
+
+        // This allows for the inventory to be generated without a Terraform workspace to be
+        // initialised, which is the case in the workflow for printing an inventory.
+        if !force {
+            let environments = self.terraform_runner.workspace_list()?;
+            if !environments.contains(&name.to_string()) {
+                return Err(eyre!("The '{}' environment does not exist", name));
+            }
+        }
+
+        // For new environments, whether it's a new or bootstrap deploy, the inventory files need
+        // to be generated for the Ansible run to work correctly.
+        //
+        // It is an idempotent operation; the files won't be generated if they already exist.
+        let output_inventory_dir_path = self
+            .working_directory_path
+            .join("ansible")
+            .join("inventory");
+        generate_environment_inventory(
+            name,
+            &self.inventory_file_path,
+            &output_inventory_dir_path,
+        )?;
+
+        let environment_details = match get_environment_details(name, &self.s3_repository).await {
+            Ok(details) => details,
+            Err(Error::EnvironmentDetailsNotFound(_)) => {
+                println!("Environment details not found: treating this as a new deployment");
+                return Ok(UploaderDeploymentInventory::empty(
+                    name,
+                    binary_option.ok_or_else(|| {
+                        eyre!("For a new deployment the binary option must be set")
+                    })?,
+                ));
+            }
+            Err(e) => return Err(e.into()),
+        };
+
+        let uploader_and_sks = self.ansible_provisioner.get_uploader_secret_keys()?;
+        let uploader_vms: Vec<UploaderVirtualMachine> = uploader_and_sks
+            .iter()
+            .map(|(vm, sks)| UploaderVirtualMachine {
+                vm: vm.clone(),
+                wallet_public_key: sks
+                    .iter()
+                    .enumerate()
+                    .map(|(user, sk)| (format!("safe{}", user + 1), sk.address().encode_hex()))
+                    .collect(),
+            })
+            .collect();
+
+        let binary_option = if let Some(binary_option) = binary_option {
+            binary_option
+        } else {
+            let ant_version = if !uploader_vms.is_empty() {
+                let random_uploader_vm = uploader_vms
+                    .choose(&mut rand::thread_rng())
+                    .ok_or_else(|| eyre!("No uploader VMs available to retrieve ant version"))?;
+                self.get_bin_version(&random_uploader_vm.vm, "ant --version", "Autonomi Client v")
+                    .ok()
+            } else {
+                None
+            };
+
+            println!("Retrieved binary versions from previous deployment:");
+            if let Some(version) = &ant_version {
+                println!("  ant: {}", version);
+            }
+
+            BinaryOption::Versioned {
+                ant_version,
+                antnode_version: None,
+                antctl_version: None,
+            }
+        };
+
+        let inventory = UploaderDeploymentInventory {
+            binary_option,
+            environment_type: environment_details.environment_type,
+            evm_details: environment_details.evm_details,
+            funding_wallet_address: None, // This would need to be populated from somewhere
+            network_id: environment_details.network_id,
+            failed_node_registry_vms: Vec::new(),
+            name: name.to_string(),
+            ssh_user: self.cloud_provider.get_ssh_user(),
+            ssh_private_key_path: self.ssh_client.private_key_path.clone(),
+            uploaded_files: Vec::new(),
+            uploader_vms,
+        };
+
+        debug!("Uploader Inventory: {inventory:?}");
+        Ok(inventory)
     }
 }
 
@@ -1143,8 +1284,16 @@ impl DeploymentInventory {
             }
         }
 
-        if self.environment_details.evm_details.data_payments_address.is_some()
-            || self.environment_details.evm_details.payment_token_address.is_some()
+        if self
+            .environment_details
+            .evm_details
+            .data_payments_address
+            .is_some()
+            || self
+                .environment_details
+                .evm_details
+                .payment_token_address
+                .is_some()
             || self.environment_details.evm_details.rpc_url.is_some()
         {
             println!("===========");
@@ -1195,6 +1344,197 @@ impl DeploymentInventory {
             let webserver = get_bootstrap_cache_url(&node_vm.vm.public_ip_addr);
             println!("{}: {webserver}", node_vm.vm.name);
         }
+    }
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct UploaderDeploymentInventory {
+    pub binary_option: BinaryOption,
+    pub environment_type: EnvironmentType,
+    pub evm_details: EvmDetails,
+    pub funding_wallet_address: Option<String>,
+    pub network_id: Option<u8>,
+    pub failed_node_registry_vms: Vec<String>,
+    pub name: String,
+    pub ssh_user: String,
+    pub ssh_private_key_path: PathBuf,
+    pub uploaded_files: Vec<(String, String)>,
+    pub uploader_vms: Vec<UploaderVirtualMachine>,
+}
+
+impl UploaderDeploymentInventory {
+    /// Create an inventory for a new uploader deployment which is initially empty, other than the name and
+    /// binary option, which will have been selected.
+    pub fn empty(name: &str, binary_option: BinaryOption) -> UploaderDeploymentInventory {
+        Self {
+            binary_option,
+            environment_type: EnvironmentType::default(),
+            evm_details: EvmDetails::default(),
+            funding_wallet_address: None,
+            network_id: None,
+            failed_node_registry_vms: Default::default(),
+            name: name.to_string(),
+            ssh_user: "root".to_string(),
+            ssh_private_key_path: Default::default(),
+            uploaded_files: Default::default(),
+            uploader_vms: Default::default(),
+        }
+    }
+
+    pub fn get_tfvars_filename(&self) -> String {
+        debug!("Environment type: {:?}", self.environment_type);
+        let filename = self.environment_type.get_tfvars_filename(&self.name);
+        debug!("Using tfvars file {filename}",);
+        filename
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.uploader_vms.is_empty()
+    }
+
+    pub fn vm_list(&self) -> Vec<VirtualMachine> {
+        self.uploader_vms
+            .iter()
+            .map(|uploader_vm| uploader_vm.vm.clone())
+            .collect()
+    }
+
+    pub fn save(&self) -> Result<()> {
+        let path = get_data_directory()?.join(format!("{}-uploader-inventory.json", self.name));
+        let serialized_data = serde_json::to_string_pretty(self)?;
+        let mut file = File::create(path)?;
+        file.write_all(serialized_data.as_bytes())?;
+        Ok(())
+    }
+
+    pub fn read(file_path: &PathBuf) -> Result<Self> {
+        let data = std::fs::read_to_string(file_path)?;
+        let deserialized_data: UploaderDeploymentInventory = serde_json::from_str(&data)?;
+        Ok(deserialized_data)
+    }
+
+    pub fn add_uploaded_files(&mut self, uploaded_files: Vec<(String, String)>) {
+        self.uploaded_files.extend_from_slice(&uploaded_files);
+    }
+
+    pub fn print_report(&self) -> Result<()> {
+        println!("**************************************");
+        println!("*                                    *");
+        println!("*     Uploader Inventory Report      *");
+        println!("*                                    *");
+        println!("**************************************");
+
+        println!("Environment Name: {}", self.name);
+        println!();
+        match &self.binary_option {
+            BinaryOption::BuildFromSource {
+                repo_owner, branch, ..
+            } => {
+                println!("==============");
+                println!("Branch Details");
+                println!("==============");
+                println!("Repo owner: {repo_owner}");
+                println!("Branch name: {branch}");
+                println!();
+            }
+            BinaryOption::Versioned { ant_version, .. } => {
+                println!("===============");
+                println!("Version Details");
+                println!("===============");
+                println!(
+                    "ant version: {}",
+                    ant_version
+                        .as_ref()
+                        .map_or("N/A".to_string(), |v| v.to_string())
+                );
+                println!();
+            }
+        }
+
+        if !self.uploader_vms.is_empty() {
+            println!("============");
+            println!("Uploader VMs");
+            println!("============");
+            for uploader_vm in self.uploader_vms.iter() {
+                println!("{}: {}", uploader_vm.vm.name, uploader_vm.vm.public_ip_addr);
+            }
+            println!("SSH user: {}", self.ssh_user);
+            println!();
+
+            println!("===========================");
+            println!("Uploader Wallet Public Keys");
+            println!("===========================");
+            for uploader_vm in self.uploader_vms.iter() {
+                for (user, key) in uploader_vm.wallet_public_key.iter() {
+                    println!("{}@{}: {}", uploader_vm.vm.name, user, key);
+                }
+            }
+            println!();
+        }
+
+        if !self.uploaded_files.is_empty() {
+            println!("==============");
+            println!("Uploaded files");
+            println!("==============");
+            for file in self.uploaded_files.iter() {
+                println!("{}: {}", file.0, file.1);
+            }
+            println!();
+        }
+
+        if self.evm_details.data_payments_address.is_some()
+            || self.evm_details.payment_token_address.is_some()
+            || self.evm_details.rpc_url.is_some()
+        {
+            println!("===========");
+            println!("EVM Details");
+            println!("===========");
+            println!(
+                "EVM data payments address: {}",
+                self.evm_details
+                    .data_payments_address
+                    .as_ref()
+                    .map_or("N/A", |addr| addr)
+            );
+            println!(
+                "EVM payment token address: {}",
+                self.evm_details
+                    .payment_token_address
+                    .as_ref()
+                    .map_or("N/A", |addr| addr)
+            );
+            println!(
+                "EVM RPC URL: {}",
+                self.evm_details.rpc_url.as_ref().map_or("N/A", |addr| addr)
+            );
+            println!();
+        }
+
+        if let Some(funding_wallet_address) = &self.funding_wallet_address {
+            println!("======================");
+            println!("Funding Wallet Address");
+            println!("======================");
+            println!("{}", funding_wallet_address);
+            println!();
+        }
+
+        if let Some(network_id) = &self.network_id {
+            println!("==========");
+            println!("Network ID");
+            println!("==========");
+            println!("{}", network_id);
+            println!();
+        }
+
+        let inventory_file_path =
+            get_data_directory()?.join(format!("{}-uploader-inventory.json", self.name));
+        println!(
+            "The full uploader inventory is at {}",
+            inventory_file_path.to_string_lossy()
+        );
+        println!();
+
+        Ok(())
     }
 }
 

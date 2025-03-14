@@ -2,24 +2,29 @@
 - name: build binaries
   hosts: all
   become: False
+  vars:
+    build_ant: "{{ build_ant | default(true) }}"
+    build_antnode: "{{ build_antnode | default(true) }}"
+    build_antctl: "{{ build_antctl | default(true) }}"
+    build_antctld: "{{ build_antctld | default(true) }}"
   roles:
     - {
         role: build_safe_network_binary,
         bin_name: "ant",
-        when: custom_bin == "true"
+        when: (custom_bin == "true") and (build_ant | bool)
       }
     - {
         role: build_safe_network_binary,
         bin_name: "antnode",
-        when: custom_bin == "true"
+        when: (custom_bin == "true") and (build_antnode | bool)
       }
     - {
         role: build_safe_network_binary,
         bin_name: "antctl",
-        when: custom_bin == "true"
+        when: (custom_bin == "true") and (build_antctl | bool)
       }
     - {
         role: build_safe_network_binary,
         bin_name: "antctld",
-        when: custom_bin == "true"
+        when: (custom_bin == "true") and (build_antctld | bool)
       }
