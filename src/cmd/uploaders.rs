@@ -11,12 +11,169 @@ use color_eyre::eyre::{eyre, Result};
 use sn_testnet_deploy::{
     ansible::{extra_vars::ExtraVarsDocBuilder, inventory::AnsibleInventoryType, AnsiblePlaybook},
     inventory::DeploymentInventoryService,
+    uploaders::{UploaderDeployBuilder, UploaderDeployOptions},
     upscale::UpscaleOptions,
-    TestnetDeployBuilder,
+    EvmDetails, TestnetDeployBuilder,
 };
 
 #[derive(Subcommand, Debug)]
+#[allow(clippy::large_enum_variant)]
 pub enum UploadersCommands {
+    /// Clean a deployed uploader environment.
+    Clean {
+        /// The name of the environment.
+        #[arg(short = 'n', long)]
+        name: String,
+        /// The cloud provider for the environment.
+        #[clap(long, value_parser = parse_provider, verbatim_doc_comment, default_value_t = CloudProvider::DigitalOcean)]
+        provider: CloudProvider,
+    },
+    /// Deploy a new set of uploaders.
+    Deploy {
+        /// Set to run Ansible with more verbose output.
+        #[arg(long)]
+        ansible_verbose: bool,
+        /// Supply a version number for the ant binary.
+        ///
+        /// There should be no 'v' prefix.
+        ///
+        /// The version arguments are mutually exclusive with the --branch and --repo-owner
+        /// arguments. You can only supply version numbers or a custom branch, not both.
+        #[arg(long, verbatim_doc_comment)]
+        ant_version: Option<String>,
+        /// The branch of the Github repository to build from.
+        ///
+        /// If used, the ant binary will be built from this branch. It is typically used for testing
+        /// changes on a fork.
+        ///
+        /// This argument must be used in conjunction with the --repo-owner argument.
+        ///
+        /// The --branch and --repo-owner arguments are mutually exclusive with the binary version
+        /// arguments. You can only supply version numbers or a custom branch, not both.
+        #[arg(long, verbatim_doc_comment)]
+        branch: Option<String>,
+        /// Specify the chunk size for the custom binaries using a 64-bit integer.
+        ///
+        /// This option only applies if the --branch and --repo-owner arguments are used.
+        #[clap(long, value_parser = parse_chunk_size)]
+        chunk_size: Option<u64>,
+        /// Provide environment variables for the antnode RPC client.
+        ///
+        /// This is useful to set the client's log levels. Each variable should be comma
+        /// separated without any space.
+        ///
+        /// Example: --client-env CLIENT_LOG=all,RUST_LOG=debug
+        #[clap(name = "client-env", long, use_value_delimiter = true, value_parser = parse_environment_variables, verbatim_doc_comment)]
+        client_env_variables: Option<Vec<(String, String)>>,
+        /// Set to disable Telegraf metrics collection on all nodes.
+        #[clap(long)]
+        disable_telegraf: bool,
+        /// The type of deployment.
+        ///
+        /// Possible values are 'development', 'production' or 'staging'. The value used will
+        /// determine the sizes of VMs, the number of VMs, and the number of nodes deployed on
+        /// them. The specification will increase in size from development, to staging, to
+        /// production.
+        ///
+        /// The default is 'development'.
+        #[clap(long, default_value_t = EnvironmentType::Development, value_parser = parse_deployment_type, verbatim_doc_comment)]
+        environment_type: EnvironmentType,
+        /// The address of the data payments contract.
+        #[arg(long)]
+        evm_data_payments_address: Option<String>,
+        /// The EVM network type to use for the deployment.
+        ///
+        /// Possible values are 'arbitrum-one' or 'custom'.
+        ///
+        /// If not used, the default is 'arbitrum-one'.
+        #[clap(long, default_value = "arbitrum-one", value_parser = parse_evm_network)]
+        evm_network_type: EvmNetwork,
+        /// The address of the payment token contract.
+        #[arg(long)]
+        evm_payment_token_address: Option<String>,
+        /// The RPC URL for the EVM network.
+        ///
+        /// This argument only applies if the EVM network type is 'custom'.
+        #[arg(long)]
+        evm_rpc_url: Option<String>,
+        /// Override the maximum number of forks Ansible will use to execute tasks on target hosts.
+        ///
+        /// The default value from ansible.cfg is 50.
+        #[clap(long)]
+        forks: Option<usize>,
+        /// The secret key for the wallet that will fund all the uploaders.
+        ///
+        /// This argument only applies when Arbitrum or Sepolia networks are used.
+        #[clap(long)]
+        funding_wallet_secret_key: Option<String>,
+        /// The amount of gas to initially transfer to each uploader, in U256
+        ///
+        /// 1 ETH = 1_000_000_000_000_000_000. Defaults to 0.1 ETH
+        #[arg(long)]
+        initial_gas: Option<U256>,
+        /// The amount of tokens to initially transfer to each uploader, in U256
+        ///
+        /// 1 Token = 1_000_000_000_000_000_000. Defaults to 100 token.
+        #[arg(long)]
+        initial_tokens: Option<U256>,
+        /// Maximum number of uploads to perform before stopping.
+        ///
+        /// If not specified, uploaders will continue uploading indefinitely.
+        #[clap(long)]
+        max_uploads: Option<u32>,
+        /// The name of the environment
+        #[arg(short = 'n', long)]
+        name: String,
+        /// Specify the network ID to use for the node services. This is used to partition the network and will not allow
+        /// nodes with different network IDs to join.
+        ///
+        /// By default, the network ID is set to 1, which represents the mainnet.
+        #[clap(long, verbatim_doc_comment)]
+        network_id: Option<u8>,
+        /// The networks contacts URL from an existing network.
+        #[arg(long)]
+        network_contacts_url: String,
+        /// A peer from an existing network that the uploaders can connect to.
+        ///
+        /// Should be in the form of a multiaddr.
+        #[arg(long)]
+        peer: String,
+        /// The cloud provider to deploy to.
+        ///
+        /// Valid values are "aws" or "digital-ocean".
+        #[clap(long, default_value_t = CloudProvider::DigitalOcean, value_parser = parse_provider, verbatim_doc_comment)]
+        provider: CloudProvider,
+        /// The owner/org of the Github repository to build from.
+        ///
+        /// If used, all binaries will be built from this repository. It is typically used for
+        /// testing changes on a fork.
+        ///
+        /// This argument must be used in conjunction with the --repo-owner argument.
+        ///
+        /// The --branch and --repo-owner arguments are mutually exclusive with the binary version
+        /// arguments. You can only supply version numbers or a custom branch, not both.
+        #[arg(long, verbatim_doc_comment)]
+        repo_owner: Option<String>,
+        /// The desired number of uploaders per VM.
+        #[clap(long, default_value_t = 1)]
+        uploaders_count: u16,
+        /// The number of uploader VMs to create.
+        ///
+        /// If the argument is not used, the value will be determined by the 'environment-type'
+        /// argument.
+        #[clap(long)]
+        uploader_vm_count: Option<u16>,
+        /// Override the size of the uploader VMs.
+        #[clap(long)]
+        uploader_vm_size: Option<String>,
+        /// Pre-funded wallet secret keys to use for uploaders.
+        ///
+        /// Can be specified multiple times, once for each uploader.
+        /// If provided, the number of keys must match the total number of uploaders (VM count * uploaders per VM).
+        /// When using this option, the deployer will not fund the wallets.
+        #[clap(long, value_name = "SECRET_KEY", number_of_values = 1)]
+        wallet_secret_key: Vec<String>,
+    },
     /// Start all uploaders for an environment
     Start {
         /// The name of the environment
@@ -103,6 +260,153 @@ pub enum UploadersCommands {
 
 pub async fn handle_uploaders_command(cmd: UploadersCommands) -> Result<()> {
     match cmd {
+        UploadersCommands::Clean { name, provider } => {
+            println!("Cleaning uploader environment '{}'...", name);
+            let uploader_deployer = UploaderDeployBuilder::default()
+                .environment_name(&name)
+                .provider(provider)
+                .build()?;
+            uploader_deployer.clean().await?;
+            println!("Uploader environment '{}' cleaned", name);
+            Ok(())
+        }
+        UploadersCommands::Deploy {
+            ansible_verbose,
+            ant_version,
+            branch,
+            chunk_size,
+            client_env_variables,
+            disable_telegraf,
+            environment_type,
+            evm_data_payments_address,
+            evm_network_type,
+            evm_payment_token_address,
+            evm_rpc_url,
+            forks,
+            funding_wallet_secret_key,
+            initial_gas,
+            initial_tokens,
+            max_uploads,
+            name,
+            network_id,
+            network_contacts_url,
+            peer,
+            provider,
+            repo_owner,
+            uploaders_count,
+            uploader_vm_count,
+            uploader_vm_size,
+            wallet_secret_key,
+        } => {
+            if (branch.is_some() && repo_owner.is_none())
+                || (branch.is_none() && repo_owner.is_some())
+            {
+                return Err(eyre!(
+                    "Both --branch and --repo-owner must be provided together"
+                ));
+            }
+
+            if ant_version.is_some() && (branch.is_some() || repo_owner.is_some()) {
+                return Err(eyre!("Cannot specify both version and branch/repo-owner"));
+            }
+
+            if evm_network_type == EvmNetwork::Custom {
+                if evm_data_payments_address.is_none() {
+                    return Err(eyre!(
+                        "Data payments address must be provided for custom EVM network"
+                    ));
+                }
+                if evm_payment_token_address.is_none() {
+                    return Err(eyre!(
+                        "Payment token address must be provided for custom EVM network"
+                    ));
+                }
+                if evm_rpc_url.is_none() {
+                    return Err(eyre!("RPC URL must be provided for custom EVM network"));
+                }
+            }
+
+            if funding_wallet_secret_key.is_none()
+                && evm_network_type != EvmNetwork::Anvil
+                && wallet_secret_key.is_empty()
+            {
+                return Err(eyre!(
+                    "For Sepolia or Arbitrum One, either a funding wallet secret key or pre-funded wallet secret keys are required"
+                ));
+            }
+
+            let total_uploaders =
+                uploader_vm_count.unwrap_or(1) as usize * uploaders_count as usize;
+            if !wallet_secret_key.is_empty() && wallet_secret_key.len() != total_uploaders {
+                return Err(eyre!(
+                    "Number of wallet secret keys ({}) must match total number of uploaders ({})",
+                    wallet_secret_key.len(),
+                    total_uploaders,
+                ));
+            }
+
+            let binary_option =
+                get_binary_option(branch, repo_owner, ant_version, None, None, None).await?;
+
+            let mut builder = UploaderDeployBuilder::new();
+            builder
+                .ansible_verbose_mode(ansible_verbose)
+                .deployment_type(environment_type.clone())
+                .environment_name(&name)
+                .provider(provider);
+            if let Some(forks_value) = forks {
+                builder.ansible_forks(forks_value);
+            }
+            let uploader_deployer = builder.build()?;
+            uploader_deployer.init().await?;
+
+            let inventory_service = DeploymentInventoryService::from(&uploader_deployer);
+            let inventory = inventory_service
+                .generate_or_retrieve_uploader_inventory(&name, true, Some(binary_option.clone()))
+                .await?;
+            let evm_details = EvmDetails {
+                network: evm_network_type,
+                data_payments_address: evm_data_payments_address,
+                payment_token_address: evm_payment_token_address,
+                rpc_url: evm_rpc_url,
+            };
+
+            let options = UploaderDeployOptions {
+                binary_option,
+                chunk_size,
+                client_env_variables,
+                current_inventory: inventory,
+                enable_telegraf: !disable_telegraf,
+                environment_type,
+                evm_details,
+                funding_wallet_secret_key,
+                initial_gas,
+                initial_tokens,
+                max_archived_log_files: 1,
+                max_log_files: 1,
+                max_uploads,
+                name: name.clone(),
+                network_id,
+                network_contacts_url,
+                output_inventory_dir_path: uploader_deployer
+                    .working_directory_path
+                    .join("inventory"),
+                peer,
+                uploader_vm_count,
+                uploader_vm_size,
+                uploaders_count,
+                wallet_secret_keys: if wallet_secret_key.is_empty() {
+                    None
+                } else {
+                    Some(wallet_secret_key)
+                },
+            };
+
+            uploader_deployer.deploy(options).await?;
+
+            println!("Uploaders deployment for '{}' completed successfully", name);
+            Ok(())
+        }
         UploadersCommands::Start { name, provider } => {
             let testnet_deployer = TestnetDeployBuilder::default()
                 .environment_name(&name)

@@ -10,9 +10,8 @@ use alloy::primitives::U256;
 use color_eyre::{eyre::eyre, Help, Result};
 use sn_testnet_deploy::{
     bootstrap::BootstrapOptions, calculate_size_per_attached_volume, deploy::DeployOptions,
-    error::Error, inventory::DeploymentInventoryService,
-    upscale::UpscaleOptions, BinaryOption, CloudProvider, EnvironmentType, EvmNetwork, LogFormat,
-    TestnetDeployBuilder,
+    error::Error, inventory::DeploymentInventoryService, upscale::UpscaleOptions, BinaryOption,
+    CloudProvider, EnvironmentType, EvmNetwork, LogFormat, TestnetDeployBuilder,
 };
 use std::time::Duration;
 
@@ -313,7 +312,6 @@ pub async fn handle_deploy(
         }
     }
 
-
     let peer_cache_node_count =
         peer_cache_node_count.unwrap_or(environment_type.get_default_peer_cache_node_count());
     let node_count = node_count.unwrap_or(environment_type.get_default_node_count());
@@ -350,7 +348,6 @@ pub async fn handle_deploy(
         initial_tokens,
         interval,
         log_format,
-        logstash_details,
         max_archived_log_files,
         max_log_files,
         name: name.clone(),
@@ -508,12 +505,14 @@ pub async fn handle_upscale(
                 antnode_version: existing_antnode_version,
                 antctl_version: existing_antctl_version,
             } => {
-                let existing_antnode_version = existing_antnode_version.as_ref().ok_or_else(|| {
-                    eyre!("The existing deployment must have an antnode version to override it")
-                })?;
-                let existing_antctl_version = existing_antctl_version.as_ref().ok_or_else(|| {
-                    eyre!("The existing deployment must have an antctl version to override it") 
-                })?;
+                let existing_antnode_version =
+                    existing_antnode_version.as_ref().ok_or_else(|| {
+                        eyre!("The existing deployment must have an antnode version to override it")
+                    })?;
+                let existing_antctl_version =
+                    existing_antctl_version.as_ref().ok_or_else(|| {
+                        eyre!("The existing deployment must have an antctl version to override it")
+                    })?;
 
                 let new_antnode_version = antnode_version
                     .map(|v| v.parse().expect("Invalid antnode version"))

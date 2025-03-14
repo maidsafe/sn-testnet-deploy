@@ -22,8 +22,9 @@ use crate::{
     error::{Error, Result},
     funding::FundingOptions,
     inventory::{DeploymentNodeRegistries, VirtualMachine},
-    print_duration, run_external_command, BinaryOption, CloudProvider, EvmNetwork, LogFormat,
-    NodeType, SshClient, UpgradeOptions,
+    print_duration, run_external_command,
+    uploaders::UploaderDeployOptions,
+    BinaryOption, CloudProvider, EvmNetwork, LogFormat, NodeType, SshClient, UpgradeOptions,
 };
 use ant_service_management::NodeRegistry;
 use evmlib::common::U256;
@@ -61,10 +62,11 @@ pub struct ProvisionOptions {
     pub full_cone_private_node_count: u16,
     pub funding_wallet_secret_key: Option<String>,
     pub gas_amount: Option<U256>,
-    pub interval: Duration,
+    pub interval: Option<Duration>,
     pub log_format: Option<LogFormat>,
     pub max_archived_log_files: u16,
     pub max_log_files: u16,
+    pub max_uploads: Option<u32>,
     pub name: String,
     pub network_id: Option<u8>,
     pub node_count: u16,
@@ -72,10 +74,11 @@ pub struct ProvisionOptions {
     pub output_inventory_dir_path: PathBuf,
     pub peer_cache_node_count: u16,
     pub public_rpc: bool,
-    pub rewards_address: String,
+    pub rewards_address: Option<String>,
     pub symmetric_private_node_count: u16,
     pub token_amount: Option<U256>,
     pub uploaders_count: Option<u16>,
+    pub wallet_secret_keys: Option<Vec<String>>,
 }
 
 /// These are obtained by running the inventory playbook
@@ -236,9 +239,9 @@ impl From<BootstrapOptions> for ProvisionOptions {
             ant_version: None,
             binary_option: bootstrap_options.binary_option,
             chunk_size: bootstrap_options.chunk_size,
+            client_env_variables: None,
             downloaders_count: 0,
             enable_telegraf: true,
-            node_env_variables: bootstrap_options.node_env_variables,
             evm_data_payments_address: bootstrap_options.evm_data_payments_address,
             evm_network: bootstrap_options.evm_network,
             evm_payment_token_address: bootstrap_options.evm_payment_token_address,
@@ -246,21 +249,23 @@ impl From<BootstrapOptions> for ProvisionOptions {
             full_cone_private_node_count: bootstrap_options.full_cone_private_node_count,
             funding_wallet_secret_key: None,
             gas_amount: None,
-            interval: bootstrap_options.interval,
+            interval: Some(bootstrap_options.interval),
             log_format: bootstrap_options.log_format,
             max_archived_log_files: bootstrap_options.max_archived_log_files,
             max_log_files: bootstrap_options.max_log_files,
+            max_uploads: None,
             name: bootstrap_options.name,
             network_id: bootstrap_options.network_id,
             node_count: bootstrap_options.node_count,
+            node_env_variables: bootstrap_options.node_env_variables,
             output_inventory_dir_path: bootstrap_options.output_inventory_dir_path,
             peer_cache_node_count: 0,
-            symmetric_private_node_count: bootstrap_options.symmetric_private_node_count,
             public_rpc: false,
-            rewards_address: bootstrap_options.rewards_address,
+            rewards_address: Some(bootstrap_options.rewards_address),
+            symmetric_private_node_count: bootstrap_options.symmetric_private_node_count,
             token_amount: None,
             uploaders_count: None,
-            client_env_variables: None,
+            wallet_secret_keys: None,
         }
     }
 }
@@ -271,6 +276,7 @@ impl From<DeployOptions> for ProvisionOptions {
             ant_version: None,
             binary_option: deploy_options.binary_option,
             chunk_size: deploy_options.chunk_size,
+            client_env_variables: deploy_options.client_env_variables,
             downloaders_count: deploy_options.downloaders_count,
             enable_telegraf: deploy_options.enable_telegraf,
             node_env_variables: deploy_options.node_env_variables,
@@ -281,21 +287,59 @@ impl From<DeployOptions> for ProvisionOptions {
             full_cone_private_node_count: deploy_options.full_cone_private_node_count,
             funding_wallet_secret_key: deploy_options.funding_wallet_secret_key,
             gas_amount: deploy_options.initial_gas,
-            interval: deploy_options.interval,
+            interval: Some(deploy_options.interval),
             log_format: deploy_options.log_format,
             max_archived_log_files: deploy_options.max_archived_log_files,
             max_log_files: deploy_options.max_log_files,
+            max_uploads: None,
             name: deploy_options.name,
             network_id: deploy_options.network_id,
             node_count: deploy_options.node_count,
             output_inventory_dir_path: deploy_options.output_inventory_dir_path,
             peer_cache_node_count: deploy_options.peer_cache_node_count,
-            symmetric_private_node_count: deploy_options.symmetric_private_node_count,
             public_rpc: deploy_options.public_rpc,
-            rewards_address: deploy_options.rewards_address,
+            rewards_address: Some(deploy_options.rewards_address),
+            symmetric_private_node_count: deploy_options.symmetric_private_node_count,
             token_amount: deploy_options.initial_tokens,
             uploaders_count: Some(deploy_options.uploaders_count),
-            client_env_variables: deploy_options.client_env_variables,
+            wallet_secret_keys: None,
+        }
+    }
+}
+
+impl From<UploaderDeployOptions> for ProvisionOptions {
+    fn from(uploader_options: UploaderDeployOptions) -> Self {
+        ProvisionOptions {
+            ant_version: None,
+            binary_option: uploader_options.binary_option,
+            chunk_size: uploader_options.chunk_size,
+            client_env_variables: uploader_options.client_env_variables,
+            downloaders_count: 0,
+            enable_telegraf: uploader_options.enable_telegraf,
+            evm_data_payments_address: uploader_options.evm_details.data_payments_address,
+            evm_network: uploader_options.evm_details.network,
+            evm_payment_token_address: uploader_options.evm_details.payment_token_address,
+            evm_rpc_url: uploader_options.evm_details.rpc_url,
+            full_cone_private_node_count: 0,
+            funding_wallet_secret_key: uploader_options.funding_wallet_secret_key,
+            gas_amount: uploader_options.initial_gas,
+            interval: None,
+            log_format: None,
+            max_archived_log_files: uploader_options.max_archived_log_files,
+            max_log_files: uploader_options.max_log_files,
+            max_uploads: uploader_options.max_uploads,
+            name: uploader_options.name,
+            network_id: uploader_options.network_id,
+            node_count: 0,
+            node_env_variables: None,
+            output_inventory_dir_path: uploader_options.output_inventory_dir_path,
+            peer_cache_node_count: 0,
+            public_rpc: false,
+            rewards_address: None,
+            symmetric_private_node_count: 0,
+            token_amount: uploader_options.initial_tokens,
+            uploaders_count: Some(uploader_options.uploaders_count),
+            wallet_secret_keys: uploader_options.wallet_secret_keys,
         }
     }
 }
@@ -320,7 +364,11 @@ impl AnsibleProvisioner {
         }
     }
 
-    pub fn build_safe_network_binaries(&self, options: &ProvisionOptions) -> Result<()> {
+    pub fn build_safe_network_binaries(
+        &self,
+        options: &ProvisionOptions,
+        binaries_to_build: Option<Vec<String>>,
+    ) -> Result<()> {
         let start = Instant::now();
         println!("Obtaining IP address for build VM...");
         let build_inventory = self
@@ -331,7 +379,45 @@ impl AnsibleProvisioner {
             .wait_for_ssh_availability(&build_ip, &self.cloud_provider.get_ssh_user())?;
 
         println!("Running ansible against build VM...");
-        let extra_vars = extra_vars::build_binaries_extra_vars_doc(options)?;
+        let base_extra_vars = extra_vars::build_binaries_extra_vars_doc(options)?;
+
+        let extra_vars = if let Some(binaries) = binaries_to_build {
+            let mut build_ant = false;
+            let mut build_antnode = false;
+            let mut build_antctl = false;
+            let mut build_antctld = false;
+
+            for binary in &binaries {
+                match binary.as_str() {
+                    "ant" => build_ant = true,
+                    "antnode" => build_antnode = true,
+                    "antctl" => build_antctl = true,
+                    "antctld" => build_antctld = true,
+                    _ => return Err(Error::InvalidBinaryName(binary.clone())),
+                }
+            }
+
+            let mut json_value: serde_json::Value = serde_json::from_str(&base_extra_vars)?;
+            if let serde_json::Value::Object(ref mut map) = json_value {
+                map.insert("build_ant".to_string(), serde_json::Value::Bool(build_ant));
+                map.insert(
+                    "build_antnode".to_string(),
+                    serde_json::Value::Bool(build_antnode),
+                );
+                map.insert(
+                    "build_antctl".to_string(),
+                    serde_json::Value::Bool(build_antctl),
+                );
+                map.insert(
+                    "build_antctld".to_string(),
+                    serde_json::Value::Bool(build_antctld),
+                );
+            }
+            json_value.to_string()
+        } else {
+            base_extra_vars
+        };
+
         self.ansible_runner.run_playbook(
             AnsiblePlaybook::Build,
             AnsibleInventoryType::Build,
@@ -920,8 +1006,10 @@ impl AnsibleProvisioner {
     ) -> Result<()> {
         let start = Instant::now();
 
-        let sk_map = self
-            .deposit_funds_to_uploaders(&FundingOptions {
+        let sk_map = if let Some(wallet_keys) = &options.wallet_secret_keys {
+            self.prepare_pre_funded_wallets(wallet_keys).await?
+        } else {
+            self.deposit_funds_to_uploaders(&FundingOptions {
                 evm_data_payments_address: options.evm_data_payments_address.clone(),
                 evm_network: options.evm_network.clone(),
                 evm_payment_token_address: options.evm_payment_token_address.clone(),
@@ -931,10 +1019,8 @@ impl AnsibleProvisioner {
                 token_amount: options.token_amount,
                 uploaders_count: options.uploaders_count,
             })
-            .await?;
-
-        println!("Running ansible against uploader machine to start the uploader script.");
-        debug!("Running ansible against uploader machine to start the uploader script.");
+            .await?
+        };
 
         self.ansible_runner.run_playbook(
             AnsiblePlaybook::Uploaders,
