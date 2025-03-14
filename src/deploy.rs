@@ -16,10 +16,7 @@ use alloy::{hex::ToHexExt, primitives::U256};
 use colored::Colorize;
 use log::error;
 use serde::{Deserialize, Serialize};
-use std::{
-    path::PathBuf,
-    time::Duration
-};
+use std::{path::PathBuf, time::Duration};
 
 #[derive(Clone, Serialize, Deserialize)]
 pub struct DeployOptions {
@@ -129,7 +126,7 @@ impl TestnetDeployer {
                 },
                 funding_wallet_address: None,
                 network_id: options.network_id,
-                rewards_address: options.rewards_address.clone(),
+                rewards_address: Some(options.rewards_address.clone()),
             },
         )
         .await?;
@@ -191,7 +188,7 @@ impl TestnetDeployer {
                 },
                 funding_wallet_address,
                 network_id: options.network_id,
-                rewards_address: options.rewards_address.clone(),
+                rewards_address: Some(options.rewards_address.clone()),
             },
         )
         .await?;
@@ -200,7 +197,7 @@ impl TestnetDeployer {
             self.ansible_provisioner
                 .print_ansible_run_banner("Build Custom Binaries");
             self.ansible_provisioner
-                .build_safe_network_binaries(&provision_options)
+                .build_safe_network_binaries(&provision_options, None)
                 .map_err(|err| {
                     println!("Failed to build safe network binaries {err:?}");
                     err

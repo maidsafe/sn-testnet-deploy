@@ -70,7 +70,7 @@ impl TestnetDeployer {
                 },
                 funding_wallet_address: None,
                 network_id: options.network_id,
-                rewards_address: options.rewards_address.clone(),
+                rewards_address: Some(options.rewards_address.clone()),
             },
         )
         .await?;
@@ -111,7 +111,7 @@ impl TestnetDeployer {
             self.ansible_provisioner
                 .print_ansible_run_banner("Build Custom Binaries");
             self.ansible_provisioner
-                .build_safe_network_binaries(&provision_options)
+                .build_safe_network_binaries(&provision_options, None)
                 .map_err(|err| {
                     println!("Failed to build safe network binaries {err:?}");
                     err

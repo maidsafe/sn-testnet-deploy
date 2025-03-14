@@ -38,34 +38,6 @@ pub struct InfraRunOptions {
 }
 
 impl InfraRunOptions {
-    fn get_value_for_resource(
-        resources: &[TerraformResource],
-        resource_name: &str,
-        field_name: &str,
-    ) -> Result<serde_json::Value, Error> {
-        let field_value = resources
-            .iter()
-            .filter(|r| r.resource_name == resource_name)
-            .try_fold(None, |acc_value: Option<serde_json::Value>, r| {
-                let Some(value) = r.values.get(field_name) else {
-                    log::error!("Failed to obtain '{field_name}' value for {resource_name}");
-                    return Err(Error::TerraformResourceFieldMissing(field_name.to_string()));
-                };
-                match acc_value {
-                    Some(ref existing_value) if existing_value != value => {
-                        log::error!("Expected value: {existing_value}, got value: {value}");
-                        Err(Error::TerraformResourceValueMismatch {
-                            expected: existing_value.to_string(),
-                            actual: value.to_string(),
-                        })
-                    }
-                    _ => Ok(Some(value.clone())),
-                }
-            })?;
-
-        field_value.ok_or(Error::TerraformResourceFieldMissing(field_name.to_string()))
-    }
-
     /// Generate the options for an existing deployment.
     pub async fn generate_existing(
         name: &str,
@@ -84,19 +56,16 @@ impl InfraRunOptions {
         let peer_cache_node_vm_count = resource_count("peer_cache_node");
         let (peer_cache_node_volume_size, peer_cache_node_vm_size) = if peer_cache_node_vm_count > 0
         {
-            let volume_size = Self::get_value_for_resource(
-                &resources,
-                "peer_cache_node_attached_volume",
-                "size",
-            )?
-            .as_u64()
-            .ok_or_else(|| {
-                log::error!(
-                    "Failed to obtain u64 'size' value for peer_cache_node_attached_volume"
-                );
-                Error::TerraformResourceFieldMissing("size".to_string())
-            })?;
-            let vm_size = Self::get_value_for_resource(&resources, "peer_cache_node", "size")?
+            let volume_size =
+                get_value_for_resource(&resources, "peer_cache_node_attached_volume", "size")?
+                    .as_u64()
+                    .ok_or_else(|| {
+                        log::error!(
+                            "Failed to obtain u64 'size' value for peer_cache_node_attached_volume"
+                        );
+                        Error::TerraformResourceFieldMissing("size".to_string())
+                    })?;
+            let vm_size = get_value_for_resource(&resources, "peer_cache_node", "size")?
                 .as_str()
                 .ok_or_else(|| {
                     log::error!("Failed to obtain str 'size' value for peer_cache_node");
@@ -113,10 +82,11 @@ impl InfraRunOptions {
         let genesis_vm_count = match environment_details.deployment_type {
             DeploymentType::New => 1,
             DeploymentType::Bootstrap => 0,
+            DeploymentType::Uploaders => 0,
         };
         let genesis_node_volume_size = if genesis_vm_count > 0 {
             let genesis_node_volume_size =
-                Self::get_value_for_resource(&resources, "genesis_node_attached_volume", "size")?
+                get_value_for_resource(&resources, "genesis_node_attached_volume", "size")?
                     .as_u64()
                     .ok_or_else(|| {
                         log::error!(
@@ -132,7 +102,7 @@ impl InfraRunOptions {
         let node_vm_count = resource_count("node");
         let node_volume_size = if node_vm_count > 0 {
             let node_volume_size =
-                Self::get_value_for_resource(&resources, "node_attached_volume", "size")?
+                get_value_for_resource(&resources, "node_attached_volume", "size")?
                     .as_u64()
                     .ok_or_else(|| {
                         log::error!("Failed to obtain u64 'size' value for node_attached_volume");
@@ -147,7 +117,7 @@ impl InfraRunOptions {
         let symmetric_private_node_vm_count = resource_count("symmetric_private_node");
         let (symmetric_private_node_volume_size, symmetric_nat_gateway_vm_size) =
             if symmetric_private_node_vm_count > 0 {
-                let symmetric_private_node_volume_size = Self::get_value_for_resource(
+                let symmetric_private_node_volume_size = get_value_for_resource(
                     &resources,
                     "symmetric_private_node_attached_volume",
                     "size",
@@ -161,7 +131,7 @@ impl InfraRunOptions {
                 })?;
                 // gateways should exists if private nodes exist
                 let symmetric_nat_gateway_vm_size =
-                    Self::get_value_for_resource(&resources, "symmetric_nat_gateway", "size")?
+                    get_value_for_resource(&resources, "symmetric_nat_gateway", "size")?
                         .as_str()
                         .ok_or_else(|| {
                             log::error!(
@@ -181,7 +151,7 @@ impl InfraRunOptions {
         let full_cone_private_node_vm_count = resource_count("full_cone_private_node");
         let (full_cone_private_node_volume_size, full_cone_nat_gateway_vm_size) =
             if full_cone_private_node_vm_count > 0 {
-                let full_cone_private_node_volume_size = Self::get_value_for_resource(
+                let full_cone_private_node_volume_size = get_value_for_resource(
                     &resources,
                     "full_cone_private_node_attached_volume",
                     "size",
@@ -195,7 +165,7 @@ impl InfraRunOptions {
                 })?;
                 // gateways should exists if private nodes exist
                 let full_cone_nat_gateway_vm_size =
-                    Self::get_value_for_resource(&resources, "full_cone_nat_gateway", "size")?
+                    get_value_for_resource(&resources, "full_cone_nat_gateway", "size")?
                         .as_str()
                         .ok_or_else(|| {
                             log::error!(
@@ -215,7 +185,7 @@ impl InfraRunOptions {
 
         let uploader_vm_count = resource_count("uploader");
         let uploader_vm_size = if uploader_vm_count > 0 {
-            let uploader_vm_size = Self::get_value_for_resource(&resources, "uploader", "size")?
+            let uploader_vm_size = get_value_for_resource(&resources, "uploader", "size")?
                 .as_str()
                 .ok_or_else(|| {
                     log::error!("Failed to obtain str 'size' value for uploader");
@@ -233,7 +203,7 @@ impl InfraRunOptions {
 
         // Node VM size var is re-used for nodes, evm nodes, symmetric and full cone private nodes
         let node_vm_size = if node_vm_count > 0 {
-            let node_vm_size = Self::get_value_for_resource(&resources, "node", "size")?
+            let node_vm_size = get_value_for_resource(&resources, "node", "size")?
                 .as_str()
                 .ok_or_else(|| {
                     log::error!("Failed to obtain str 'size' value for node");
@@ -243,7 +213,7 @@ impl InfraRunOptions {
             Some(node_vm_size)
         } else if symmetric_private_node_vm_count > 0 {
             let symmetric_private_node_vm_size =
-                Self::get_value_for_resource(&resources, "symmetric_private_node", "size")?
+                get_value_for_resource(&resources, "symmetric_private_node", "size")?
                     .as_str()
                     .ok_or_else(|| {
                         log::error!("Failed to obtain str 'size' value for symmetric_private_node");
@@ -253,7 +223,7 @@ impl InfraRunOptions {
             Some(symmetric_private_node_vm_size)
         } else if full_cone_private_node_vm_count > 0 {
             let full_cone_private_node_vm_size =
-                Self::get_value_for_resource(&resources, "full_cone_private_node", "size")?
+                get_value_for_resource(&resources, "full_cone_private_node", "size")?
                     .as_str()
                     .ok_or_else(|| {
                         log::error!("Failed to obtain str 'size' value for full_cone_private_node");
@@ -262,7 +232,7 @@ impl InfraRunOptions {
                     .to_string();
             Some(full_cone_private_node_vm_size)
         } else if evm_node_count > 0 {
-            let evm_node_vm_size = Self::get_value_for_resource(&resources, "evm_node", "size")?
+            let evm_node_vm_size = get_value_for_resource(&resources, "evm_node", "size")?
                 .as_str()
                 .ok_or_else(|| {
                     log::error!("Failed to obtain str 'size' value for evm_node");
@@ -320,6 +290,115 @@ impl TestnetDeployer {
         print_duration(start.elapsed());
         Ok(())
     }
+}
+
+#[derive(Clone, Debug)]
+pub struct UploaderInfraRunOptions {
+    pub enable_build_vm: bool,
+    pub name: String,
+    pub tfvars_filename: String,
+    pub uploader_vm_count: Option<u16>,
+    pub uploader_vm_size: Option<String>,
+}
+
+impl UploaderInfraRunOptions {
+    /// Generate the options for an existing uploader deployment.
+    pub async fn generate_existing(
+        name: &str,
+        terraform_runner: &TerraformRunner,
+        environment_details: &EnvironmentDetails,
+    ) -> Result<Self> {
+        let resources = terraform_runner.show(name)?;
+
+        let resource_count = |resource_name: &str| -> u16 {
+            resources
+                .iter()
+                .filter(|r| r.resource_name == resource_name)
+                .count() as u16
+        };
+
+        let uploader_vm_count = resource_count("uploader");
+        let uploader_vm_size = if uploader_vm_count > 0 {
+            let uploader_vm_size = get_value_for_resource(&resources, "uploader", "size")?
+                .as_str()
+                .ok_or_else(|| {
+                    log::error!("Failed to obtain str 'size' value for uploader");
+                    Error::TerraformResourceFieldMissing("size".to_string())
+                })?
+                .to_string();
+            Some(uploader_vm_size)
+        } else {
+            None
+        };
+
+        let build_vm_count = resource_count("build");
+        let enable_build_vm = build_vm_count > 0;
+
+        let options = Self {
+            enable_build_vm,
+            name: name.to_string(),
+            tfvars_filename: environment_details
+                .environment_type
+                .get_tfvars_filename(name),
+            uploader_vm_count: Some(uploader_vm_count),
+            uploader_vm_size,
+        };
+
+        Ok(options)
+    }
+
+    pub fn build_terraform_args(&self) -> Result<Vec<(String, String)>> {
+        let mut args = Vec::new();
+
+        args.push((
+            "use_custom_bin".to_string(),
+            self.enable_build_vm.to_string(),
+        ));
+
+        if let Some(uploader_vm_count) = self.uploader_vm_count {
+            args.push((
+                "uploader_vm_count".to_string(),
+                uploader_vm_count.to_string(),
+            ));
+        }
+        if let Some(uploader_vm_size) = &self.uploader_vm_size {
+            args.push((
+                "uploader_droplet_size".to_string(),
+                uploader_vm_size.clone(),
+            ));
+        }
+
+        Ok(args)
+    }
+}
+
+/// Extract a specific field value from terraform resources.
+fn get_value_for_resource(
+    resources: &[TerraformResource],
+    resource_name: &str,
+    field_name: &str,
+) -> Result<serde_json::Value, Error> {
+    let field_value = resources
+        .iter()
+        .filter(|r| r.resource_name == resource_name)
+        .try_fold(None, |acc_value: Option<serde_json::Value>, r| {
+            let Some(value) = r.values.get(field_name) else {
+                log::error!("Failed to obtain '{field_name}' value for {resource_name}");
+                return Err(Error::TerraformResourceFieldMissing(field_name.to_string()));
+            };
+            match acc_value {
+                Some(ref existing_value) if existing_value != value => {
+                    log::error!("Expected value: {existing_value}, got value: {value}");
+                    Err(Error::TerraformResourceValueMismatch {
+                        expected: existing_value.to_string(),
+                        actual: value.to_string(),
+                    })
+                }
+                _ => Ok(Some(value.clone())),
+            }
+        })?;
+
+    field_value.ok_or(Error::TerraformResourceFieldMissing(field_name.to_string()))
 }
 
 /// Build the terraform arguments from InfraRunOptions
@@ -441,4 +520,27 @@ pub fn build_terraform_args(options: &InfraRunOptions) -> Result<Vec<(String, St
     }
 
     Ok(args)
+}
+
+/// Select a Terraform workspace for an environment.
+/// Returns an error if the environment doesn't exist.
+pub fn select_workspace(terraform_runner: &TerraformRunner, name: &str) -> Result<()> {
+    terraform_runner.init()?;
+    let workspaces = terraform_runner.workspace_list()?;
+    if !workspaces.contains(&name.to_string()) {
+        return Err(Error::EnvironmentDoesNotExist(name.to_string()));
+    }
+    terraform_runner.workspace_select(name)?;
+    println!("Selected {name} workspace");
+    Ok(())
+}
+
+pub fn delete_workspace(terraform_runner: &TerraformRunner, name: &str) -> Result<()> {
+    // The 'dev' workspace is one we always expect to exist, for admin purposes.
+    // You can't delete a workspace while it is selected, so we select 'dev' before we delete
+    // the current workspace.
+    terraform_runner.workspace_select("dev")?;
+    terraform_runner.workspace_delete(name)?;
+    println!("Deleted {name} workspace");
+    Ok(())
 }
