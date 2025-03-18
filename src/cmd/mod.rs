@@ -176,9 +176,9 @@ pub enum Commands {
         /// Specify the network ID to use for the node services. This is used to partition the network and will not allow
         /// nodes with different network IDs to join.
         ///
-        /// By default, the network ID is set to 1, which represents the mainnet.
-        #[clap(long, verbatim_doc_comment)]
-        network_id: Option<u8>,
+        /// This must match the network ID of the original network being bootstrapped from.
+        #[clap(long, required = true, verbatim_doc_comment)]
+        network_id: u8,
         /// The number of antnode services to run on each VM.
         ///
         /// If the argument is not used, the value will be determined by the 'environment-type'

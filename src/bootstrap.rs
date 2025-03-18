@@ -34,7 +34,7 @@ pub struct BootstrapOptions {
     pub max_archived_log_files: u16,
     pub max_log_files: u16,
     pub name: String,
-    pub network_id: Option<u8>,
+    pub network_id: u8,
     pub node_count: u16,
     pub node_env_variables: Option<Vec<(String, String)>>,
     pub node_vm_count: Option<u16>,
@@ -69,7 +69,7 @@ impl TestnetDeployer {
                     rpc_url: options.evm_rpc_url.clone(),
                 },
                 funding_wallet_address: None,
-                network_id: options.network_id,
+                network_id: Some(options.network_id),
                 rewards_address: Some(options.rewards_address.clone()),
             },
         )

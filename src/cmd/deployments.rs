@@ -38,7 +38,7 @@ pub async fn handle_bootstrap(
     interval: Duration,
     log_format: Option<LogFormat>,
     name: String,
-    network_id: Option<u8>,
+    network_id: u8,
     node_count: Option<u16>,
     node_vm_count: Option<u16>,
     node_volume_size: Option<u16>,

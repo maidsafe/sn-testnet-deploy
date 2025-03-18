@@ -255,7 +255,7 @@ impl From<BootstrapOptions> for ProvisionOptions {
             max_log_files: bootstrap_options.max_log_files,
             max_uploads: None,
             name: bootstrap_options.name,
-            network_id: bootstrap_options.network_id,
+            network_id: Some(bootstrap_options.network_id),
             node_count: bootstrap_options.node_count,
             node_env_variables: bootstrap_options.node_env_variables,
             output_inventory_dir_path: bootstrap_options.output_inventory_dir_path,
