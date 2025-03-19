@@ -40,6 +40,9 @@ use std::time::Duration;
 pub enum Commands {
     /// Bootstrap a new network from an existing deployment.
     Bootstrap {
+        /// Set to run Ansible with more verbose output.
+        #[arg(long)]
+        ansible_verbose: bool,
         /// Supply a version number for the antctl binary.
         ///
         /// There should be no 'v' prefix.
@@ -63,9 +66,6 @@ pub enum Commands {
         /// arguments. You can only supply version numbers or a custom branch, not both.
         #[arg(long, verbatim_doc_comment)]
         antnode_version: Option<String>,
-        /// Set to run Ansible with more verbose output.
-        #[arg(long)]
-        ansible_verbose: bool,
         /// The branch of the Github repository to build from.
         ///
         /// If used, all binaries will be built from this branch. It is typically used for testing
@@ -77,15 +77,6 @@ pub enum Commands {
         /// arguments. You can only supply version numbers or a custom branch, not both.
         #[arg(long, verbatim_doc_comment)]
         branch: Option<String>,
-        /// The network contacts URL to bootstrap from.
-        ///
-        /// Either this or the `bootstrap-peer` argument must be provided.
-        bootstrap_network_contacts_url: Option<String>,
-        /// The peer from an existing network that we can bootstrap from.
-        ///
-        /// Either this or the `bootstrap-network-contacts-url` argument must be provided.
-        #[arg(long)]
-        bootstrap_peer: Option<String>,
         /// Specify the chunk size for the custom binaries using a 64-bit integer.
         ///
         /// This option only applies if the --branch and --repo-owner arguments are used.
@@ -101,14 +92,6 @@ pub enum Commands {
         /// The default is 'development'.
         #[clap(long, default_value_t = EnvironmentType::Development, value_parser = parse_deployment_type, verbatim_doc_comment)]
         environment_type: EnvironmentType,
-        /// Provide environment variables for the antnode service.
-        ///
-        /// This is useful to set the antnode's log levels. Each variable should be comma
-        /// separated without any space.
-        ///
-        /// Example: --node-env ANT_LOG=all,RUST_LOG=libp2p=debug
-        #[clap(name = "node-env", long, use_value_delimiter = true, value_parser = parse_environment_variables, verbatim_doc_comment)]
-        node_env_variables: Option<Vec<(String, String)>>,
         /// The address of the data payments contract.
         ///
         /// This argument must match the same contract address used in the existing network.
@@ -173,6 +156,11 @@ pub enum Commands {
         /// The name of the environment
         #[arg(short = 'n', long)]
         name: String,
+        /// The network contacts URL to bootstrap from.
+        ///
+        /// Either this or the `peer` argument must be provided.
+        #[arg(long)]
+        network_contacts_url: Option<String>,
         /// Specify the network ID to use for the node services. This is used to partition the network and will not allow
         /// nodes with different network IDs to join.
         ///
@@ -185,6 +173,14 @@ pub enum Commands {
         /// argument.
         #[clap(long)]
         node_count: Option<u16>,
+        /// Provide environment variables for the antnode service.
+        ///
+        /// This is useful to set the antnode's log levels. Each variable should be comma
+        /// separated without any space.
+        ///
+        /// Example: --node-env ANT_LOG=all,RUST_LOG=libp2p=debug
+        #[clap(name = "node-env", long, use_value_delimiter = true, value_parser = parse_environment_variables, verbatim_doc_comment)]
+        node_env_variables: Option<Vec<(String, String)>>,
         /// The number of node VMs to create.
         ///
         /// Each VM will run many antnode services.
@@ -203,6 +199,11 @@ pub enum Commands {
         /// argument.
         #[clap(long)]
         node_volume_size: Option<u16>,
+        /// The peer from an existing network that we can bootstrap from.
+        ///
+        /// Either this or the `network-contacts-url` argument must be provided.
+        #[arg(long)]
+        peer: Option<String>,
         /// The cloud provider to deploy to.
         ///
         /// Valid values are "aws" or "digital-ocean".
