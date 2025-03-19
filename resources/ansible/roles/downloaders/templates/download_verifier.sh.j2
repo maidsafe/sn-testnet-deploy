@@ -1,0 +1,191 @@
+#!/usr/bin/env bash
+SUCCESSFUL_UPLOAD_METRIC_FILE="/home/${USER}/uploaded_files.log"
+DOWNLOAD_DIR="/home/${USER}/downloaded_files"
+SLEEP_INTERVAL=5
+
+CONTACT_PEER_ARG=""
+NETWORK_CONTACTS_URL_ARG=""
+NETWORK_ID_ARG=""
+TESTNET_ARG=""
+
+if [ -n "${1:-}" ]; then
+  echo "Setting contact peer arg to ${1:-}"
+  CONTACT_PEER_ARG="--peer ${1:-}"
+fi
+if [ -n "${2:-}" ]; then
+  echo "Setting network contacts URL arg to ${2:-}"
+  NETWORK_CONTACTS_URL_ARG="--network-contacts-url ${2:-}"
+fi
+if [ -n "${3:-}" ]; then
+  echo "Setting network ID arg to ${3:-}"
+  NETWORK_ID_ARG="--network-id ${3:-}"
+  echo "Setting --testnet arg"
+  TESTNET_ARG="--testnet"
+fi
+
+if ! command -v ant &> /dev/null; then
+  echo "Error: 'ant' not found in PATH."
+  exit 1
+fi
+
+get_error_enum() {
+  local exit_code=$1
+  case $exit_code in
+    0)
+      echo "SUCCESS"
+      ;;
+    6)
+      echo "INVALID_INPUT"
+      ;;
+    11)
+      echo "SERIALIZATION_ERROR"
+      ;;
+    12)
+      echo "IO_ERROR"
+      ;;
+    13)
+      echo "NETWORK_ERROR"
+      ;;
+    14)
+      echo "PROTOCOL_ERROR"
+      ;;
+    15)
+      echo "SELF_ENCRYPTION_ERROR"
+      ;;
+    21)
+      echo "EVM_WALLET_NETWORK_MISMATCH"
+      ;;
+    22)
+      echo "EVM_WALLET_ERROR"
+      ;;
+    23)
+      echo "PAY_COST_ERROR"
+      ;;
+    31)
+      echo "INVALID_DATA_MAP"
+      ;;
+    32)
+      echo "DECRYPTION_ERROR"
+      ;;
+    36)
+      echo "UNRECOGNIZED_INPUT"
+      ;;
+    37)
+      echo "FAILED_GET"
+      ;;
+    41)
+      echo "PUT_COST_ERROR"
+      ;;
+    42)
+      echo "WALLET_ERROR"
+      ;;
+    43)
+      echo "SCRATCHPAD_BAD_OWNER"
+      ;;
+    44)
+      echo "PAYMENT_UNEXPECTEDLY_INVALID"
+      ;;
+    45)
+      echo "PAYEES_MISSING"
+      ;;
+    51)
+      echo "NO_BOOTSTRAP_PEERS_FOUND"
+      ;;
+    52)
+      echo "FAILED_TO_PARSE_CACHE_DATA"
+      ;;
+    53)
+      echo "COULD_NOT_OBTAIN_DATA_DIR"
+      ;;
+    54)
+      echo "FAILED_TO_OBTAIN_ADDRS_FROM_URL"
+      ;;
+    55)
+      echo "FAILED_TO_PARSE_URL"
+      ;;
+    56)
+      echo "JSON_ERROR"
+      ;;
+    57) 
+      echo "HTTP_ERROR"
+      ;;
+    58)
+      echo "LOCK_ERROR"
+      ;;
+    *)
+      echo "UNKNOWN_ERROR"
+      ;;
+  esac
+}
+
+write_metrics_on_success() {
+  local time=$1
+  local exit_code=$2
+  metrics_header
+  error_enum=$(get_error_enum $exit_code)
+
+  echo "$time,$file_ref,$exit_code" >> "./downloader_metrics.csv"
+}
+
+write_metrics_on_failure() {
+  local time=$1
+  local exit_code=$2
+  metrics_header
+  error_enum=$(get_error_enum $exit_code)
+  echo "$time,$file_ref,$error_enum" >> "./downloader_metrics.csv"
+}
+
+metrics_header() {
+  if [ ! -f "./downloader_metrics.csv" ]; then
+    echo "Total Time(s),File Address,Exit Status" > "./downloader_metrics.csv"
+  fi
+}
+
+download_file() {
+  local file_ref=$1
+  # Multiple downloaders can be running on the same machine, so one or more
+  # could select the same file address at the same time. We therefore use a GUID
+  # to ensure a unique output file.
+  local download_filename=$(uuidgen)
+  (
+    download_path="$DOWNLOAD_DIR/$download_filename"
+    echo "Downloading file: $file_ref" 
+    start_time=$(date +"%s")
+    stdout=$(ant $CONTACT_PEER_ARG $NETWORK_CONTACTS_URL_ARG $TESTNET_ARG $NETWORK_ID_ARG file download "$download_path" "$file_ref" 2>&1)
+    exit_code=$?
+    end_time=$(date +"%s")
+    echo "$stdout"
+    echo "Exit code: $exit_code"
+    rm -rf "$download_path"
+
+    if [ ! -f "./downloader_metrics.csv" ]; then
+        echo "Total Time(s),File Address,Exit Status" > "./downloader_metrics.csv"
+    fi
+
+    if [ $exit_code -eq 0 ]; then
+        echo "Successfully downloaded $file_ref using ANT CLI"
+    else
+        echo "Failed to download $file_ref using ANT CLI"
+    fi
+
+    error_enum=$(get_error_enum $exit_code)
+    elapsed=$(($(date +"%s") - $start_time))
+    echo "$elapsed,$file_ref,$error_enum" >> "./downloader_metrics.csv"
+  )
+}
+
+while true; do
+  if [[ -f "$SUCCESSFUL_UPLOAD_METRIC_FILE" && -s "$SUCCESSFUL_UPLOAD_METRIC_FILE" ]]; then
+    file_ref=$(tail -n 10 "$SUCCESSFUL_UPLOAD_METRIC_FILE" | head -n 1)
+    if [[ -n "$file_ref" ]]; then
+      download_file "$file_ref"
+      sleep "$SLEEP_INTERVAL"
+    else
+      echo "Selected line is empty. Retrying in '$SLEEP_INTERVAL' seconds..."
+      sleep "$SLEEP_INTERVAL"
+    fi
+  else
+    echo "Upload metric file '$SUCCESSFUL_UPLOAD_METRIC_FILE' does not exist or is empty. Retrying in '$SLEEP_INTERVAL' seconds..."
+    sleep "$SLEEP_INTERVAL"
+  fi
+done

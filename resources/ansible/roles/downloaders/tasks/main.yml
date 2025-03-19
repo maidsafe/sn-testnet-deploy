@@ -1,30 +1,35 @@
 ---
 # This role makes the assumption that the uploaders role has already been applied.
-# The uploaders role will download the `safe` binary.
+# The uploaders role will download the `ant` binary.
 # There is no context in which you would want to use this role without using the uploaders role.
-- name: copy download.sh to remote
-  ansible.builtin.copy:
-    src: download.sh
-    dest: /home/safe/download.sh
-    owner: safe
-    group: safe
-    mode: '0744'
-  become: yes
-  become_user: safe
+- name: copy download_verifier.sh to remote
+  ansible.builtin.template:
+    src: download_verifier.sh.j2
+    dest: /home/ant1/download_verifier.sh
+    owner: ant1
+    group: ant
+    mode: '0775'
+  become: true
+  become_user: ant1
+
+- name: Check if systemd service file exists
+  ansible.builtin.stat:
+    path: "/etc/systemd/system/download_verifier.service"
+  register: service_file_stat
 
 - name: create systemd service file
   ansible.builtin.template:
-    src: safe_downloader.service.j2
-    dest: /etc/systemd/system/safe_downloader@.service
-    owner: root
-    group: root
+    src: download_verifier.service.j2
+    dest: "/etc/systemd/system/download_verifier.service"
+    owner: ant1
+    group: ant
     mode: '0644'
-  become: yes
+  become: true
+  when: not service_file_stat.stat.exists
 
-- name: start and enable safe_downloader services
+- name: start and enable download_verifier services
   ansible.builtin.systemd:
-    name: "safe_downloader@{{ item }}"
+    name: download_verifier
     state: started
     enabled: yes
-  become: yes
-  loop: "{{ range(1, safe_downloader_instances|int + 1)|list }}"
+  become: true

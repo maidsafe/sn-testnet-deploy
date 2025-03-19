@@ -33,6 +33,7 @@ pub struct UploaderDeployOptions {
     pub chunk_size: Option<u64>,
     pub client_env_variables: Option<Vec<(String, String)>>,
     pub current_inventory: UploaderDeploymentInventory,
+    pub enable_downloaders: bool,
     pub enable_telegraf: bool,
     pub environment_type: EnvironmentType,
     pub evm_details: EvmDetails,
@@ -362,6 +363,21 @@ impl UploaderDeployer {
                 println!("Failed to provision uploaders {err:?}");
                 err
             })?;
+
+        self.ansible_provisioner
+            .print_ansible_run_banner("Provision Downloaders");
+        self.ansible_provisioner
+            .provision_downloaders(
+                &provision_options,
+                Some(options.peer.clone()),
+                Some(options.network_contacts_url.clone()),
+            )
+            .await
+            .map_err(|err| {
+                println!("Failed to provision downloaders {err:?}");
+                err
+            })?;
+
         println!("Deployment completed successfully in {:?}", start.elapsed());
         Ok(())
     }

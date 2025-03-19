@@ -183,7 +183,7 @@ impl TestnetDeployer {
             binary_option: options.current_inventory.binary_option.clone(),
             chunk_size: None,
             client_env_variables: None,
-            downloaders_count: 0,
+            enable_downloaders: false,
             enable_telegraf: true,
             evm_network: options
                 .current_inventory
@@ -487,7 +487,7 @@ impl TestnetDeployer {
             binary_option: options.current_inventory.binary_option.clone(),
             chunk_size: None,
             client_env_variables: None,
-            downloaders_count: 0,
+            enable_downloaders: false,
             enable_telegraf: true,
             evm_data_payments_address: options
                 .current_inventory
