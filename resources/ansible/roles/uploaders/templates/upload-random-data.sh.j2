@@ -57,26 +57,121 @@ if ! command -v ant &> /dev/null; then
   exit 1
 fi
 
+
+get_error_enum() {
+  local exit_code=$1
+  case $exit_code in
+    0)
+      echo "SUCCESS"
+      ;;
+    6)
+      echo "INVALID_INPUT"
+      ;;
+    11)
+      echo "SERIALIZATION_ERROR"
+      ;;
+    12)
+      echo "IO_ERROR"
+      ;;
+    13)
+      echo "NETWORK_ERROR"
+      ;;
+    14)
+      echo "PROTOCOL_ERROR"
+      ;;
+    15)
+      echo "SELF_ENCRYPTION_ERROR"
+      ;;
+    21)
+      echo "EVM_WALLET_NETWORK_MISMATCH"
+      ;;
+    22)
+      echo "EVM_WALLET_ERROR"
+      ;;
+    23)
+      echo "PAY_COST_ERROR"
+      ;;
+    31)
+      echo "INVALID_DATA_MAP"
+      ;;
+    32)
+      echo "DECRYPTION_ERROR"
+      ;;
+    36)
+      echo "UNRECOGNIZED_INPUT"
+      ;;
+    37)
+      echo "FAILED_GET"
+      ;;
+    41)
+      echo "PUT_COST_ERROR"
+      ;;
+    42)
+      echo "WALLET_ERROR"
+      ;;
+    43)
+      echo "SCRATCHPAD_BAD_OWNER"
+      ;;
+    44)
+      echo "PAYMENT_UNEXPECTEDLY_INVALID"
+      ;;
+    45)
+      echo "PAYEES_MISSING"
+      ;;
+    51)
+      echo "NO_BOOTSTRAP_PEERS_FOUND"
+      ;;
+    52)
+      echo "FAILED_TO_PARSE_CACHE_DATA"
+      ;;
+    53)
+      echo "COULD_NOT_OBTAIN_DATA_DIR"
+      ;;
+    54)
+      echo "FAILED_TO_OBTAIN_ADDRS_FROM_URL"
+      ;;
+    55)
+      echo "FAILED_TO_PARSE_URL"
+      ;;
+    56)
+      echo "JSON_ERROR"
+      ;;
+    57) 
+      echo "HTTP_ERROR"
+      ;;
+    58)
+      echo "LOCK_ERROR"
+      ;;
+    *)
+      echo "UNKNOWN_ERROR"
+      ;;
+  esac
+}
+
 write_metrics_on_success() {
   local time=$1
   local file_size_kb=$2
+  local exit_code=$3
   metrics_header
   number_of_chunks=$(echo "$stdout" | rg -o 'Number of chunks uploaded: [0-9]+' | rg -o '[0-9]+')
   store_cost=$(echo "$stdout" | rg -o 'Total cost: [0-9]+' | rg -o '[0-9]+' | head -n 1)
+  error_enum=$(get_error_enum $exit_code)
 
-  echo "$time,$file_size_kb,$number_of_chunks,$store_cost" >> "./uploader_metrics.csv"
+  echo "$time,$file_size_kb,$number_of_chunks,$store_cost,$exit_code" >> "./uploader_metrics.csv"
 }
 
 write_metrics_on_failure() {
   local time=$1
   local file_size_kb=$2
+  local exit_code=$3
   metrics_header
-  echo "$time,$file_size_kb" >> "./uploader_metrics.csv"
+  error_enum=$(get_error_enum $exit_code)
+  echo "$time,$file_size_kb,0,0,$error_enum" >> "./uploader_metrics.csv"
 }
 
 metrics_header() {
   if [ ! -f "./uploader_metrics.csv" ]; then
-    echo "Total Time(s),File Size (KB),Number of Chunks,Store Cost (AttoTokens)" > "./uploader_metrics.csv"
+    echo "Total Time(s),File Size (KB),Number of Chunks,Store Cost (AttoTokens),Exit Status" > "./uploader_metrics.csv"
   fi
 }
 
@@ -99,10 +194,12 @@ generate_random_data_file_and_upload() {
     $NETWORK_ID_ARG \
     $LOG_OUTPUT_ARG \
     file upload "$tmpfile" 2>&1)
+  exit_code=$?
   echo "$stdout"
+  echo "Exit code: $exit_code"
 
   if [ $? -eq 0 ]; then
-    echo "Successfully uploaded $tmpfile using SAFE CLI"
+    echo "Successfully uploaded $tmpfile using ANT CLI"
 
     file_ref=$(echo "$stdout" | grep -oP 'At address: \K\S+')
     if [ -z "$file_ref" ]; then
@@ -112,11 +209,11 @@ generate_random_data_file_and_upload() {
     fi
 
     elapsed=$(($(date +"%s") - $now))
-    write_metrics_on_success $elapsed $file_size_kb
+    write_metrics_on_success $elapsed $file_size_kb $exit_code
   else
-    echo "Failed to upload $tmpfile using SAFE CLI"
+    echo "Failed to upload $tmpfile using ANT CLI"
     elapsed=$(($(date +"%s") - $now))
-    write_metrics_on_failure $elapsed $file_size_kb
+    write_metrics_on_failure $elapsed $file_size_kb $exit_code
   fi
 
   rm "$tmpfile"

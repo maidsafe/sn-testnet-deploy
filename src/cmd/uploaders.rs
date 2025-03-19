@@ -68,6 +68,9 @@ pub enum UploadersCommands {
         /// Set to disable Telegraf metrics collection on all nodes.
         #[clap(long)]
         disable_telegraf: bool,
+        /// Set to enable the downloaders on the VMs.
+        #[clap(long)]
+        enable_downloaders: bool,
         /// The type of deployment.
         ///
         /// Possible values are 'development', 'production' or 'staging'. The value used will
@@ -277,6 +280,7 @@ pub async fn handle_uploaders_command(cmd: UploadersCommands) -> Result<()> {
             chunk_size,
             client_env_variables,
             disable_telegraf,
+            enable_downloaders,
             environment_type,
             evm_data_payments_address,
             evm_network_type,
@@ -376,6 +380,7 @@ pub async fn handle_uploaders_command(cmd: UploadersCommands) -> Result<()> {
                 chunk_size,
                 client_env_variables,
                 current_inventory: inventory,
+                enable_downloaders,
                 enable_telegraf: !disable_telegraf,
                 environment_type,
                 evm_details,

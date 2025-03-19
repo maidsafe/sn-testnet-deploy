@@ -1,17 +1,12 @@
 ---
-- name: configure uploaders
+- name: configure downloaders
   hosts: all
   become: False
   ignore_unreachable: yes
   roles:
-    - role: setup_striped_storage
+    - role: downloaders
       become: True
-      vars:
-        mount_base: /mnt/client-logs
-    - role: uploader-metrics
-      become: True
-    - role: uploaders
-      become: True
+      when: enable_downloaders | bool
 
   tasks:
     # Something is wrong with the journal service on Ubuntu that causes no
@@ -23,10 +18,6 @@
         name: systemd-journald
         state: restarted
         enabled: yes
-      register: journald_restart
-      retries: 3
-      delay: 5
-      until: journald_restart is success
     # # The Telegraf service seems to need to be rebooted for metrics to start transmitting.
     - name: restart telegraf
       become: True
@@ -34,8 +25,3 @@
         name: telegraf
         state: restarted
         enabled: yes
-      when: enable_telegraf | bool
-      register: telegraf_restart
-      retries: 3
-      delay: 5
-      until: telegraf_restart is success

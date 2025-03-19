@@ -3,28 +3,28 @@
   hosts: all
   become: False
   vars:
-    build_ant: "{{ build_ant | default(true) }}"
-    build_antnode: "{{ build_antnode | default(true) }}"
-    build_antctl: "{{ build_antctl | default(true) }}"
-    build_antctld: "{{ build_antctld | default(true) }}"
+    build_ant_var: "{{ build_ant | default(true) }}"
+    build_antnode_var: "{{ build_antnode | default(true) }}"
+    build_antctl_var: "{{ build_antctl | default(true) }}"
+    build_antctld_var: "{{ build_antctld | default(true) }}"
   roles:
     - {
         role: build_safe_network_binary,
         bin_name: "ant",
-        when: (custom_bin == "true") and (build_ant | bool)
+        when: (custom_bin == "true") and (build_ant_var | bool)
       }
     - {
         role: build_safe_network_binary,
         bin_name: "antnode",
-        when: (custom_bin == "true") and (build_antnode | bool)
+        when: (custom_bin == "true") and (build_antnode_var | bool)
       }
     - {
         role: build_safe_network_binary,
         bin_name: "antctl",
-        when: (custom_bin == "true") and (build_antctl | bool)
+        when: (custom_bin == "true") and (build_antctl_var | bool)
       }
     - {
         role: build_safe_network_binary,
         bin_name: "antctld",
-        when: (custom_bin == "true") and (build_antctld | bool)
+        when: (custom_bin == "true") and (build_antctld_var | bool)
       }
