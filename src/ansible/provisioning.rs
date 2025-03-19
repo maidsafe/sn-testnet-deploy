@@ -53,7 +53,7 @@ pub struct ProvisionOptions {
     pub binary_option: BinaryOption,
     pub chunk_size: Option<u64>,
     pub client_env_variables: Option<Vec<(String, String)>>,
-    pub downloaders_count: u16,
+    pub enable_downloaders: bool,
     pub enable_telegraf: bool,
     pub evm_data_payments_address: Option<String>,
     pub evm_network: EvmNetwork,
@@ -240,7 +240,7 @@ impl From<BootstrapOptions> for ProvisionOptions {
             binary_option: bootstrap_options.binary_option,
             chunk_size: bootstrap_options.chunk_size,
             client_env_variables: None,
-            downloaders_count: 0,
+            enable_downloaders: false,
             enable_telegraf: true,
             evm_data_payments_address: bootstrap_options.evm_data_payments_address,
             evm_network: bootstrap_options.evm_network,
@@ -277,7 +277,7 @@ impl From<DeployOptions> for ProvisionOptions {
             binary_option: deploy_options.binary_option,
             chunk_size: deploy_options.chunk_size,
             client_env_variables: deploy_options.client_env_variables,
-            downloaders_count: deploy_options.downloaders_count,
+            enable_downloaders: deploy_options.enable_downloaders,
             enable_telegraf: deploy_options.enable_telegraf,
             node_env_variables: deploy_options.node_env_variables,
             evm_data_payments_address: deploy_options.evm_data_payments_address,
@@ -314,7 +314,7 @@ impl From<UploaderDeployOptions> for ProvisionOptions {
             binary_option: uploader_options.binary_option,
             chunk_size: uploader_options.chunk_size,
             client_env_variables: uploader_options.client_env_variables,
-            downloaders_count: 0,
+            enable_downloaders: uploader_options.enable_downloaders,
             enable_telegraf: uploader_options.enable_telegraf,
             evm_data_payments_address: uploader_options.evm_details.data_payments_address,
             evm_network: uploader_options.evm_details.network,
@@ -995,6 +995,31 @@ impl AnsibleProvisioner {
             NodeType::SymmetricPrivateNode,
         )?;
 
+        Ok(())
+    }
+
+    pub async fn provision_downloaders(
+        &self,
+        options: &ProvisionOptions,
+        genesis_multiaddr: Option<String>,
+        genesis_network_contacts_url: Option<String>,
+    ) -> Result<()> {
+        let start = Instant::now();
+
+        println!("Running ansible against uploader machine to start the downloader script.");
+        debug!("Running ansible against uploader machine to start the downloader script.");
+
+        self.ansible_runner.run_playbook(
+            AnsiblePlaybook::Downloaders,
+            AnsibleInventoryType::Uploaders,
+            Some(extra_vars::build_downloaders_extra_vars_doc(
+                &self.cloud_provider.to_string(),
+                options,
+                genesis_multiaddr,
+                genesis_network_contacts_url,
+            )?),
+        )?;
+        print_duration(start.elapsed());
         Ok(())
     }
 

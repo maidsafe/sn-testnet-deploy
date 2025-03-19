@@ -315,6 +315,9 @@ pub enum Commands {
         /// arguments. You can only supply version numbers or a custom branch, not both.
         #[arg(long, verbatim_doc_comment)]
         branch: Option<String>,
+        /// Set to enable the downloaders on the VMs.
+        #[clap(long)]
+        enable_downloaders: bool,
         /// The number of antnode services to run on each Peer Cache VM.
         ///
         /// If the argument is not used, the value will be determined by the 'environment-type'
@@ -344,13 +347,6 @@ pub enum Commands {
         /// This option only applies if the --branch and --repo-owner arguments are used.
         #[clap(long, value_parser = parse_chunk_size)]
         chunk_size: Option<u64>,
-        /// If set to a non-zero value, the uploaders will also be accompanied by the specified
-        /// number of downloaders.
-        ///
-        /// This will be the number on each uploader VM. So if the value here is 2 and there are
-        /// 5 uploader VMs, there will be 10 downloaders across the 5 VMs.
-        #[clap(long, default_value_t = 0)]
-        downloaders_count: u16,
         /// Provide environment variables for the antnode service.
         ///
         /// This is useful to set the antnode's log levels. Each variable should be comma

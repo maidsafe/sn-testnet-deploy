@@ -77,6 +77,10 @@ pub enum AnsiblePlaybook {
     ///
     /// Use in combination with `AnsibleInventoryType::Genesis` or `AnsibleInventoryType::Nodes`.
     CopyLogs,
+    /// The Downloaders playbook will setup the downloader scripts on the uploader VMs.
+    ///
+    /// Use in combination with `AnsibleInventoryType::Uploaders`.
+    Downloaders,
     /// The EVM node playbook will setup and manage EVM nodes for the deployment.
     ///
     /// Use in combination with `AnsibleInventoryType::EvmNodes`.
@@ -196,6 +200,7 @@ impl AnsiblePlaybook {
             AnsiblePlaybook::CleanupLogs => "cleanup_logs.yml".to_string(),
             AnsiblePlaybook::ConfigureSwapfile => "configure_swapfile.yml".to_string(),
             AnsiblePlaybook::CopyLogs => "copy_logs.yml".to_string(),
+            AnsiblePlaybook::Downloaders => "downloaders.yml".to_string(),
             AnsiblePlaybook::EvmNodes => "evm_nodes.yml".to_string(),
             AnsiblePlaybook::ExtendVolumeSize => "extend_volume_size.yml".to_string(),
             AnsiblePlaybook::Faucet => "faucet.yml".to_string(),
