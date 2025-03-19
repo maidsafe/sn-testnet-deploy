@@ -24,7 +24,7 @@ pub struct DeployOptions {
     pub chunk_size: Option<u64>,
     pub client_env_variables: Option<Vec<(String, String)>>,
     pub current_inventory: DeploymentInventory,
-    pub downloaders_count: u16,
+    pub enable_downloaders: bool,
     pub enable_telegraf: bool,
     pub environment_type: EnvironmentType,
     pub evm_data_payments_address: Option<String>,
@@ -324,21 +324,34 @@ impl TestnetDeployer {
             }
         }
 
-        if options.current_inventory.is_empty() {
-            self.ansible_provisioner
-                .print_ansible_run_banner("Provision Uploaders");
-            self.ansible_provisioner
-                .provision_uploaders(
-                    &provision_options,
-                    Some(genesis_multiaddr.clone()),
-                    Some(genesis_network_contacts.clone()),
-                )
-                .await
-                .map_err(|err| {
-                    println!("Failed to provision uploaders {err:?}");
-                    err
-                })?;
-        }
+        // if options.current_inventory.is_empty() {
+        self.ansible_provisioner
+            .print_ansible_run_banner("Provision Uploaders");
+        self.ansible_provisioner
+            .provision_uploaders(
+                &provision_options,
+                Some(genesis_multiaddr.clone()),
+                Some(genesis_network_contacts.clone()),
+            )
+            .await
+            .map_err(|err| {
+                println!("Failed to provision uploaders {err:?}");
+                err
+            })?;
+        self.ansible_provisioner
+            .print_ansible_run_banner("Provision Downloaders");
+        self.ansible_provisioner
+            .provision_downloaders(
+                &provision_options,
+                Some(genesis_multiaddr.clone()),
+                Some(genesis_network_contacts.clone()),
+            )
+            .await
+            .map_err(|err| {
+                println!("Failed to provision downloaders {err:?}");
+                err
+            })?;
+        // }
 
         if node_provision_failed {
             println!();
