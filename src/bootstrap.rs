@@ -18,8 +18,6 @@ use log::error;
 #[derive(Clone)]
 pub struct BootstrapOptions {
     pub binary_option: BinaryOption,
-    pub bootstrap_network_contacts_url: Option<String>,
-    pub bootstrap_peer: Option<String>,
     pub chunk_size: Option<u64>,
     pub environment_type: EnvironmentType,
     pub evm_data_payments_address: Option<String>,
@@ -34,6 +32,7 @@ pub struct BootstrapOptions {
     pub max_archived_log_files: u16,
     pub max_log_files: u16,
     pub name: String,
+    pub network_contacts_url: Option<String>,
     pub network_id: u8,
     pub node_count: u16,
     pub node_env_variables: Option<Vec<(String, String)>>,
@@ -41,6 +40,7 @@ pub struct BootstrapOptions {
     pub node_vm_size: Option<String>,
     pub node_volume_size: Option<u16>,
     pub output_inventory_dir_path: PathBuf,
+    pub peer: Option<String>,
     pub rewards_address: String,
     pub symmetric_private_node_count: u16,
     pub symmetric_private_node_vm_count: Option<u16>,
@@ -124,8 +124,8 @@ impl TestnetDeployer {
             .print_ansible_run_banner("Provision Normal Nodes");
         match self.ansible_provisioner.provision_nodes(
             &provision_options,
-            options.bootstrap_peer.clone(),
-            options.bootstrap_network_contacts_url.clone(),
+            options.peer.clone(),
+            options.network_contacts_url.clone(),
             NodeType::Generic,
         ) {
             Ok(()) => {
@@ -146,8 +146,8 @@ impl TestnetDeployer {
         if private_node_inventory.should_provision_full_cone_private_nodes() {
             match self.ansible_provisioner.provision_full_cone(
                 &provision_options,
-                options.bootstrap_peer.clone(),
-                options.bootstrap_network_contacts_url.clone(),
+                options.peer.clone(),
+                options.network_contacts_url.clone(),
                 private_node_inventory.clone(),
                 None,
             ) {
@@ -175,8 +175,8 @@ impl TestnetDeployer {
                 .print_ansible_run_banner("Provision Symmetric Private Nodes");
             match self.ansible_provisioner.provision_symmetric_private_nodes(
                 &mut provision_options,
-                options.bootstrap_peer.clone(),
-                options.bootstrap_network_contacts_url.clone(),
+                options.peer.clone(),
+                options.network_contacts_url.clone(),
                 &private_node_inventory,
             ) {
                 Ok(()) => {
