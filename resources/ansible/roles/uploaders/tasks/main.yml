@@ -52,6 +52,17 @@
     recurse: yes
   become: true
 
+- name: ensure individual ant user upload directories exist
+  ansible.builtin.file:
+    path: "/mnt/ant-storage/logs/upload_files/ant{{ item }}"
+    state: directory
+    mode: '0775'
+    owner: "ant{{ item }}"
+    group: ant
+    recurse: yes
+  become: true
+  loop: "{{ range(1, ant_uploader_instances | int + 1) | list }}"
+
 - name: copy upload-random-data.sh to remote for each ant user
   ansible.builtin.template:
     src: upload-random-data.sh.j2
