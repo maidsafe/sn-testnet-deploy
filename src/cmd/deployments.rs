@@ -9,13 +9,9 @@ use super::{get_binary_option, upload_options_to_s3, OptionsType};
 use alloy::primitives::U256;
 use color_eyre::{eyre::eyre, Help, Result};
 use sn_testnet_deploy::{
-    bootstrap::BootstrapOptions,
-    calculate_size_per_attached_volume,
-    deploy::DeployOptions,
-    error::Error,
-    inventory::{DeploymentInventory, DeploymentInventoryService},
-    upscale::UpscaleOptions,
-    BinaryOption, CloudProvider, EnvironmentType, EvmNetwork, LogFormat, TestnetDeployBuilder,
+    bootstrap::BootstrapOptions, calculate_size_per_attached_volume, deploy::DeployOptions,
+    error::Error, inventory::DeploymentInventoryService, upscale::UpscaleOptions, BinaryOption,
+    CloudProvider, EnvironmentType, EvmNetwork, LogFormat, TestnetDeployBuilder,
 };
 use std::time::Duration;
 
@@ -292,10 +288,10 @@ pub async fn handle_deploy(
     let testnet_deployer = builder.build()?;
 
     let inventory_service = DeploymentInventoryService::from(&testnet_deployer);
-    // let inventory = inventory_service
-    //     .generate_or_retrieve_inventory(&name, true, Some(binary_option.clone()))
-    //     .await?;
-    let inventory = DeploymentInventory::empty(&name, binary_option.clone());
+    let inventory = inventory_service
+        .generate_or_retrieve_inventory(&name, true, Some(binary_option.clone()))
+        .await?;
+    // let inventory = DeploymentInventory::empty(&name, binary_option.clone());
 
     match testnet_deployer.init().await {
         Ok(_) => {}
