@@ -1,8 +1,10 @@
 #!/usr/bin/env bash
 SUCCESSFUL_UPLOAD_METRIC_FILE="/mnt/ant-storage/logs/upload_files/${USER}/metrics_success.csv"
 DOWNLOAD_DIR="/home/${USER}/downloaded_files"
-DOWNLOAD_METRICS_DIR="/mnt/ant-storage/logs/download_files/download_verifier/${USER}/metrics_success.csv"
+DOWNLOAD_METRICS_DIR="/mnt/ant-storage/logs/download_files/download_verifier/${USER}"
 SLEEP_INTERVAL=20
+
+mkdir -p "${UPLOAD_METRIC_DIR}"
 
 CONTACT_PEER_ARG=""
 NETWORK_CONTACTS_URL_ARG=""
@@ -119,29 +121,6 @@ get_error_enum() {
   esac
 }
 
-write_metrics_on_success() {
-  local time=$1
-  local exit_code=$2
-  metrics_header
-  error_enum=$(get_error_enum $exit_code)
-
-  echo "$time,$file_ref,$exit_code" >> "./downloader_metrics.csv"
-}
-
-write_metrics_on_failure() {
-  local time=$1
-  local exit_code=$2
-  metrics_header
-  error_enum=$(get_error_enum $exit_code)
-  echo "$time,$file_ref,$error_enum" >> "./downloader_metrics.csv"
-}
-
-metrics_header() {
-  if [ ! -f "./downloader_metrics.csv" ]; then
-    echo "Total Time(s),File Address,Exit Status" > "./downloader_metrics.csv"
-  fi
-}
-
 download_file() {
   local file_ref=$1
   local expected_hash=$2 
@@ -153,7 +132,7 @@ download_file() {
     download_path="$DOWNLOAD_DIR/$download_filename"
     echo "Downloading file: $file_ref" 
     start_time=$(date +"%s")
-    stdout=$(ant $CONTACT_PEER_ARG $NETWORK_CONTACTS_URL_ARG $TESTNET_ARG $NETWORK_ID_ARG file download "$download_path" "$file_ref" 2>&1)
+    stdout=$(ant $CONTACT_PEER_ARG $NETWORK_CONTACTS_URL_ARG $TESTNET_ARG $NETWORK_ID_ARG file download "$file_ref" "$download_path" 2>&1)
     exit_code=$?
     end_time=$(date +"%s")
     echo "$stdout"
@@ -177,31 +156,30 @@ download_file() {
         fi
     fi
 
-    if [ $? -eq 0 ]; then
-    echo "Successfully downloaded $tmpfile using ANT CLI"
-    success_file="$UPLOAD_METRIC_DIR/metrics_success.csv"
+    if [ exit_code -eq 0 ]; then
+        echo "Successfully downloaded $file_ref using ANT CLI"
+        success_file="$DOWNLOAD_METRICS_DIR/metrics_success.csv"
 
-    if [ ! -f "$success_file" ]; then
-      echo "Timestamp_Start,Timestamp_Finish,File_Address,Duration,Exit_Status,Service_Type,Ant_User" > "$success_file"
+        if [ ! -f "$success_file" ]; then
+        echo "Timestamp_Start,Timestamp_Finish,File_Address,Duration,Exit_Status,Service_Type,Ant_User" > "$success_file"
+        fi
+        echo "$start_time,$end_time,$file_ref,$elapsed,$error_enum,DOWNLOAD_VERIFIER,$USER" >> "$success_file"
+    else
+        echo "Failed to download $file_ref using ANT CLI"
+        failure_file="$DOWNLOAD_METRICS_DIR/metrics_failure.csv"
+
+        if [ ! -f "$failure_file" ]; then
+        echo "Timestamp_Start,Timestamp_Finish,File_Address,Duration,Exit_Status,Service_Type,Ant_User" > "$failure_file"
+        fi
+        echo "$start_time,$end_time,$file_ref,$elapsed,$error_enum,DOWNLOAD_VERIFIER,$USER" >> "$failure_file"
     fi
-    echo "$start_time,$end_time,$file_ref,$elapsed,$error_enum,DOWNLOAD_VERIFIER,$USER" >> "$success_file"
-
-  else
-    echo "Failed to download $tmpfile using ANT CLI"
-    failure_file="$UPLOAD_METRIC_DIR/metrics_failure.csv"
-
-    if [ ! -f "$failure_file" ]; then
-      echo "Timestamp_Start,Timestamp_Finish,File_Address,Duration,Exit_Status,Service_Type,Ant_User" > "$failure_file"
-    fi
-    echo "$start_time,$end_time,$file_ref,$elapsed,$error_enum,DOWNLOAD_VERIFIER,$USER" >> "$failure_file"
-  fi
   )
 }
 
 while true; do
   if [[ -f "$SUCCESSFUL_UPLOAD_METRIC_FILE" && -s "$SUCCESSFUL_UPLOAD_METRIC_FILE" ]]; then
-    file_ref=$(tail -n 10 "$SUCCESSFUL_UPLOAD_METRIC_FILE" | cut -d ',' -f 3)
-    file_hash=$(tail -n 10 "$SUCCESSFUL_UPLOAD_METRIC_FILE" | cut -d ',' -f 12)
+    file_ref=$(tail -n 3 "$SUCCESSFUL_UPLOAD_METRIC_FILE" | cut -d ',' -f 3 | head -n 1)
+    file_hash=$(tail -n 3 "$SUCCESSFUL_UPLOAD_METRIC_FILE" | cut -d ',' -f 12 | head -n 1 )
 
     if [[ -n "$file_ref" ]]; then
       download_file "$file_ref"
