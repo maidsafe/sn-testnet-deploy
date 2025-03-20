@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 LOG_OUTPUT_DEST="{{ log_output_dest }}"
+UPLOAD_METRIC_DIR="/mnt/ant-storage/logs/upload_files/${USER}"
 
 if [[ -n "${SECRET_KEY}" ]] && ! grep -q "export SECRET_KEY=" ~/.profile; then
   echo "export SECRET_KEY=${SECRET_KEY}" >> ~/.profile
@@ -138,45 +139,19 @@ get_error_enum() {
   esac
 }
 
-write_metrics_on_success() {
-  local time=$1
-  local file_size_kb=$2
-  local exit_code=$3
-  metrics_header
-  number_of_chunks=$(echo "$stdout" | rg -o 'Number of chunks uploaded: [0-9]+' | rg -o '[0-9]+')
-  store_cost=$(echo "$stdout" | rg -o 'Total cost: [0-9]+' | rg -o '[0-9]+' | head -n 1)
-  error_enum=$(get_error_enum $exit_code)
-
-  echo "$time,$file_size_kb,$number_of_chunks,$store_cost,$exit_code" >> "./uploader_metrics.csv"
-}
-
-write_metrics_on_failure() {
-  local time=$1
-  local file_size_kb=$2
-  local exit_code=$3
-  metrics_header
-  error_enum=$(get_error_enum $exit_code)
-  echo "$time,$file_size_kb,0,0,$error_enum" >> "./uploader_metrics.csv"
-}
-
-metrics_header() {
-  if [ ! -f "./uploader_metrics.csv" ]; then
-    echo "Total Time(s),File Size (KB),Number of Chunks,Store Cost (AttoTokens),Exit Status" > "./uploader_metrics.csv"
-  fi
-}
-
 generate_random_data_file_and_upload() {
   tmpfile=$(mktemp)
   dd if=/dev/urandom of="$tmpfile" bs=100M count=1 iflag=fullblock &> /dev/null
 
-  echo "Generated random data file at $tmpfile"
   file_size_kb=$(du -k "$tmpfile" | cut -f1)
+  file_hash=$(sha256sum "$tmpfile" | awk '{ print $1 }')
+  echo "Generated random data file at $tmpfile with size $file_size_kb KB and SHA-256 hash $file_hash"
 
   timestamp=$(date +"%Y%m%d_%H%M%S")
   log_file_path="${LOG_OUTPUT_DEST}/${timestamp}"
   LOG_OUTPUT_ARG="--log-output-dest $log_file_path"
   
-  now=$(date +"%s")
+  start_time=$(date +"%s")
   stdout=$(ant \
     $CONTACT_PEER_ARG \
     $NETWORK_CONTACTS_URL_ARG \
@@ -185,25 +160,37 @@ generate_random_data_file_and_upload() {
     $LOG_OUTPUT_ARG \
     file upload "$tmpfile" 2>&1)
   exit_code=$?
+  end_time=$(date +"%s")
   echo "$stdout"
   echo "Exit code: $exit_code"
 
   if [ $? -eq 0 ]; then
     echo "Successfully uploaded $tmpfile using ANT CLI"
+    success_file="$UPLOAD_METRIC_DIR/metrics_success.csv"
 
-    file_ref=$(echo "$stdout" | grep -oP 'At address: \K\S+')
-    if [ -z "$file_ref" ]; then
-      echo "Error: Unable to extract file reference."
-    else
-      echo "$file_ref" >> "./uploaded_files.log"
+    uploaded_address=$(echo "$stdout" | grep -oP 'At address: \K\S+')
+    number_of_chunks=$(echo "$stdout" | rg -o 'Number of chunks uploaded: [0-9]+' | rg -o '[0-9]+')
+    already_uploaded_chunks=$(echo "$stdout" | rg -o 'Number of chunks already paid/uploaded: [0-9]+' | rg -o '[0-9]+')
+    store_cost=$(echo "$stdout" | rg -o 'Total cost: [0-9]+' | rg -o '[0-9]+' | head -n 1)
+    error_enum=$(get_error_enum $exit_code)
+    elapsed=$(($end_time - $start_time))
+
+    if [ ! -f "$success_file" ]; then
+      echo "Timestamp_Start,Timestamp_Finish,File_Address,Duration,Chunks_Uploaded,Chunks_Already_Paid,Exit_Status,Service_Type,Ant_User,Store_Cost,File_Size,Sha256_Hash" > "$success_file"
     fi
+    echo "$start_time,$end_time,$uploaded_address,$elapsed,$number_of_chunks,$already_uploaded_chunks,$error_enum,UPLOADER,$USER,$store_cost,$file_size_kb,$file_hash" >> "$success_file"
 
-    elapsed=$(($(date +"%s") - $now))
-    write_metrics_on_success $elapsed $file_size_kb $exit_code
   else
     echo "Failed to upload $tmpfile using ANT CLI"
-    elapsed=$(($(date +"%s") - $now))
-    write_metrics_on_failure $elapsed $file_size_kb $exit_code
+    failure_file="$UPLOAD_METRIC_DIR/metrics_failure.csv"
+
+    elapsed=$(($end_time - $start_time))
+    error_enum=$(get_error_enum $exit_code)
+
+    if [ ! -f "$failure_file" ]; then
+      echo "Timestamp_Start,Timestamp_Finish,Duration,Exit_Status,Service_Type,Ant_User,File_Size,Sha256_Hash" > "$failure_file"
+    fi
+    echo "$start_time,$end_time,$elapsed,$error_enum,UPLOADER,$USER,$file_size_kb,$file_hash" >> "$failure_file"
   fi
 
   rm "$tmpfile"
