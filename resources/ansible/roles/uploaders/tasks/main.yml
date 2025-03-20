@@ -42,6 +42,16 @@
     group: ant
   become: true
 
+- name: ensure the ant users can write to the upload metrics directory
+  ansible.builtin.file:
+    path: "/mnt/ant-storage/logs/upload_files"
+    state: directory
+    mode: '0775'
+    owner: root
+    group: ant
+    recurse: yes
+  become: true
+
 - name: copy upload-random-data.sh to remote for each ant user
   ansible.builtin.template:
     src: upload-random-data.sh.j2
