@@ -2,6 +2,8 @@
 LOG_OUTPUT_DEST="{{ log_output_dest }}"
 UPLOAD_METRIC_DIR="/mnt/ant-storage/logs/upload_files/${USER}"
 
+mkdir -p "${UPLOAD_METRIC_DIR}"
+
 if [[ -n "${SECRET_KEY}" ]] && ! grep -q "export SECRET_KEY=" ~/.profile; then
   echo "export SECRET_KEY=${SECRET_KEY}" >> ~/.profile
 fi
@@ -21,6 +23,7 @@ fi
 if [[ -n "${EVM_NETWORK}" ]] && ! grep -q "export EVM_NETWORK=" ~/.profile; then
   echo "export EVM_NETWORK=${EVM_NETWORK}" >> ~/.profile
 fi
+
 
 CONTACT_PEER_ARG=""
 NETWORK_CONTACTS_URL_ARG=""
