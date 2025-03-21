@@ -137,6 +137,8 @@ download_file() {
     end_time=$(date +"%s")
     echo "$stdout"
     echo "Exit code: $exit_code"
+    package_version=$(ant --package-version 2>&1 | grep "Package version" | awk '{print $3}')
+    echo "Package version: $package_version"
     rm -rf "$download_path"
     elapsed=$(($end_time - $start_time))
     error_enum=$(get_error_enum $exit_code)
@@ -161,17 +163,17 @@ download_file() {
         success_file="$DOWNLOAD_METRICS_DIR/metrics_success.csv"
 
         if [ ! -f "$success_file" ]; then
-        echo "Timestamp_Start,Timestamp_Finish,File_Address,Duration,Exit_Status,Service_Type,Ant_User" > "$success_file"
+        echo "Timestamp_Start,Timestamp_Finish,File_Address,Duration,Exit_Status,Service_Type,Ant_User,Sha256_Hash,Ant_Package_Version" > "$success_file"
         fi
-        echo "$start_time,$end_time,$file_ref,$elapsed,$error_enum,DOWNLOAD_VERIFIER,$USER" >> "$success_file"
+        echo "$start_time,$end_time,$file_ref,$elapsed,$error_enum,DOWNLOAD_VERIFIER,$USER,$actual_hash,$package_version" >> "$success_file"
     else
         echo "Failed to download $file_ref using ANT CLI"
         failure_file="$DOWNLOAD_METRICS_DIR/metrics_failure.csv"
 
         if [ ! -f "$failure_file" ]; then
-        echo "Timestamp_Start,Timestamp_Finish,File_Address,Duration,Exit_Status,Service_Type,Ant_User" > "$failure_file"
+        echo "Timestamp_Start,Timestamp_Finish,File_Address,Duration,Exit_Status,Service_Type,Ant_User,Sha256_Hash,Ant_Package_Version" > "$failure_file"
         fi
-        echo "$start_time,$end_time,$file_ref,$elapsed,$error_enum,DOWNLOAD_VERIFIER,$USER" >> "$failure_file"
+        echo "$start_time,$end_time,$file_ref,$elapsed,$error_enum,DOWNLOAD_VERIFIER,$USER,$actual_hash,$package_version" >> "$failure_file"
     fi
   )
 }
