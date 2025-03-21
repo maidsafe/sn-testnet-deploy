@@ -44,7 +44,7 @@
 
 - name: ensure the ant users can write to the upload metrics directory
   ansible.builtin.file:
-    path: "/mnt/ant-storage/logs/upload_files"
+    path: "/mnt/ant-storage/logs/upload_files/random_uploader"
     state: directory
     mode: '0775'
     owner: root
@@ -54,7 +54,7 @@
 
 - name: ensure individual ant user upload directories exist
   ansible.builtin.file:
-    path: "/mnt/ant-storage/logs/upload_files/ant{{ item }}"
+    path: "/mnt/ant-storage/logs/upload_files/random_uploader/ant{{ item }}"
     state: directory
     mode: '0775'
     owner: "ant{{ item }}"
@@ -63,10 +63,10 @@
   become: true
   loop: "{{ range(1, ant_uploader_instances | int + 1) | list }}"
 
-- name: copy upload-random-data.sh to remote for each ant user
+- name: copy ant_random_uploader.sh to remote for each ant user
   ansible.builtin.template:
-    src: upload-random-data.sh.j2
-    dest: "/home/ant{{ item }}/upload-random-data.sh"
+    src: ant_random_uploader.sh.j2
+    dest: "/home/ant{{ item }}/ant_random_uploader.sh"
     owner: "ant{{ item }}"
     group: "ant"
     mode: '0744'
@@ -76,7 +76,7 @@
 
 - name: Check if systemd service file exists
   ansible.builtin.stat:
-    path: "/etc/systemd/system/ant_uploader_{{ item }}.service"
+    path: "/etc/systemd/system/ant_random_uploader_{{ item }}.service"
   register: service_file_stat
   loop: "{{ range(1, ant_uploader_instances | int + 1) | list }}"
 
@@ -84,10 +84,10 @@
   set_fact:
     secret_keys_per_machine: "{{ ant_secret_key_map[inventory_hostname] | regex_replace('\"', '') }}"
 
-- name: create systemd service file
+- name: create ant_random_uploader service file
   ansible.builtin.template:
-    src: ant_uploader.service.j2
-    dest: "/etc/systemd/system/ant_uploader_{{ item.0 }}.service"
+    src: ant_random_uploader.service.j2
+    dest: "/etc/systemd/system/ant_random_uploader_{{ item.0 }}.service"
     owner: "ant{{ item.0 }}"
     group: "ant"
     mode: '0644'
@@ -98,9 +98,9 @@
     count: "{{ item.0 }}"
     secret_key: "{{ item.1 }}"
 
-- name: start and enable ant_uploader service for each uploader
+- name: start and enable ant_random_uploader service for each uploader
   ansible.builtin.systemd:
-    name: "ant_uploader_{{ item }}"
+    name: "ant_random_uploader_{{ item }}"
     state: started
     enabled: yes
   become: true
