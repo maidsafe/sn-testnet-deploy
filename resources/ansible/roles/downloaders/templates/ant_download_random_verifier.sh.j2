@@ -124,7 +124,7 @@ get_error_enum() {
 download_file() {
   local file_ref=$1
   local expected_hash=$2 
-  local file_size=$3
+  local expected_file_size=$3
   # Multiple downloaders can be running on the same machine, so one or more
   # could select the same file address at the same time. We therefore use a GUID
   # to ensure a unique output file.
@@ -179,17 +179,17 @@ download_file() {
         success_file="$DOWNLOAD_METRICS_DIR/metrics_success.csv"
 
         if [ ! -f "$success_file" ]; then
-        echo "Timestamp_Start,Timestamp_Finish,File_Address,Duration,Retries,Fetched_Chunks,Total_Chunks,Exit_Status,Service_Type,Ant_User,Service_Number,Sha256_Hash,Ant_Package_Version,Ant_Package_Build_Date" > "$success_file"
+        echo "TIMESTAMP_START,TIMESTAMP_FINISH,DATA_ADDRESS,DURATION,RETRIES,FETCHED_RECORDS,TOTAL_RECORDS,EXIT_STATUS,SERVICE_TYPE,ANT_USER,SERVICE_NUMBER,EXPECTED_TOTAL_SIZE,SHA256_HASH,ANT_PACKAGE_VERSION,ANT_PACKAGE_BUILD_DATE" > "$success_file"
         fi
-        echo "$start_time,$end_time,$file_ref,$elapsed,0,0,0,$error_enum,RANDOM_VERIFIER,$USER,1,$actual_hash,$package_version,$build_date" >> "$success_file"
+        echo "$start_time,$end_time,$file_ref,$elapsed,0,0,0,$error_enum,RANDOM_VERIFIER,$USER,1,$expected_file_size,$actual_hash,$package_version,$build_date" >> "$success_file"
     else
         echo "Failed to download $file_ref using ANT CLI"
         failure_file="$DOWNLOAD_METRICS_DIR/metrics_failure.csv"
 
         if [ ! -f "$failure_file" ]; then
-        echo "Timestamp_Start,Timestamp_Finish,File_Address,Duration,Retries,Fetched_Chunks,Total_Chunks,Exit_Status,Service_Type,Ant_User,Service_Number,Sha256_Hash,Ant_Package_Version,Ant_Package_Build_Date" > "$failure_file"
+        echo "TIMESTAMP_START,TIMESTAMP_FINISH,DATA_ADDRESS,DURATION,RETRIES,FETCHED_RECORDS,TOTAL_RECORDS,EXIT_STATUS,SERVICE_TYPE,ANT_USER,SERVICE_NUMBER,EXPECTED_TOTAL_SIZE,SHA256_HASH,ANT_PACKAGE_VERSION,ANT_PACKAGE_BUILD_DATE" > "$failure_file"
         fi
-        echo "$start_time,$end_time,$file_ref,$elapsed,0,0,0,$error_enum,RANDOM_VERIFIER,$USER,1,$actual_hash,$package_version,$build_date" >> "$failure_file"
+        echo "$start_time,$end_time,$file_ref,$elapsed,0,0,0,$error_enum,RANDOM_VERIFIER,$USER,1,$expected_file_size,$actual_hash,$package_version,$build_date" >> "$failure_file"
     fi
   )
 }
