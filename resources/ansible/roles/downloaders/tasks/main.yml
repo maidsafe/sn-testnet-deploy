@@ -2,17 +2,47 @@
 # This role makes the assumption that the uploaders role has already been applied.
 # The uploaders role will download the `ant` binary.
 # There is no context in which you would want to use this role without using the uploaders role.
-- name: copy download_verifier.sh to remote
+- name: copy ant_download_random_verifier.sh to remote
   ansible.builtin.template:
-    src: download_verifier.sh.j2
-    dest: /home/ant1/download_verifier.sh
+    src: ant_download_random_verifier.sh.j2
+    dest: /home/ant1/ant_download_random_verifier.sh
     owner: ant1
     group: ant
     mode: '0775'
   become: true
   become_user: ant1
 
-- name: ensure the ant users can write to the download metrics directory
+- name: copy ant_download_verifier.sh to remote
+  ansible.builtin.template:
+    src: ant_download_verifier.sh.j2
+    dest: /home/ant1/ant_download_verifier.sh
+    owner: ant1
+    group: ant
+    mode: '0775'
+  become: true
+  become_user: ant1
+
+- name: copy ant_performance_verifier.sh to remote
+  ansible.builtin.template:
+    src: ant_performance_verifier.sh.j2
+    dest: /home/ant1/ant_performance_verifier.sh
+    owner: ant1
+    group: ant
+    mode: '0775'
+  become: true
+  become_user: ant1
+
+- name: ensure the ant users can write to the random_verifier metrics directory
+  ansible.builtin.file:
+    path: "/mnt/ant-storage/logs/download_files/random_verifier/ant1/"
+    state: directory
+    mode: '0775'
+    owner: ant1
+    group: ant
+    recurse: yes
+  become: true
+
+- name: ensure the ant users can write to the download_verifier metrics directory
   ansible.builtin.file:
     path: "/mnt/ant-storage/logs/download_files/download_verifier/ant1/"
     state: directory
@@ -22,24 +52,78 @@
     recurse: yes
   become: true
 
-- name: Check if systemd service file exists
-  ansible.builtin.stat:
-    path: "/etc/systemd/system/download_verifier.service"
-  register: service_file_stat
+- name: ensure the ant users can write to the performance_verifier metrics directory
+  ansible.builtin.file:
+    path: "/mnt/ant-storage/logs/download_files/performance_verifier/ant1/"
+    state: directory
+    mode: '0775'
+    owner: ant1
+    group: ant
+    recurse: yes
+  become: true
 
-- name: create systemd service file
+- name: Check if systemd ant_download_random_verifier service file exists
+  ansible.builtin.stat:
+    path: "/etc/systemd/system/ant_download_random_verifier.service"
+  register: ant_download_random_verifier_stat
+
+- name: Check if systemd ant_download_verifier service file exists
+  ansible.builtin.stat:
+    path: "/etc/systemd/system/ant_download_verifier.service"
+  register: ant_download_verifier_stat
+
+- name: Check if systemd ant_performance_verifier service file exists
+  ansible.builtin.stat:
+    path: "/etc/systemd/system/ant_performance_verifier.service"
+  register: ant_performance_verifier_stat
+
+- name: create ant_download_random_verifier systemd service file
   ansible.builtin.template:
-    src: download_verifier.service.j2
-    dest: "/etc/systemd/system/download_verifier.service"
+    src: ant_download_random_verifier.service.j2
+    dest: "/etc/systemd/system/ant_download_random_verifier.service"
     owner: ant1
     group: ant
     mode: '0644'
   become: true
-  when: not service_file_stat.stat.exists
+  when: not ant_download_random_verifier_stat.stat.exists
 
-- name: start and enable download_verifier services
+- name: create ant_download_verifier systemd service file
+  ansible.builtin.template:
+    src: ant_download_verifier.service.j2
+    dest: "/etc/systemd/system/ant_download_verifier.service"
+    owner: ant1
+    group: ant
+    mode: '0644'
+  become: true
+  when: not ant_download_verifier_stat.stat.exists
+
+- name: create ant_performance_verifier systemd service file
+  ansible.builtin.template:
+    src: ant_performance_verifier.service.j2
+    dest: "/etc/systemd/system/ant_performance_verifier.service"
+    owner: ant1
+    group: ant
+    mode: '0644'
+  become: true
+  when: not ant_performance_verifier_stat.stat.exists
+
+- name: start and enable ant_download_random_verifier services
   ansible.builtin.systemd:
-    name: download_verifier
+    name: ant_download_random_verifier
+    state: started
+    enabled: yes
+  become: true
+
+- name: start and enable ant_download_verifier services
+  ansible.builtin.systemd:
+    name: ant_download_verifier
+    state: started
+    enabled: yes
+  become: true
+
+- name: start and enable ant_performance_verifier services
+  ansible.builtin.systemd:
+    name: ant_performance_verifier
     state: started
     enabled: yes
   become: true

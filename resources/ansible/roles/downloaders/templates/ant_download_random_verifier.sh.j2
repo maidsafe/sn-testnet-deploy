@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 SUCCESSFUL_UPLOAD_METRIC_FILE="/mnt/ant-storage/logs/upload_files/${USER}/metrics_success.csv"
 DOWNLOAD_DIR="/home/${USER}/downloaded_files"
-DOWNLOAD_METRICS_DIR="/mnt/ant-storage/logs/download_files/download_verifier/${USER}"
+DOWNLOAD_METRICS_DIR="/mnt/ant-storage/logs/download_files/random_verifier/${USER}"
 SLEEP_INTERVAL=20
 
 mkdir -p "${UPLOAD_METRIC_DIR}"
@@ -132,7 +132,7 @@ download_file() {
     download_path="$DOWNLOAD_DIR/$download_filename"
     echo "Downloading file: $file_ref" 
     start_time=$(date +"%s")
-    stdout=$(ant $CONTACT_PEER_ARG $NETWORK_CONTACTS_URL_ARG $TESTNET_ARG $NETWORK_ID_ARG file download "$file_ref" "$download_path" 2>&1)
+    stdout=$(ant $CONTACT_PEER_ARG $NETWORK_CONTACTS_URL_ARG $TESTNET_ARG $NETWORK_ID_ARG file download "$file_ref" "$download_path --quorum majority" 2>&1)
     exit_code=$?
     end_time=$(date +"%s")
     echo "$stdout"
@@ -165,7 +165,7 @@ download_file() {
         if [ ! -f "$success_file" ]; then
         echo "Timestamp_Start,Timestamp_Finish,File_Address,Duration,Exit_Status,Service_Type,Ant_User,Sha256_Hash,Ant_Package_Version" > "$success_file"
         fi
-        echo "$start_time,$end_time,$file_ref,$elapsed,$error_enum,DOWNLOAD_VERIFIER,$USER,$actual_hash,$package_version" >> "$success_file"
+        echo "$start_time,$end_time,$file_ref,$elapsed,$error_enum,RANDOM_VERIFIER,$USER,$actual_hash,$package_version" >> "$success_file"
     else
         echo "Failed to download $file_ref using ANT CLI"
         failure_file="$DOWNLOAD_METRICS_DIR/metrics_failure.csv"
@@ -173,15 +173,17 @@ download_file() {
         if [ ! -f "$failure_file" ]; then
         echo "Timestamp_Start,Timestamp_Finish,File_Address,Duration,Exit_Status,Service_Type,Ant_User,Sha256_Hash,Ant_Package_Version" > "$failure_file"
         fi
-        echo "$start_time,$end_time,$file_ref,$elapsed,$error_enum,DOWNLOAD_VERIFIER,$USER,$actual_hash,$package_version" >> "$failure_file"
+        echo "$start_time,$end_time,$file_ref,$elapsed,$error_enum,RANDOM_VERIFIER,$USER,$actual_hash,$package_version" >> "$failure_file"
     fi
   )
 }
 
 while true; do
   if [[ -f "$SUCCESSFUL_UPLOAD_METRIC_FILE" && -s "$SUCCESSFUL_UPLOAD_METRIC_FILE" ]]; then
-    file_ref=$(tail -n 3 "$SUCCESSFUL_UPLOAD_METRIC_FILE" | cut -d ',' -f 3 | head -n 1)
-    file_hash=$(tail -n 3 "$SUCCESSFUL_UPLOAD_METRIC_FILE" | cut -d ',' -f 12 | head -n 1 )
+    # downloads a random line from the file, except the first line.
+    tail -n +2 | sort -R | head -n 1
+    file_ref=$(tail -n +2 "$SUCCESSFUL_UPLOAD_METRIC_FILE" | sort -R | head -n 1 | cut -d ',' -f 3 | head -n 1)
+    file_hash=$(tail -n +2 "$SUCCESSFUL_UPLOAD_METRIC_FILE" | sort -R | head -n 1 | cut -d ',' -f 12 | head -n 1 )
 
     if [[ -n "$file_ref" ]]; then
       download_file "$file_ref"
