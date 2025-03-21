@@ -1,5 +1,5 @@
 [Unit]
-Description=Network Download Verifier
+Description=Ant Network Download Verifier
 After=network.target
 
 [Service]
@@ -14,9 +14,9 @@ Environment="EVM_NETWORK=arbitrum-one"
 {% endif %}
 User=ant1
 {% if testnet_name.startswith('PROD-') %}
-ExecStart=/home/ant1/download_verifier.sh
+ExecStart=/home/ant1/ant_download_verifier.sh
 {% else %}
-ExecStart=/home/ant1/download_verifier.sh {{ genesis_multiaddr }} {{network_contacts_url}}{% if network_id is defined %} {{network_id}}{% endif %}
+ExecStart=/home/ant1/ant_download_verifier.sh {{ genesis_multiaddr }} {{network_contacts_url}}{% if network_id is defined %} {{network_id}}{% endif %}
 
 {% endif %}
 Restart=always
