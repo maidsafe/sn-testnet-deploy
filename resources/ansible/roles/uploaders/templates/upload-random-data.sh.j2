@@ -166,8 +166,11 @@ generate_random_data_file_and_upload() {
   end_time=$(date +"%s")
   echo "$stdout"
   echo "Exit code: $exit_code"
-  package_version=$(ant --package-version 2>&1 | grep "Package version" | awk '{print $3}')
+  version_stdout=$(ant --version 2>&1)
+  package_version=$(echo "$version_stdout" | grep "Package version:" | awk '{print $3}')
+  build_date=$(echo "$version_stdout" | grep "Git info:" | awk '{print $7}')
   echo "Package version: $package_version"
+  echo "Build date: $build_date"
   elapsed=$(($end_time - $start_time))
   error_enum=$(get_error_enum $exit_code)
 
@@ -181,9 +184,9 @@ generate_random_data_file_and_upload() {
     store_cost=$(echo "$stdout" | rg -o 'Total cost: [0-9]+' | rg -o '[0-9]+' | head -n 1)
 
     if [ ! -f "$success_file" ]; then
-      echo "Timestamp_Start,Timestamp_Finish,File_Address,Duration,Chunks_Uploaded,Chunks_Already_Paid,Exit_Status,Service_Type,Ant_User,Store_Cost,File_Size,Sha256_Hash,Ant_Package_Version" > "$success_file"
+      echo "Timestamp_Start,Timestamp_Finish,File_Address,Duration,Chunks_Uploaded,Chunks_Already_Paid,Total_Chunks,Exit_Status,Service_Type,Ant_User,Store_Cost,File_Size,Sha256_Hash,Ant_Package_Version,Ant_Package_Build_Date" > "$success_file"
     fi
-    echo "$start_time,$end_time,$uploaded_address,$elapsed,$number_of_chunks,$already_uploaded_chunks,$error_enum,UPLOADER,$USER,$store_cost,$file_size_kb,$file_hash,$package_version" >> "$success_file"
+    echo "$start_time,$end_time,$uploaded_address,$elapsed,$number_of_chunks,$already_uploaded_chunks,0,$error_enum,UPLOADER,$USER,$store_cost,$file_size_kb,$file_hash,$package_version,$build_date" >> "$success_file"
 
   else
     echo "Failed to upload $tmpfile using ANT CLI"
@@ -191,9 +194,9 @@ generate_random_data_file_and_upload() {
 
 
     if [ ! -f "$failure_file" ]; then
-      echo "Timestamp_Start,Timestamp_Finish,Duration,Exit_Status,Service_Type,Ant_User,File_Size,Sha256_Hash,Ant_Package_Version" > "$failure_file"
+      echo "Timestamp_Start,Timestamp_Finish,Duration,Chunks_Uploaded,Chunks_Already_Paid,Total_Chunks,Exit_Status,Service_Type,Ant_User,File_Size,Sha256_Hash,Ant_Package_Version,Ant_Package_Build_Date" > "$failure_file"
     fi
-    echo "$start_time,$end_time,$elapsed,$error_enum,UPLOADER,$USER,$file_size_kb,$file_hash,$package_version" >> "$failure_file"
+    echo "$start_time,$end_time,$elapsed,0,0,0,$error_enum,UPLOADER,$USER,$file_size_kb,$file_hash,$package_version,$build_date" >> "$failure_file"
   fi
 
   rm "$tmpfile"

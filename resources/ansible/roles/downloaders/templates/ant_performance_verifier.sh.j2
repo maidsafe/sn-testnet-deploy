@@ -123,7 +123,8 @@ get_error_enum() {
 
 download_file() {
   local file_ref=$1
-  local expected_hash=$2 
+  local expected_hash=$2
+  local file_size=$3
   # Multiple downloaders can be running on the same machine, so one or more
   # could select the same file address at the same time. We therefore use a GUID
   # to ensure a unique output file.
@@ -131,15 +132,20 @@ download_file() {
   (
     download_path="$DOWNLOAD_DIR/$download_filename"
     echo "Downloading file: $file_ref" 
-    start_time=$(date +"%s")
+    start_time=$(date +%s%N)
     stdout=$(ant $CONTACT_PEER_ARG $NETWORK_CONTACTS_URL_ARG $TESTNET_ARG $NETWORK_ID_ARG file download "$file_ref" "$download_path" 2>&1)
     exit_code=$?
-    end_time=$(date +"%s")
+    end_time=$(date +%s%N)
     echo "$stdout"
     echo "Exit code: $exit_code"
-    package_version=$(ant --package-version 2>&1 | grep "Package version" | awk '{print $3}')
+    version_stdout=$(ant --version 2>&1)
+    package_version=$(echo "$version_stdout" | grep "Package version:" | awk '{print $3}')
+    build_date=$(echo "$version_stdout" | grep "Git info:" | awk '{print $7}')
     echo "Package version: $package_version"
-    elapsed=$(($end_time - $start_time))
+    echo "Build date: $build_date"
+
+    elapsed=$(echo "scale=2; ($end_time - $start_time) / 1000000000" | bc)
+    echo "Elapsed time: $elapsed seconds"
     error_enum=$(get_error_enum $exit_code)
     
     # Only verify hash if download was successful
@@ -173,17 +179,17 @@ download_file() {
         success_file="$DOWNLOAD_METRICS_DIR/metrics_success.csv"
 
         if [ ! -f "$success_file" ]; then
-        echo "Timestamp_Start,Timestamp_Finish,File_Address,Duration,Exit_Status,Service_Type,Ant_User,Sha256_Hash,Ant_Package_Version" > "$success_file"
+        echo "Timestamp_Start,Timestamp_Finish,File_Address,Duration,Retries,Fetched_Chunks,Total_Chunks,Exit_Status,Service_Type,Ant_User,Service_Number,Sha256_Hash,Ant_Package_Version,Ant_Package_Build_Date" > "$success_file"
         fi
-        echo "$start_time,$end_time,$file_ref,$elapsed,$error_enum,PERFORMANCE_VERIFIER,$USER,$actual_hash,$package_version" >> "$success_file"
+        echo "$start_time,$end_time,$file_ref,$elapsed,0,0,0,$error_enum,PERFORMANCE_VERIFIER,$USER,1,$actual_hash,$package_version,$build_date" >> "$success_file"
     else
         echo "Failed to download $file_ref using ANT CLI"
         failure_file="$DOWNLOAD_METRICS_DIR/metrics_failure.csv"
 
         if [ ! -f "$failure_file" ]; then
-        echo "Timestamp_Start,Timestamp_Finish,File_Address,Duration,Exit_Status,Service_Type,Ant_User,Sha256_Hash,Ant_Package_Version" > "$failure_file"
+        echo "Timestamp_Start,Timestamp_Finish,File_Address,Duration,Retries,Fetched_Chunks,Total_Chunks,Exit_Status,Service_Type,Ant_User,Service_Number,Sha256_Hash,Ant_Package_Version,Ant_Package_Build_Date" > "$failure_file"
         fi
-        echo "$start_time,$end_time,$file_ref,$elapsed,$error_enum,PERFORMANCE_VERIFIER,$USER,$actual_hash,$package_version" >> "$failure_file"
+        echo "$start_time,$end_time,$file_ref,$elapsed,0,0,0,$error_enum,PERFORMANCE_VERIFIER,$USER,1,$actual_hash,$package_version,$build_date" >> "$failure_file"
     fi
   )
 }
@@ -193,9 +199,10 @@ while true; do
     # downloads the same file repeatedly
     file_ref=$(head -n 2 "$SUCCESSFUL_UPLOAD_METRIC_FILE" | tail -n 1 | cut -d ',' -f 3 | head -n 1)
     file_hash=$(head -n 2 "$SUCCESSFUL_UPLOAD_METRIC_FILE" | tail -n 1 | cut -d ',' -f 12 | head -n 1 )
+    file_size=$(head -n 2 "$SUCCESSFUL_UPLOAD_METRIC_FILE" | tail -n 1 | cut -d ',' -f 11 | head -n 1 )
 
     if [[ -n "$file_ref" ]]; then
-      download_file "$file_ref" "$file_hash"
+      download_file "$file_ref" "$file_hash" "$file_size"
       sleep "$SLEEP_INTERVAL"
     else
       echo "Selected line is empty. Retrying in 5 seconds..."
