@@ -1,5 +1,5 @@
 [Unit]
-Description=Autonomi Uploader {{ count }}
+Description=Ant Network Random Uploader {{ count }}
 After=network.target
 
 [Service]
@@ -18,9 +18,9 @@ Environment="{{ client_env_variables }}"
 {% endif %}
 User=ant{{ count }}
 {% if testnet_name.startswith('PROD-') %}
-ExecStart=/home/ant{{ count }}/upload-random-data.sh
+ExecStart=/home/ant{{ count }}/ant_random_uploader.sh
 {% else %}
-ExecStart=/home/ant{{ count }}/upload-random-data.sh {{ genesis_multiaddr }} {{network_contacts_url}}{% if network_id is defined %} {{network_id}}{% endif %}
+ExecStart=/home/ant{{ count }}/ant_random_uploader.sh {{ genesis_multiaddr }} {{network_contacts_url}}{% if network_id is defined %} {{network_id}}{% endif %}
 
 {% endif %}
 Restart=always

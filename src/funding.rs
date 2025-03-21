@@ -289,7 +289,8 @@ impl AnsibleProvisioner {
                 "Fetching uploader count for {} @ {}",
                 vm.name, vm.public_ip_addr
             );
-            let cmd = "systemctl list-units --type=service --all | grep ant_uploader_ | wc -l";
+            let cmd =
+                "systemctl list-units --type=service --all | grep ant_random_uploader_ | wc -l";
             let result = self
                 .ssh_client
                 .run_command(&vm.public_ip_addr, "root", cmd, true);
@@ -347,7 +348,7 @@ impl AnsibleProvisioner {
         // the playbook expects them in order
         for count in 1..=instance_count {
             let cmd = format!(
-                "systemctl show ant_uploader_{count}.service --property=Environment | grep SECRET_KEY | cut -d= -f3 | awk '{{print $1}}'"
+                "systemctl show ant_random_uploader_{count}.service --property=Environment | grep SECRET_KEY | cut -d= -f3 | awk '{{print $1}}'"
             );
             debug!("Fetching secret key for {} instance {count}", vm.name);
             let result = self
