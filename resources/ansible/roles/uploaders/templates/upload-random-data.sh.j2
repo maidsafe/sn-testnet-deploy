@@ -154,7 +154,7 @@ generate_random_data_file_and_upload() {
   log_file_path="${LOG_OUTPUT_DEST}/${timestamp}"
   LOG_OUTPUT_ARG="--log-output-dest $log_file_path"
   
-  start_time=$(date +"%s")
+  start_time=$(date +%s%N)
   stdout=$(ant \
     $CONTACT_PEER_ARG \
     $NETWORK_CONTACTS_URL_ARG \
@@ -163,7 +163,7 @@ generate_random_data_file_and_upload() {
     $LOG_OUTPUT_ARG \
     file upload "$tmpfile" 2>&1)
   exit_code=$?
-  end_time=$(date +"%s")
+  end_time=$(date +%s%N)
   echo "$stdout"
   echo "Exit code: $exit_code"
   version_stdout=$(ant --version 2>&1)
@@ -171,7 +171,9 @@ generate_random_data_file_and_upload() {
   build_date=$(echo "$version_stdout" | grep "Git info:" | awk '{print $7}')
   echo "Package version: $package_version"
   echo "Build date: $build_date"
-  elapsed=$(($end_time - $start_time))
+
+  elapsed=$(echo "scale=2; ($end_time - $start_time) / 1000000000" | bc)
+  echo "Elapsed time: $elapsed seconds"
   error_enum=$(get_error_enum $exit_code)
 
   if [ $? -eq 0 ]; then
@@ -184,9 +186,9 @@ generate_random_data_file_and_upload() {
     store_cost=$(echo "$stdout" | rg -o 'Total cost: [0-9]+' | rg -o '[0-9]+' | head -n 1)
 
     if [ ! -f "$success_file" ]; then
-      echo "TIMESTAMP_START,TIMESTAMP_FINISH,DATA_ADDRESS,DURATION,RETRIES,RECORDS_UPLOADED,RECORDS_ALREADY_PAID,TOTAL_RECORDS,EXIT_STATUS,SERVICE_TYPE,ANT_USER,STORE_COST,TOTAL_SIZE,SHA256_HASH,ANT_PACKAGE_VERSION,ANT_PACKAGE_BUILD_DATE" > "$success_file"
+      echo "TIMESTAMP_START,TIMESTAMP_FINISH,DATA_ADDRESS,DURATION,RETRIES,RECORDS_UPLOADED,RECORDS_ALREADY_PAID,TOTAL_RECORDS,EXIT_STATUS,SERVICE_TYPE,ANT_USER,SERVICE_NUMBER,STORE_COST,EXPECTED_TOTAL_SIZE,ACTUAL_TOTAL_SIZE,SHA256_HASH,ANT_PACKAGE_VERSION,ANT_PACKAGE_BUILD_DATE" > "$success_file"
     fi
-    echo "$start_time,$end_time,$uploaded_address,$elapsed,0,$number_of_chunks,$already_uploaded_chunks,0,$error_enum,UPLOADER,$USER,$store_cost,$file_size_kb,$file_hash,$package_version,$build_date" >> "$success_file"
+    echo "$start_time,$end_time,$uploaded_address,$elapsed,0,$number_of_chunks,$already_uploaded_chunks,0,$error_enum,UPLOADER,$USER,1,$store_cost,0,$file_size_kb,$file_hash,$package_version,$build_date" >> "$success_file"
 
   else
     echo "Failed to upload $tmpfile using ANT CLI"
@@ -194,9 +196,9 @@ generate_random_data_file_and_upload() {
 
 
     if [ ! -f "$failure_file" ]; then
-      echo "TIMESTAMP_START,TIMESTAMP_FINISH,DURATION,RETRIES,RECORDS_UPLOADED,RECORDS_ALREADY_PAID,TOTAL_RECORDS,EXIT_STATUS,SERVICE_TYPE,ANT_USER,TOTAL_SIZE,SHA256_HASH,ANT_PACKAGE_VERSION,ANT_PACKAGE_BUILD_DATE" > "$failure_file"
+      echo "TIMESTAMP_START,TIMESTAMP_FINISH,DATA_ADDRESS,DURATION,RETRIES,RECORDS_UPLOADED,RECORDS_ALREADY_PAID,TOTAL_RECORDS,EXIT_STATUS,SERVICE_TYPE,ANT_USER,SERVICE_NUMBER,STORE_COST,EXPECTED_TOTAL_SIZE,ACTUAL_TOTAL_SIZE,SHA256_HASH,ANT_PACKAGE_VERSION,ANT_PACKAGE_BUILD_DATE" > "$failure_file"
     fi
-    echo "$start_time,$end_time,$elapsed,0,0,0,0,$error_enum,UPLOADER,$USER,$file_size_kb,$file_hash,$package_version,$build_date" >> "$failure_file"
+    echo "$start_time,$end_time,0,$elapsed,0,0,0,0,$error_enum,UPLOADER,$USER,1,0,0,$file_size_kb,$file_hash,$package_version,$build_date" >> "$failure_file"
   fi
 
   rm "$tmpfile"
