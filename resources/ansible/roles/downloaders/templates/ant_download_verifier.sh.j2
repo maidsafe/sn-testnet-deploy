@@ -132,33 +132,43 @@ download_file() {
     download_path="$DOWNLOAD_DIR/$download_filename"
     echo "Downloading file: $file_ref" 
     start_time=$(date +"%s")
-    stdout=$(ant $CONTACT_PEER_ARG $NETWORK_CONTACTS_URL_ARG $TESTNET_ARG $NETWORK_ID_ARG file download "$file_ref" "$download_path --quorum majority" 2>&1)
+    stdout=$(ant $CONTACT_PEER_ARG $NETWORK_CONTACTS_URL_ARG $TESTNET_ARG $NETWORK_ID_ARG file download "$file_ref" "$download_path" --quorum majority 2>&1)
     exit_code=$?
     end_time=$(date +"%s")
     echo "$stdout"
     echo "Exit code: $exit_code"
     package_version=$(ant --package-version 2>&1 | grep "Package version" | awk '{print $3}')
     echo "Package version: $package_version"
-    rm -rf "$download_path"
     elapsed=$(($end_time - $start_time))
     error_enum=$(get_error_enum $exit_code)
     
     # Only verify hash if download was successful
     if [ $exit_code -eq 0 ] && [ -n "$expected_hash" ]; then
-        # Calculate hash of downloaded file
-        actual_hash=$(sha256sum "$download_path" | awk '{print $1}')
+        # Find the first file in the download directory
+        first_file=$(find "$download_path" -type f | head -n 1)
         
-        # Compare hashes
-        if [ "$actual_hash" != "$expected_hash" ]; then
-            echo "Hash mismatch! Expected: $expected_hash, Got: $actual_hash"
-            exit_code=1  # Set to non zero
-            error_enum=HASH_MISMATCH
+        if [ -n "$first_file" ]; then
+            # Calculate hash of the first file
+            actual_hash=$(sha256sum "$first_file" | awk '{print $1}')
+            
+            # Compare hashes
+            if [ "$actual_hash" != "$expected_hash" ]; then
+                echo "Hash mismatch! Expected: $expected_hash, Got: $actual_hash"
+                exit_code=1 # Set to non zero
+                error_enum=HASH_MISMATCH
+            else
+                echo "Hash verification successful"
+            fi
         else
-            echo "Hash verification successful"
+            echo "No files found in $download_path"
+            exit_code=1
+            error_enum=NO_FILES_FOUND
         fi
     fi
 
-    if [ exit_code -eq 0 ]; then
+    rm -rf "$download_path"
+
+    if [ $exit_code -eq 0 ]; then
         echo "Successfully downloaded $file_ref using ANT CLI"
         success_file="$DOWNLOAD_METRICS_DIR/metrics_success.csv"
 
@@ -185,7 +195,7 @@ while true; do
     file_hash=$(tail -n 3 "$SUCCESSFUL_UPLOAD_METRIC_FILE" | cut -d ',' -f 12 | head -n 1 )
 
     if [[ -n "$file_ref" ]]; then
-      download_file "$file_ref"
+      download_file "$file_ref" "$file_hash"
       sleep "$SLEEP_INTERVAL"
     else
       echo "Selected line is empty. Retrying in 5 seconds..."
