@@ -115,6 +115,15 @@ get_error_enum() {
     58)
       echo "LOCK_ERROR"
       ;;
+    59)
+      echo "CONNECTION_TIMED_OUT"
+      ;;
+    60)
+      echo "CONNECTION_TIMED_OUT_WITH_INCOMPATIBLE_PROTOCOL"
+      ;;
+    61)
+      echo "FAILED_TO_GET_EVM_NETWORK"
+      ;;
     *)
       echo "UNKNOWN_ERROR"
       ;;
@@ -200,10 +209,10 @@ download_file() {
 while true; do
   if [[ -f "$SUCCESSFUL_UPLOAD_METRIC_FILE" && -s "$SUCCESSFUL_UPLOAD_METRIC_FILE" ]]; then
     # downloads a random line from the file, except the first line.
-    tail -n +2 | sort -R | head -n 1
-    file_ref=$(tail -n +2 "$SUCCESSFUL_UPLOAD_METRIC_FILE" | sort -R | head -n 1 | cut -d ',' -f 3 | head -n 1)
-    file_hash=$(tail -n +2 "$SUCCESSFUL_UPLOAD_METRIC_FILE" | sort -R | head -n 1 | cut -d ',' -f 16 | head -n 1 )
-    file_size=$(tail -n +2 "$SUCCESSFUL_UPLOAD_METRIC_FILE" | sort -R | head -n 1 | cut -d ',' -f 15 | head -n 1 )
+    random_line=$(tail -n +2 "$SUCCESSFUL_UPLOAD_METRIC_FILE" | sort -R | head -n 1)
+    file_ref=$(echo "$random_line" | cut -d ',' -f 3 | head -n 1)
+    file_hash=$(echo "$random_line" | cut -d ',' -f 16 | head -n 1 )
+    file_size=$(echo "$random_line" | cut -d ',' -f 15 | head -n 1 )
 
     if [[ -n "$file_ref" ]]; then
       download_file "$file_ref" "$file_hash" "$file_size"

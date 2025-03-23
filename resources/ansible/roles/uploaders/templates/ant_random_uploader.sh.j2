@@ -136,6 +136,15 @@ get_error_enum() {
     58)
       echo "LOCK_ERROR"
       ;;
+    59)
+      echo "CONNECTION_TIMED_OUT"
+      ;;
+    60)
+      echo "CONNECTION_TIMED_OUT_WITH_INCOMPATIBLE_PROTOCOL"
+      ;;
+    61)
+      echo "FAILED_TO_GET_EVM_NETWORK"
+      ;;
     *)
       echo "UNKNOWN_ERROR"
       ;;
@@ -176,7 +185,7 @@ generate_random_data_file_and_upload() {
   echo "Elapsed time: $elapsed seconds"
   error_enum=$(get_error_enum $exit_code)
 
-  if [ $? -eq 0 ]; then
+  if [ $exit_code -eq 0 ]; then
     echo "Successfully uploaded $tmpfile using ANT CLI"
     success_file="$UPLOAD_METRIC_DIR/metrics_success.csv"
 
