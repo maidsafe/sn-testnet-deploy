@@ -972,49 +972,9 @@ impl TestnetDeployer {
         )
         .await?;
 
-        let mut args = Vec::new();
-        if let Some(full_cone_private_node_volume_size) = options.full_cone_private_node_volume_size
-        {
-            args.push((
-                "full_cone_private_node_volume_size".to_string(),
-                full_cone_private_node_volume_size.to_string(),
-            ));
-        }
-        if let Some(genesis_node_volume_size) = options.genesis_node_volume_size {
-            args.push((
-                "genesis_node_volume_size".to_string(),
-                genesis_node_volume_size.to_string(),
-            ));
-        }
-        if let Some(node_volume_size) = options.node_volume_size {
-            args.push(("node_volume_size".to_string(), node_volume_size.to_string()));
-        }
-        if let Some(peer_cache_node_volume_size) = options.peer_cache_node_volume_size {
-            args.push((
-                "peer_cache_node_volume_size".to_string(),
-                peer_cache_node_volume_size.to_string(),
-            ));
-        }
-        if let Some(symmetric_private_node_volume_size) = options.symmetric_private_node_volume_size
-        {
-            args.push((
-                "symmetric_private_node_volume_size".to_string(),
-                symmetric_private_node_volume_size.to_string(),
-            ));
-        }
+        let args = build_terraform_args(&options)?;
 
-        self.terraform_runner.destroy(
-            Some(args),
-            Some(
-                environment_details
-                    .map(|details| {
-                        details
-                            .environment_type
-                            .get_tfvars_filename(&self.environment_name)
-                    })
-                    .unwrap_or("dev.tfvars".to_string()),
-            ),
-        )?;
+        self.terraform_runner.destroy(Some(args), None)?;
 
         infra::delete_workspace(&self.terraform_runner, &self.environment_name)?;
 

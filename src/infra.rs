@@ -31,21 +31,30 @@ const SYMMETRIC_PRIVATE_NODE_ATTACHED_VOLUME: &str = "symmetric_private_node_att
 const UPLOADER: &str = "uploader";
 
 const SIZE: &str = "size";
+const IMAGE: &str = "image";
 
 #[derive(Clone, Debug)]
 pub struct InfraRunOptions {
     pub enable_build_vm: bool,
     pub evm_node_count: Option<u16>,
     pub evm_node_vm_size: Option<String>,
+    /// Set to None for new deployments, as the value will be fetched from tfvars.
+    pub evm_node_image_id: Option<String>,
     pub full_cone_nat_gateway_vm_size: Option<String>,
     pub full_cone_private_node_vm_count: Option<u16>,
     pub full_cone_private_node_volume_size: Option<u16>,
     pub genesis_vm_count: Option<u16>,
     pub genesis_node_volume_size: Option<u16>,
     pub name: String,
+    /// Set to None for new deployments, as the value will be fetched from tfvars.
+    pub nat_gateway_image_id: Option<String>,
+    /// Set to None for new deployments, as the value will be fetched from tfvars.
+    pub node_image_id: Option<String>,
     pub node_vm_count: Option<u16>,
     pub node_vm_size: Option<String>,
     pub node_volume_size: Option<u16>,
+    /// Set to None for new deployments, as the value will be fetched from tfvars.
+    pub peer_cache_image_id: Option<String>,
     pub peer_cache_node_vm_count: Option<u16>,
     pub peer_cache_node_vm_size: Option<String>,
     pub peer_cache_node_volume_size: Option<u16>,
@@ -53,6 +62,8 @@ pub struct InfraRunOptions {
     pub symmetric_private_node_vm_count: Option<u16>,
     pub symmetric_private_node_volume_size: Option<u16>,
     pub tfvars_filename: Option<String>,
+    /// Set to None for new deployments, as the value will be fetched from tfvars.
+    pub uploader_image_id: Option<String>,
     pub uploader_vm_count: Option<u16>,
     pub uploader_vm_size: Option<String>,
 }
@@ -74,22 +85,28 @@ impl InfraRunOptions {
         };
 
         let peer_cache_node_vm_count = resource_count(PEER_CACHE_NODE);
-        debug!("Peer cache node count: {}", peer_cache_node_vm_count);
-        let (peer_cache_node_volume_size, peer_cache_node_vm_size) = if peer_cache_node_vm_count > 0
-        {
-            let volume_size =
-                get_value_for_resource(&resources, PEER_CACHE_NODE_ATTACHED_VOLUME, SIZE)?
-                    .and_then(|size| size.as_u64())
-                    .map(|size| size as u16);
-            let vm_size = get_value_for_resource(&resources, PEER_CACHE_NODE, SIZE)?
-                .map(|size| size.to_string());
+        debug!("Peer cache node count: {peer_cache_node_vm_count}");
+        let (peer_cache_node_volume_size, peer_cache_node_vm_size, peer_cache_image_id) =
+            if peer_cache_node_vm_count > 0 {
+                let volume_size =
+                    get_value_for_resource(&resources, PEER_CACHE_NODE_ATTACHED_VOLUME, SIZE)?
+                        .and_then(|size| size.as_u64())
+                        .map(|size| size as u16);
+                debug!("Peer cache node volume size: {volume_size:?}");
+                let vm_size = get_value_for_resource(&resources, PEER_CACHE_NODE, SIZE)?
+                    .map(|size| size.to_string());
+                debug!("Peer cache node size: {vm_size:?}");
+                let image_id = get_value_for_resource(&resources, PEER_CACHE_NODE, IMAGE)?
+                    .map(|image_id| image_id.to_string());
+                debug!("Peer cache node image id: {image_id:?}");
 
-            (volume_size, vm_size)
-        } else {
-            (None, None)
-        };
+                (volume_size, vm_size, image_id)
+            } else {
+                (None, None, None)
+            };
 
         let genesis_node_vm_count = resource_count(GENESIS_NODE);
+        debug!("Genesis node count: {genesis_node_vm_count}");
         let genesis_node_volume_size = if genesis_node_vm_count > 0 {
             get_value_for_resource(&resources, GENESIS_NODE_ATTACHED_VOLUME, SIZE)?
                 .and_then(|size| size.as_u64())
@@ -97,8 +114,10 @@ impl InfraRunOptions {
         } else {
             None
         };
+        debug!("Genesis node volume size: {genesis_node_volume_size:?}");
 
         let node_vm_count = resource_count(NODE);
+        debug!("Node count: {node_vm_count}");
         let node_volume_size = if node_vm_count > 0 {
             get_value_for_resource(&resources, NODE_ATTACHED_VOLUME, SIZE)?
                 .and_then(|size| size.as_u64())
@@ -106,8 +125,11 @@ impl InfraRunOptions {
         } else {
             None
         };
+        debug!("Node volume size: {node_volume_size:?}");
 
+        let mut nat_gateway_image_id = None;
         let symmetric_private_node_vm_count = resource_count(SYMMETRIC_PRIVATE_NODE);
+        debug!("Symmetric private node count: {symmetric_private_node_vm_count}");
         let (symmetric_private_node_volume_size, symmetric_nat_gateway_vm_size) =
             if symmetric_private_node_vm_count > 0 {
                 let symmetric_private_node_volume_size = get_value_for_resource(
@@ -117,10 +139,22 @@ impl InfraRunOptions {
                 )?
                 .and_then(|size| size.as_u64())
                 .map(|size| size as u16);
+                debug!(
+                    "Symmetric private node volume size: {symmetric_private_node_volume_size:?}"
+                );
                 // gateways should exists if private nodes exist
                 let symmetric_nat_gateway_vm_size =
                     get_value_for_resource(&resources, SYMMETRIC_NAT_GATEWAY, SIZE)?
                         .map(|size| size.to_string());
+
+                debug!("Symmetric nat gateway size: {symmetric_nat_gateway_vm_size:?}");
+
+                if let Some(nat_gateway_image) =
+                    get_value_for_resource(&resources, SYMMETRIC_NAT_GATEWAY, IMAGE)?
+                {
+                    debug!("Nat gateway image: {nat_gateway_image}");
+                    nat_gateway_image_id = Some(nat_gateway_image.to_string());
+                }
 
                 (
                     symmetric_private_node_volume_size,
@@ -129,7 +163,9 @@ impl InfraRunOptions {
             } else {
                 (None, None)
             };
+
         let full_cone_private_node_vm_count = resource_count(FULL_CONE_PRIVATE_NODE);
+        debug!("Full cone private node count: {full_cone_private_node_vm_count}");
         let (full_cone_private_node_volume_size, full_cone_nat_gateway_vm_size) =
             if full_cone_private_node_vm_count > 0 {
                 let full_cone_private_node_volume_size = get_value_for_resource(
@@ -139,10 +175,21 @@ impl InfraRunOptions {
                 )?
                 .and_then(|size| size.as_u64())
                 .map(|size| size as u16);
+                debug!(
+                    "Full cone private node volume size: {full_cone_private_node_volume_size:?}"
+                );
                 // gateways should exists if private nodes exist
                 let full_cone_nat_gateway_vm_size =
                     get_value_for_resource(&resources, FULL_CONE_NAT_GATEWAY, SIZE)?
                         .map(|size| size.to_string());
+                debug!("Full cone nat gateway size: {full_cone_nat_gateway_vm_size:?}");
+
+                if let Some(nat_gateway_image) =
+                    get_value_for_resource(&resources, FULL_CONE_NAT_GATEWAY, IMAGE)?
+                {
+                    debug!("Nat gateway image: {nat_gateway_image}");
+                    nat_gateway_image_id = Some(nat_gateway_image.to_string());
+                }
 
                 (
                     full_cone_private_node_volume_size,
@@ -153,45 +200,83 @@ impl InfraRunOptions {
             };
 
         let uploader_vm_count = resource_count(UPLOADER);
-        let uploader_vm_size = if uploader_vm_count > 0 {
-            get_value_for_resource(&resources, UPLOADER, SIZE)?.map(|size| size.to_string())
+        debug!("Uploader count: {uploader_vm_count}");
+        let (uploader_vm_size, uploader_image_id) = if uploader_vm_count > 0 {
+            let vm_size =
+                get_value_for_resource(&resources, UPLOADER, SIZE)?.map(|size| size.to_string());
+            debug!("Uploader size: {vm_size:?}");
+            let image_id = get_value_for_resource(&resources, UPLOADER, IMAGE)?
+                .map(|image_id| image_id.to_string());
+            debug!("Uploader image id: {image_id:?}");
+            (vm_size, image_id)
         } else {
-            None
+            (None, None)
         };
 
-        let evm_node_count = resource_count(EVM_NODE);
         let build_vm_count = resource_count(BUILD_VM);
+        debug!("Build VM count: {build_vm_count}");
         let enable_build_vm = build_vm_count > 0;
 
         // Node VM size var is re-used for nodes, evm nodes, symmetric and full cone private nodes
-        let node_vm_size = if node_vm_count > 0 {
-            get_value_for_resource(&resources, NODE, SIZE)?.map(|size| size.to_string())
+        let (node_vm_size, node_image_id) = if node_vm_count > 0 {
+            let vm_size =
+                get_value_for_resource(&resources, NODE, SIZE)?.map(|size| size.to_string());
+            debug!("Node size obtained from {NODE}: {vm_size:?}");
+            let image_id = get_value_for_resource(&resources, NODE, IMAGE)?
+                .map(|image_id| image_id.to_string());
+            debug!("Node image id obtained from {NODE}: {image_id:?}");
+            (vm_size, image_id)
         } else if symmetric_private_node_vm_count > 0 {
-            get_value_for_resource(&resources, SYMMETRIC_PRIVATE_NODE, SIZE)?
-                .map(|size| size.to_string())
+            let vm_size = get_value_for_resource(&resources, SYMMETRIC_PRIVATE_NODE, SIZE)?
+                .map(|size| size.to_string());
+            debug!("Node size obtained from {SYMMETRIC_PRIVATE_NODE}: {vm_size:?}");
+            let image_id = get_value_for_resource(&resources, SYMMETRIC_PRIVATE_NODE, IMAGE)?
+                .map(|image_id| image_id.to_string());
+            debug!("Node image id obtained from {SYMMETRIC_PRIVATE_NODE}: {image_id:?}");
+            (vm_size, image_id)
         } else if full_cone_private_node_vm_count > 0 {
-            get_value_for_resource(&resources, FULL_CONE_PRIVATE_NODE, SIZE)?
-                .map(|size| size.to_string())
-        } else if evm_node_count > 0 {
-            get_value_for_resource(&resources, EVM_NODE, SIZE)?.map(|size| size.to_string())
+            let vm_size = get_value_for_resource(&resources, FULL_CONE_PRIVATE_NODE, SIZE)?
+                .map(|size| size.to_string());
+            debug!("Node size obtained from {FULL_CONE_PRIVATE_NODE}: {vm_size:?}");
+            let image_id = get_value_for_resource(&resources, FULL_CONE_PRIVATE_NODE, IMAGE)?
+                .map(|image_id| image_id.to_string());
+            debug!("Node image id obtained from {FULL_CONE_PRIVATE_NODE}: {image_id:?}");
+            (vm_size, image_id)
         } else {
-            None
+            (None, None)
+        };
+
+        let evm_node_count = resource_count(EVM_NODE);
+        debug!("EVM node count: {evm_node_count}");
+        let (evm_node_vm_size, evm_node_image_id) = if evm_node_count > 0 {
+            let emv_node_vm_size =
+                get_value_for_resource(&resources, EVM_NODE, SIZE)?.map(|size| size.to_string());
+            debug!("EVM node size: {emv_node_vm_size:?}");
+            let evm_node_image_id = get_value_for_resource(&resources, EVM_NODE, IMAGE)?
+                .map(|image_id| image_id.to_string());
+            debug!("EVM node image id: {evm_node_image_id:?}");
+            (emv_node_vm_size, evm_node_image_id)
+        } else {
+            (None, None)
         };
 
         let options = Self {
             enable_build_vm,
             evm_node_count: Some(evm_node_count),
-            // The EVM node size never needs to change so it will be obtained from the tfvars file
-            evm_node_vm_size: None,
+            evm_node_vm_size,
+            evm_node_image_id,
             full_cone_nat_gateway_vm_size,
             full_cone_private_node_vm_count: Some(full_cone_private_node_vm_count),
             full_cone_private_node_volume_size,
             genesis_vm_count: Some(genesis_node_vm_count),
             genesis_node_volume_size,
             name: name.to_string(),
+            nat_gateway_image_id,
+            node_image_id,
             node_vm_count: Some(node_vm_count),
             node_vm_size,
             node_volume_size,
+            peer_cache_image_id,
             peer_cache_node_vm_count: Some(peer_cache_node_vm_count),
             peer_cache_node_vm_size,
             peer_cache_node_volume_size,
@@ -202,6 +287,7 @@ impl InfraRunOptions {
                 .map(|details| details.environment_type.get_tfvars_filename(name)),
             uploader_vm_count: Some(uploader_vm_count),
             uploader_vm_size,
+            uploader_image_id,
         };
 
         Ok(options)
@@ -232,6 +318,8 @@ pub struct UploaderInfraRunOptions {
     pub tfvars_filename: String,
     pub uploader_vm_count: Option<u16>,
     pub uploader_vm_size: Option<String>,
+    /// Set to None for new deployments, as the value will be fetched from tfvars.
+    pub uploader_image_id: Option<String>,
 }
 
 impl UploaderInfraRunOptions {
@@ -251,13 +339,21 @@ impl UploaderInfraRunOptions {
         };
 
         let uploader_vm_count = resource_count(UPLOADER);
-        let uploader_vm_size = if uploader_vm_count > 0 {
-            get_value_for_resource(&resources, UPLOADER, SIZE)?.map(|size| size.to_string())
+        debug!("Uploader count: {uploader_vm_count}");
+        let (uploader_vm_size, uploader_image_id) = if uploader_vm_count > 0 {
+            let vm_size =
+                get_value_for_resource(&resources, UPLOADER, SIZE)?.map(|size| size.to_string());
+            debug!("Uploader size: {vm_size:?}");
+            let image_id = get_value_for_resource(&resources, UPLOADER, IMAGE)?
+                .map(|image_id| image_id.to_string());
+            debug!("Uploader image id: {image_id:?}");
+            (vm_size, image_id)
         } else {
-            None
+            (None, None)
         };
 
         let build_vm_count = resource_count(BUILD_VM);
+        debug!("Build VM count: {build_vm_count}");
         let enable_build_vm = build_vm_count > 0;
 
         let options = Self {
@@ -268,6 +364,7 @@ impl UploaderInfraRunOptions {
                 .get_tfvars_filename(name),
             uploader_vm_count: Some(uploader_vm_count),
             uploader_vm_size,
+            uploader_image_id,
         };
 
         Ok(options)
@@ -291,6 +388,12 @@ impl UploaderInfraRunOptions {
             args.push((
                 "uploader_droplet_size".to_string(),
                 uploader_vm_size.clone(),
+            ));
+        }
+        if let Some(uploader_image_id) = &self.uploader_image_id {
+            args.push((
+                "uploader_droplet_image_id".to_string(),
+                uploader_image_id.clone(),
             ));
         }
 
@@ -331,69 +434,13 @@ fn get_value_for_resource(
 pub fn build_terraform_args(options: &InfraRunOptions) -> Result<Vec<(String, String)>> {
     let mut args = Vec::new();
 
-    if let Some(reserved_ips) = crate::reserved_ip::get_reserved_ips_args(&options.name) {
-        args.push(("peer_cache_reserved_ips".to_string(), reserved_ips));
-    }
-
-    if let Some(genesis_vm_count) = options.genesis_vm_count {
-        args.push(("genesis_vm_count".to_string(), genesis_vm_count.to_string()));
-    }
-
-    if let Some(peer_cache_node_vm_count) = options.peer_cache_node_vm_count {
-        args.push((
-            "peer_cache_node_vm_count".to_string(),
-            peer_cache_node_vm_count.to_string(),
-        ));
-    }
-    if let Some(node_vm_count) = options.node_vm_count {
-        args.push(("node_vm_count".to_string(), node_vm_count.to_string()));
-    }
-
-    if let Some(symmetric_private_node_vm_count) = options.symmetric_private_node_vm_count {
-        args.push((
-            "symmetric_private_node_vm_count".to_string(),
-            symmetric_private_node_vm_count.to_string(),
-        ));
-    }
-    if let Some(full_cone_private_node_vm_count) = options.full_cone_private_node_vm_count {
-        args.push((
-            "full_cone_private_node_vm_count".to_string(),
-            full_cone_private_node_vm_count.to_string(),
-        ));
-    }
-
-    if let Some(evm_node_count) = options.evm_node_count {
-        args.push(("evm_node_vm_count".to_string(), evm_node_count.to_string()));
-    }
-
-    if let Some(uploader_vm_count) = options.uploader_vm_count {
-        args.push((
-            "uploader_vm_count".to_string(),
-            uploader_vm_count.to_string(),
-        ));
-    }
-
     args.push((
         "use_custom_bin".to_string(),
         options.enable_build_vm.to_string(),
     ));
 
-    if let Some(node_vm_size) = &options.node_vm_size {
-        args.push(("node_droplet_size".to_string(), node_vm_size.clone()));
-    }
-
-    if let Some(peer_cache_vm_size) = &options.peer_cache_node_vm_size {
-        args.push((
-            "peer_cache_droplet_size".to_string(),
-            peer_cache_vm_size.clone(),
-        ));
-    }
-
-    if let Some(uploader_vm_size) = &options.uploader_vm_size {
-        args.push((
-            "uploader_droplet_size".to_string(),
-            uploader_vm_size.clone(),
-        ));
+    if let Some(evm_node_count) = options.evm_node_count {
+        args.push(("evm_node_vm_count".to_string(), evm_node_count.to_string()));
     }
 
     if let Some(evm_node_vm_size) = &options.evm_node_vm_size {
@@ -403,20 +450,11 @@ pub fn build_terraform_args(options: &InfraRunOptions) -> Result<Vec<(String, St
         ));
     }
 
-    if let Some(peer_cache_node_volume_size) = options.peer_cache_node_volume_size {
+    if let Some(emv_node_image_id) = &options.evm_node_image_id {
         args.push((
-            "peer_cache_node_volume_size".to_string(),
-            peer_cache_node_volume_size.to_string(),
+            "evm_node_droplet_image_id".to_string(),
+            emv_node_image_id.clone(),
         ));
-    }
-    if let Some(genesis_node_volume_size) = options.genesis_node_volume_size {
-        args.push((
-            "genesis_node_volume_size".to_string(),
-            genesis_node_volume_size.to_string(),
-        ));
-    }
-    if let Some(node_volume_size) = options.node_volume_size {
-        args.push(("node_volume_size".to_string(), node_volume_size.to_string()));
     }
 
     if let Some(full_cone_gateway_vm_size) = &options.full_cone_nat_gateway_vm_size {
@@ -425,10 +463,84 @@ pub fn build_terraform_args(options: &InfraRunOptions) -> Result<Vec<(String, St
             full_cone_gateway_vm_size.clone(),
         ));
     }
+
+    if let Some(full_cone_private_node_vm_count) = options.full_cone_private_node_vm_count {
+        args.push((
+            "full_cone_private_node_vm_count".to_string(),
+            full_cone_private_node_vm_count.to_string(),
+        ));
+    }
+
     if let Some(full_cone_private_node_volume_size) = options.full_cone_private_node_volume_size {
         args.push((
             "full_cone_private_node_volume_size".to_string(),
             full_cone_private_node_volume_size.to_string(),
+        ));
+    }
+
+    if let Some(genesis_vm_count) = options.genesis_vm_count {
+        args.push(("genesis_vm_count".to_string(), genesis_vm_count.to_string()));
+    }
+
+    if let Some(genesis_node_volume_size) = options.genesis_node_volume_size {
+        args.push((
+            "genesis_node_volume_size".to_string(),
+            genesis_node_volume_size.to_string(),
+        ));
+    }
+
+    if let Some(nat_gateway_image_id) = &options.nat_gateway_image_id {
+        args.push((
+            "nat_gateway_droplet_image_id".to_string(),
+            nat_gateway_image_id.clone(),
+        ));
+    }
+
+    if let Some(node_image_id) = &options.node_image_id {
+        args.push(("node_droplet_image_id".to_string(), node_image_id.clone()));
+    }
+
+    if let Some(node_vm_count) = options.node_vm_count {
+        args.push(("node_vm_count".to_string(), node_vm_count.to_string()));
+    }
+
+    if let Some(node_vm_size) = &options.node_vm_size {
+        args.push(("node_droplet_size".to_string(), node_vm_size.clone()));
+    }
+
+    if let Some(node_volume_size) = options.node_volume_size {
+        args.push(("node_volume_size".to_string(), node_volume_size.to_string()));
+    }
+
+    if let Some(peer_cache_image_id) = &options.peer_cache_image_id {
+        args.push((
+            "peer_cache_droplet_image_id".to_string(),
+            peer_cache_image_id.clone(),
+        ));
+    }
+
+    if let Some(peer_cache_node_vm_count) = options.peer_cache_node_vm_count {
+        args.push((
+            "peer_cache_node_vm_count".to_string(),
+            peer_cache_node_vm_count.to_string(),
+        ));
+    }
+
+    if let Some(peer_cache_vm_size) = &options.peer_cache_node_vm_size {
+        args.push((
+            "peer_cache_droplet_size".to_string(),
+            peer_cache_vm_size.clone(),
+        ));
+    }
+
+    if let Some(reserved_ips) = crate::reserved_ip::get_reserved_ips_args(&options.name) {
+        args.push(("peer_cache_reserved_ips".to_string(), reserved_ips));
+    }
+
+    if let Some(peer_cache_node_volume_size) = options.peer_cache_node_volume_size {
+        args.push((
+            "peer_cache_node_volume_size".to_string(),
+            peer_cache_node_volume_size.to_string(),
         ));
     }
 
@@ -438,10 +550,39 @@ pub fn build_terraform_args(options: &InfraRunOptions) -> Result<Vec<(String, St
             nat_gateway_vm_size.clone(),
         ));
     }
+
+    if let Some(symmetric_private_node_vm_count) = options.symmetric_private_node_vm_count {
+        args.push((
+            "symmetric_private_node_vm_count".to_string(),
+            symmetric_private_node_vm_count.to_string(),
+        ));
+    }
+
     if let Some(symmetric_private_node_volume_size) = options.symmetric_private_node_volume_size {
         args.push((
             "symmetric_private_node_volume_size".to_string(),
             symmetric_private_node_volume_size.to_string(),
+        ));
+    }
+
+    if let Some(uploader_image_id) = &options.uploader_image_id {
+        args.push((
+            "uploader_droplet_image_id".to_string(),
+            uploader_image_id.clone(),
+        ));
+    }
+
+    if let Some(uploader_vm_count) = options.uploader_vm_count {
+        args.push((
+            "uploader_vm_count".to_string(),
+            uploader_vm_count.to_string(),
+        ));
+    }
+
+    if let Some(uploader_vm_size) = &options.uploader_vm_size {
+        args.push((
+            "uploader_droplet_size".to_string(),
+            uploader_vm_size.clone(),
         ));
     }
 
