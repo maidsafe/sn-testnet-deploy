@@ -690,7 +690,7 @@ impl TestnetDeployer {
         let args = build_terraform_args(options)?;
 
         self.terraform_runner
-            .plan(Some(args), Some(options.tfvars_filename.clone()))?;
+            .plan(Some(args), options.tfvars_filename.clone())?;
         Ok(())
     }
 
@@ -929,10 +929,17 @@ impl TestnetDeployer {
 
     pub async fn clean(&self) -> Result<()> {
         let environment_details =
-            get_environment_details(&self.environment_name, &self.s3_repository).await?;
-        funding::drain_funds(&self.ansible_provisioner, &environment_details).await?;
+            get_environment_details(&self.environment_name, &self.s3_repository)
+                .await
+                .inspect_err(|err| {
+                    println!("Failed to get environment details: {err}. Continuing cleanup...");
+                })
+                .ok();
+        if let Some(environment_details) = &environment_details {
+            funding::drain_funds(&self.ansible_provisioner, environment_details).await?;
+        }
 
-        self.destroy_infra(&environment_details).await?;
+        self.destroy_infra(environment_details).await?;
 
         cleanup_environment_inventory(
             &self.environment_name,
@@ -945,19 +952,23 @@ impl TestnetDeployer {
 
         println!("Deleted Ansible inventory for {}", self.environment_name);
 
-        self.s3_repository
+        if let Err(err) = self
+            .s3_repository
             .delete_object("sn-environment-type", &self.environment_name)
-            .await?;
+            .await
+        {
+            println!("Failed to delete environment type: {err}. Continuing cleanup...");
+        }
         Ok(())
     }
 
-    async fn destroy_infra(&self, environment_details: &EnvironmentDetails) -> Result<()> {
+    async fn destroy_infra(&self, environment_details: Option<EnvironmentDetails>) -> Result<()> {
         infra::select_workspace(&self.terraform_runner, &self.environment_name)?;
 
         let options = InfraRunOptions::generate_existing(
             &self.environment_name,
             &self.terraform_runner,
-            environment_details,
+            environment_details.as_ref(),
         )
         .await?;
 
@@ -994,11 +1005,11 @@ impl TestnetDeployer {
 
         self.terraform_runner.destroy(
             Some(args),
-            Some(
-                environment_details
+            environment_details.map(|details| {
+                details
                     .environment_type
-                    .get_tfvars_filename(&self.environment_name),
-            ),
+                    .get_tfvars_filename(&self.environment_name)
+            }),
         )?;
 
         infra::delete_workspace(&self.terraform_runner, &self.environment_name)?;
