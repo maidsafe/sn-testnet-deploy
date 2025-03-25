@@ -43,6 +43,16 @@
     dest: /etc/default/telegraf
     remote_src: yes
 
+# testing
+- name: Update InfluxDB URLs in telegraf env file
+  lineinfile:
+    path: /etc/default/telegraf
+    regexp: "{{ item.regexp }}"
+    line: "{{ item.line }}"
+  loop:
+    - { regexp: '^TELEGRAF_INFLUX_ANT_URL_INFLUX_LB_1=.*', line: 'TELEGRAF_INFLUX_ANT_URL_INFLUX_LB_1=http://10.131.0.54:8086' }
+    - { regexp: '^TELEGRAF_INFLUX_ANT_URL_INFLUX_LB_2=.*', line: 'TELEGRAF_INFLUX_ANT_URL_INFLUX_LB_2=http://10.131.0.54:8086' }
+
 - name: replace ANT_CLIENT_TESTNET_NAME value
   replace:
     path: "/etc/default/telegraf"

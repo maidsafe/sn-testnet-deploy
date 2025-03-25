@@ -1,5 +1,5 @@
 ---
-network_dashboard_branch: main
+network_dashboard_branch: shu-uploaders-v2
 network_dashboard_github_url: git@github.com:maidsafe/network-dashboard.git
 network_dashboard_repo_path: /root/network-dashboard
 network_dashboard_sk_path: /root/.ssh/network-dashboard
