@@ -14,9 +14,9 @@ Environment="EVM_NETWORK=arbitrum-one"
 {% endif %}
 User=ant1
 {% if testnet_name.startswith('PROD-') %}
-ExecStart=/home/ant1/ant_performance_verifier.sh
+ExecStart=/home/ant1/ant_downloader.sh performance
 {% else %}
-ExecStart=/home/ant1/ant_performance_verifier.sh {{ genesis_multiaddr }} {{network_contacts_url}}{% if network_id is defined %} {{network_id}}{% endif %}
+ExecStart=/home/ant1/ant_downloader.sh performance {{ genesis_multiaddr }} {{network_contacts_url}}{% if network_id is defined %} {{network_id}}{% endif %}
 
 {% endif %}
 Restart=always

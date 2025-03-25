@@ -1,27 +1,78 @@
 #!/usr/bin/env bash
+# Combined verifier script that supports performance, verifier, and random download modes
+
+# Usage: ./script.sh mode [peer] [network_contacts_url] [network_id]
+#
+#   mode: REQUIRED - must be one of: performance, verifier, random
+#   peer: Optional contact peer
+#   network_contacts_url: Optional network contacts URL
+#   network_id: Optional network ID (also enables testnet mode)
+
+# Require first argument to be mode
+if [ $# -eq 0 ]; then
+  echo "Error: Mode is required as the first argument"
+  echo "Usage: $0 mode [peer] [network_contacts_url] [network_id]"
+  echo "  mode: Must be one of: performance, verifier, random"
+  exit 1
+fi
+
+MODE="$1"
+
+# Validate mode
+if [[ "$MODE" != "performance" && "$MODE" != "verifier" && "$MODE" != "random" ]]; then
+  echo "Error: Invalid mode '$MODE'. Must be one of: performance, verifier, random"
+  exit 1
+fi
+
 SUCCESSFUL_UPLOAD_METRIC_FILE="/mnt/ant-storage/logs/upload_files/random_uploader/${USER}/metrics_success.csv"
 DOWNLOAD_DIR="/home/${USER}/downloaded_files"
-DOWNLOAD_METRICS_DIR="/mnt/ant-storage/logs/download_files/random_verifier/${USER}"
 SLEEP_INTERVAL=20
+FILE_REF_INDEX=3
+FILE_HASH_INDEX=16
+FILE_SIZE_INDEX=15
 
-mkdir -p "${UPLOAD_METRIC_DIR}"
 
+# Set the download metrics dir based on mode
+case "$MODE" in
+  performance)
+    DOWNLOAD_METRICS_DIR="/mnt/ant-storage/logs/download_files/performance_verifier/${USER}"
+    SERVICE_TYPE="PERFORMANCE_VERIFIER"
+    ;;
+  verifier)
+    DOWNLOAD_METRICS_DIR="/mnt/ant-storage/logs/download_files/download_verifier/${USER}"
+    SERVICE_TYPE="DOWNLOAD_VERIFIER"
+    ;;
+  random)
+    DOWNLOAD_METRICS_DIR="/mnt/ant-storage/logs/download_files/random_verifier/${USER}"
+    SERVICE_TYPE="RANDOM_VERIFIER"
+    ;;
+  *)
+    echo "Invalid mode: $MODE. Must be one of: performance, verifier, random"
+    exit 1
+    ;;
+esac
+
+# Create directories
+mkdir -p "${DOWNLOAD_DIR}"
+mkdir -p "${DOWNLOAD_METRICS_DIR}"
+
+# Process command line arguments
 CONTACT_PEER_ARG=""
 NETWORK_CONTACTS_URL_ARG=""
 NETWORK_ID_ARG=""
 TESTNET_ARG=""
 
-if [ -n "${1:-}" ]; then
-  echo "Setting contact peer arg to ${1:-}"
-  CONTACT_PEER_ARG="--peer ${1:-}"
-fi
 if [ -n "${2:-}" ]; then
-  echo "Setting network contacts URL arg to ${2:-}"
-  NETWORK_CONTACTS_URL_ARG="--network-contacts-url ${2:-}"
+  echo "Setting contact peer arg to ${2:-}"
+  CONTACT_PEER_ARG="--peer ${2:-}"
 fi
 if [ -n "${3:-}" ]; then
-  echo "Setting network ID arg to ${3:-}"
-  NETWORK_ID_ARG="--network-id ${3:-}"
+  echo "Setting network contacts URL arg to ${3:-}"
+  NETWORK_CONTACTS_URL_ARG="--network-contacts-url ${3:-}"
+fi
+if [ -n "${4:-}" ]; then
+  echo "Setting network ID arg to ${4:-}"
+  NETWORK_ID_ARG="--network-id ${4:-}"
   echo "Setting --testnet arg"
   TESTNET_ARG="--testnet"
 fi
@@ -132,7 +183,7 @@ get_error_enum() {
 
 download_file() {
   local file_ref=$1
-  local expected_hash=$2 
+  local expected_hash=$2
   local expected_file_size=$3
   # Multiple downloaders can be running on the same machine, so one or more
   # could select the same file address at the same time. We therefore use a GUID
@@ -142,8 +193,14 @@ download_file() {
     download_path="$DOWNLOAD_DIR/$download_filename"
     echo "Downloading file: $file_ref" 
     
+    # Add quorum majority flag for download mode
+    QUORUM_ARG=""
+    if [[ "$MODE" == "verifier" ]]; then
+      QUORUM_ARG="--quorum majority"
+    fi
+    
     start_time=$(date +%s%N)
-    stdout=$(ant $CONTACT_PEER_ARG $NETWORK_CONTACTS_URL_ARG $TESTNET_ARG $NETWORK_ID_ARG file download "$file_ref" "$download_path" 2>&1)
+    stdout=$(ant $CONTACT_PEER_ARG $NETWORK_CONTACTS_URL_ARG $TESTNET_ARG $NETWORK_ID_ARG file download "$file_ref" "$download_path" $QUORUM_ARG 2>&1)
     exit_code=$?
     end_time=$(date +%s%N)
     echo "$stdout"
@@ -194,7 +251,7 @@ download_file() {
         if [ ! -f "$success_file" ]; then
         echo "TIMESTAMP_START,TIMESTAMP_FINISH,DATA_ADDRESS,DURATION,RETRIES,FETCHED_RECORDS,TOTAL_RECORDS,EXIT_STATUS,SERVICE_TYPE,ANT_USER,SERVICE_NUMBER,EXPECTED_TOTAL_SIZE,ACTUAL_TOTAL_SIZE,ACTUAL_SHA256_HASH,EXPECTED_SHA256_HASH,ANT_PACKAGE_VERSION,ANT_PACKAGE_BUILD_DATE" > "$success_file"
         fi
-        echo "$start_time,$end_time,$file_ref,$elapsed,0,0,0,$error_enum,RANDOM_VERIFIER,$USER,1,$expected_file_size,$actual_file_size_kb,$actual_hash,$expected_hash,$package_version,$build_date" >> "$success_file"
+        echo "$start_time,$end_time,$file_ref,$elapsed,0,0,0,$error_enum,$SERVICE_TYPE,$USER,1,$expected_file_size,$actual_file_size_kb,$actual_hash,$expected_hash,$package_version,$build_date" >> "$success_file"
     else
         echo "Failed to download $file_ref using ANT CLI"
         failure_file="$DOWNLOAD_METRICS_DIR/metrics_failure.csv"
@@ -202,18 +259,38 @@ download_file() {
         if [ ! -f "$failure_file" ]; then
         echo "TIMESTAMP_START,TIMESTAMP_FINISH,DATA_ADDRESS,DURATION,RETRIES,FETCHED_RECORDS,TOTAL_RECORDS,EXIT_STATUS,SERVICE_TYPE,ANT_USER,SERVICE_NUMBER,EXPECTED_TOTAL_SIZE,ACTUAL_TOTAL_SIZE,ACTUAL_SHA256_HASH,EXPECTED_SHA256_HASH,ANT_PACKAGE_VERSION,ANT_PACKAGE_BUILD_DATE" > "$failure_file"
         fi
-        echo "$start_time,$end_time,$file_ref,$elapsed,0,0,0,$error_enum,RANDOM_VERIFIER,$USER,1,$expected_file_size,$actual_file_size_kb,$actual_hash,$expected_hash,$package_version,$build_date" >> "$failure_file"
+        echo "$start_time,$end_time,$file_ref,$elapsed,0,0,0,$error_enum,$SERVICE_TYPE,$USER,1,$expected_file_size,$actual_file_size_kb,$actual_hash,$expected_hash,$package_version,$build_date" >> "$failure_file"
     fi
   )
 }
 
+# Main loop
 while true; do
   if [[ -f "$SUCCESSFUL_UPLOAD_METRIC_FILE" && -s "$SUCCESSFUL_UPLOAD_METRIC_FILE" ]]; then
-    # downloads a random line from the file, except the first line.
-    random_line=$(tail -n +2 "$SUCCESSFUL_UPLOAD_METRIC_FILE" | sort -R | head -n 1)
-    file_ref=$(echo "$random_line" | cut -d ',' -f 3 | head -n 1)
-    file_hash=$(echo "$random_line" | cut -d ',' -f 16 | head -n 1 )
-    file_size=$(echo "$random_line" | cut -d ',' -f 15 | head -n 1 )
+    # Select file based on mode
+    case "$MODE" in
+      performance)
+        # downloads the same file repeatedly - second line of the file
+        first_file=$(head -n 2 "$SUCCESSFUL_UPLOAD_METRIC_FILE" | tail -n 1)
+        file_ref=$(echo "$first_file" | cut -d ',' -f $FILE_REF_INDEX | head -n 1)
+        file_hash=$(echo "$first_file" | cut -d ',' -f $FILE_HASH_INDEX | head -n 1 )
+        file_size=$(echo "$first_file" | cut -d ',' -f $FILE_SIZE_INDEX | head -n 1 )
+        ;;
+      verifier)
+        # downloads the 3rd latest file
+        third_latest_file=$(tail -n 3 "$SUCCESSFUL_UPLOAD_METRIC_FILE" | head -n 1)
+        file_ref=$(echo "$third_latest_file" | cut -d ',' -f $FILE_REF_INDEX | head -n 1)
+        file_hash=$(echo "$third_latest_file" | cut -d ',' -f $FILE_HASH_INDEX | head -n 1 )
+        file_size=$(echo "$third_latest_file" | cut -d ',' -f $FILE_SIZE_INDEX | head -n 1 )
+        ;;
+      random)
+        # downloads a random line from the file, except the first line
+        random_line=$(tail -n +2 "$SUCCESSFUL_UPLOAD_METRIC_FILE" | sort -R | head -n 1)
+        file_ref=$(echo "$random_line" | cut -d ',' -f $FILE_REF_INDEX | head -n 1)
+        file_hash=$(echo "$random_line" | cut -d ',' -f $FILE_HASH_INDEX | head -n 1 )
+        file_size=$(echo "$random_line" | cut -d ',' -f $FILE_SIZE_INDEX | head -n 1 )
+        ;;
+    esac
 
     if [[ -n "$file_ref" ]]; then
       download_file "$file_ref" "$file_hash" "$file_size"
