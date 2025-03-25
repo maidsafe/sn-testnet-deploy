@@ -4,6 +4,8 @@
 // This SAFE Network Software is licensed under the BSD-3-Clause license.
 // Please see the LICENSE file for more details.
 
+use log::debug;
+
 use crate::{
     error::{Error, Result},
     print_duration,
@@ -11,6 +13,24 @@ use crate::{
     EnvironmentDetails, TestnetDeployer,
 };
 use std::time::Instant;
+
+const BUILD_VM: &str = "build";
+const EVM_NODE: &str = "evm_node";
+const FULL_CONE_NAT_GATEWAY: &str = "full_cone_nat_gateway";
+const FULL_CONE_PRIVATE_NODE: &str = "full_cone_private_node";
+const FULL_CONE_PRIVATE_NODE_ATTACHED_VOLUME: &str = "full_cone_private_node_attached_volume";
+const GENESIS_NODE: &str = "genesis_bootstrap";
+const GENESIS_NODE_ATTACHED_VOLUME: &str = "genesis_node_attached_volume";
+const NODE: &str = "node";
+const NODE_ATTACHED_VOLUME: &str = "node_attached_volume";
+const PEER_CACHE_NODE: &str = "peer_cache_node";
+const PEER_CACHE_NODE_ATTACHED_VOLUME: &str = "peer_cache_node_attached_volume";
+const SYMMETRIC_NAT_GATEWAY: &str = "symmetric_nat_gateway";
+const SYMMETRIC_PRIVATE_NODE: &str = "symmetric_private_node";
+const SYMMETRIC_PRIVATE_NODE_ATTACHED_VOLUME: &str = "symmetric_private_node_attached_volume";
+const UPLOADER: &str = "uploader";
+
+const SIZE: &str = "size";
 
 #[derive(Clone, Debug)]
 pub struct InfraRunOptions {
@@ -53,15 +73,15 @@ impl InfraRunOptions {
                 .count() as u16
         };
 
-        let peer_cache_node_vm_count = resource_count("peer_cache_node");
-        println!("Peer cache node count: {}", peer_cache_node_vm_count);
+        let peer_cache_node_vm_count = resource_count(PEER_CACHE_NODE);
+        debug!("Peer cache node count: {}", peer_cache_node_vm_count);
         let (peer_cache_node_volume_size, peer_cache_node_vm_size) = if peer_cache_node_vm_count > 0
         {
             let volume_size =
-                get_value_for_resource(&resources, "peer_cache_node_attached_volume", "size")?
+                get_value_for_resource(&resources, PEER_CACHE_NODE_ATTACHED_VOLUME, SIZE)?
                     .and_then(|size| size.as_u64())
                     .map(|size| size as u16);
-            let vm_size = get_value_for_resource(&resources, "peer_cache_node", "size")?
+            let vm_size = get_value_for_resource(&resources, PEER_CACHE_NODE, SIZE)?
                 .map(|size| size.to_string());
 
             (volume_size, vm_size)
@@ -69,37 +89,37 @@ impl InfraRunOptions {
             (None, None)
         };
 
-        let genesis_node_vm_count = resource_count("genesis_bootstrap");
+        let genesis_node_vm_count = resource_count(GENESIS_NODE);
         let genesis_node_volume_size = if genesis_node_vm_count > 0 {
-            get_value_for_resource(&resources, "genesis_node_attached_volume", "size")?
+            get_value_for_resource(&resources, GENESIS_NODE_ATTACHED_VOLUME, SIZE)?
                 .and_then(|size| size.as_u64())
                 .map(|size| size as u16)
         } else {
             None
         };
 
-        let node_vm_count = resource_count("node");
+        let node_vm_count = resource_count(NODE);
         let node_volume_size = if node_vm_count > 0 {
-            get_value_for_resource(&resources, "node_attached_volume", "size")?
+            get_value_for_resource(&resources, NODE_ATTACHED_VOLUME, SIZE)?
                 .and_then(|size| size.as_u64())
                 .map(|size| size as u16)
         } else {
             None
         };
 
-        let symmetric_private_node_vm_count = resource_count("symmetric_private_node");
+        let symmetric_private_node_vm_count = resource_count(SYMMETRIC_PRIVATE_NODE);
         let (symmetric_private_node_volume_size, symmetric_nat_gateway_vm_size) =
             if symmetric_private_node_vm_count > 0 {
                 let symmetric_private_node_volume_size = get_value_for_resource(
                     &resources,
-                    "symmetric_private_node_attached_volume",
-                    "size",
+                    SYMMETRIC_PRIVATE_NODE_ATTACHED_VOLUME,
+                    SIZE,
                 )?
                 .and_then(|size| size.as_u64())
                 .map(|size| size as u16);
                 // gateways should exists if private nodes exist
                 let symmetric_nat_gateway_vm_size =
-                    get_value_for_resource(&resources, "symmetric_nat_gateway", "size")?
+                    get_value_for_resource(&resources, SYMMETRIC_NAT_GATEWAY, SIZE)?
                         .map(|size| size.to_string());
 
                 (
@@ -109,19 +129,19 @@ impl InfraRunOptions {
             } else {
                 (None, None)
             };
-        let full_cone_private_node_vm_count = resource_count("full_cone_private_node");
+        let full_cone_private_node_vm_count = resource_count(FULL_CONE_PRIVATE_NODE);
         let (full_cone_private_node_volume_size, full_cone_nat_gateway_vm_size) =
             if full_cone_private_node_vm_count > 0 {
                 let full_cone_private_node_volume_size = get_value_for_resource(
                     &resources,
-                    "full_cone_private_node_attached_volume",
-                    "size",
+                    FULL_CONE_PRIVATE_NODE_ATTACHED_VOLUME,
+                    SIZE,
                 )?
                 .and_then(|size| size.as_u64())
                 .map(|size| size as u16);
                 // gateways should exists if private nodes exist
                 let full_cone_nat_gateway_vm_size =
-                    get_value_for_resource(&resources, "full_cone_nat_gateway", "size")?
+                    get_value_for_resource(&resources, FULL_CONE_NAT_GATEWAY, SIZE)?
                         .map(|size| size.to_string());
 
                 (
@@ -132,28 +152,28 @@ impl InfraRunOptions {
                 (None, None)
             };
 
-        let uploader_vm_count = resource_count("uploader");
+        let uploader_vm_count = resource_count(UPLOADER);
         let uploader_vm_size = if uploader_vm_count > 0 {
-            get_value_for_resource(&resources, "uploader", "size")?.map(|size| size.to_string())
+            get_value_for_resource(&resources, UPLOADER, SIZE)?.map(|size| size.to_string())
         } else {
             None
         };
 
-        let evm_node_count = resource_count("evm_node");
-        let build_vm_count = resource_count("build");
+        let evm_node_count = resource_count(EVM_NODE);
+        let build_vm_count = resource_count(BUILD_VM);
         let enable_build_vm = build_vm_count > 0;
 
         // Node VM size var is re-used for nodes, evm nodes, symmetric and full cone private nodes
         let node_vm_size = if node_vm_count > 0 {
-            get_value_for_resource(&resources, "node", "size")?.map(|size| size.to_string())
+            get_value_for_resource(&resources, NODE, SIZE)?.map(|size| size.to_string())
         } else if symmetric_private_node_vm_count > 0 {
-            get_value_for_resource(&resources, "symmetric_private_node", "size")?
+            get_value_for_resource(&resources, SYMMETRIC_PRIVATE_NODE, SIZE)?
                 .map(|size| size.to_string())
         } else if full_cone_private_node_vm_count > 0 {
-            get_value_for_resource(&resources, "full_cone_private_node", "size")?
+            get_value_for_resource(&resources, FULL_CONE_PRIVATE_NODE, SIZE)?
                 .map(|size| size.to_string())
         } else if evm_node_count > 0 {
-            get_value_for_resource(&resources, "evm_node", "size")?.map(|size| size.to_string())
+            get_value_for_resource(&resources, EVM_NODE, SIZE)?.map(|size| size.to_string())
         } else {
             None
         };
@@ -230,14 +250,14 @@ impl UploaderInfraRunOptions {
                 .count() as u16
         };
 
-        let uploader_vm_count = resource_count("uploader");
+        let uploader_vm_count = resource_count(UPLOADER);
         let uploader_vm_size = if uploader_vm_count > 0 {
-            get_value_for_resource(&resources, "uploader", "size")?.map(|size| size.to_string())
+            get_value_for_resource(&resources, UPLOADER, SIZE)?.map(|size| size.to_string())
         } else {
             None
         };
 
-        let build_vm_count = resource_count("build");
+        let build_vm_count = resource_count(BUILD_VM);
         let enable_build_vm = build_vm_count > 0;
 
         let options = Self {
