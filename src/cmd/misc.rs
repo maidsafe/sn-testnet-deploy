@@ -50,7 +50,7 @@ pub async fn handle_extend_volume_size(
     let mut infra_run_options = InfraRunOptions::generate_existing(
         &name,
         &testnet_deployer.terraform_runner,
-        &environemt_details,
+        Some(&environemt_details),
     )
     .await?;
     println!("Obtained infra run options from previous deployment {infra_run_options:?}");

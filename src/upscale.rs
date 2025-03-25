@@ -153,7 +153,7 @@ impl TestnetDeployer {
         let mut infra_run_options = InfraRunOptions::generate_existing(
             &options.current_inventory.name,
             &self.terraform_runner,
-            &options.current_inventory.environment_details,
+            Some(&options.current_inventory.environment_details),
         )
         .await?;
         infra_run_options.peer_cache_node_vm_count = Some(desired_peer_cache_node_vm_count);
@@ -451,7 +451,7 @@ impl TestnetDeployer {
         let mut infra_run_options = InfraRunOptions::generate_existing(
             &options.current_inventory.name,
             &self.terraform_runner,
-            &options.current_inventory.environment_details,
+            Some(&options.current_inventory.environment_details),
         )
         .await?;
         infra_run_options.uploader_vm_count = Some(desired_uploader_vm_count);
