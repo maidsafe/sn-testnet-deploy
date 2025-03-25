@@ -1005,11 +1005,15 @@ impl TestnetDeployer {
 
         self.terraform_runner.destroy(
             Some(args),
-            environment_details.map(|details| {
-                details
-                    .environment_type
-                    .get_tfvars_filename(&self.environment_name)
-            }),
+            Some(
+                environment_details
+                    .map(|details| {
+                        details
+                            .environment_type
+                            .get_tfvars_filename(&self.environment_name)
+                    })
+                    .unwrap_or("dev.tfvars".to_string()),
+            ),
         )?;
 
         infra::delete_workspace(&self.terraform_runner, &self.environment_name)?;
