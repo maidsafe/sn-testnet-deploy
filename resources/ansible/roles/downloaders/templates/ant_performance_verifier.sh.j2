@@ -157,6 +157,7 @@ download_file() {
     echo "Elapsed time: $elapsed seconds"
     error_enum=$(get_error_enum $exit_code)
     
+    actual_hash="0x0"
     actual_file_size_kb=0
     # Only verify hash if download was successful
     if [ $exit_code -eq 0 ] && [ -n "$expected_hash" ]; then
@@ -190,17 +191,17 @@ download_file() {
         success_file="$DOWNLOAD_METRICS_DIR/metrics_success.csv"
 
         if [ ! -f "$success_file" ]; then
-        echo "TIMESTAMP_START,TIMESTAMP_FINISH,DATA_ADDRESS,DURATION,RETRIES,FETCHED_RECORDS,TOTAL_RECORDS,EXIT_STATUS,SERVICE_TYPE,ANT_USER,SERVICE_NUMBER,EXPECTED_TOTAL_SIZE,ACTUAL_TOTAL_SIZE,SHA256_HASH,ANT_PACKAGE_VERSION,ANT_PACKAGE_BUILD_DATE" > "$success_file"
+        echo "TIMESTAMP_START,TIMESTAMP_FINISH,DATA_ADDRESS,DURATION,RETRIES,FETCHED_RECORDS,TOTAL_RECORDS,EXIT_STATUS,SERVICE_TYPE,ANT_USER,SERVICE_NUMBER,EXPECTED_TOTAL_SIZE,ACTUAL_TOTAL_SIZE,ACTUAL_SHA256_HASH,EXPECTED_SHA256_HASH,ANT_PACKAGE_VERSION,ANT_PACKAGE_BUILD_DATE" > "$success_file"
         fi
-        echo "$start_time,$end_time,$file_ref,$elapsed,0,0,0,$error_enum,PERFORMANCE_VERIFIER,$USER,1,$expected_file_size,$actual_file_size_kb,$actual_hash,$package_version,$build_date" >> "$success_file"
+        echo "$start_time,$end_time,$file_ref,$elapsed,0,0,0,$error_enum,PERFORMANCE_VERIFIER,$USER,1,$expected_file_size,$actual_file_size_kb,$actual_hash,$expected_hash,$package_version,$build_date" >> "$success_file"
     else
         echo "Failed to download $file_ref using ANT CLI"
         failure_file="$DOWNLOAD_METRICS_DIR/metrics_failure.csv"
 
         if [ ! -f "$failure_file" ]; then
-        echo "TIMESTAMP_START,TIMESTAMP_FINISH,DATA_ADDRESS,DURATION,RETRIES,FETCHED_RECORDS,TOTAL_RECORDS,EXIT_STATUS,SERVICE_TYPE,ANT_USER,SERVICE_NUMBER,EXPECTED_TOTAL_SIZE,ACTUAL_TOTAL_SIZE,SHA256_HASH,ANT_PACKAGE_VERSION,ANT_PACKAGE_BUILD_DATE" > "$failure_file"
+        echo "TIMESTAMP_START,TIMESTAMP_FINISH,DATA_ADDRESS,DURATION,RETRIES,FETCHED_RECORDS,TOTAL_RECORDS,EXIT_STATUS,SERVICE_TYPE,ANT_USER,SERVICE_NUMBER,EXPECTED_TOTAL_SIZE,ACTUAL_TOTAL_SIZE,ACTUAL_SHA256_HASH,EXPECTED_SHA256_HASH,ANT_PACKAGE_VERSION,ANT_PACKAGE_BUILD_DATE" > "$failure_file"
         fi
-        echo "$start_time,$end_time,$file_ref,$elapsed,0,0,0,$error_enum,PERFORMANCE_VERIFIER,$USER,1,$expected_file_size,$actual_file_size_kb,$actual_hash,$package_version,$build_date" >> "$failure_file"
+        echo "$start_time,$end_time,$file_ref,$elapsed,0,0,0,$error_enum,PERFORMANCE_VERIFIER,$USER,1,$expected_file_size,$actual_file_size_kb,$actual_hash,$expected_hash,$package_version,$build_date" >> "$failure_file"
     fi
   )
 }
