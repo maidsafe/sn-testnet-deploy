@@ -79,15 +79,19 @@ impl TestnetDeployer {
             enable_build_vm: build_custom_binaries,
             evm_node_count: Some(0),
             evm_node_vm_size: None,
+            evm_node_image_id: None,
             full_cone_nat_gateway_vm_size: None, // We can take the value from tfvars for bootstrap deployments.
             full_cone_private_node_vm_count: options.full_cone_private_node_vm_count,
             full_cone_private_node_volume_size: options.full_cone_private_node_volume_size,
             genesis_vm_count: Some(0),
             genesis_node_volume_size: None,
             name: options.name.clone(),
+            nat_gateway_image_id: None,
+            node_image_id: None,
             node_vm_count: options.node_vm_count,
             node_vm_size: options.node_vm_size.clone(),
             node_volume_size: options.node_volume_size,
+            peer_cache_image_id: None,
             peer_cache_node_vm_count: Some(0),
             peer_cache_node_vm_size: None,
             peer_cache_node_volume_size: None,
@@ -100,6 +104,7 @@ impl TestnetDeployer {
                     .get_tfvars_filename(&options.name)
                     .to_string(),
             ),
+            uploader_image_id: None,
             uploader_vm_count: Some(0),
             uploader_vm_size: None,
         })
