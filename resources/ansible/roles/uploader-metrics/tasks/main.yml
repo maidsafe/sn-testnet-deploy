@@ -39,46 +39,70 @@
 
 - name: copy telegraf environment file
   copy:
-    src: "{{ network_dashboard_repo_path }}/telegraf/EnvironmentFile/uploaders/telegraf"
+    src: "{{ network_dashboard_repo_path }}/telegraf/EnvironmentFile/ant_clients/telegraf"
     dest: /etc/default/telegraf
     remote_src: yes
 
-- name: replace ANT_UPLOADER_TESTNET_NAME value
+- name: replace ANT_CLIENT_TESTNET_NAME value
   replace:
     path: "/etc/default/telegraf"
-    regexp: 'ANT_UPLOADER_TESTNET_NAME=UNDEFINED'
-    replace: 'ANT_UPLOADER_TESTNET_NAME={{ testnet_name | upper }}'
+    regexp: 'ANT_CLIENT_TESTNET_NAME=UNDEFINED'
+    replace: 'ANT_CLIENT_TESTNET_NAME={{ testnet_name | upper }}'
 
-- name: replace ANT_UPLOADER_HOST_ROLE value
+- name: replace ANT_CLIENT_HOST_ROLE value
   replace:
     path: "/etc/default/telegraf"
-    regexp: 'ANT_UPLOADER_HOST_ROLE=UNDEFINED'
-    replace: 'ANT_UPLOADER_HOST_ROLE=UPLOADER_NODE'
+    regexp: 'ANT_CLIENT_HOST_ROLE=UNDEFINED'
+    replace: 'ANT_CLIENT_HOST_ROLE=ANT_CLIENT'
 
 # The real branch name will be supplied later, when it is available in `safenode`.
-- name: replace ANT_UPLOADER_BRANCH_NAME value
+- name: replace ANT_CLIENT_BRANCH_NAME value
   replace:
     path: "/etc/default/telegraf"
-    regexp: "ANT_UPLOADER_BRANCH_NAME=UNDEFINED"
-    replace: "ANT_UPLOADER_BRANCH_NAME=STABLE"
+    regexp: "ANT_CLIENT_BRANCH_NAME=UNDEFINED"
+    replace: "ANT_CLIENT_BRANCH_NAME=STABLE"
 
 # The real commit hash will be supplied later, when it is available in `safenode`.
-- name: replace ANT_UPLOADER_BRANCH_COMMIT value
+- name: replace ANT_CLIENT_BRANCH_COMMIT value
   replace:
     path: "/etc/default/telegraf"
-    regexp: "ANT_UPLOADER_BRANCH_COMMIT=UNDEFINED"
-    replace: "ANT_UPLOADER_BRANCH_COMMIT=UNDEFINED"
+    regexp: "ANT_CLIENT_BRANCH_COMMIT=UNDEFINED"
+    replace: "ANT_CLIENT_BRANCH_COMMIT=UNDEFINED"
 
-- name: copy telegraf config file
+- name: copy telegraf.conf
   copy:
-    src: "{{ network_dashboard_repo_path }}/telegraf/ConfigurationFile/uploaders/telegraf.conf"
+    src: "{{ network_dashboard_repo_path }}/telegraf/ConfigurationFile/ant_clients/telegraf.conf"
     dest: /etc/telegraf/telegraf.conf
     remote_src: yes
 
-- name: copy telegraf uploader config file
+- name: copy telegraf_ant_common.conf
   copy:
-    src: "{{ network_dashboard_repo_path }}/telegraf/ConfigurationFile/uploaders/telegraf_ant_uploader_node.conf"
-    dest: /etc/telegraf/telegraf.d/telegraf_ant_uploader_node.conf
+    src: "{{ network_dashboard_repo_path }}/telegraf/ConfigurationFile/ant_clients/telegraf_ant_common.conf"
+    dest: /etc/telegraf/telegraf.d/telegraf_ant_common.conf
+    remote_src: yes
+
+- name: copy telegraf_ant_download_verifier.conf
+  copy:
+    src: "{{ network_dashboard_repo_path }}/telegraf/ConfigurationFile/ant_clients/telegraf_ant_download_verifier.conf"
+    dest: /etc/telegraf/telegraf.d/telegraf_ant_download_verifier.conf
+    remote_src: yes
+
+- name: copy telegraf_ant_performance_verifier.conf
+  copy:
+    src: "{{ network_dashboard_repo_path }}/telegraf/ConfigurationFile/ant_clients/telegraf_ant_performance_verifier.conf"
+    dest: /etc/telegraf/telegraf.d/telegraf_ant_performance_verifier.conf
+    remote_src: yes
+
+- name: copy telegraf_ant_random_uploader.conf
+  copy:
+    src: "{{ network_dashboard_repo_path }}/telegraf/ConfigurationFile/ant_clients/telegraf_ant_random_uploader.conf"
+    dest: /etc/telegraf/telegraf.d/telegraf_ant_random_uploader.conf
+    remote_src: yes
+
+- name: copy telegraf_ant_random_verifier.conf
+  copy:
+    src: "{{ network_dashboard_repo_path }}/telegraf/ConfigurationFile/ant_clients/telegraf_ant_random_verifier.conf"
+    dest: /etc/telegraf/telegraf.d/telegraf_ant_random_verifier.conf
     remote_src: yes
 
 - name: add telegraf user to sudoers for safe command
