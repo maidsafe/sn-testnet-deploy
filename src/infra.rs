@@ -59,65 +59,30 @@ impl InfraRunOptions {
         {
             let volume_size =
                 get_value_for_resource(&resources, "peer_cache_node_attached_volume", "size")?
-                    .as_u64()
-                    .ok_or_else(|| {
-                        log::error!(
-                            "Failed to obtain u64 'size' value for peer_cache_node_attached_volume"
-                        );
-                        Error::TerraformResourceFieldMissing {
-                            resource: "peer_cache_node_attached_volume".to_string(),
-                            field: "size".to_string(),
-                        }
-                    })?;
+                    .and_then(|size| size.as_u64())
+                    .map(|size| size as u16);
             let vm_size = get_value_for_resource(&resources, "peer_cache_node", "size")?
-                .as_str()
-                .ok_or_else(|| {
-                    log::error!("Failed to obtain str 'size' value for peer_cache_node");
-                    Error::TerraformResourceFieldMissing {
-                        resource: "peer_cache_node".to_string(),
-                        field: "size".to_string(),
-                    }
-                })?
-                .to_string();
+                .map(|size| size.to_string());
 
-            (Some(volume_size as u16), Some(vm_size))
+            (volume_size, vm_size)
         } else {
             (None, None)
         };
 
         let genesis_node_vm_count = resource_count("genesis_bootstrap");
         let genesis_node_volume_size = if genesis_node_vm_count > 0 {
-            let genesis_node_volume_size =
-                get_value_for_resource(&resources, "genesis_node_attached_volume", "size")?
-                    .as_u64()
-                    .ok_or_else(|| {
-                        log::error!(
-                            "Failed to obtain u64 'size' value for genesis_node_attached_volume"
-                        );
-                        Error::TerraformResourceFieldMissing {
-                            resource: "genesis_node_attached_volume".to_string(),
-                            field: "size".to_string(),
-                        }
-                    })?;
-            Some(genesis_node_volume_size as u16)
+            get_value_for_resource(&resources, "genesis_node_attached_volume", "size")?
+                .and_then(|size| size.as_u64())
+                .map(|size| size as u16)
         } else {
             None
         };
 
         let node_vm_count = resource_count("node");
         let node_volume_size = if node_vm_count > 0 {
-            let node_volume_size =
-                get_value_for_resource(&resources, "node_attached_volume", "size")?
-                    .as_u64()
-                    .ok_or_else(|| {
-                        log::error!("Failed to obtain u64 'size' value for node_attached_volume");
-                        Error::TerraformResourceFieldMissing {
-                            resource: "node_attached_volume".to_string(),
-                            field: "size".to_string(),
-                        }
-                    })?;
-
-            Some(node_volume_size as u16)
+            get_value_for_resource(&resources, "node_attached_volume", "size")?
+                .and_then(|size| size.as_u64())
+                .map(|size| size as u16)
         } else {
             None
         };
@@ -130,34 +95,16 @@ impl InfraRunOptions {
                     "symmetric_private_node_attached_volume",
                     "size",
                 )?
-                .as_u64()
-                .ok_or_else(|| {
-                    log::error!(
-                    "Failed to obtain u64 'size' value for symmetric_private_node_attached_volume"
-                );
-                    Error::TerraformResourceFieldMissing {
-                        resource: "symmetric_private_node_attached_volume".to_string(),
-                        field: "size".to_string(),
-                    }
-                })?;
+                .and_then(|size| size.as_u64())
+                .map(|size| size as u16);
                 // gateways should exists if private nodes exist
                 let symmetric_nat_gateway_vm_size =
                     get_value_for_resource(&resources, "symmetric_nat_gateway", "size")?
-                        .as_str()
-                        .ok_or_else(|| {
-                            log::error!(
-                                "Failed to obtain str 'size' value for symmetric_nat_gateway"
-                            );
-                            Error::TerraformResourceFieldMissing {
-                                resource: "symmetric_nat_gateway".to_string(),
-                                field: "size".to_string(),
-                            }
-                        })?
-                        .to_string();
+                        .map(|size| size.to_string());
 
                 (
-                    Some(symmetric_private_node_volume_size as u16),
-                    Some(symmetric_nat_gateway_vm_size),
+                    symmetric_private_node_volume_size,
+                    symmetric_nat_gateway_vm_size,
                 )
             } else {
                 (None, None)
@@ -170,34 +117,16 @@ impl InfraRunOptions {
                     "full_cone_private_node_attached_volume",
                     "size",
                 )?
-                .as_u64()
-                .ok_or_else(|| {
-                    log::error!(
-                    "Failed to obtain u64 'size' value for full_cone_private_node_attached_volume"
-                );
-                    Error::TerraformResourceFieldMissing {
-                        resource: "full_cone_private_node_attached_volume".to_string(),
-                        field: "size".to_string(),
-                    }
-                })?;
+                .and_then(|size| size.as_u64())
+                .map(|size| size as u16);
                 // gateways should exists if private nodes exist
                 let full_cone_nat_gateway_vm_size =
                     get_value_for_resource(&resources, "full_cone_nat_gateway", "size")?
-                        .as_str()
-                        .ok_or_else(|| {
-                            log::error!(
-                                "Failed to obtain str 'size' value for full_cone_nat_gateway"
-                            );
-                            Error::TerraformResourceFieldMissing {
-                                resource: "full_cone_nat_gateway".to_string(),
-                                field: "size".to_string(),
-                            }
-                        })?
-                        .to_string();
+                        .map(|size| size.to_string());
 
                 (
-                    Some(full_cone_private_node_volume_size as u16),
-                    Some(full_cone_nat_gateway_vm_size),
+                    full_cone_private_node_volume_size,
+                    full_cone_nat_gateway_vm_size,
                 )
             } else {
                 (None, None)
@@ -205,17 +134,7 @@ impl InfraRunOptions {
 
         let uploader_vm_count = resource_count("uploader");
         let uploader_vm_size = if uploader_vm_count > 0 {
-            let uploader_vm_size = get_value_for_resource(&resources, "uploader", "size")?
-                .as_str()
-                .ok_or_else(|| {
-                    log::error!("Failed to obtain str 'size' value for uploader");
-                    Error::TerraformResourceFieldMissing {
-                        resource: "uploader".to_string(),
-                        field: "size".to_string(),
-                    }
-                })?
-                .to_string();
-            Some(uploader_vm_size)
+            get_value_for_resource(&resources, "uploader", "size")?.map(|size| size.to_string())
         } else {
             None
         };
@@ -226,55 +145,15 @@ impl InfraRunOptions {
 
         // Node VM size var is re-used for nodes, evm nodes, symmetric and full cone private nodes
         let node_vm_size = if node_vm_count > 0 {
-            let node_vm_size = get_value_for_resource(&resources, "node", "size")?
-                .as_str()
-                .ok_or_else(|| {
-                    log::error!("Failed to obtain str 'size' value for node");
-                    Error::TerraformResourceFieldMissing {
-                        resource: "node".to_string(),
-                        field: "size".to_string(),
-                    }
-                })?
-                .to_string();
-            Some(node_vm_size)
+            get_value_for_resource(&resources, "node", "size")?.map(|size| size.to_string())
         } else if symmetric_private_node_vm_count > 0 {
-            let symmetric_private_node_vm_size =
-                get_value_for_resource(&resources, "symmetric_private_node", "size")?
-                    .as_str()
-                    .ok_or_else(|| {
-                        log::error!("Failed to obtain str 'size' value for symmetric_private_node");
-                        Error::TerraformResourceFieldMissing {
-                            resource: "symmetric_private_node".to_string(),
-                            field: "size".to_string(),
-                        }
-                    })?
-                    .to_string();
-            Some(symmetric_private_node_vm_size)
+            get_value_for_resource(&resources, "symmetric_private_node", "size")?
+                .map(|size| size.to_string())
         } else if full_cone_private_node_vm_count > 0 {
-            let full_cone_private_node_vm_size =
-                get_value_for_resource(&resources, "full_cone_private_node", "size")?
-                    .as_str()
-                    .ok_or_else(|| {
-                        log::error!("Failed to obtain str 'size' value for full_cone_private_node");
-                        Error::TerraformResourceFieldMissing {
-                            resource: "full_cone_private_node".to_string(),
-                            field: "size".to_string(),
-                        }
-                    })?
-                    .to_string();
-            Some(full_cone_private_node_vm_size)
+            get_value_for_resource(&resources, "full_cone_private_node", "size")?
+                .map(|size| size.to_string())
         } else if evm_node_count > 0 {
-            let evm_node_vm_size = get_value_for_resource(&resources, "evm_node", "size")?
-                .as_str()
-                .ok_or_else(|| {
-                    log::error!("Failed to obtain str 'size' value for evm_node");
-                    Error::TerraformResourceFieldMissing {
-                        resource: "evm_node".to_string(),
-                        field: "size".to_string(),
-                    }
-                })?
-                .to_string();
-            Some(evm_node_vm_size)
+            get_value_for_resource(&resources, "evm_node", "size")?.map(|size| size.to_string())
         } else {
             None
         };
@@ -353,17 +232,7 @@ impl UploaderInfraRunOptions {
 
         let uploader_vm_count = resource_count("uploader");
         let uploader_vm_size = if uploader_vm_count > 0 {
-            let uploader_vm_size = get_value_for_resource(&resources, "uploader", "size")?
-                .as_str()
-                .ok_or_else(|| {
-                    log::error!("Failed to obtain str 'size' value for uploader");
-                    Error::TerraformResourceFieldMissing {
-                        resource: "uploader".to_string(),
-                        field: "size".to_string(),
-                    }
-                })?
-                .to_string();
-            Some(uploader_vm_size)
+            get_value_for_resource(&resources, "uploader", "size")?.map(|size| size.to_string())
         } else {
             None
         };
@@ -414,34 +283,28 @@ fn get_value_for_resource(
     resources: &[TerraformResource],
     resource_name: &str,
     field_name: &str,
-) -> Result<serde_json::Value, Error> {
+) -> Result<Option<serde_json::Value>, Error> {
     let field_value = resources
         .iter()
         .filter(|r| r.resource_name == resource_name)
         .try_fold(None, |acc_value: Option<serde_json::Value>, r| {
-            let Some(value) = r.values.get(field_name) else {
-                log::error!("Failed to obtain '{field_name}' value for {resource_name}");
-                return Err(Error::TerraformResourceFieldMissing {
-                    resource: resource_name.to_string(),
-                    field: field_name.to_string(),
-                });
-            };
-            match acc_value {
-                Some(ref existing_value) if existing_value != value => {
-                    log::error!("Expected value: {existing_value}, got value: {value}");
-                    Err(Error::TerraformResourceValueMismatch {
-                        expected: existing_value.to_string(),
-                        actual: value.to_string(),
-                    })
+            if let Some(value) = r.values.get(field_name) {
+                match acc_value {
+                    Some(ref existing_value) if existing_value != value => {
+                        log::error!("Expected value: {existing_value}, got value: {value}");
+                        Err(Error::TerraformResourceValueMismatch {
+                            expected: existing_value.to_string(),
+                            actual: value.to_string(),
+                        })
+                    }
+                    _ => Ok(Some(value.clone())),
                 }
-                _ => Ok(Some(value.clone())),
+            } else {
+                Ok(acc_value)
             }
         })?;
 
-    field_value.ok_or(Error::TerraformResourceFieldMissing {
-        resource: resource_name.to_string(),
-        field: field_name.to_string(),
-    })
+    Ok(field_value)
 }
 
 /// Build the terraform arguments from InfraRunOptions
