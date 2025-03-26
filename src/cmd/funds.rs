@@ -18,9 +18,9 @@ use std::str::FromStr;
 
 #[derive(Subcommand, Debug)]
 pub enum FundsCommand {
-    /// Deposit tokens and gas from the provided funding wallet secret key to all the uploaders
+    /// Deposit tokens and gas from the provided funding wallet secret key to all the ANT uploader.
     Deposit {
-        /// The secret key for the wallet that will fund all the uploaders.
+        /// The secret key for the wallet that will fund all the ANT uploader.
         ///
         /// This argument only applies when Arbitrum or Sepolia networks are used.
         #[clap(long)]
@@ -42,7 +42,7 @@ pub enum FundsCommand {
         #[arg(long)]
         tokens_to_transfer: Option<U256>,
     },
-    /// Drain all the tokens and gas from the uploaders to the funding wallet.
+    /// Drain all the tokens and gas from the ANT instances to the funding wallet.
     Drain {
         /// The name of the environment.
         #[arg(short = 'n', long)]
@@ -85,13 +85,13 @@ pub async fn handle_funds_command(cmd: FundsCommand) -> Result<()> {
                 evm_rpc_url: environment_details.evm_details.rpc_url,
                 evm_network: environment_details.evm_details.network,
                 funding_wallet_secret_key,
-                uploaders_count: None,
-                token_amount: tokens_to_transfer,
                 gas_amount: gas_to_transfer,
+                token_amount: tokens_to_transfer,
+                uploaders_count: None,
             };
             testnet_deployer
                 .ansible_provisioner
-                .deposit_funds_to_uploaders(&options)
+                .deposit_funds_to_clients(&options)
                 .await?;
 
             Ok(())
@@ -127,7 +127,7 @@ pub async fn handle_funds_command(cmd: FundsCommand) -> Result<()> {
             let network = match environment_details.evm_details.network {
                 EvmNetwork::Anvil => {
                     return Err(eyre!(
-                        "Draining funds from uploaders is not supported for an Anvil network"
+                        "Draining funds from ANT instances is not supported for an Anvil network"
                     ));
                 }
                 EvmNetwork::ArbitrumOne => Network::ArbitrumOne,
@@ -157,7 +157,7 @@ pub async fn handle_funds_command(cmd: FundsCommand) -> Result<()> {
 
             testnet_deployer
                 .ansible_provisioner
-                .drain_funds_from_uploaders(to_address, network)
+                .drain_funds_from_ant_instances(to_address, network)
                 .await?;
 
             Ok(())

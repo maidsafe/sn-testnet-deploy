@@ -1,5 +1,5 @@
 ---
-- name: upgrade the uploaders
+- name: upgrade the ANT binary
   hosts: all
   become: True
   vars:
@@ -10,7 +10,7 @@
       register: ant_users
       changed_when: false
 
-    - name: stop all uploader services
+    - name: stop all ANT uploader services
       systemd:
         name: "ant_random_uploader_{{ item | regex_replace('ant([0-9]+)', '\\1') }}"
         state: stopped
@@ -18,7 +18,7 @@
 
     # It is antr to make sure both of these are removed, because Ansible may not re-download and
     # replace them if they already exist.
-    - name: remove existing ant binary
+    - name: remove existing ANT binary
       ansible.builtin.file:
         path: /usr/local/bin/ant
         state: absent
@@ -49,7 +49,7 @@
       become_user: "ant{{ item | regex_replace('ant([0-9]+)', '\\1') }}"
       loop: "{{ ant_users.stdout_lines }}"
 
-    - name: start all uploader services
+    - name: start all ANT uploader services
       systemd:
         name: "ant_random_uploader_{{ item | regex_replace('ant([0-9]+)', '\\1') }}"
         state: started

@@ -11,15 +11,15 @@ use color_eyre::eyre::{eyre, Result};
 use sn_testnet_deploy::{
     ansible::{extra_vars::ExtraVarsDocBuilder, inventory::AnsibleInventoryType, AnsiblePlaybook},
     inventory::DeploymentInventoryService,
-    uploaders::{UploaderDeployBuilder, UploaderDeployOptions},
+    uploaders::{ClientDeployBuilder, ClientDeployOptions},
     upscale::UpscaleOptions,
     EvmDetails, TestnetDeployBuilder,
 };
 
 #[derive(Subcommand, Debug)]
 #[allow(clippy::large_enum_variant)]
-pub enum UploadersCommands {
-    /// Clean a deployed uploader environment.
+pub enum ClientCommands {
+    /// Clean a deployed Client environment.
     Clean {
         /// The name of the environment.
         #[arg(short = 'n', long)]
@@ -28,7 +28,7 @@ pub enum UploadersCommands {
         #[clap(long, value_parser = parse_provider, verbatim_doc_comment, default_value_t = CloudProvider::DigitalOcean)]
         provider: CloudProvider,
     },
-    /// Deploy a new set of uploaders.
+    /// Deploy a new Client environment.
     Deploy {
         /// Set to run Ansible with more verbose output.
         #[arg(long)]
@@ -65,6 +65,15 @@ pub enum UploadersCommands {
         /// Example: --client-env CLIENT_LOG=all,RUST_LOG=debug
         #[clap(name = "client-env", long, use_value_delimiter = true, value_parser = parse_environment_variables, verbatim_doc_comment)]
         client_env_variables: Option<Vec<(String, String)>>,
+        /// The number of Client VMs to create.
+        ///
+        /// If the argument is not used, the value will be determined by the 'environment-type'
+        /// argument.
+        #[clap(long)]
+        client_vm_count: Option<u16>,
+        /// Override the size of the Client VMs.
+        #[clap(long)]
+        client_vm_size: Option<String>,
         /// Set to disable Telegraf metrics collection on all nodes.
         #[clap(long)]
         disable_telegraf: bool,
@@ -104,17 +113,17 @@ pub enum UploadersCommands {
         /// The default value from ansible.cfg is 50.
         #[clap(long)]
         forks: Option<usize>,
-        /// The secret key for the wallet that will fund all the uploaders.
+        /// The secret key for the wallet that will fund all the ANT instances.
         ///
         /// This argument only applies when Arbitrum or Sepolia networks are used.
         #[clap(long)]
         funding_wallet_secret_key: Option<String>,
-        /// The amount of gas to initially transfer to each uploader, in U256
+        /// The amount of gas to initially transfer to each ANT instance, in U256
         ///
         /// 1 ETH = 1_000_000_000_000_000_000. Defaults to 0.1 ETH
         #[arg(long)]
         initial_gas: Option<U256>,
-        /// The amount of tokens to initially transfer to each uploader, in U256
+        /// The amount of tokens to initially transfer to each ANT instance, in U256
         ///
         /// 1 Token = 1_000_000_000_000_000_000. Defaults to 100 token.
         #[arg(long)]
@@ -136,7 +145,7 @@ pub enum UploadersCommands {
         /// The networks contacts URL from an existing network.
         #[arg(long)]
         network_contacts_url: String,
-        /// A peer from an existing network that the uploaders can connect to.
+        /// A peer from an existing network that the Ant Client can connect to.
         ///
         /// Should be in the form of a multiaddr.
         #[arg(long)]
@@ -157,21 +166,12 @@ pub enum UploadersCommands {
         /// arguments. You can only supply version numbers or a custom branch, not both.
         #[arg(long, verbatim_doc_comment)]
         repo_owner: Option<String>,
-        /// The desired number of uploaders per VM.
+        /// The desired number of uploaders per Client VM.
         #[clap(long, default_value_t = 1)]
         uploaders_count: u16,
-        /// The number of uploader VMs to create.
+        /// Pre-funded wallet secret keys to use for the ANT instances.
         ///
-        /// If the argument is not used, the value will be determined by the 'environment-type'
-        /// argument.
-        #[clap(long)]
-        uploader_vm_count: Option<u16>,
-        /// Override the size of the uploader VMs.
-        #[clap(long)]
-        uploader_vm_size: Option<String>,
-        /// Pre-funded wallet secret keys to use for uploaders.
-        ///
-        /// Can be specified multiple times, once for each uploader.
+        /// Can be specified multiple times, once for each ANT instance.
         /// If provided, the number of keys must match the total number of uploaders (VM count * uploaders per VM).
         /// When using this option, the deployer will not fund the wallets.
         #[clap(long, value_name = "SECRET_KEY", number_of_values = 1)]
@@ -195,7 +195,7 @@ pub enum UploadersCommands {
         #[clap(long, default_value_t = CloudProvider::DigitalOcean, value_parser = parse_provider, verbatim_doc_comment)]
         provider: CloudProvider,
     },
-    /// Upgrade the uploaders for a given environment.
+    /// Upgrade the Ant binary for a given environment.
     Upgrade {
         /// The name of the environment.
         #[arg(short = 'n', long)]
@@ -211,30 +211,30 @@ pub enum UploadersCommands {
         #[arg(long)]
         version: Option<String>,
     },
-    /// Upscale uploaders for an existing network.
+    /// Upscale Clients for an existing network.
     Upscale {
-        /// Supply a version number for the autonomi binary to be used for new uploader VMs.
+        /// Supply a version number for the autonomi binary to be used for new Client VMs.
         ///
         /// There should be no 'v' prefix.
         #[arg(long, verbatim_doc_comment)]
         autonomi_version: String,
-        /// The desired number of uploader VMs to be running after the scale.
+        /// The desired number of Client VMs to be running after the upscale.
         ///
         /// If there are currently 10 VMs running, and you want there to be 25, the value used
         /// should be 25, rather than 15 as a delta to reach 25.
         #[clap(long, verbatim_doc_comment)]
-        desired_uploader_vm_count: Option<u16>,
-        /// The desired number of uploaders to be running after the scale.
+        desired_client_vm_count: Option<u16>,
+        /// The desired number of uploaders to be running after the upscale.
         ///
-        /// If you want each uploader VM to run multiple uploader services, specify the total desired count.
+        /// If you want each Client VM to run multiple uploader services, specify the total desired count.
         #[clap(long, verbatim_doc_comment)]
         desired_uploaders_count: Option<u16>,
-        /// The secret key for the wallet that will fund all the uploaders.
+        /// The secret key for the wallet that will fund all the ANT instances.
         ///
         /// This argument only applies when Arbitrum or Sepolia networks are used.
         #[clap(long)]
         funding_wallet_secret_key: Option<String>,
-        /// The amount of gas tokens to transfer to each uploader.
+        /// The amount of gas tokens to transfer to each ANT instance.
         /// Must be a decimal value between 0 and 1, e.g. "0.1"
         #[clap(long)]
         gas_amount: Option<String>,
@@ -261,24 +261,26 @@ pub enum UploadersCommands {
     },
 }
 
-pub async fn handle_uploaders_command(cmd: UploadersCommands) -> Result<()> {
+pub async fn handle_client_command(cmd: ClientCommands) -> Result<()> {
     match cmd {
-        UploadersCommands::Clean { name, provider } => {
-            println!("Cleaning uploader environment '{}'...", name);
-            let uploader_deployer = UploaderDeployBuilder::default()
+        ClientCommands::Clean { name, provider } => {
+            println!("Cleaning Client environment '{}'...", name);
+            let client_deployer = ClientDeployBuilder::default()
                 .environment_name(&name)
                 .provider(provider)
                 .build()?;
-            uploader_deployer.clean().await?;
-            println!("Uploader environment '{}' cleaned", name);
+            client_deployer.clean().await?;
+            println!("Client environment '{}' cleaned", name);
             Ok(())
         }
-        UploadersCommands::Deploy {
+        ClientCommands::Deploy {
             ansible_verbose,
             ant_version,
             branch,
             chunk_size,
             client_env_variables,
+            client_vm_count,
+            client_vm_size,
             disable_telegraf,
             enable_downloaders,
             environment_type,
@@ -298,8 +300,6 @@ pub async fn handle_uploaders_command(cmd: UploadersCommands) -> Result<()> {
             provider,
             repo_owner,
             uploaders_count,
-            uploader_vm_count,
-            uploader_vm_size,
             wallet_secret_key,
         } => {
             if (branch.is_some() && repo_owner.is_none())
@@ -339,8 +339,7 @@ pub async fn handle_uploaders_command(cmd: UploadersCommands) -> Result<()> {
                 ));
             }
 
-            let total_uploaders =
-                uploader_vm_count.unwrap_or(1) as usize * uploaders_count as usize;
+            let total_uploaders = client_vm_count.unwrap_or(1) as usize * uploaders_count as usize;
             if !wallet_secret_key.is_empty() && wallet_secret_key.len() != total_uploaders {
                 return Err(eyre!(
                     "Number of wallet secret keys ({}) must match total number of uploaders ({})",
@@ -352,7 +351,7 @@ pub async fn handle_uploaders_command(cmd: UploadersCommands) -> Result<()> {
             let binary_option =
                 get_binary_option(branch, repo_owner, ant_version, None, None, None).await?;
 
-            let mut builder = UploaderDeployBuilder::new();
+            let mut builder = ClientDeployBuilder::new();
             builder
                 .ansible_verbose_mode(ansible_verbose)
                 .deployment_type(environment_type.clone())
@@ -361,12 +360,12 @@ pub async fn handle_uploaders_command(cmd: UploadersCommands) -> Result<()> {
             if let Some(forks_value) = forks {
                 builder.ansible_forks(forks_value);
             }
-            let uploader_deployer = builder.build()?;
-            uploader_deployer.init().await?;
+            let client_deployer = builder.build()?;
+            client_deployer.init().await?;
 
-            let inventory_service = DeploymentInventoryService::from(&uploader_deployer);
+            let inventory_service = DeploymentInventoryService::from(&client_deployer);
             let inventory = inventory_service
-                .generate_or_retrieve_uploader_inventory(&name, true, Some(binary_option.clone()))
+                .generate_or_retrieve_client_inventory(&name, true, Some(binary_option.clone()))
                 .await?;
             let evm_details = EvmDetails {
                 network: evm_network_type,
@@ -375,10 +374,12 @@ pub async fn handle_uploaders_command(cmd: UploadersCommands) -> Result<()> {
                 rpc_url: evm_rpc_url,
             };
 
-            let options = UploaderDeployOptions {
+            let options = ClientDeployOptions {
                 binary_option,
                 chunk_size,
                 client_env_variables,
+                client_vm_count,
+                client_vm_size,
                 current_inventory: inventory,
                 enable_downloaders,
                 enable_telegraf: !disable_telegraf,
@@ -393,12 +394,8 @@ pub async fn handle_uploaders_command(cmd: UploadersCommands) -> Result<()> {
                 name: name.clone(),
                 network_id,
                 network_contacts_url,
-                output_inventory_dir_path: uploader_deployer
-                    .working_directory_path
-                    .join("inventory"),
+                output_inventory_dir_path: client_deployer.working_directory_path.join("inventory"),
                 peer,
-                uploader_vm_count,
-                uploader_vm_size,
                 uploaders_count,
                 wallet_secret_keys: if wallet_secret_key.is_empty() {
                     None
@@ -407,12 +404,12 @@ pub async fn handle_uploaders_command(cmd: UploadersCommands) -> Result<()> {
                 },
             };
 
-            uploader_deployer.deploy(options).await?;
+            client_deployer.deploy(options).await?;
 
-            println!("Uploaders deployment for '{}' completed successfully", name);
+            println!("Client deployment for '{}' completed successfully", name);
             Ok(())
         }
-        UploadersCommands::Start { name, provider } => {
+        ClientCommands::Start { name, provider } => {
             let testnet_deployer = TestnetDeployBuilder::default()
                 .environment_name(&name)
                 .provider(provider)
@@ -425,12 +422,12 @@ pub async fn handle_uploaders_command(cmd: UploadersCommands) -> Result<()> {
             let ansible_runner = testnet_deployer.ansible_provisioner.ansible_runner;
             ansible_runner.run_playbook(
                 AnsiblePlaybook::StartUploaders,
-                AnsibleInventoryType::Uploaders,
+                AnsibleInventoryType::Clients,
                 None,
             )?;
             Ok(())
         }
-        UploadersCommands::Stop { name, provider } => {
+        ClientCommands::Stop { name, provider } => {
             let testnet_deployer = TestnetDeployBuilder::default()
                 .environment_name(&name)
                 .provider(provider)
@@ -443,12 +440,12 @@ pub async fn handle_uploaders_command(cmd: UploadersCommands) -> Result<()> {
             let ansible_runner = testnet_deployer.ansible_provisioner.ansible_runner;
             ansible_runner.run_playbook(
                 AnsiblePlaybook::StopUploaders,
-                AnsibleInventoryType::Uploaders,
+                AnsibleInventoryType::Clients,
                 None,
             )?;
             Ok(())
         }
-        UploadersCommands::Upgrade {
+        ClientCommands::Upgrade {
             name,
             provider,
             version,
@@ -473,16 +470,16 @@ pub async fn handle_uploaders_command(cmd: UploadersCommands) -> Result<()> {
             extra_vars.add_variable("testnet_name", &name);
             extra_vars.add_variable("ant_version", &version.to_string());
             ansible_runner.run_playbook(
-                AnsiblePlaybook::UpgradeUploaders,
-                AnsibleInventoryType::Uploaders,
+                AnsiblePlaybook::UpgradeClients,
+                AnsibleInventoryType::Clients,
                 Some(extra_vars.build()),
             )?;
 
             Ok(())
         }
-        UploadersCommands::Upscale {
+        ClientCommands::Upscale {
             autonomi_version,
-            desired_uploader_vm_count,
+            desired_client_vm_count,
             desired_uploaders_count,
             funding_wallet_secret_key,
             gas_amount,
@@ -506,7 +503,7 @@ pub async fn handle_uploaders_command(cmd: UploadersCommands) -> Result<()> {
                 None
             };
 
-            println!("Upscaling uploaders...");
+            println!("Upscaling Clients...");
             let testnet_deployer = TestnetDeployBuilder::default()
                 .environment_name(&name)
                 .provider(provider)
@@ -519,9 +516,10 @@ pub async fn handle_uploaders_command(cmd: UploadersCommands) -> Result<()> {
                 .await?;
 
             testnet_deployer
-                .upscale_uploaders(&UpscaleOptions {
+                .upscale_clients(&UpscaleOptions {
                     ansible_verbose: false,
                     current_inventory: inventory,
+                    desired_client_vm_count,
                     desired_full_cone_private_node_count: None,
                     desired_full_cone_private_node_vm_count: None,
                     desired_node_count: None,
@@ -530,7 +528,6 @@ pub async fn handle_uploaders_command(cmd: UploadersCommands) -> Result<()> {
                     desired_peer_cache_node_vm_count: None,
                     desired_symmetric_private_node_count: None,
                     desired_symmetric_private_node_vm_count: None,
-                    desired_uploader_vm_count,
                     desired_uploaders_count,
                     funding_wallet_secret_key,
                     gas_amount,

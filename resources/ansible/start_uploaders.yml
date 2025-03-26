@@ -1,5 +1,5 @@
 ---
-- name: ensure the ant uploader service is started
+- name: ensure the ant ANT uploader service is started
   hosts: all
   become: True
   tasks:
@@ -8,7 +8,7 @@
       register: ant_users
       changed_when: false
 
-    - name: start all ant uploader services
+    - name: start all ANT uploader services
       ansible.builtin.systemd:
         name: "ant_random_uploader_{{ item | regex_replace('ant([0-9]+)', '\\1') }}"
         state: started

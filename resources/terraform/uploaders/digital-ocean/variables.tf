@@ -19,8 +19,8 @@ variable "droplet_ssh_keys" {
   ]
 }
 
-variable "uploader_droplet_size" {
-  description = "The size of the droplet for uploader VMs"
+variable "ant_client_droplet_size" {
+  description = "The size of the droplet for ANT Client VMs"
 }
 
 variable "build_machine_size" {
@@ -31,17 +31,17 @@ variable "build_droplet_image_id" {
   default = "172723670"
 }
 
-variable "uploader_droplet_image_id" {
-  description = "The ID of the uploader droplet image. Varies per environment type."
+variable "ant_client_droplet_image_id" {
+  description = "The ID of the ANT Client droplet image. Varies per environment type."
 }
 
 variable "region" {
   default = "lon1"
 }
 
-variable "uploader_vm_count" {
+variable "ant_client_vm_count" {
   default     = 2
-  description = "The number of droplets to launch for uploaders"
+  description = "The number of droplets to launch for ANT Clients"
 }
 
 variable "use_custom_bin" {
@@ -56,8 +56,8 @@ variable "volumes_per_node" {
   default     = 7
 }
 
-variable "uploader_volume_size" {
-  description = "Size of each volume in GB for uploader nodes"
+variable "ant_client_volume_size" {
+  description = "Size of each volume in GB for ANT Client VMs"
   type        = number
   default     = 70
 }

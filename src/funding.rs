@@ -32,48 +32,46 @@ pub struct FundingOptions {
     /// For custom network
     pub evm_rpc_url: Option<String>,
     pub funding_wallet_secret_key: Option<String>,
-    /// Have to specify during upscale and deploy
-    pub uploaders_count: Option<u16>,
-    /// The amount of tokens to transfer to each uploader.
-    /// Defaults to 100 token, i.e., 100_000_000_000_000_000_000
-    pub token_amount: Option<U256>,
-    /// The amount of gas tokens to transfer to each uploader
+    /// The amount of gas tokens to transfer to each ant instance
     /// Defaults to 0.1 ETH i.e, 100_000_000_000_000_000
     pub gas_amount: Option<U256>,
+    /// The amount of tokens to transfer to each ant instance.
+    /// Defaults to 100 token, i.e., 100_000_000_000_000_000_000
+    pub token_amount: Option<U256>,
+    /// Have to specify during upscale and deploy
+    pub uploaders_count: Option<u16>,
 }
 
 impl AnsibleProvisioner {
-    /// Retrieve the uploader secret keys for all uploader VMs
-    pub fn get_uploader_secret_keys(
-        &self,
-    ) -> Result<HashMap<VirtualMachine, Vec<PrivateKeySigner>>> {
-        let uploaders_count = self.get_current_uploader_count()?;
+    /// Retrieve the Ant secret keys from all the Client VMs.
+    pub fn get_client_secret_keys(&self) -> Result<HashMap<VirtualMachine, Vec<PrivateKeySigner>>> {
+        let ant_instance_count = self.get_current_ant_instance_count()?;
 
-        debug!("Fetching uploader secret keys");
-        let mut uploader_secret_keys = HashMap::new();
+        debug!("Fetching ANT secret keys");
+        let mut ant_secret_keys = HashMap::new();
 
-        if uploaders_count.is_empty() {
-            debug!("No uploaders VMs found");
-            return Err(Error::EmptyInventory(AnsibleInventoryType::Uploaders));
+        if ant_instance_count.is_empty() {
+            debug!("No Client VMs found");
+            return Err(Error::EmptyInventory(AnsibleInventoryType::Clients));
         }
 
-        for (vm, count) in uploaders_count {
+        for (vm, count) in ant_instance_count {
             if count == 0 {
-                warn!("No uploader instances found for {:?}, ", vm.name);
-                uploader_secret_keys.insert(vm.clone(), Vec::new());
+                warn!("No ANT instances found for {:?}, ", vm.name);
+                ant_secret_keys.insert(vm.clone(), Vec::new());
             } else {
-                let sks = self.get_uploader_secret_key_per_vm(&vm, count)?;
-                uploader_secret_keys.insert(vm.clone(), sks);
+                let sks = self.get_ant_secret_key_per_vm(&vm, count)?;
+                ant_secret_keys.insert(vm.clone(), sks);
             }
         }
 
-        Ok(uploader_secret_keys)
+        Ok(ant_secret_keys)
     }
 
-    /// Deposit funds from the funding_wallet_secret_key to the uploader wallets
-    /// If FundingOptions::uploaders_count is provided, it will generate the missing secret keys.
-    /// If not provided, we'll just fund the existing uploader wallets
-    pub async fn deposit_funds_to_uploaders(
+    /// Deposit funds from the funding_wallet_secret_key to the ant wallets
+    /// If FundingOptions::ant_uploader_count is provided, it will generate the missing secret keys.
+    /// If not provided, we'll just fund the existing ant wallets
+    pub async fn deposit_funds_to_clients(
         &self,
         options: &FundingOptions,
     ) -> Result<HashMap<VirtualMachine, Vec<PrivateKeySigner>>> {
@@ -81,14 +79,14 @@ impl AnsibleProvisioner {
             "Funding secret key: {:?}",
             options.funding_wallet_secret_key
         );
-        debug!("Funding all the uploader wallets");
-        let mut uploader_secret_keys = self.get_uploader_secret_keys()?;
+        debug!("Funding all the ant wallets");
+        let mut ant_secret_keys = self.get_client_secret_keys()?;
 
-        for (vm, keys) in uploader_secret_keys.iter_mut() {
+        for (vm, keys) in ant_secret_keys.iter_mut() {
             if let Some(provided_count) = options.uploaders_count {
                 if provided_count < keys.len() as u16 {
-                    error!("Provided {provided_count} is less than the existing {} uploaders count for {}", keys.len(), vm.name);
-                    return Err(Error::InvalidUpscaleDesiredUploaderCount);
+                    error!("Provided {provided_count} is less than the existing {} ant uploader count for {}", keys.len(), vm.name);
+                    return Err(Error::InvalidUpscaleDesiredClientCount);
                 }
                 let missing_keys_count = provided_count - keys.len() as u16;
                 debug!(
@@ -116,10 +114,10 @@ impl AnsibleProvisioner {
             None
         };
 
-        self.deposit_funds(funding_wallet_sk, &uploader_secret_keys, options)
+        self.deposit_funds(funding_wallet_sk, &ant_secret_keys, options)
             .await?;
 
-        Ok(uploader_secret_keys)
+        Ok(ant_secret_keys)
     }
 
     pub async fn prepare_pre_funded_wallets(
@@ -128,15 +126,15 @@ impl AnsibleProvisioner {
     ) -> Result<HashMap<VirtualMachine, Vec<PrivateKeySigner>>> {
         debug!("Using pre-funded wallets");
 
-        let uploader_vms = self
+        let client_vms = self
             .ansible_runner
-            .get_inventory(AnsibleInventoryType::Uploaders, true)?;
-        if uploader_vms.is_empty() {
-            return Err(Error::EmptyInventory(AnsibleInventoryType::Uploaders));
+            .get_inventory(AnsibleInventoryType::Clients, true)?;
+        if client_vms.is_empty() {
+            return Err(Error::EmptyInventory(AnsibleInventoryType::Clients));
         }
 
         let total_keys = wallet_keys.len();
-        let vm_count = uploader_vms.len();
+        let vm_count = client_vms.len();
         if total_keys % vm_count != 0 {
             return Err(Error::InvalidWalletCount(total_keys, vm_count));
         }
@@ -145,7 +143,7 @@ impl AnsibleProvisioner {
         let mut vm_to_keys = HashMap::new();
         let mut key_index = 0;
 
-        for vm in uploader_vms {
+        for vm in client_vms {
             let mut keys = Vec::new();
             for _ in 0..uploaders_per_vm {
                 let sk_str = &wallet_keys[key_index];
@@ -159,31 +157,29 @@ impl AnsibleProvisioner {
         Ok(vm_to_keys)
     }
 
-    /// Drain all the funds from the uploader wallets to the provided wallet
-    pub async fn drain_funds_from_uploaders(
+    /// Drain all the funds from the local ANT wallets to the provided wallet
+    pub async fn drain_funds_from_ant_instances(
         &self,
         to_address: Address,
         evm_network: Network,
     ) -> Result<()> {
-        debug!("Draining all the uploader wallets to {to_address:?}");
-        println!("Draining all the uploader wallets to {to_address:?}");
-        let uploader_secret_keys = self.get_uploader_secret_keys()?;
+        debug!("Draining all the local ANT wallets to {to_address:?}");
+        println!("Draining all the local ANT wallets to {to_address:?}");
+        let ant_secret_keys = self.get_client_secret_keys()?;
 
-        for (vm, keys) in uploader_secret_keys.iter() {
+        for (vm, keys) in ant_secret_keys.iter() {
             debug!(
-                "Draining funds for uploader vm: {} to {to_address:?}",
+                "Draining funds for Client vm: {} to {to_address:?}",
                 vm.name
             );
-            for uploader_sk in keys.iter() {
+            for ant_sk in keys.iter() {
                 debug!(
-                    "Draining funds for uploader vm: {} with key: {uploader_sk:?}",
+                    "Draining funds for Client vm: {} with key: {ant_sk:?}",
                     vm.name,
                 );
 
-                let from_wallet = Wallet::new(
-                    evm_network.clone(),
-                    EthereumWallet::new(uploader_sk.clone()),
-                );
+                let from_wallet =
+                    Wallet::new(evm_network.clone(), EthereumWallet::new(ant_sk.clone()));
 
                 let token_balance = from_wallet.balance_of_tokens().await.inspect_err(|err| {
                     debug!(
@@ -272,21 +268,21 @@ impl AnsibleProvisioner {
         Ok(())
     }
 
-    /// Return the (vm name, uploader count) for all uploader VMs
-    pub fn get_current_uploader_count(&self) -> Result<HashMap<VirtualMachine, usize>> {
-        let uploader_inventories = self
+    /// Return the (vm name, ant_instance count) for all Client VMs
+    pub fn get_current_ant_instance_count(&self) -> Result<HashMap<VirtualMachine, usize>> {
+        let client_inventories = self
             .ansible_runner
-            .get_inventory(AnsibleInventoryType::Uploaders, true)?;
-        if uploader_inventories.is_empty() {
-            debug!("No uploaders VMs found");
-            return Err(Error::EmptyInventory(AnsibleInventoryType::Uploaders));
+            .get_inventory(AnsibleInventoryType::Clients, true)?;
+        if client_inventories.is_empty() {
+            debug!("No Client VMs found");
+            return Err(Error::EmptyInventory(AnsibleInventoryType::Clients));
         }
 
-        let mut uploader_count = HashMap::new();
+        let mut ant_instnace_count = HashMap::new();
 
-        for vm in uploader_inventories {
+        for vm in client_inventories {
             debug!(
-                "Fetching uploader count for {} @ {}",
+                "Fetching ant instance count for {} @ {}",
                 vm.name, vm.public_ip_addr
             );
             let cmd =
@@ -306,17 +302,17 @@ impl AnsibleProvisioner {
                         .trim()
                         .parse()
                         .map_err(|_| Error::FailedToParseKey)?;
-                    uploader_count.insert(vm.clone(), count);
+                    ant_instnace_count.insert(vm.clone(), count);
                 }
                 Err(Error::ExternalCommandRunFailed {
                     binary,
                     exit_status,
                 }) => {
                     if let Some(1) = exit_status.code() {
-                        debug!("No uploaders found for {:?}", vm.public_ip_addr);
-                        uploader_count.insert(vm.clone(), 0);
+                        debug!("No ant instance found for {:?}", vm.public_ip_addr);
+                        ant_instnace_count.insert(vm.clone(), 0);
                     } else {
-                        debug!("Error while fetching uploader count with different exit code {exit_status:?}",);
+                        debug!("Error while fetching ant instance count with different exit code {exit_status:?}",);
                         return Err(Error::ExternalCommandRunFailed {
                             binary,
                             exit_status,
@@ -324,16 +320,16 @@ impl AnsibleProvisioner {
                     }
                 }
                 Err(err) => {
-                    debug!("Error while fetching uploader count: {err:?}",);
+                    debug!("Error while fetching ant instance count: {err:?}",);
                     return Err(err);
                 }
             }
         }
 
-        Ok(uploader_count)
+        Ok(ant_instnace_count)
     }
 
-    fn get_uploader_secret_key_per_vm(
+    fn get_ant_secret_key_per_vm(
         &self,
         vm: &VirtualMachine,
         instance_count: usize,
@@ -341,7 +337,7 @@ impl AnsibleProvisioner {
         let mut sks_per_vm = Vec::new();
 
         debug!(
-            "Fetching uploader secret key for {} @ {}",
+            "Fetching ANT secret key for {} @ {}",
             vm.name, vm.public_ip_addr
         );
         // Note: if this is gonna be parallelized, we need to make sure the secret keys are in order.
@@ -387,7 +383,7 @@ impl AnsibleProvisioner {
         options: &FundingOptions,
     ) -> Result<()> {
         if all_secret_keys.is_empty() {
-            error!("No uploader secret keys found");
+            error!("No ANT secret keys found");
             return Err(Error::SecretKeyNotFound);
         }
 
@@ -455,11 +451,15 @@ impl AnsibleProvisioner {
         let token_amount = options.token_amount.unwrap_or(default_token_amount);
         let gas_amount = options.gas_amount.unwrap_or(default_gas_amount);
 
-        println!("Transferring {token_amount} tokens and {gas_amount} gas tokens to each uploader");
-        debug!("Transferring {token_amount} tokens and {gas_amount} gas tokens to each uploader");
+        println!(
+            "Transferring {token_amount} tokens and {gas_amount} gas tokens to each ANT instance"
+        );
+        debug!(
+            "Transferring {token_amount} tokens and {gas_amount} gas tokens to each ANT instance"
+        );
 
         for (vm, vm_secret_keys) in all_secret_keys.iter() {
-            println!("Transferring funds for uploader vm: {}", vm.name);
+            println!("Transferring funds for Client vm: {}", vm.name);
             for sk in vm_secret_keys.iter() {
                 sk.address();
 
@@ -531,7 +531,7 @@ pub async fn drain_funds(
         (evm_network, &environment_details.funding_wallet_address)
     {
         ansible_provisioner
-            .drain_funds_from_uploaders(
+            .drain_funds_from_ant_instances(
                 Address::from_str(address).map_err(|err| {
                     log::error!("Invalid funding wallet public key: {err:?}");
                     Error::FailedToParseKey

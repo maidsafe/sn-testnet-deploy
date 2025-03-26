@@ -8,7 +8,7 @@
       become: True
       vars:
         mount_base: /mnt/client-logs
-    - role: uploader-metrics
+    - role: client-metrics
       become: True
     - role: uploaders
       become: True

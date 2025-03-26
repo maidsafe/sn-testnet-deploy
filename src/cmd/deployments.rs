@@ -198,6 +198,8 @@ pub async fn handle_deploy(
     branch: Option<String>,
     chunk_size: Option<u64>,
     client_env_variables: Option<Vec<(String, String)>>,
+    client_vm_count: Option<u16>,
+    client_vm_size: Option<String>,
     disable_telegraf: bool,
     enable_downloaders: bool,
     environment_type: crate::EnvironmentType,
@@ -240,8 +242,6 @@ pub async fn handle_deploy(
     repo_owner: Option<String>,
     rewards_address: String,
     to_genesis: bool,
-    uploader_vm_count: Option<u16>,
-    uploader_vm_size: Option<String>,
     uploaders_count: u16,
 ) -> Result<()> {
     if evm_network_type == EvmNetwork::Custom {
@@ -325,6 +325,8 @@ pub async fn handle_deploy(
         binary_option: binary_option.clone(),
         chunk_size,
         client_env_variables,
+        client_vm_count,
+        client_vm_size,
         current_inventory: inventory,
         enable_downloaders,
         enable_telegraf: !disable_telegraf,
@@ -378,8 +380,6 @@ pub async fn handle_deploy(
                 symmetric_private_node_count,
             ))
         }),
-        uploader_vm_count,
-        uploader_vm_size,
         uploaders_count,
     };
 
@@ -430,6 +430,7 @@ pub async fn handle_upscale(
     antctl_version: Option<String>,
     antnode_version: Option<String>,
     branch: Option<String>,
+    desired_client_vm_count: Option<u16>,
     desired_node_count: Option<u16>,
     desired_full_cone_private_node_count: Option<u16>,
     desired_full_cone_private_node_vm_count: Option<u16>,
@@ -438,7 +439,6 @@ pub async fn handle_upscale(
     desired_peer_cache_node_vm_count: Option<u16>,
     desired_symmetric_private_node_count: Option<u16>,
     desired_symmetric_private_node_vm_count: Option<u16>,
-    desired_uploader_vm_count: Option<u16>,
     desired_uploaders_count: Option<u16>,
     funding_wallet_secret_key: Option<String>,
     infra_only: bool,
@@ -465,17 +465,15 @@ pub async fn handle_upscale(
         ));
     }
 
-    if desired_uploader_vm_count.is_some() && ant_version.is_none() {
-        return Err(eyre!(
-            "The ant version is required to upscale the uploaders"
-        ));
+    if desired_client_vm_count.is_some() && ant_version.is_none() {
+        return Err(eyre!("The ant version is required to upscale the Clients"));
     }
 
-    if (desired_uploader_vm_count.is_some() || desired_uploaders_count.is_some())
+    if (desired_client_vm_count.is_some() || desired_uploaders_count.is_some())
         && funding_wallet_secret_key.is_none()
     {
         return Err(eyre!(
-            "The funding wallet secret key is required to upscale the uploaders"
+            "The funding wallet secret key is required to upscale the Clients"
         ));
     }
 
@@ -547,6 +545,7 @@ pub async fn handle_upscale(
             ansible_verbose,
             ant_version,
             current_inventory: inventory,
+            desired_client_vm_count,
             desired_node_count,
             desired_full_cone_private_node_count,
             desired_full_cone_private_node_vm_count,
@@ -555,7 +554,6 @@ pub async fn handle_upscale(
             desired_peer_cache_node_vm_count,
             desired_symmetric_private_node_count,
             desired_symmetric_private_node_vm_count,
-            desired_uploader_vm_count,
             desired_uploaders_count,
             funding_wallet_secret_key,
             gas_amount: None,

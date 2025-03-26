@@ -96,14 +96,14 @@ resource "digitalocean_droplet" "symmetric_private_node" {
   tags     = ["environment:${terraform.workspace}", "type:symmetric_private_node"]
 }
 
-resource "digitalocean_droplet" "uploader" {
-  count    = var.uploader_vm_count
-  image    = var.uploader_droplet_image_id
-  name     = "${terraform.workspace}-uploader-${count.index + 1}"
+resource "digitalocean_droplet" "ant_client" {
+  count    = var.ant_client_vm_count
+  image    = var.ant_client_droplet_image_id
+  name     = "${terraform.workspace}-ant-client-${count.index + 1}"
   region   = var.region
-  size     = var.uploader_droplet_size
+  size     = var.ant_client_droplet_size
   ssh_keys = var.droplet_ssh_keys
-  tags     = ["environment:${terraform.workspace}", "type:uploader"]
+  tags     = ["environment:${terraform.workspace}", "type:ant_client"]
 }
 
 resource "digitalocean_droplet" "evm_node" {
@@ -135,8 +135,8 @@ locals {
     ]
   ])
 
-  uploader_volume_keys = flatten([
-    for node_index in range(var.uploader_vm_count) : [
+  ant_client_volume_keys = flatten([
+    for node_index in range(var.ant_client_vm_count) : [
       for volume_index in range(var.volumes_per_node) : "${node_index+1}-${volume_index+1}"
     ]
   ])
@@ -220,15 +220,15 @@ resource "digitalocean_volume_attachment" "symmetric_private_node_volume_attachm
   volume_id  = digitalocean_volume.symmetric_private_node_attached_volume[each.key].id
 }
 
-resource "digitalocean_volume" "uploader_attached_volume" {
-  for_each = var.uploader_volume_size > 0 ? { for key in local.uploader_volume_keys : key => key } : {}
-  name     = lower("${terraform.workspace}-uploader-${split("-", each.key)[0]}-volume-${split("-", each.key)[1]}")
-  size     = var.uploader_volume_size
+resource "digitalocean_volume" "ant_client_attached_volume" {
+  for_each = var.ant_client_volume_size > 0 ? { for key in local.ant_client_volume_keys : key => key } : {}
+  name     = lower("${terraform.workspace}-ant-client-${split("-", each.key)[0]}-volume-${split("-", each.key)[1]}")
+  size     = var.ant_client_volume_size
   region   = var.region
 }
 
-resource "digitalocean_volume_attachment" "uploader_volume_attachment" {
-  for_each   = var.uploader_volume_size > 0 ? { for key in local.uploader_volume_keys : key => key } : {}
-  droplet_id = digitalocean_droplet.uploader[tonumber(split("-", each.key)[0]) - 1].id
-  volume_id  = digitalocean_volume.uploader_attached_volume[each.key].id
+resource "digitalocean_volume_attachment" "ant_client_volume_attachment" {
+  for_each   = var.ant_client_volume_size > 0 ? { for key in local.ant_client_volume_keys : key => key } : {}
+  droplet_id = digitalocean_droplet.ant_client[tonumber(split("-", each.key)[0]) - 1].id
+  volume_id  = digitalocean_volume.ant_client_attached_volume[each.key].id
 }
