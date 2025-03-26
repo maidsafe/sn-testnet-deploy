@@ -10,8 +10,8 @@ use ant_releases::ReleaseType;
 use color_eyre::eyre::{eyre, Result};
 use sn_testnet_deploy::{
     ansible::{extra_vars::ExtraVarsDocBuilder, inventory::AnsibleInventoryType, AnsiblePlaybook},
+    client::{ClientDeployBuilder, ClientDeployOptions},
     inventory::DeploymentInventoryService,
-    uploaders::{ClientDeployBuilder, ClientDeployOptions},
     upscale::UpscaleOptions,
     EvmDetails, TestnetDeployBuilder,
 };

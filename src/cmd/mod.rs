@@ -4,6 +4,7 @@
 // This SAFE Network Software is licensed under the BSD-3-Clause license.
 // Please see the LICENSE file for more details.
 
+pub mod client;
 pub mod deployments;
 pub mod funds;
 pub mod logs;
@@ -13,11 +14,10 @@ pub mod nodes;
 pub mod provision;
 pub mod telegraf;
 pub mod upgrade;
-pub mod uploaders;
 
 use crate::cmd::{
-    funds::FundsCommand, logs::LogCommands, network::NetworkCommands, provision::ProvisionCommands,
-    uploaders::ClientCommands,
+    client::ClientCommands, funds::FundsCommand, logs::LogCommands, network::NetworkCommands,
+    provision::ProvisionCommands,
 };
 use alloy::primitives::U256;
 use ant_releases::{AntReleaseRepoActions, ReleaseType};

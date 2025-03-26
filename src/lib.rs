@@ -6,6 +6,7 @@
 
 pub mod ansible;
 pub mod bootstrap;
+pub mod client;
 pub mod deploy;
 pub mod digital_ocean;
 pub mod error;
@@ -20,7 +21,6 @@ pub mod safe;
 pub mod setup;
 pub mod ssh;
 pub mod terraform;
-pub mod uploaders;
 pub mod upscale;
 
 const STORAGE_REQUIRED_PER_NODE: u16 = 7;

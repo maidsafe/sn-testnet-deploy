@@ -18,13 +18,13 @@ use crate::{
         generate_full_cone_nat_gateway_static_environment_inventory,
     },
     bootstrap::BootstrapOptions,
+    client::ClientDeployOptions,
     deploy::DeployOptions,
     error::{Error, Result},
     funding::FundingOptions,
     inventory::{DeploymentNodeRegistries, VirtualMachine},
-    print_duration, run_external_command,
-    uploaders::ClientDeployOptions,
-    BinaryOption, CloudProvider, EvmNetwork, LogFormat, NodeType, SshClient, UpgradeOptions,
+    print_duration, run_external_command, BinaryOption, CloudProvider, EvmNetwork, LogFormat,
+    NodeType, SshClient, UpgradeOptions,
 };
 use ant_service_management::NodeRegistry;
 use evmlib::common::U256;

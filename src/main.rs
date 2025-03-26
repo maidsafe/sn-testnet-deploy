@@ -120,7 +120,7 @@ async fn main() -> Result<()> {
             Ok(())
         }
         Commands::Client(client_cmd) => {
-            cmd::uploaders::handle_client_command(client_cmd).await?;
+            cmd::client::handle_client_command(client_cmd).await?;
             Ok(())
         }
         Commands::Deploy {
