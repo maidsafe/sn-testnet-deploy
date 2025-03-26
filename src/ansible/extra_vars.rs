@@ -224,7 +224,7 @@ impl ExtraVarsDocBuilder {
         binary_option: &BinaryOption,
         ant_version: Option<String>,
     ) -> Result<(), Error> {
-        // This applies when upscaling the uploaders.
+        // This applies when upscaling the Clients.
         // In that scenario, the safe version in the binary option is not set to the correct value
         // because it is not recorded in the inventory.
         if let Some(version) = ant_version {
@@ -264,7 +264,7 @@ impl ExtraVarsDocBuilder {
                     );
                     Ok(())
                 }
-                None => Err(Error::NoUploadersError),
+                None => Err(Error::NoClientError),
             },
         }
     }
@@ -478,7 +478,7 @@ pub fn build_downloaders_extra_vars_doc(
     Ok(extra_vars.build())
 }
 
-pub fn build_uploaders_extra_vars_doc(
+pub fn build_clients_extra_vars_doc(
     cloud_provider: &str,
     options: &ProvisionOptions,
     genesis_multiaddr: Option<String>,
@@ -575,7 +575,7 @@ pub fn build_node_telegraf_upgrade(name: &str, node_type: &NodeType) -> Result<S
     Ok(extra_vars.build())
 }
 
-pub fn build_uploader_telegraf_upgrade(name: &str) -> Result<String> {
+pub fn build_client_telegraf_upgrade(name: &str) -> Result<String> {
     let mut extra_vars: ExtraVarsDocBuilder = ExtraVarsDocBuilder::default();
     extra_vars.add_variable("testnet_name", name);
     Ok(extra_vars.build())

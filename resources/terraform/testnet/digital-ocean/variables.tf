@@ -39,8 +39,8 @@ variable "peer_cache_droplet_size" {
   default = "s-2vcpu-4gb"
 }
 
-variable "uploader_droplet_size" {
-  description = "The size of the droplet for uploader VMs"
+variable "ant_client_droplet_size" {
+  description = "The size of the droplet for ANT Client VMs"
   default = "s-2vcpu-4gb"
 }
 
@@ -67,8 +67,8 @@ variable "node_droplet_image_id" {
   default = 173265007
 }
 
-variable "uploader_droplet_image_id" {
-  description = "The ID of the uploader droplet image. Varies per environment type."
+variable "ant_client_droplet_image_id" {
+  description = "The ID of the ANT Client droplet image. Varies per environment type."
   default = 172724146
 }
 
@@ -101,9 +101,9 @@ variable "symmetric_private_node_vm_count" {
   description = "The number of droplets to launch for symmetric private nodes"
 }
 
-variable "uploader_vm_count" {
+variable "ant_client_vm_count" {
   default     = 2
-  description = "The number of droplets to launch for uploaders"
+  description = "The number of droplets to launch for the ANT Clients"
 }
 
 variable "use_custom_bin" {
@@ -169,8 +169,8 @@ variable "peer_cache_reserved_ips" {
   default = []
 }
 
-variable "uploader_volume_size" {
-  description = "Size of each volume in GB for uploader nodes"
+variable "ant_client_volume_size" {
+  description = "Size of each volume in GB for the ANT Client VMs"
   type        = number
   default     = 70
 }

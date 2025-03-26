@@ -76,6 +76,9 @@ impl TestnetDeployer {
         .await?;
 
         self.create_or_update_infra(&InfraRunOptions {
+            client_image_id: None,
+            client_vm_count: Some(0),
+            client_vm_size: None,
             enable_build_vm: build_custom_binaries,
             evm_node_count: Some(0),
             evm_node_vm_size: None,
@@ -104,9 +107,6 @@ impl TestnetDeployer {
                     .get_tfvars_filename(&options.name)
                     .to_string(),
             ),
-            uploader_image_id: None,
-            uploader_vm_count: Some(0),
-            uploader_vm_size: None,
         })
         .map_err(|err| {
             println!("Failed to create infra {err:?}");

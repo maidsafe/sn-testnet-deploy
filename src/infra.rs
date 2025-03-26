@@ -15,6 +15,7 @@ use crate::{
 use std::time::Instant;
 
 const BUILD_VM: &str = "build";
+const CLIENT: &str = "ant_client";
 const EVM_NODE: &str = "evm_node";
 const FULL_CONE_NAT_GATEWAY: &str = "full_cone_nat_gateway";
 const FULL_CONE_PRIVATE_NODE: &str = "full_cone_private_node";
@@ -28,13 +29,16 @@ const PEER_CACHE_NODE_ATTACHED_VOLUME: &str = "peer_cache_node_attached_volume";
 const SYMMETRIC_NAT_GATEWAY: &str = "symmetric_nat_gateway";
 const SYMMETRIC_PRIVATE_NODE: &str = "symmetric_private_node";
 const SYMMETRIC_PRIVATE_NODE_ATTACHED_VOLUME: &str = "symmetric_private_node_attached_volume";
-const UPLOADER: &str = "uploader";
 
 const SIZE: &str = "size";
 const IMAGE: &str = "image";
 
 #[derive(Clone, Debug)]
 pub struct InfraRunOptions {
+    /// Set to None for new deployments, as the value will be fetched from tfvars.
+    pub client_image_id: Option<String>,
+    pub client_vm_count: Option<u16>,
+    pub client_vm_size: Option<String>,
     pub enable_build_vm: bool,
     pub evm_node_count: Option<u16>,
     pub evm_node_vm_size: Option<String>,
@@ -62,10 +66,6 @@ pub struct InfraRunOptions {
     pub symmetric_private_node_vm_count: Option<u16>,
     pub symmetric_private_node_volume_size: Option<u16>,
     pub tfvars_filename: Option<String>,
-    /// Set to None for new deployments, as the value will be fetched from tfvars.
-    pub uploader_image_id: Option<String>,
-    pub uploader_vm_count: Option<u16>,
-    pub uploader_vm_size: Option<String>,
 }
 
 impl InfraRunOptions {
@@ -199,15 +199,15 @@ impl InfraRunOptions {
                 (None, None)
             };
 
-        let uploader_vm_count = resource_count(UPLOADER);
-        debug!("Uploader count: {uploader_vm_count}");
-        let (uploader_vm_size, uploader_image_id) = if uploader_vm_count > 0 {
+        let client_vm_count = resource_count(CLIENT);
+        debug!("Client count: {client_vm_count}");
+        let (client_vm_size, client_image_id) = if client_vm_count > 0 {
             let vm_size =
-                get_value_for_resource(&resources, UPLOADER, SIZE)?.map(|size| size.to_string());
-            debug!("Uploader size: {vm_size:?}");
-            let image_id = get_value_for_resource(&resources, UPLOADER, IMAGE)?
+                get_value_for_resource(&resources, CLIENT, SIZE)?.map(|size| size.to_string());
+            debug!("Client size: {vm_size:?}");
+            let image_id = get_value_for_resource(&resources, CLIENT, IMAGE)?
                 .map(|image_id| image_id.to_string());
-            debug!("Uploader image id: {image_id:?}");
+            debug!("Client image id: {image_id:?}");
             (vm_size, image_id)
         } else {
             (None, None)
@@ -261,6 +261,9 @@ impl InfraRunOptions {
         };
 
         let options = Self {
+            client_image_id,
+            client_vm_count: Some(client_vm_count),
+            client_vm_size,
             enable_build_vm,
             evm_node_count: Some(evm_node_count),
             evm_node_vm_size,
@@ -285,9 +288,6 @@ impl InfraRunOptions {
             symmetric_private_node_volume_size,
             tfvars_filename: environment_details
                 .map(|details| details.environment_type.get_tfvars_filename(name)),
-            uploader_vm_count: Some(uploader_vm_count),
-            uploader_vm_size,
-            uploader_image_id,
         };
 
         Ok(options)
@@ -312,18 +312,18 @@ impl TestnetDeployer {
 }
 
 #[derive(Clone, Debug)]
-pub struct UploaderInfraRunOptions {
+pub struct ClientInfraRunOptions {
+    pub client_image_id: Option<String>,
+    pub client_vm_count: Option<u16>,
+    pub client_vm_size: Option<String>,
+    /// Set to None for new deployments, as the value will be fetched from tfvars.
     pub enable_build_vm: bool,
     pub name: String,
     pub tfvars_filename: String,
-    pub uploader_vm_count: Option<u16>,
-    pub uploader_vm_size: Option<String>,
-    /// Set to None for new deployments, as the value will be fetched from tfvars.
-    pub uploader_image_id: Option<String>,
 }
 
-impl UploaderInfraRunOptions {
-    /// Generate the options for an existing uploader deployment.
+impl ClientInfraRunOptions {
+    /// Generate the options for an existing Client deployment.
     pub async fn generate_existing(
         name: &str,
         terraform_runner: &TerraformRunner,
@@ -338,15 +338,15 @@ impl UploaderInfraRunOptions {
                 .count() as u16
         };
 
-        let uploader_vm_count = resource_count(UPLOADER);
-        debug!("Uploader count: {uploader_vm_count}");
-        let (uploader_vm_size, uploader_image_id) = if uploader_vm_count > 0 {
+        let client_vm_count = resource_count(CLIENT);
+        debug!("Client count: {client_vm_count}");
+        let (client_vm_size, client_image_id) = if client_vm_count > 0 {
             let vm_size =
-                get_value_for_resource(&resources, UPLOADER, SIZE)?.map(|size| size.to_string());
-            debug!("Uploader size: {vm_size:?}");
-            let image_id = get_value_for_resource(&resources, UPLOADER, IMAGE)?
+                get_value_for_resource(&resources, CLIENT, SIZE)?.map(|size| size.to_string());
+            debug!("Client size: {vm_size:?}");
+            let image_id = get_value_for_resource(&resources, CLIENT, IMAGE)?
                 .map(|image_id| image_id.to_string());
-            debug!("Uploader image id: {image_id:?}");
+            debug!("Client image id: {image_id:?}");
             (vm_size, image_id)
         } else {
             (None, None)
@@ -357,14 +357,14 @@ impl UploaderInfraRunOptions {
         let enable_build_vm = build_vm_count > 0;
 
         let options = Self {
+            client_image_id,
+            client_vm_count: Some(client_vm_count),
+            client_vm_size,
             enable_build_vm,
             name: name.to_string(),
             tfvars_filename: environment_details
                 .environment_type
                 .get_tfvars_filename(name),
-            uploader_vm_count: Some(uploader_vm_count),
-            uploader_vm_size,
-            uploader_image_id,
         };
 
         Ok(options)
@@ -378,22 +378,16 @@ impl UploaderInfraRunOptions {
             self.enable_build_vm.to_string(),
         ));
 
-        if let Some(uploader_vm_count) = self.uploader_vm_count {
-            args.push((
-                "uploader_vm_count".to_string(),
-                uploader_vm_count.to_string(),
-            ));
+        if let Some(client_vm_count) = self.client_vm_count {
+            args.push(("client_vm_count".to_string(), client_vm_count.to_string()));
         }
-        if let Some(uploader_vm_size) = &self.uploader_vm_size {
-            args.push((
-                "uploader_droplet_size".to_string(),
-                uploader_vm_size.clone(),
-            ));
+        if let Some(client_vm_size) = &self.client_vm_size {
+            args.push(("client_droplet_size".to_string(), client_vm_size.clone()));
         }
-        if let Some(uploader_image_id) = &self.uploader_image_id {
+        if let Some(client_image_id) = &self.client_image_id {
             args.push((
-                "uploader_droplet_image_id".to_string(),
-                uploader_image_id.clone(),
+                "client_droplet_image_id".to_string(),
+                client_image_id.clone(),
             ));
         }
 
@@ -565,25 +559,19 @@ pub fn build_terraform_args(options: &InfraRunOptions) -> Result<Vec<(String, St
         ));
     }
 
-    if let Some(uploader_image_id) = &options.uploader_image_id {
+    if let Some(client_image_id) = &options.client_image_id {
         args.push((
-            "uploader_droplet_image_id".to_string(),
-            uploader_image_id.clone(),
+            "client_droplet_image_id".to_string(),
+            client_image_id.clone(),
         ));
     }
 
-    if let Some(uploader_vm_count) = options.uploader_vm_count {
-        args.push((
-            "uploader_vm_count".to_string(),
-            uploader_vm_count.to_string(),
-        ));
+    if let Some(client_vm_count) = options.client_vm_count {
+        args.push(("client_vm_count".to_string(), client_vm_count.to_string()));
     }
 
-    if let Some(uploader_vm_size) = &options.uploader_vm_size {
-        args.push((
-            "uploader_droplet_size".to_string(),
-            uploader_vm_size.clone(),
-        ));
+    if let Some(client_vm_size) = &options.client_vm_size {
+        args.push(("client_droplet_size".to_string(), client_vm_size.clone()));
     }
 
     Ok(args)

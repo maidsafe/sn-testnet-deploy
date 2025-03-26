@@ -23,6 +23,8 @@ pub struct DeployOptions {
     pub binary_option: BinaryOption,
     pub chunk_size: Option<u64>,
     pub client_env_variables: Option<Vec<(String, String)>>,
+    pub client_vm_count: Option<u16>,
+    pub client_vm_size: Option<String>,
     pub current_inventory: DeploymentInventory,
     pub enable_downloaders: bool,
     pub enable_telegraf: bool,
@@ -62,8 +64,6 @@ pub struct DeployOptions {
     pub symmetric_private_node_volume_size: Option<u16>,
     pub public_rpc: bool,
     pub rewards_address: String,
-    pub uploader_vm_count: Option<u16>,
-    pub uploader_vm_size: Option<String>,
     pub uploaders_count: u16,
 }
 
@@ -80,6 +80,9 @@ impl TestnetDeployer {
         };
 
         self.create_or_update_infra(&InfraRunOptions {
+            client_image_id: None,
+            client_vm_count: options.client_vm_count,
+            client_vm_size: options.client_vm_size.clone(),
             enable_build_vm: build_custom_binaries,
             evm_node_count: match options.evm_network {
                 EvmNetwork::Anvil => Some(1),
@@ -108,9 +111,6 @@ impl TestnetDeployer {
             symmetric_private_node_vm_count: options.symmetric_private_node_vm_count,
             symmetric_private_node_volume_size: options.symmetric_private_node_volume_size,
             tfvars_filename: Some(options.environment_type.get_tfvars_filename(&options.name)),
-            uploader_image_id: None,
-            uploader_vm_count: options.uploader_vm_count,
-            uploader_vm_size: options.uploader_vm_size.clone(),
         })
         .map_err(|err| {
             println!("Failed to create infra {err:?}");
@@ -326,16 +326,16 @@ impl TestnetDeployer {
 
         if options.current_inventory.is_empty() {
             self.ansible_provisioner
-                .print_ansible_run_banner("Provision Uploaders");
+                .print_ansible_run_banner("Provision Clients");
             self.ansible_provisioner
-                .provision_uploaders(
+                .provision_clients(
                     &provision_options,
                     Some(genesis_multiaddr.clone()),
                     Some(genesis_network_contacts.clone()),
                 )
                 .await
                 .map_err(|err| {
-                    println!("Failed to provision uploaders {err:?}");
+                    println!("Failed to provision Clients {err:?}");
                     err
                 })?;
             self.ansible_provisioner

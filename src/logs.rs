@@ -46,7 +46,7 @@ impl TestnetDeployer {
 
         let mut all_inventory = vec![];
         if !disable_client_logs {
-            all_inventory.extend(self.get_uploader_inventory(name)?);
+            all_inventory.extend(self.get_client_inventory(name)?);
         }
 
         all_inventory.extend(self.get_all_node_inventory(name)?);
@@ -80,9 +80,9 @@ impl TestnetDeployer {
                     debug!("Using symmetric rsync args for {:?}", vm.name);
                     debug!("Args for {}: {:?}", vm.name, args);
                     args
-                } else if vm.name.contains("uploader") {
-                    let args = self.construct_uploader_args(vm, &log_base_dir);
-                    debug!("Using uploader rsync args for {:?} ", vm.name);
+                } else if vm.name.contains("client") {
+                    let args = self.construct_client_args(vm, &log_base_dir);
+                    debug!("Using Client rsync args for {:?} ", vm.name);
                     debug!("Args for {}: {:?}", vm.name, args);
                     args
                 } else {
@@ -136,7 +136,7 @@ impl TestnetDeployer {
         Ok(())
     }
 
-    fn construct_uploader_args(&self, vm: &VirtualMachine, log_base_dir: &Path) -> Vec<String> {
+    fn construct_client_args(&self, vm: &VirtualMachine, log_base_dir: &Path) -> Vec<String> {
         let vm_path = log_base_dir.join(&vm.name);
         let mut rsync_args = DEFAULT_RSYNC_ARGS
             .iter()
@@ -424,12 +424,12 @@ impl TestnetDeployer {
         self.ansible_provisioner.get_all_node_inventory()
     }
 
-    fn get_uploader_inventory(&self, name: &str) -> Result<Vec<VirtualMachine>> {
+    fn get_client_inventory(&self, name: &str) -> Result<Vec<VirtualMachine>> {
         let environments = self.terraform_runner.workspace_list()?;
         if !environments.contains(&name.to_string()) {
             return Err(Error::EnvironmentDoesNotExist(name.to_string()));
         }
-        self.ansible_provisioner.get_uploader_inventory()
+        self.ansible_provisioner.get_client_inventory()
     }
 }
 
