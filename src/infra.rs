@@ -341,23 +341,29 @@ impl ClientInfraRunOptions {
     pub fn build_terraform_args(&self) -> Result<Vec<(String, String)>> {
         let mut args = Vec::new();
 
+        if let Some(client_vm_count) = self.client_vm_count {
+            args.push((
+                "ant_client_vm_count".to_string(),
+                client_vm_count.to_string(),
+            ));
+        }
+        if let Some(client_vm_size) = &self.client_vm_size {
+            args.push((
+                "ant_client_droplet_size".to_string(),
+                client_vm_size.clone(),
+            ));
+        }
+        if let Some(client_image_id) = &self.client_image_id {
+            args.push((
+                "ant_client_droplet_image_id".to_string(),
+                client_image_id.clone(),
+            ));
+        }
+
         args.push((
             "use_custom_bin".to_string(),
             self.enable_build_vm.to_string(),
         ));
-
-        if let Some(client_vm_count) = self.client_vm_count {
-            args.push(("client_vm_count".to_string(), client_vm_count.to_string()));
-        }
-        if let Some(client_vm_size) = &self.client_vm_size {
-            args.push(("client_droplet_size".to_string(), client_vm_size.clone()));
-        }
-        if let Some(client_image_id) = &self.client_image_id {
-            args.push((
-                "client_droplet_image_id".to_string(),
-                client_image_id.clone(),
-            ));
-        }
 
         Ok(args)
     }
@@ -366,6 +372,27 @@ impl ClientInfraRunOptions {
 /// Build the terraform arguments from InfraRunOptions
 pub fn build_terraform_args(options: &InfraRunOptions) -> Result<Vec<(String, String)>> {
     let mut args = Vec::new();
+
+    if let Some(client_image_id) = &options.client_image_id {
+        args.push((
+            "ant_client_droplet_image_id".to_string(),
+            client_image_id.clone(),
+        ));
+    }
+
+    if let Some(client_vm_count) = options.client_vm_count {
+        args.push((
+            "ant_client_vm_count".to_string(),
+            client_vm_count.to_string(),
+        ));
+    }
+
+    if let Some(client_vm_size) = &options.client_vm_size {
+        args.push((
+            "ant_client_droplet_size".to_string(),
+            client_vm_size.clone(),
+        ));
+    }
 
     args.push((
         "use_custom_bin".to_string(),
@@ -496,21 +523,6 @@ pub fn build_terraform_args(options: &InfraRunOptions) -> Result<Vec<(String, St
             "symmetric_private_node_volume_size".to_string(),
             symmetric_private_node_volume_size.to_string(),
         ));
-    }
-
-    if let Some(client_image_id) = &options.client_image_id {
-        args.push((
-            "client_droplet_image_id".to_string(),
-            client_image_id.clone(),
-        ));
-    }
-
-    if let Some(client_vm_count) = options.client_vm_count {
-        args.push(("client_vm_count".to_string(), client_vm_count.to_string()));
-    }
-
-    if let Some(client_vm_size) = &options.client_vm_size {
-        args.push(("client_droplet_size".to_string(), client_vm_size.clone()));
     }
 
     Ok(args)

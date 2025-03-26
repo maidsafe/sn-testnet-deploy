@@ -277,8 +277,8 @@ while true; do
         file_size=$(echo "$first_file" | cut -d ',' -f $FILE_SIZE_INDEX | head -n 1 )
         ;;
       verifier)
-        # downloads the 3rd latest file
-        third_latest_file=$(tail -n 3 "$SUCCESSFUL_UPLOAD_METRIC_FILE" | head -n 1)
+        # downloads the 10th latest file
+        third_latest_file=$(tail -n 10 "$SUCCESSFUL_UPLOAD_METRIC_FILE" | head -n 1)
         file_ref=$(echo "$third_latest_file" | cut -d ',' -f $FILE_REF_INDEX | head -n 1)
         file_hash=$(echo "$third_latest_file" | cut -d ',' -f $FILE_HASH_INDEX | head -n 1 )
         file_size=$(echo "$third_latest_file" | cut -d ',' -f $FILE_SIZE_INDEX | head -n 1 )
