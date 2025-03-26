@@ -12,8 +12,8 @@ use crate::{
     },
     error::{Error, Result},
     get_environment_details,
-    infra::UploaderInfraRunOptions,
-    inventory::UploaderDeploymentInventory,
+    infra::ClientInfraRunOptions,
+    inventory::ClientDeploymentInventory,
     print_duration,
     s3::S3Repository,
     ssh::SshClient,
@@ -28,11 +28,13 @@ use std::{path::PathBuf, time::Instant};
 const ANSIBLE_DEFAULT_FORKS: usize = 50;
 
 #[derive(Clone, Serialize, Deserialize)]
-pub struct UploaderDeployOptions {
+pub struct ClientDeployOptions {
     pub binary_option: BinaryOption,
     pub chunk_size: Option<u64>,
     pub client_env_variables: Option<Vec<(String, String)>>,
-    pub current_inventory: UploaderDeploymentInventory,
+    pub client_vm_count: Option<u16>,
+    pub client_vm_size: Option<String>,
+    pub current_inventory: ClientDeploymentInventory,
     pub enable_downloaders: bool,
     pub enable_telegraf: bool,
     pub environment_type: EnvironmentType,
@@ -48,14 +50,12 @@ pub struct UploaderDeployOptions {
     pub network_contacts_url: String,
     pub output_inventory_dir_path: PathBuf,
     pub peer: String,
-    pub uploader_vm_count: Option<u16>,
-    pub uploader_vm_size: Option<String>,
     pub uploaders_count: u16,
     pub wallet_secret_keys: Option<Vec<String>>,
 }
 
 #[derive(Default)]
-pub struct UploaderDeployBuilder {
+pub struct ClientDeployBuilder {
     ansible_forks: Option<usize>,
     ansible_verbose_mode: bool,
     deployment_type: EnvironmentType,
@@ -68,7 +68,7 @@ pub struct UploaderDeployBuilder {
     working_directory_path: Option<PathBuf>,
 }
 
-impl UploaderDeployBuilder {
+impl ClientDeployBuilder {
     pub fn new() -> Self {
         Default::default()
     }
@@ -123,7 +123,7 @@ impl UploaderDeployBuilder {
         self
     }
 
-    pub fn build(&self) -> Result<UploaderDeployer> {
+    pub fn build(&self) -> Result<ClientDeployer> {
         let provider = self.provider.unwrap_or(CloudProvider::DigitalOcean);
         match provider {
             CloudProvider::DigitalOcean => {
@@ -143,7 +143,7 @@ impl UploaderDeployBuilder {
 
         let state_bucket_name = match self.state_bucket_name {
             Some(ref bucket_name) => bucket_name.clone(),
-            None => std::env::var("UPLOADERS_TERRAFORM_STATE_BUCKET_NAME")?,
+            None => std::env::var("CLIENT_TERRAFORM_STATE_BUCKET_NAME")?,
         };
 
         let default_terraform_bin_path = PathBuf::from("terraform");
@@ -171,7 +171,7 @@ impl UploaderDeployBuilder {
             terraform_binary_path.to_path_buf(),
             working_directory_path
                 .join("terraform")
-                .join("uploaders")
+                .join("client")
                 .join(provider.to_string()),
             provider,
             &state_bucket_name,
@@ -191,7 +191,7 @@ impl UploaderDeployBuilder {
         let ansible_provisioner =
             AnsibleProvisioner::new(ansible_runner, provider, ssh_client.clone());
 
-        let uploader_deployer = UploaderDeployer::new(
+        let client_deployer = ClientDeployer::new(
             ansible_provisioner,
             provider,
             self.deployment_type.clone(),
@@ -202,12 +202,12 @@ impl UploaderDeployBuilder {
             working_directory_path,
         )?;
 
-        Ok(uploader_deployer)
+        Ok(client_deployer)
     }
 }
 
 #[derive(Clone)]
-pub struct UploaderDeployer {
+pub struct ClientDeployer {
     pub ansible_provisioner: AnsibleProvisioner,
     pub cloud_provider: CloudProvider,
     pub deployment_type: EnvironmentType,
@@ -219,7 +219,7 @@ pub struct UploaderDeployer {
     pub working_directory_path: PathBuf,
 }
 
-impl UploaderDeployer {
+impl ClientDeployer {
     #[allow(clippy::too_many_arguments)]
     pub fn new(
         ansible_provisioner: AnsibleProvisioner,
@@ -230,7 +230,7 @@ impl UploaderDeployer {
         ssh_client: SshClient,
         terraform_runner: TerraformRunner,
         working_directory_path: PathBuf,
-    ) -> Result<UploaderDeployer> {
+    ) -> Result<ClientDeployer> {
         if environment_name.is_empty() {
             return Err(Error::EnvironmentNameRequired);
         }
@@ -239,7 +239,7 @@ impl UploaderDeployer {
             .join("inventory")
             .join("dev_inventory_digital_ocean.yml");
 
-        Ok(UploaderDeployer {
+        Ok(ClientDeployer {
             ansible_provisioner,
             cloud_provider,
             deployment_type,
@@ -252,7 +252,7 @@ impl UploaderDeployer {
         })
     }
 
-    pub fn create_or_update_infra(&self, options: &UploaderInfraRunOptions) -> Result<()> {
+    pub fn create_or_update_infra(&self, options: &ClientInfraRunOptions) -> Result<()> {
         let start = Instant::now();
         println!("Selecting {} workspace...", options.name);
         self.terraform_runner.workspace_select(&options.name)?;
@@ -279,7 +279,7 @@ impl UploaderDeployer {
         Ok(())
     }
 
-    pub fn plan(&self, options: &UploaderInfraRunOptions) -> Result<()> {
+    pub fn plan(&self, options: &ClientInfraRunOptions) -> Result<()> {
         println!("Selecting {} workspace...", options.name);
         self.terraform_runner.workspace_select(&options.name)?;
 
@@ -290,9 +290,9 @@ impl UploaderDeployer {
         Ok(())
     }
 
-    pub async fn deploy(&self, options: UploaderDeployOptions) -> Result<()> {
+    pub async fn deploy(&self, options: ClientDeployOptions) -> Result<()> {
         println!(
-            "Deploying uploaders for environment: {}",
+            "Deploying client for environment: {}",
             self.environment_name
         );
 
@@ -306,13 +306,13 @@ impl UploaderDeployer {
         let start = Instant::now();
         println!("Initializing infrastructure...");
 
-        let infra_options = UploaderInfraRunOptions {
+        let infra_options = ClientInfraRunOptions {
+            client_image_id: None,
+            client_vm_count: options.client_vm_count,
+            client_vm_size: options.client_vm_size.clone(),
             enable_build_vm: build_custom_binaries,
             name: options.name.clone(),
             tfvars_filename: options.current_inventory.get_tfvars_filename(),
-            uploader_image_id: None,
-            uploader_vm_count: options.uploader_vm_count,
-            uploader_vm_size: options.uploader_vm_size.clone(),
         };
 
         self.create_or_update_infra(&infra_options)?;
@@ -321,7 +321,7 @@ impl UploaderDeployer {
             &self.s3_repository,
             &options.name,
             &EnvironmentDetails {
-                deployment_type: DeploymentType::Uploaders,
+                deployment_type: DeploymentType::Client,
                 environment_type: options.environment_type.clone(),
                 evm_details: EvmDetails {
                     network: options.evm_details.network.clone(),
@@ -336,7 +336,7 @@ impl UploaderDeployer {
         )
         .await?;
 
-        println!("Provisioning uploaders with Ansible...");
+        println!("Provisioning Client with Ansible...");
         let provision_options = ProvisionOptions::from(options.clone());
 
         if build_custom_binaries {
@@ -351,16 +351,16 @@ impl UploaderDeployer {
         }
 
         self.ansible_provisioner
-            .print_ansible_run_banner("Provision Uploaders");
+            .print_ansible_run_banner("Provision Clients");
         self.ansible_provisioner
-            .provision_uploaders(
+            .provision_clients(
                 &provision_options,
                 Some(options.peer.clone()),
                 Some(options.network_contacts_url.clone()),
             )
             .await
             .map_err(|err| {
-                println!("Failed to provision uploaders {err:?}");
+                println!("Failed to provision Clients {err:?}");
                 err
             })?;
 
@@ -385,7 +385,7 @@ impl UploaderDeployer {
     async fn destroy_infra(&self, environment_details: &EnvironmentDetails) -> Result<()> {
         crate::infra::select_workspace(&self.terraform_runner, &self.environment_name)?;
 
-        let options = UploaderInfraRunOptions::generate_existing(
+        let options = ClientInfraRunOptions::generate_existing(
             &self.environment_name,
             &self.terraform_runner,
             environment_details,
@@ -393,11 +393,11 @@ impl UploaderDeployer {
         .await?;
 
         let mut args = Vec::new();
-        if let Some(vm_count) = options.uploader_vm_count {
-            args.push(("uploader_vm_count".to_string(), vm_count.to_string()));
+        if let Some(vm_count) = options.client_vm_count {
+            args.push(("client_vm_count".to_string(), vm_count.to_string()));
         }
-        if let Some(vm_size) = &options.uploader_vm_size {
-            args.push(("uploader_droplet_size".to_string(), vm_size.clone()));
+        if let Some(vm_size) = &options.client_vm_size {
+            args.push(("client_droplet_size".to_string(), vm_size.clone()));
         }
         args.push((
             "use_custom_bin".to_string(),

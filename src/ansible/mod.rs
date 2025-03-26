@@ -77,9 +77,9 @@ pub enum AnsiblePlaybook {
     ///
     /// Use in combination with `AnsibleInventoryType::Genesis` or `AnsibleInventoryType::Nodes`.
     CopyLogs,
-    /// The Downloaders playbook will setup the downloader scripts on the uploader VMs.
+    /// The Downloaders playbook will setup the downloader scripts on the Client VMs.
     ///
-    /// Use in combination with `AnsibleInventoryType::Uploaders`.
+    /// Use in combination with `AnsibleInventoryType::Clients`.
     Downloaders,
     /// The EVM node playbook will setup and manage EVM nodes for the deployment.
     ///
@@ -150,6 +150,8 @@ pub enum AnsiblePlaybook {
     /// upgrade.
     StartTelegraf,
     /// This playbook will start the uploaders on each machine.
+    ///
+    /// Use in combination with `AnsibleInventoryType::Clients`.
     StartUploaders,
     /// This playbook will stop the faucet for the environment.
     StopFaucet,
@@ -164,6 +166,8 @@ pub enum AnsiblePlaybook {
     /// status`, which writes to the registry file and can interfere with an upgrade.
     StopTelegraf,
     /// This playbook will stop the uploaders on each machine.
+    ///
+    /// Use in combination with `AnsibleInventoryType::Clients`.
     StopUploaders,
     /// This playbook will setup the VM to act as a Symmetric NAT gateway and will route the private node through it.
     ///
@@ -179,13 +183,17 @@ pub enum AnsiblePlaybook {
     UpgradeNodes,
     /// Update the node Telegraf configuration to the latest version in the repository.
     UpgradeNodeTelegrafConfig,
-    /// Upgrade the uploaders to the latest version of the safe client.
-    UpgradeUploaders,
-    /// Update the uploader Telegraf configuration to the latest version in the repository.
-    UpgradeUploaderTelegrafConfig,
+    /// Upgrade the binary to the latest version of the ant client.
+    ///
+    /// Use in combination with `AnsibleInventoryType::Clients`.
+    UpgradeClients,
+    /// Update the client Telegraf configuration to the latest version in the repository.
+    ///
+    /// Use in combination with `AnsibleInventoryType::Clients`.
+    UpgradeClientTelegrafConfig,
     /// The uploader playbook will setup the uploader scripts on the uploader VMs.
     ///
-    /// Use in combination with `AnsibleInventoryType::Uploaders`.
+    /// Use in combination with `AnsibleInventoryType::Clients`.
     Uploaders,
     /// The update peer playbook will update the peer multiaddr in all node service definitions.
     UpdatePeer,
@@ -223,13 +231,13 @@ impl AnsiblePlaybook {
             AnsiblePlaybook::StopUploaders => "stop_uploaders.yml".to_string(),
             AnsiblePlaybook::SymmetricNatGateway => "symmetric_nat_gateway.yml".to_string(),
             AnsiblePlaybook::UpgradeAntctl => "upgrade_antctl.yml".to_string(),
+            AnsiblePlaybook::UpgradeClients => "upgrade_clients.yml".to_string(),
+            AnsiblePlaybook::UpgradeClientTelegrafConfig => {
+                "upgrade_client_telegraf_config.yml".to_string()
+            }
             AnsiblePlaybook::UpgradeNodes => "upgrade_nodes.yml".to_string(),
             AnsiblePlaybook::UpgradeNodeTelegrafConfig => {
                 "upgrade_node_telegraf_config.yml".to_string()
-            }
-            AnsiblePlaybook::UpgradeUploaders => "upgrade_uploaders.yml".to_string(),
-            AnsiblePlaybook::UpgradeUploaderTelegrafConfig => {
-                "upgrade_uploader_telegraf_config.yml".to_string()
             }
             AnsiblePlaybook::Uploaders => "uploaders.yml".to_string(),
             AnsiblePlaybook::UpdatePeer => "update_peer.yml".to_string(),

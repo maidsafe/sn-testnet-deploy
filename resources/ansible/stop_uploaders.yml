@@ -1,5 +1,5 @@
 ---
-- name: ensure the ant uploader service is stopped
+- name: ensure all the ANT uploader service are stopped
   hosts: all
   become: True
   tasks:

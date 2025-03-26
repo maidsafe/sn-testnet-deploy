@@ -64,10 +64,11 @@ const ANSIBLE_DEFAULT_FORKS: usize = 50;
 pub enum DeploymentType {
     /// The deployment has been bootstrapped from an existing network.
     Bootstrap,
+    /// Client deployment.
+    Client,
     /// The deployment is a new network.
     #[default]
     New,
-    Uploaders,
 }
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
@@ -82,8 +83,8 @@ impl std::fmt::Display for DeploymentType {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             DeploymentType::Bootstrap => write!(f, "bootstrap"),
+            DeploymentType::Client => write!(f, "client"),
             DeploymentType::New => write!(f, "new"),
-            DeploymentType::Uploaders => write!(f, "uploaders"),
         }
     }
 }
@@ -94,8 +95,8 @@ impl std::str::FromStr for DeploymentType {
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         match s.to_lowercase().as_str() {
             "bootstrap" => Ok(DeploymentType::Bootstrap),
+            "client" => Ok(DeploymentType::Client),
             "new" => Ok(DeploymentType::New),
-            "uploaders" => Ok(DeploymentType::Uploaders),
             _ => Err(format!("Invalid deployment type: {}", s)),
         }
     }
@@ -922,8 +923,8 @@ impl TestnetDeployer {
         Ok(())
     }
 
-    pub fn upgrade_uploader_telegraf(&self, name: &str) -> Result<()> {
-        self.ansible_provisioner.upgrade_uploader_telegraf(name)?;
+    pub fn upgrade_client_telegraf(&self, name: &str) -> Result<()> {
+        self.ansible_provisioner.upgrade_client_telegraf(name)?;
         Ok(())
     }
 

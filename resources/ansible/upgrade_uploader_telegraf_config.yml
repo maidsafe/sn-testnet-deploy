@@ -1,8 +1,8 @@
 ---
-- name: upgrade the uploader telegraf configuration
+- name: upgrade the client telegraf configuration
   hosts: all
   roles:
-    - role: uploader-metrics
+    - role: client-metrics
       become: True
   tasks:
     - name: restart telegraf service

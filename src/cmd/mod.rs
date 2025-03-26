@@ -17,7 +17,7 @@ pub mod uploaders;
 
 use crate::cmd::{
     funds::FundsCommand, logs::LogCommands, network::NetworkCommands, provision::ProvisionCommands,
-    uploaders::UploadersCommands,
+    uploaders::ClientCommands,
 };
 use alloy::primitives::U256;
 use ant_releases::{AntReleaseRepoActions, ReleaseType};
@@ -253,6 +253,9 @@ pub enum Commands {
         #[clap(long, value_parser = parse_provider, verbatim_doc_comment, default_value_t = CloudProvider::DigitalOcean)]
         provider: CloudProvider,
     },
+    /// Manage Client for an environment
+    #[clap(name = "client", subcommand)]
+    Client(ClientCommands),
     /// Configure a swapfile on all nodes in the environment.
     ConfigureSwapfile {
         /// The name of the environment.
@@ -315,6 +318,15 @@ pub enum Commands {
         /// arguments. You can only supply version numbers or a custom branch, not both.
         #[arg(long, verbatim_doc_comment)]
         branch: Option<String>,
+        /// The number of Client VMs to create.
+        ///
+        /// If the argument is not used, the value will be determined by the 'environment-type'
+        /// argument.
+        #[clap(long)]
+        client_vm_count: Option<u16>,
+        /// Override the size of the Client VMs.
+        #[clap(long)]
+        client_vm_size: Option<String>,
         /// Set to enable the downloaders on the VMs.
         #[clap(long)]
         enable_downloaders: bool,
@@ -422,7 +434,7 @@ pub enum Commands {
         /// argument.
         #[clap(long)]
         full_cone_private_node_volume_size: Option<u16>,
-        /// The secret key for the wallet that will fund all the uploaders.
+        /// The secret key for the wallet that will fund all the ANT instances.
         ///
         /// This argument only applies when Arbitrum or Sepolia networks are used.
         #[clap(long)]
@@ -434,12 +446,12 @@ pub enum Commands {
         /// argument.
         #[clap(long)]
         genesis_node_volume_size: Option<u16>,
-        /// The amount of gas to initially transfer to each uploader, in U256
+        /// The amount of gas to initially transfer to each ANT instance, in U256
         ///
         /// 1 ETH = 1_000_000_000_000_000_000. Defaults to 0.1 ETH
         #[arg(long)]
         initial_gas: Option<U256>,
-        /// The amount of tokens to initially transfer to each uploader, in U256
+        /// The amount of tokens to initially transfer to each ANT instance, in U256
         ///
         /// 1 Token = 1_000_000_000_000_000_000. Defaults to 100 token.
         #[arg(long)]
@@ -549,15 +561,6 @@ pub enum Commands {
         /// The desired number of uploaders per VM.
         #[clap(long, default_value_t = 1)]
         uploaders_count: u16,
-        /// The number of uploader VMs to create.
-        ///
-        /// If the argument is not used, the value will be determined by the 'environment-type'
-        /// argument.
-        #[clap(long)]
-        uploader_vm_count: Option<u16>,
-        /// Override the size of the uploader VMs.
-        #[clap(long)]
-        uploader_vm_size: Option<String>,
         /// Set to only deploy up to the genesis node.
         ///
         /// This will provision all infrastructure but only deploy and start the genesis node.
@@ -891,9 +894,9 @@ pub enum Commands {
         #[clap(long, value_parser = parse_provider, verbatim_doc_comment, default_value_t = CloudProvider::DigitalOcean)]
         provider: CloudProvider,
     },
-    /// Upgrade the uploader Telegraf configuration on an environment.
-    #[clap(name = "upgrade-uploader-telegraf-config")]
-    UpgradeUploaderTelegrafConfig {
+    /// Upgrade the client Telegraf configuration on an environment.
+    #[clap(name = "upgrade-client-telegraf-config")]
+    UpgradeClientTelegrafConfig {
         /// Maximum number of forks Ansible will use to execute tasks on target hosts.
         #[clap(long, default_value_t = 50)]
         forks: usize,
@@ -904,9 +907,6 @@ pub enum Commands {
         #[clap(long, value_parser = parse_provider, verbatim_doc_comment, default_value_t = CloudProvider::DigitalOcean)]
         provider: CloudProvider,
     },
-    /// Manage uploaders for an environment
-    #[clap(name = "uploaders", subcommand)]
-    Uploaders(UploadersCommands),
     /// Upscale VMs and node services for an existing network.
     Upscale {
         /// Set to run Ansible with more verbose output.
@@ -922,11 +922,11 @@ pub enum Commands {
         /// There should be no 'v' prefix.
         #[arg(long, verbatim_doc_comment)]
         antnode_version: Option<String>,
-        /// Supply a version number for the safe binary to be used for new uploader VMs.
+        /// Supply a version number for the safe binary to be used for new Client VMs.
         ///
         /// There should be no 'v' prefix.
         ///
-        /// This argument is required when the uploader count is supplied.
+        /// This argument is required when the Client VM count is supplied.
         #[arg(long, verbatim_doc_comment)]
         ant_version: Option<String>,
         /// The name of a branch from which custom binaries were built.
@@ -938,6 +938,14 @@ pub enum Commands {
         /// exclusive with the version arguments.
         #[arg(long, verbatim_doc_comment)]
         branch: Option<String>,
+        /// The desired number of Client VMs to be running after the scale.
+        ///
+        /// If there are currently 10 VMs running, and you want there to be 25, the value used
+        /// should be 25, rather than 15 as a delta to reach 25.
+        ///
+        /// This option is not applicable to a bootstrap deployment.
+        #[clap(long, verbatim_doc_comment)]
+        desired_client_vm_count: Option<u16>,
         /// The desired number of antnode services to be running behind a Full Cone NAT on each private node VM after
         /// the scale.
         ///
@@ -1001,20 +1009,12 @@ pub enum Commands {
         /// This option is not applicable to a bootstrap deployment.
         #[clap(long, verbatim_doc_comment)]
         desired_symmetric_private_node_vm_count: Option<u16>,
-        /// The desired number of uploader VMs to be running after the scale.
-        ///
-        /// If there are currently 10 VMs running, and you want there to be 25, the value used
-        /// should be 25, rather than 15 as a delta to reach 25.
-        ///
-        /// This option is not applicable to a bootstrap deployment.
-        #[clap(long, verbatim_doc_comment)]
-        desired_uploader_vm_count: Option<u16>,
         /// The desired number of uploaders to be running after the scale.
         ///
-        /// If you want each uploader VM to run multiple uploader services, specify the total desired count.
+        /// If you want each Client VM to run multiple uploader services, specify the total desired count.
         #[clap(long, verbatim_doc_comment)]
         desired_uploaders_count: Option<u16>,
-        /// The secret key for the wallet that will fund all the uploaders.
+        /// The secret key for the wallet that will fund all the ANT instances.
         ///
         /// This argument only applies when Arbitrum or Sepolia networks are used.
         #[clap(long)]

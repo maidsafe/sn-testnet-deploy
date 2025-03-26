@@ -23,7 +23,7 @@ use crate::{
     funding::FundingOptions,
     inventory::{DeploymentNodeRegistries, VirtualMachine},
     print_duration, run_external_command,
-    uploaders::UploaderDeployOptions,
+    uploaders::ClientDeployOptions,
     BinaryOption, CloudProvider, EvmNetwork, LogFormat, NodeType, SshClient, UpgradeOptions,
 };
 use ant_service_management::NodeRegistry;
@@ -307,39 +307,39 @@ impl From<DeployOptions> for ProvisionOptions {
     }
 }
 
-impl From<UploaderDeployOptions> for ProvisionOptions {
-    fn from(uploader_options: UploaderDeployOptions) -> Self {
+impl From<ClientDeployOptions> for ProvisionOptions {
+    fn from(client_options: ClientDeployOptions) -> Self {
         ProvisionOptions {
             ant_version: None,
-            binary_option: uploader_options.binary_option,
-            chunk_size: uploader_options.chunk_size,
-            client_env_variables: uploader_options.client_env_variables,
-            enable_downloaders: uploader_options.enable_downloaders,
-            enable_telegraf: uploader_options.enable_telegraf,
-            evm_data_payments_address: uploader_options.evm_details.data_payments_address,
-            evm_network: uploader_options.evm_details.network,
-            evm_payment_token_address: uploader_options.evm_details.payment_token_address,
-            evm_rpc_url: uploader_options.evm_details.rpc_url,
+            binary_option: client_options.binary_option,
+            chunk_size: client_options.chunk_size,
+            client_env_variables: client_options.client_env_variables,
+            enable_downloaders: client_options.enable_downloaders,
+            enable_telegraf: client_options.enable_telegraf,
+            evm_data_payments_address: client_options.evm_details.data_payments_address,
+            evm_network: client_options.evm_details.network,
+            evm_payment_token_address: client_options.evm_details.payment_token_address,
+            evm_rpc_url: client_options.evm_details.rpc_url,
             full_cone_private_node_count: 0,
-            funding_wallet_secret_key: uploader_options.funding_wallet_secret_key,
-            gas_amount: uploader_options.initial_gas,
+            funding_wallet_secret_key: client_options.funding_wallet_secret_key,
+            gas_amount: client_options.initial_gas,
             interval: None,
             log_format: None,
-            max_archived_log_files: uploader_options.max_archived_log_files,
-            max_log_files: uploader_options.max_log_files,
-            max_uploads: uploader_options.max_uploads,
-            name: uploader_options.name,
-            network_id: uploader_options.network_id,
+            max_archived_log_files: client_options.max_archived_log_files,
+            max_log_files: client_options.max_log_files,
+            max_uploads: client_options.max_uploads,
+            name: client_options.name,
+            network_id: client_options.network_id,
             node_count: 0,
             node_env_variables: None,
-            output_inventory_dir_path: uploader_options.output_inventory_dir_path,
+            output_inventory_dir_path: client_options.output_inventory_dir_path,
             peer_cache_node_count: 0,
             public_rpc: false,
             rewards_address: None,
             symmetric_private_node_count: 0,
-            token_amount: uploader_options.initial_tokens,
-            uploaders_count: Some(uploader_options.uploaders_count),
-            wallet_secret_keys: uploader_options.wallet_secret_keys,
+            token_amount: client_options.initial_tokens,
+            uploaders_count: Some(client_options.uploaders_count),
+            wallet_secret_keys: client_options.wallet_secret_keys,
         }
     }
 }
@@ -471,9 +471,9 @@ impl AnsibleProvisioner {
             .get_inventory(AnsibleInventoryType::FullConeNatGateway, false)
     }
 
-    pub fn get_uploader_inventory(&self) -> Result<Vec<VirtualMachine>> {
+    pub fn get_client_inventory(&self) -> Result<Vec<VirtualMachine>> {
         self.ansible_runner
-            .get_inventory(AnsibleInventoryType::Uploaders, false)
+            .get_inventory(AnsibleInventoryType::Clients, false)
     }
 
     pub fn get_node_registries(
@@ -1006,12 +1006,12 @@ impl AnsibleProvisioner {
     ) -> Result<()> {
         let start = Instant::now();
 
-        println!("Running ansible against uploader machine to start the downloader script.");
-        debug!("Running ansible against uploader machine to start the downloader script.");
+        println!("Running ansible against Client machine to start the downloader script.");
+        debug!("Running ansible against Client machine to start the downloader script.");
 
         self.ansible_runner.run_playbook(
             AnsiblePlaybook::Downloaders,
-            AnsibleInventoryType::Uploaders,
+            AnsibleInventoryType::Clients,
             Some(extra_vars::build_downloaders_extra_vars_doc(
                 &self.cloud_provider.to_string(),
                 options,
@@ -1023,7 +1023,7 @@ impl AnsibleProvisioner {
         Ok(())
     }
 
-    pub async fn provision_uploaders(
+    pub async fn provision_clients(
         &self,
         options: &ProvisionOptions,
         genesis_multiaddr: Option<String>,
@@ -1034,7 +1034,7 @@ impl AnsibleProvisioner {
         let sk_map = if let Some(wallet_keys) = &options.wallet_secret_keys {
             self.prepare_pre_funded_wallets(wallet_keys).await?
         } else {
-            self.deposit_funds_to_uploaders(&FundingOptions {
+            self.deposit_funds_to_clients(&FundingOptions {
                 evm_data_payments_address: options.evm_data_payments_address.clone(),
                 evm_network: options.evm_network.clone(),
                 evm_payment_token_address: options.evm_payment_token_address.clone(),
@@ -1049,8 +1049,8 @@ impl AnsibleProvisioner {
 
         self.ansible_runner.run_playbook(
             AnsiblePlaybook::Uploaders,
-            AnsibleInventoryType::Uploaders,
-            Some(extra_vars::build_uploaders_extra_vars_doc(
+            AnsibleInventoryType::Clients,
+            Some(extra_vars::build_clients_extra_vars_doc(
                 &self.cloud_provider.to_string(),
                 options,
                 genesis_multiaddr,
@@ -1293,11 +1293,11 @@ impl AnsibleProvisioner {
         Ok(())
     }
 
-    pub fn upgrade_uploader_telegraf(&self, name: &str) -> Result<()> {
+    pub fn upgrade_client_telegraf(&self, name: &str) -> Result<()> {
         self.ansible_runner.run_playbook(
-            AnsiblePlaybook::UpgradeUploaderTelegrafConfig,
-            AnsibleInventoryType::Uploaders,
-            Some(extra_vars::build_uploader_telegraf_upgrade(name)?),
+            AnsiblePlaybook::UpgradeClientTelegrafConfig,
+            AnsibleInventoryType::Clients,
+            Some(extra_vars::build_client_telegraf_upgrade(name)?),
         )?;
         Ok(())
     }

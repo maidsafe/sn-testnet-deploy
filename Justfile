@@ -35,7 +35,7 @@ build-node-image:
     packer build -var 'size=s-2vcpu-4gb' node.pkr.hcl
   )
 
-build-uploader-image:
+build-client-image:
   #!/usr/bin/env bash
   (
     cd resources/packer/node

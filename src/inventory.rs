@@ -18,7 +18,7 @@ use crate::{
     s3::S3Repository,
     ssh::SshClient,
     terraform::TerraformRunner,
-    uploaders::UploaderDeployer,
+    uploaders::ClientDeployer,
     BinaryOption, CloudProvider, DeploymentType, EnvironmentDetails, EnvironmentType, Error,
     EvmDetails, TestnetDeployer,
 };
@@ -79,8 +79,8 @@ impl From<&TestnetDeployer> for DeploymentInventoryService {
     }
 }
 
-impl From<&UploaderDeployer> for DeploymentInventoryService {
-    fn from(item: &UploaderDeployer) -> Self {
+impl From<&ClientDeployer> for DeploymentInventoryService {
+    fn from(item: &ClientDeployer) -> Self {
         let provider = match item.cloud_provider {
             CloudProvider::Aws => "aws",
             CloudProvider::DigitalOcean => "digital_ocean",
@@ -235,11 +235,11 @@ impl DeploymentInventoryService {
             .ansible_runner
             .get_inventory(AnsibleInventoryType::PeerCacheNodes, false)?;
 
-        let uploader_vms = if environment_details.deployment_type != DeploymentType::Bootstrap {
-            let uploader_and_sks = self.ansible_provisioner.get_uploader_secret_keys()?;
-            uploader_and_sks
+        let client_vms = if environment_details.deployment_type != DeploymentType::Bootstrap {
+            let client_and_sks = self.ansible_provisioner.get_client_secret_keys()?;
+            client_and_sks
                 .iter()
-                .map(|(vm, sks)| UploaderVirtualMachine {
+                .map(|(vm, sks)| ClientVirtualMachine {
                     vm: vm.clone(),
                     wallet_public_key: sks
                         .iter()
@@ -340,10 +340,10 @@ impl DeploymentInventoryService {
             };
 
             let ant_version = if environment_details.deployment_type != DeploymentType::Bootstrap {
-                let random_uploader_vm = uploader_vms
+                let random_client_vm = client_vms
                     .choose(&mut rand::thread_rng())
-                    .ok_or_else(|| eyre!("No uploader VMs available to retrieve ant version"))?;
-                self.get_bin_version(&random_uploader_vm.vm, "ant --version", "Autonomi Client v")
+                    .ok_or_else(|| eyre!("No Client VMs available to retrieve ant version"))?;
+                self.get_bin_version(&random_client_vm.vm, "ant --version", "Autonomi Client v")
                     .ok()
             } else {
                 None
@@ -378,6 +378,7 @@ impl DeploymentInventoryService {
             };
         let inventory = DeploymentInventory {
             binary_option,
+            client_vms,
             environment_details,
             failed_node_registry_vms,
             faucet_address: genesis_ip.map(|ip| format!("{ip}:8000")),
@@ -394,7 +395,6 @@ impl DeploymentInventoryService {
             symmetric_nat_gateway_vms,
             symmetric_private_node_vms,
             uploaded_files: Vec::new(),
-            uploader_vms,
         };
         debug!("Inventory: {inventory:?}");
         Ok(inventory)
@@ -534,7 +534,7 @@ impl DeploymentInventoryService {
         Version::parse(version_str).map_err(|e| eyre!("Failed to parse {} version: {}", command, e))
     }
 
-    /// Generate or retrieve the uploader inventory for the deployment.
+    /// Generate or retrieve the Client inventory for the deployment.
     ///
     /// If we're creating a new environment and there is no inventory yet, an empty inventory will
     /// be returned; otherwise the inventory will represent what is deployed currently.
@@ -542,18 +542,18 @@ impl DeploymentInventoryService {
     /// The `force` flag is used when the `deploy` command runs, to make sure that a new inventory
     /// is generated, because it's possible that an old one with the same environment name has been
     /// cached.
-    pub async fn generate_or_retrieve_uploader_inventory(
+    pub async fn generate_or_retrieve_client_inventory(
         &self,
         name: &str,
         force: bool,
         binary_option: Option<BinaryOption>,
-    ) -> Result<UploaderDeploymentInventory> {
+    ) -> Result<ClientDeploymentInventory> {
         println!("===============================================");
-        println!("  Generating or Retrieving Uploader Inventory  ");
+        println!("  Generating or Retrieving Client Inventory  ");
         println!("===============================================");
-        let inventory_path = get_data_directory()?.join(format!("{name}-uploader-inventory.json"));
+        let inventory_path = get_data_directory()?.join(format!("{name}-client-inventory.json"));
         if inventory_path.exists() && !force {
-            let inventory = UploaderDeploymentInventory::read(&inventory_path)?;
+            let inventory = ClientDeploymentInventory::read(&inventory_path)?;
             return Ok(inventory);
         }
 
@@ -584,7 +584,7 @@ impl DeploymentInventoryService {
             Ok(details) => details,
             Err(Error::EnvironmentDetailsNotFound(_)) => {
                 println!("Environment details not found: treating this as a new deployment");
-                return Ok(UploaderDeploymentInventory::empty(
+                return Ok(ClientDeploymentInventory::empty(
                     name,
                     binary_option.ok_or_else(|| {
                         eyre!("For a new deployment the binary option must be set")
@@ -594,10 +594,10 @@ impl DeploymentInventoryService {
             Err(e) => return Err(e.into()),
         };
 
-        let uploader_and_sks = self.ansible_provisioner.get_uploader_secret_keys()?;
-        let uploader_vms: Vec<UploaderVirtualMachine> = uploader_and_sks
+        let client_and_sks = self.ansible_provisioner.get_client_secret_keys()?;
+        let client_vms: Vec<ClientVirtualMachine> = client_and_sks
             .iter()
-            .map(|(vm, sks)| UploaderVirtualMachine {
+            .map(|(vm, sks)| ClientVirtualMachine {
                 vm: vm.clone(),
                 wallet_public_key: sks
                     .iter()
@@ -610,11 +610,11 @@ impl DeploymentInventoryService {
         let binary_option = if let Some(binary_option) = binary_option {
             binary_option
         } else {
-            let ant_version = if !uploader_vms.is_empty() {
-                let random_uploader_vm = uploader_vms
+            let ant_version = if !client_vms.is_empty() {
+                let random_client_vm = client_vms
                     .choose(&mut rand::thread_rng())
-                    .ok_or_else(|| eyre!("No uploader VMs available to retrieve ant version"))?;
-                self.get_bin_version(&random_uploader_vm.vm, "ant --version", "Autonomi Client v")
+                    .ok_or_else(|| eyre!("No Client VMs available to retrieve ant version"))?;
+                self.get_bin_version(&random_client_vm.vm, "ant --version", "Autonomi Client v")
                     .ok()
             } else {
                 None
@@ -632,8 +632,9 @@ impl DeploymentInventoryService {
             }
         };
 
-        let inventory = UploaderDeploymentInventory {
+        let inventory = ClientDeploymentInventory {
             binary_option,
+            client_vms,
             environment_type: environment_details.environment_type,
             evm_details: environment_details.evm_details,
             funding_wallet_address: None, // This would need to be populated from somewhere
@@ -643,10 +644,9 @@ impl DeploymentInventoryService {
             ssh_user: self.cloud_provider.get_ssh_user(),
             ssh_private_key_path: self.ssh_client.private_key_path.clone(),
             uploaded_files: Vec::new(),
-            uploader_vms,
         };
 
-        debug!("Uploader Inventory: {inventory:?}");
+        debug!("Client Inventory: {inventory:?}");
         Ok(inventory)
     }
 }
@@ -738,9 +738,9 @@ impl NodeVirtualMachine {
 pub type OsUser = String;
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
-pub struct UploaderVirtualMachine {
+pub struct ClientVirtualMachine {
     pub vm: VirtualMachine,
-    /// The public key of the wallet for each OS user (1 uploader instance per OS user).
+    /// The public key of the wallet for each OS user (1 ant uploader instance per OS user).
     pub wallet_public_key: HashMap<OsUser, String>,
 }
 
@@ -824,6 +824,7 @@ impl DeploymentNodeRegistries {
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct DeploymentInventory {
     pub binary_option: BinaryOption,
+    pub client_vms: Vec<ClientVirtualMachine>,
     pub environment_details: EnvironmentDetails,
     pub failed_node_registry_vms: Vec<String>,
     pub faucet_address: Option<String>,
@@ -840,7 +841,6 @@ pub struct DeploymentInventory {
     pub symmetric_nat_gateway_vms: Vec<VirtualMachine>,
     pub symmetric_private_node_vms: Vec<NodeVirtualMachine>,
     pub uploaded_files: Vec<(String, String)>,
-    pub uploader_vms: Vec<UploaderVirtualMachine>,
 }
 
 impl DeploymentInventory {
@@ -849,6 +849,7 @@ impl DeploymentInventory {
     pub fn empty(name: &str, binary_option: BinaryOption) -> DeploymentInventory {
         Self {
             binary_option,
+            client_vms: Default::default(),
             environment_details: EnvironmentDetails::default(),
             genesis_vm: Default::default(),
             genesis_multiaddr: Default::default(),
@@ -865,7 +866,6 @@ impl DeploymentInventory {
             symmetric_nat_gateway_vms: Default::default(),
             symmetric_private_node_vms: Default::default(),
             uploaded_files: Default::default(),
-            uploader_vms: Default::default(),
         }
     }
 
@@ -904,11 +904,7 @@ impl DeploymentInventory {
                 .iter()
                 .map(|node_vm| node_vm.vm.clone()),
         );
-        list.extend(
-            self.uploader_vms
-                .iter()
-                .map(|uploader_vm| uploader_vm.vm.clone()),
-        );
+        list.extend(self.client_vms.iter().map(|client_vm| client_vm.vm.clone()));
         list
     }
 
@@ -1170,21 +1166,21 @@ impl DeploymentInventory {
             println!();
         }
 
-        if !self.uploader_vms.is_empty() {
-            println!("============");
-            println!("Uploader VMs");
-            println!("============");
-            for uploader_vm in self.uploader_vms.iter() {
-                println!("{}: {}", uploader_vm.vm.name, uploader_vm.vm.public_ip_addr);
+        if !self.client_vms.is_empty() {
+            println!("==========");
+            println!("Client VMs");
+            println!("==========");
+            for client_vm in self.client_vms.iter() {
+                println!("{}: {}", client_vm.vm.name, client_vm.vm.public_ip_addr);
             }
             println!();
 
-            println!("===========================");
-            println!("Uploader Wallet Public Keys");
-            println!("===========================");
-            for uploader_vm in self.uploader_vms.iter() {
-                for (user, key) in uploader_vm.wallet_public_key.iter() {
-                    println!("{}@{}: {}", uploader_vm.vm.name, user, key);
+            println!("=============================");
+            println!("Ant Client Wallet Public Keys");
+            println!("=============================");
+            for client_vm in self.client_vms.iter() {
+                for (user, key) in client_vm.wallet_public_key.iter() {
+                    println!("{}@{}: {}", client_vm.vm.name, user, key);
                 }
             }
         }
@@ -1348,8 +1344,9 @@ impl DeploymentInventory {
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
-pub struct UploaderDeploymentInventory {
+pub struct ClientDeploymentInventory {
     pub binary_option: BinaryOption,
+    pub client_vms: Vec<ClientVirtualMachine>,
     pub environment_type: EnvironmentType,
     pub evm_details: EvmDetails,
     pub funding_wallet_address: Option<String>,
@@ -1359,15 +1356,15 @@ pub struct UploaderDeploymentInventory {
     pub ssh_user: String,
     pub ssh_private_key_path: PathBuf,
     pub uploaded_files: Vec<(String, String)>,
-    pub uploader_vms: Vec<UploaderVirtualMachine>,
 }
 
-impl UploaderDeploymentInventory {
-    /// Create an inventory for a new uploader deployment which is initially empty, other than the name and
+impl ClientDeploymentInventory {
+    /// Create an inventory for a new Client deployment which is initially empty, other than the name and
     /// binary option, which will have been selected.
-    pub fn empty(name: &str, binary_option: BinaryOption) -> UploaderDeploymentInventory {
+    pub fn empty(name: &str, binary_option: BinaryOption) -> ClientDeploymentInventory {
         Self {
             binary_option,
+            client_vms: Default::default(),
             environment_type: EnvironmentType::default(),
             evm_details: EvmDetails::default(),
             funding_wallet_address: None,
@@ -1377,7 +1374,6 @@ impl UploaderDeploymentInventory {
             ssh_user: "root".to_string(),
             ssh_private_key_path: Default::default(),
             uploaded_files: Default::default(),
-            uploader_vms: Default::default(),
         }
     }
 
@@ -1389,18 +1385,18 @@ impl UploaderDeploymentInventory {
     }
 
     pub fn is_empty(&self) -> bool {
-        self.uploader_vms.is_empty()
+        self.client_vms.is_empty()
     }
 
     pub fn vm_list(&self) -> Vec<VirtualMachine> {
-        self.uploader_vms
+        self.client_vms
             .iter()
-            .map(|uploader_vm| uploader_vm.vm.clone())
+            .map(|client_vm| client_vm.vm.clone())
             .collect()
     }
 
     pub fn save(&self) -> Result<()> {
-        let path = get_data_directory()?.join(format!("{}-uploader-inventory.json", self.name));
+        let path = get_data_directory()?.join(format!("{}-client-inventory.json", self.name));
         let serialized_data = serde_json::to_string_pretty(self)?;
         let mut file = File::create(path)?;
         file.write_all(serialized_data.as_bytes())?;
@@ -1409,7 +1405,7 @@ impl UploaderDeploymentInventory {
 
     pub fn read(file_path: &PathBuf) -> Result<Self> {
         let data = std::fs::read_to_string(file_path)?;
-        let deserialized_data: UploaderDeploymentInventory = serde_json::from_str(&data)?;
+        let deserialized_data: ClientDeploymentInventory = serde_json::from_str(&data)?;
         Ok(deserialized_data)
     }
 
@@ -1418,11 +1414,11 @@ impl UploaderDeploymentInventory {
     }
 
     pub fn print_report(&self) -> Result<()> {
-        println!("**************************************");
-        println!("*                                    *");
-        println!("*     Uploader Inventory Report      *");
-        println!("*                                    *");
-        println!("**************************************");
+        println!("************************************");
+        println!("*                                  *");
+        println!("*     Client Inventory Report      *");
+        println!("*                                  *");
+        println!("************************************");
 
         println!("Environment Name: {}", self.name);
         println!();
@@ -1451,22 +1447,22 @@ impl UploaderDeploymentInventory {
             }
         }
 
-        if !self.uploader_vms.is_empty() {
-            println!("============");
-            println!("Uploader VMs");
-            println!("============");
-            for uploader_vm in self.uploader_vms.iter() {
-                println!("{}: {}", uploader_vm.vm.name, uploader_vm.vm.public_ip_addr);
+        if !self.client_vms.is_empty() {
+            println!("==========");
+            println!("Client VMs");
+            println!("==========");
+            for client_vm in self.client_vms.iter() {
+                println!("{}: {}", client_vm.vm.name, client_vm.vm.public_ip_addr);
             }
             println!("SSH user: {}", self.ssh_user);
             println!();
 
-            println!("===========================");
-            println!("Uploader Wallet Public Keys");
-            println!("===========================");
-            for uploader_vm in self.uploader_vms.iter() {
-                for (user, key) in uploader_vm.wallet_public_key.iter() {
-                    println!("{}@{}: {}", uploader_vm.vm.name, user, key);
+            println!("=============================");
+            println!("Ant Client Wallet Public Keys");
+            println!("=============================");
+            for client_vm in self.client_vms.iter() {
+                for (user, key) in client_vm.wallet_public_key.iter() {
+                    println!("{}@{}: {}", client_vm.vm.name, user, key);
                 }
             }
             println!();
@@ -1527,9 +1523,9 @@ impl UploaderDeploymentInventory {
         }
 
         let inventory_file_path =
-            get_data_directory()?.join(format!("{}-uploader-inventory.json", self.name));
+            get_data_directory()?.join(format!("{}-client-inventory.json", self.name));
         println!(
-            "The full uploader inventory is at {}",
+            "The full Client inventory is at {}",
             inventory_file_path.to_string_lossy()
         );
         println!();
