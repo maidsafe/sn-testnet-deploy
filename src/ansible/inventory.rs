@@ -127,7 +127,7 @@ impl AnsibleInventoryType {
         match self {
             Self::PeerCacheNodes => "peer_cache_node",
             Self::Build => "build",
-            Self::Clients => "client",
+            Self::Clients => "ant_client",
             Self::Custom => "custom",
             Self::EvmNodes => "evm_node",
             Self::FullConeNatGateway => "full_cone_nat_gateway",
