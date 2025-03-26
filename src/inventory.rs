@@ -14,11 +14,11 @@ use crate::{
         provisioning::{AnsibleProvisioner, PrivateNodeProvisionInventory},
         AnsibleRunner,
     },
+    client::ClientDeployer,
     get_bootstrap_cache_url, get_environment_details, get_genesis_multiaddr,
     s3::S3Repository,
     ssh::SshClient,
     terraform::TerraformRunner,
-    uploaders::ClientDeployer,
     BinaryOption, CloudProvider, DeploymentType, EnvironmentDetails, EnvironmentType, Error,
     EvmDetails, TestnetDeployer,
 };
