@@ -327,7 +327,9 @@ pub enum Commands {
         /// Override the size of the Client VMs.
         #[clap(long)]
         client_vm_size: Option<String>,
-        /// Set to enable the downloaders on the VMs.
+        /// Set to enable the all the downloader types on the VMs.
+        ///
+        /// This will setup 'download-verifier', 'random-verifier' and 'performance-verifier' downloaders.
         #[clap(long)]
         enable_downloaders: bool,
         /// The number of antnode services to run on each Peer Cache VM.
@@ -1014,6 +1016,11 @@ pub enum Commands {
         /// If you want each Client VM to run multiple uploader services, specify the total desired count.
         #[clap(long, verbatim_doc_comment)]
         desired_uploaders_count: Option<u16>,
+        /// Set to enable the all the downloader types on the VMs.
+        ///
+        /// This will setup 'download-verifier', 'random-verifier' and 'performance-verifier' downloaders.
+        #[clap(long)]
+        enable_downloaders: bool,
         /// The secret key for the wallet that will fund all the ANT instances.
         ///
         /// This argument only applies when Arbitrum or Sepolia networks are used.
