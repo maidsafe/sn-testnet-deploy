@@ -155,40 +155,40 @@ locals {
 }
 
 resource "digitalocean_volume" "peer_cache_node_attached_volume" {
-  for_each    = var.peer_cache_node_volume_size > 0 ? { for key in local.peer_cache_node_volume_keys : key => key } : {}
+  for_each = { for key in local.peer_cache_node_volume_keys : key => key }
   name        = lower("${terraform.workspace}-peer-cache-node-${split("-", each.key)[0]}-volume-${split("-", each.key)[1]}")
   size        = var.peer_cache_node_volume_size
   region      = var.region
 }
 
 resource "digitalocean_volume_attachment" "peer_cache_node_volume_attachment" {
-  for_each   = var.peer_cache_node_volume_size > 0 ? { for key in local.peer_cache_node_volume_keys : key => key } : {}
+  for_each = { for key in local.peer_cache_node_volume_keys : key => key }
   droplet_id = digitalocean_droplet.peer_cache_node[tonumber(split("-", each.key)[0]) -1 ].id
   volume_id  = digitalocean_volume.peer_cache_node_attached_volume[each.key].id
 }
 
 resource "digitalocean_volume" "genesis_node_attached_volume" {
-  for_each    = var.genesis_node_volume_size > 0 ? { for key in local.genesis_node_volume_keys : key => key } : {}
+  for_each = { for key in local.genesis_node_volume_keys : key => key }
   name        = lower("${terraform.workspace}-genesis-bootstrap-${split("-", each.key)[0]}-volume-${split("-", each.key)[1]}")
   size        = var.genesis_node_volume_size
   region      = var.region
 }
 
 resource "digitalocean_volume_attachment" "genesis_node_volume_attachment" {
-  for_each   = var.genesis_node_volume_size > 0 ? { for key in local.genesis_node_volume_keys : key => key } : {}
+  for_each = { for key in local.genesis_node_volume_keys : key => key }
   droplet_id = digitalocean_droplet.genesis_bootstrap[tonumber(split("-", each.key)[0]) -1 ].id
   volume_id  = digitalocean_volume.genesis_node_attached_volume[each.key].id
 }
 
 resource "digitalocean_volume" "node_attached_volume" {
-  for_each    = var.node_volume_size > 0 ? { for key in local.node_volume_keys : key => key } : {}
+  for_each = { for key in local.node_volume_keys : key => key }
   name        = lower("${terraform.workspace}-node-${split("-", each.key)[0]}-volume-${split("-", each.key)[1]}")
   size        = var.node_volume_size
   region      = var.region
 }
 
 resource "digitalocean_volume_attachment" "node_volume_attachment" {
-  for_each   = var.node_volume_size > 0 ? { for key in local.node_volume_keys : key => key } : {}
+  for_each = { for key in local.node_volume_keys : key => key }
   droplet_id = digitalocean_droplet.node[tonumber(split("-", each.key)[0]) -1 ].id
   volume_id  = digitalocean_volume.node_attached_volume[each.key].id
 }
@@ -201,7 +201,7 @@ resource "digitalocean_volume" "full_cone_private_node_attached_volume" {
 }
 
 resource "digitalocean_volume_attachment" "full_cone_private_node_volume_attachment" {
-  for_each   = var.full_cone_private_node_volume_size > 0 ? { for key in local.full_cone_private_node_volume_keys : key => key } : {}
+  for_each = var.full_cone_private_node_volume_size > 0 ? { for key in local.full_cone_private_node_volume_keys : key => key } : {}
   droplet_id = digitalocean_droplet.full_cone_private_node[tonumber(split("-", each.key)[0]) - 1].id
   volume_id  = digitalocean_volume.full_cone_private_node_attached_volume[each.key].id
 }
@@ -215,7 +215,7 @@ resource "digitalocean_volume" "symmetric_private_node_attached_volume" {
 }
 
 resource "digitalocean_volume_attachment" "symmetric_private_node_volume_attachment" {
-  for_each   = var.symmetric_private_node_volume_size > 0 ? { for key in local.symmetric_private_node_volume_keys : key => key } : {}
+  for_each = var.symmetric_private_node_volume_size > 0 ? { for key in local.symmetric_private_node_volume_keys : key => key } : {}
   droplet_id = digitalocean_droplet.symmetric_private_node[tonumber(split("-", each.key)[0]) - 1].id
   volume_id  = digitalocean_volume.symmetric_private_node_attached_volume[each.key].id
 }
@@ -228,7 +228,7 @@ resource "digitalocean_volume" "uploader_attached_volume" {
 }
 
 resource "digitalocean_volume_attachment" "uploader_volume_attachment" {
-  for_each   = var.uploader_volume_size > 0 ? { for key in local.uploader_volume_keys : key => key } : {}
+  for_each = var.uploader_volume_size > 0 ? { for key in local.uploader_volume_keys : key => key } : {}
   droplet_id = digitalocean_droplet.uploader[tonumber(split("-", each.key)[0]) - 1].id
   volume_id  = digitalocean_volume.uploader_attached_volume[each.key].id
 }
