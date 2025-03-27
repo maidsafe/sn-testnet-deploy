@@ -16,6 +16,15 @@
         state: stopped
       loop: "{{ ant_users.stdout_lines }}"
 
+    - name: stop all ANT downloader services
+      ansible.builtin.systemd:
+        name: "{{ item }}"
+        state: stopped
+      loop:
+        - ant_download_verifier
+        - ant_download_random_verifier
+        - ant_performance_verifier
+
     # It is antr to make sure both of these are removed, because Ansible may not re-download and
     # replace them if they already exist.
     - name: remove existing ANT binary
@@ -55,3 +64,13 @@
         state: started
         enabled: true
       loop: "{{ ant_users.stdout_lines }}"
+
+    - name: start all ANT downloader services
+      ansible.builtin.systemd:
+        name: "{{ item }}"
+        state: started
+        enabled: true
+      loop:
+        - ant_download_verifier
+        - ant_download_random_verifier
+        - ant_performance_verifier

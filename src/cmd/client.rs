@@ -19,6 +19,15 @@ use sn_testnet_deploy::{
 #[derive(Subcommand, Debug)]
 #[allow(clippy::large_enum_variant)]
 pub enum ClientCommands {
+    /// Enable downloaders on the Client environment.
+    EnableDownloaders {
+        /// The name of the environment
+        #[arg(long)]
+        name: String,
+        /// The cloud provider that was used.
+        #[clap(long, default_value_t = CloudProvider::DigitalOcean, value_parser = parse_provider, verbatim_doc_comment)]
+        provider: CloudProvider,
+    },
     /// Clean a deployed Client environment.
     Clean {
         /// The name of the environment.
@@ -77,7 +86,9 @@ pub enum ClientCommands {
         /// Set to disable Telegraf metrics collection on all nodes.
         #[clap(long)]
         disable_telegraf: bool,
-        /// Set to enable the downloaders on the VMs.
+        /// Set to enable the all the downloader types on the VMs.
+        ///
+        /// This will setup 'download-verifier', 'random-verifier' and 'performance-verifier' downloaders.
         #[clap(long)]
         enable_downloaders: bool,
         /// The type of deployment.
@@ -177,8 +188,26 @@ pub enum ClientCommands {
         #[clap(long, value_name = "SECRET_KEY", number_of_values = 1)]
         wallet_secret_key: Vec<String>,
     },
+    /// Start all downloaders for an environment.
+    StartDownloaders {
+        /// The name of the environment
+        #[arg(long)]
+        name: String,
+        /// The cloud provider that was used.
+        #[clap(long, default_value_t = CloudProvider::DigitalOcean, value_parser = parse_provider, verbatim_doc_comment)]
+        provider: CloudProvider,
+    },
     /// Start all uploaders for an environment
-    Start {
+    StartUploaders {
+        /// The name of the environment
+        #[arg(long)]
+        name: String,
+        /// The cloud provider that was used.
+        #[clap(long, default_value_t = CloudProvider::DigitalOcean, value_parser = parse_provider, verbatim_doc_comment)]
+        provider: CloudProvider,
+    },
+    /// Stop all downloaders for an environment.
+    StopDownloaders {
         /// The name of the environment
         #[arg(long)]
         name: String,
@@ -187,7 +216,7 @@ pub enum ClientCommands {
         provider: CloudProvider,
     },
     /// Stop all uploaders for an environment.
-    Stop {
+    StopUploaders {
         /// The name of the environment
         #[arg(long)]
         name: String,
@@ -229,6 +258,11 @@ pub enum ClientCommands {
         /// If you want each Client VM to run multiple uploader services, specify the total desired count.
         #[clap(long, verbatim_doc_comment)]
         desired_uploaders_count: Option<u16>,
+        /// Set to enable the all the downloader types on the new VMs after the upscale.
+        ///
+        /// This will setup 'download-verifier', 'random-verifier' and 'performance-verifier' downloaders.
+        #[clap(long)]
+        enable_downloaders: bool,
         /// The secret key for the wallet that will fund all the ANT instances.
         ///
         /// This argument only applies when Arbitrum or Sepolia networks are used.
@@ -263,6 +297,24 @@ pub enum ClientCommands {
 
 pub async fn handle_client_command(cmd: ClientCommands) -> Result<()> {
     match cmd {
+        ClientCommands::EnableDownloaders { name, provider } => {
+            let testnet_deployer = TestnetDeployBuilder::default()
+                .environment_name(&name)
+                .provider(provider)
+                .build()?;
+            let inventory_service = DeploymentInventoryService::from(&testnet_deployer);
+            inventory_service
+                .generate_or_retrieve_inventory(&name, true, None)
+                .await?;
+
+            let ansible_runner = testnet_deployer.ansible_provisioner.ansible_runner;
+            ansible_runner.run_playbook(
+                AnsiblePlaybook::Downloaders,
+                AnsibleInventoryType::Clients,
+                None,
+            )?;
+            Ok(())
+        }
         ClientCommands::Clean { name, provider } => {
             println!("Cleaning Client environment '{}'...", name);
             let client_deployer = ClientDeployBuilder::default()
@@ -409,7 +461,25 @@ pub async fn handle_client_command(cmd: ClientCommands) -> Result<()> {
             println!("Client deployment for '{}' completed successfully", name);
             Ok(())
         }
-        ClientCommands::Start { name, provider } => {
+        ClientCommands::StartDownloaders { name, provider } => {
+            let testnet_deployer = TestnetDeployBuilder::default()
+                .environment_name(&name)
+                .provider(provider)
+                .build()?;
+            let inventory_service = DeploymentInventoryService::from(&testnet_deployer);
+            inventory_service
+                .generate_or_retrieve_inventory(&name, true, None)
+                .await?;
+
+            let ansible_runner = testnet_deployer.ansible_provisioner.ansible_runner;
+            ansible_runner.run_playbook(
+                AnsiblePlaybook::StartDownloaders,
+                AnsibleInventoryType::Clients,
+                None,
+            )?;
+            Ok(())
+        }
+        ClientCommands::StartUploaders { name, provider } => {
             let testnet_deployer = TestnetDeployBuilder::default()
                 .environment_name(&name)
                 .provider(provider)
@@ -427,7 +497,25 @@ pub async fn handle_client_command(cmd: ClientCommands) -> Result<()> {
             )?;
             Ok(())
         }
-        ClientCommands::Stop { name, provider } => {
+        ClientCommands::StopDownloaders { name, provider } => {
+            let testnet_deployer = TestnetDeployBuilder::default()
+                .environment_name(&name)
+                .provider(provider)
+                .build()?;
+            let inventory_service = DeploymentInventoryService::from(&testnet_deployer);
+            inventory_service
+                .generate_or_retrieve_inventory(&name, true, None)
+                .await?;
+
+            let ansible_runner = testnet_deployer.ansible_provisioner.ansible_runner;
+            ansible_runner.run_playbook(
+                AnsiblePlaybook::StopDownloaders,
+                AnsibleInventoryType::Clients,
+                None,
+            )?;
+            Ok(())
+        }
+        ClientCommands::StopUploaders { name, provider } => {
             let testnet_deployer = TestnetDeployBuilder::default()
                 .environment_name(&name)
                 .provider(provider)
@@ -481,6 +569,7 @@ pub async fn handle_client_command(cmd: ClientCommands) -> Result<()> {
             autonomi_version,
             desired_client_vm_count,
             desired_uploaders_count,
+            enable_downloaders,
             funding_wallet_secret_key,
             gas_amount,
             infra_only,
@@ -529,6 +618,7 @@ pub async fn handle_client_command(cmd: ClientCommands) -> Result<()> {
                     desired_symmetric_private_node_count: None,
                     desired_symmetric_private_node_vm_count: None,
                     desired_uploaders_count,
+                    enable_downloaders,
                     funding_wallet_secret_key,
                     gas_amount,
                     max_archived_log_files: 1,

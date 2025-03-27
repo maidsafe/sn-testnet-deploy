@@ -142,6 +142,10 @@ pub enum AnsiblePlaybook {
     ///
     /// Useful to determine the state of all the nodes in a deployment.
     Status,
+    /// This playbook will start the downloaders on each machine.
+    ///
+    /// Use in combination with `AnsibleInventoryType::Clients`.
+    StartDownloaders,
     /// This playbook will start the faucet for the environment.
     StartFaucet,
     /// This playbook will start the Telegraf service on each machine.
@@ -153,6 +157,10 @@ pub enum AnsiblePlaybook {
     ///
     /// Use in combination with `AnsibleInventoryType::Clients`.
     StartUploaders,
+    /// This playbook will stop the downloaders on each machine.
+    ///
+    /// Use in combination with `AnsibleInventoryType::Clients`.
+    StopDownloaders,
     /// This playbook will stop the faucet for the environment.
     StopFaucet,
     /// The stop nodes playbook will use the node manager to stop any node services on any
@@ -220,11 +228,13 @@ impl AnsiblePlaybook {
             AnsiblePlaybook::PrivateNodeConfig => "private_node_config.yml".to_string(),
             AnsiblePlaybook::RpcClient => "safenode_rpc_client.yml".to_string(),
             AnsiblePlaybook::ResetToNNodes => "reset_to_n_nodes.yml".to_string(),
+            AnsiblePlaybook::StartDownloaders => "start_downloaders.yml".to_string(),
             AnsiblePlaybook::StartFaucet => "start_faucet.yml".to_string(),
             AnsiblePlaybook::StartNodes => "start_nodes.yml".to_string(),
             AnsiblePlaybook::StartTelegraf => "start_telegraf.yml".to_string(),
             AnsiblePlaybook::StartUploaders => "start_uploaders.yml".to_string(),
             AnsiblePlaybook::Status => "node_status.yml".to_string(),
+            AnsiblePlaybook::StopDownloaders => "stop_downloaders.yml".to_string(),
             AnsiblePlaybook::StopFaucet => "stop_faucet.yml".to_string(),
             AnsiblePlaybook::StopNodes => "stop_nodes.yml".to_string(),
             AnsiblePlaybook::StopTelegraf => "stop_telegraf.yml".to_string(),
