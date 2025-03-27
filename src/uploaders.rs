@@ -309,7 +309,6 @@ impl UploaderDeployer {
             enable_build_vm: build_custom_binaries,
             name: options.name.clone(),
             tfvars_filename: options.current_inventory.get_tfvars_filename(),
-            uploader_image_id: None,
             uploader_vm_count: options.uploader_vm_count,
             uploader_vm_size: options.uploader_vm_size.clone(),
         };
