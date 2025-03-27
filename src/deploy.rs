@@ -103,7 +103,7 @@ impl TestnetDeployer {
             symmetric_nat_gateway_vm_size: options.symmetric_nat_gateway_vm_size.clone(),
             symmetric_private_node_vm_count: options.symmetric_private_node_vm_count,
             symmetric_private_node_volume_size: options.symmetric_private_node_volume_size,
-            tfvars_filename: Some(options.environment_type.get_tfvars_filename(&options.name)),
+            tfvars_filename: options.environment_type.get_tfvars_filename(&options.name),
             uploader_vm_count: options.uploader_vm_count,
             uploader_vm_size: options.uploader_vm_size.clone(),
         })

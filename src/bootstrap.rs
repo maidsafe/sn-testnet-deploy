@@ -94,12 +94,10 @@ impl TestnetDeployer {
             symmetric_nat_gateway_vm_size: None, // We can take the value from tfvars for bootstrap deployments.
             symmetric_private_node_vm_count: options.symmetric_private_node_vm_count,
             symmetric_private_node_volume_size: options.symmetric_private_node_volume_size,
-            tfvars_filename: Some(
-                options
-                    .environment_type
-                    .get_tfvars_filename(&options.name)
-                    .to_string(),
-            ),
+            tfvars_filename: options
+                .environment_type
+                .get_tfvars_filename(&options.name)
+                .to_string(),
             uploader_vm_count: Some(0),
             uploader_vm_size: None,
         })
