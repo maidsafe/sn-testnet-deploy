@@ -31,17 +31,14 @@ variable "symmetric_nat_gateway_droplet_size" {
 
 variable "node_droplet_size" {
   description = "The size of the droplet for generic nodes VMs"
-  default = "s-2vcpu-4gb"
 }
 
 variable "peer_cache_droplet_size" {
   description = "The size of the droplet for Peer Cache nodes VMs"
-  default = "s-2vcpu-4gb"
 }
 
 variable "uploader_droplet_size" {
   description = "The size of the droplet for uploader VMs"
-  default = "s-2vcpu-4gb"
 }
 
 variable "build_machine_size" {
@@ -54,22 +51,18 @@ variable "build_droplet_image_id" {
 
 variable "peer_cache_droplet_image_id" {
   description = "The ID of the Peer Cache node droplet image. Varies per environment type."
-  default = 173264988
 }
 
 variable "nat_gateway_droplet_image_id" {
   description = "The ID of the gateway droplet image. Varies per environment type."
-  default = 178052140
 }
 
 variable "node_droplet_image_id" {
   description = "The ID of the node droplet image. Varies per environment type."
-  default = 173265007
 }
 
 variable "uploader_droplet_image_id" {
   description = "The ID of the uploader droplet image. Varies per environment type."
-  default = 172724146
 }
 
 variable "region" {
@@ -119,12 +112,10 @@ variable "evm_node_vm_count" {
 
 variable "evm_node_droplet_size" {
   description = "The size of the droplet for EVM node VMs"
-  default = "s-4vcpu-8gb"
 }
 
 variable "evm_node_droplet_image_id" {
   description = "The ID of the EVM node droplet image. Varies per environment type."
-  default = 172723723
 }
 
 variable "volumes_per_node" {
