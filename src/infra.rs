@@ -282,7 +282,7 @@ impl TestnetDeployer {
 }
 
 #[derive(Clone, Debug)]
-pub struct ClientInfraRunOptions {
+pub struct ClientsInfraRunOptions {
     pub client_image_id: Option<String>,
     pub client_vm_count: Option<u16>,
     pub client_vm_size: Option<String>,
@@ -292,7 +292,7 @@ pub struct ClientInfraRunOptions {
     pub tfvars_filename: String,
 }
 
-impl ClientInfraRunOptions {
+impl ClientsInfraRunOptions {
     /// Generate the options for an existing Client deployment.
     pub async fn generate_existing(
         name: &str,

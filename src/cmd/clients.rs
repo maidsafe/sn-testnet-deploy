@@ -10,7 +10,7 @@ use ant_releases::ReleaseType;
 use color_eyre::eyre::{eyre, Result};
 use sn_testnet_deploy::{
     ansible::{extra_vars::ExtraVarsDocBuilder, inventory::AnsibleInventoryType, AnsiblePlaybook},
-    client::{ClientDeployBuilder, ClientDeployOptions},
+    clients::{ClientsDeployBuilder, ClientsDeployOptions},
     inventory::DeploymentInventoryService,
     upscale::UpscaleOptions,
     EvmDetails, TestnetDeployBuilder,
@@ -18,7 +18,7 @@ use sn_testnet_deploy::{
 
 #[derive(Subcommand, Debug)]
 #[allow(clippy::large_enum_variant)]
-pub enum ClientCommands {
+pub enum ClientsCommands {
     /// Enable downloaders on the Client environment.
     EnableDownloaders {
         /// The name of the environment
@@ -295,9 +295,9 @@ pub enum ClientCommands {
     },
 }
 
-pub async fn handle_client_command(cmd: ClientCommands) -> Result<()> {
+pub async fn handle_clients_command(cmd: ClientsCommands) -> Result<()> {
     match cmd {
-        ClientCommands::EnableDownloaders { name, provider } => {
+        ClientsCommands::EnableDownloaders { name, provider } => {
             let testnet_deployer = TestnetDeployBuilder::default()
                 .environment_name(&name)
                 .provider(provider)
@@ -315,9 +315,9 @@ pub async fn handle_client_command(cmd: ClientCommands) -> Result<()> {
             )?;
             Ok(())
         }
-        ClientCommands::Clean { name, provider } => {
+        ClientsCommands::Clean { name, provider } => {
             println!("Cleaning Client environment '{}'...", name);
-            let client_deployer = ClientDeployBuilder::default()
+            let client_deployer = ClientsDeployBuilder::default()
                 .environment_name(&name)
                 .provider(provider)
                 .build()?;
@@ -325,7 +325,7 @@ pub async fn handle_client_command(cmd: ClientCommands) -> Result<()> {
             println!("Client environment '{}' cleaned", name);
             Ok(())
         }
-        ClientCommands::Deploy {
+        ClientsCommands::Deploy {
             ansible_verbose,
             ant_version,
             branch,
@@ -403,7 +403,7 @@ pub async fn handle_client_command(cmd: ClientCommands) -> Result<()> {
             let binary_option =
                 get_binary_option(branch, repo_owner, ant_version, None, None, None).await?;
 
-            let mut builder = ClientDeployBuilder::new();
+            let mut builder = ClientsDeployBuilder::new();
             builder
                 .ansible_verbose_mode(ansible_verbose)
                 .deployment_type(environment_type.clone())
@@ -426,7 +426,7 @@ pub async fn handle_client_command(cmd: ClientCommands) -> Result<()> {
                 rpc_url: evm_rpc_url,
             };
 
-            let options = ClientDeployOptions {
+            let options = ClientsDeployOptions {
                 binary_option,
                 chunk_size,
                 client_env_variables,
@@ -461,7 +461,7 @@ pub async fn handle_client_command(cmd: ClientCommands) -> Result<()> {
             println!("Client deployment for '{}' completed successfully", name);
             Ok(())
         }
-        ClientCommands::StartDownloaders { name, provider } => {
+        ClientsCommands::StartDownloaders { name, provider } => {
             let testnet_deployer = TestnetDeployBuilder::default()
                 .environment_name(&name)
                 .provider(provider)
@@ -479,7 +479,7 @@ pub async fn handle_client_command(cmd: ClientCommands) -> Result<()> {
             )?;
             Ok(())
         }
-        ClientCommands::StartUploaders { name, provider } => {
+        ClientsCommands::StartUploaders { name, provider } => {
             let testnet_deployer = TestnetDeployBuilder::default()
                 .environment_name(&name)
                 .provider(provider)
@@ -497,7 +497,7 @@ pub async fn handle_client_command(cmd: ClientCommands) -> Result<()> {
             )?;
             Ok(())
         }
-        ClientCommands::StopDownloaders { name, provider } => {
+        ClientsCommands::StopDownloaders { name, provider } => {
             let testnet_deployer = TestnetDeployBuilder::default()
                 .environment_name(&name)
                 .provider(provider)
@@ -515,7 +515,7 @@ pub async fn handle_client_command(cmd: ClientCommands) -> Result<()> {
             )?;
             Ok(())
         }
-        ClientCommands::StopUploaders { name, provider } => {
+        ClientsCommands::StopUploaders { name, provider } => {
             let testnet_deployer = TestnetDeployBuilder::default()
                 .environment_name(&name)
                 .provider(provider)
@@ -533,7 +533,7 @@ pub async fn handle_client_command(cmd: ClientCommands) -> Result<()> {
             )?;
             Ok(())
         }
-        ClientCommands::Upgrade {
+        ClientsCommands::Upgrade {
             name,
             provider,
             version,
@@ -565,7 +565,7 @@ pub async fn handle_client_command(cmd: ClientCommands) -> Result<()> {
 
             Ok(())
         }
-        ClientCommands::Upscale {
+        ClientsCommands::Upscale {
             autonomi_version,
             desired_client_vm_count,
             desired_uploaders_count,

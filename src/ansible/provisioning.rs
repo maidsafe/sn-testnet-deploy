@@ -18,7 +18,7 @@ use crate::{
         generate_full_cone_nat_gateway_static_environment_inventory,
     },
     bootstrap::BootstrapOptions,
-    client::ClientDeployOptions,
+    clients::ClientsDeployOptions,
     deploy::DeployOptions,
     error::{Error, Result},
     funding::FundingOptions,
@@ -307,8 +307,8 @@ impl From<DeployOptions> for ProvisionOptions {
     }
 }
 
-impl From<ClientDeployOptions> for ProvisionOptions {
-    fn from(client_options: ClientDeployOptions) -> Self {
+impl From<ClientsDeployOptions> for ProvisionOptions {
+    fn from(client_options: ClientsDeployOptions) -> Self {
         ProvisionOptions {
             ant_version: None,
             binary_option: client_options.binary_option,

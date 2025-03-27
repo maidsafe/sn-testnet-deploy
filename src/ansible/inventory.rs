@@ -70,7 +70,7 @@ impl std::fmt::Display for AnsibleInventoryType {
         let s = match self {
             AnsibleInventoryType::PeerCacheNodes => "PeerCacheNodes",
             AnsibleInventoryType::Build => "Build",
-            AnsibleInventoryType::Clients => "Client",
+            AnsibleInventoryType::Clients => "Clients",
             AnsibleInventoryType::Custom => "Custom",
             AnsibleInventoryType::EvmNodes => "EvmNodes",
             AnsibleInventoryType::FullConeNatGateway => "FullConeNatGateway",
@@ -119,7 +119,7 @@ impl AnsibleInventoryType {
             Self::SymmetricPrivateNodesStatic => PathBuf::from(format!(
                 ".{name}_symmetric_private_node_static_inventory_{provider}.yml"
             )),
-            Self::Clients => PathBuf::from(format!(".{name}_client_inventory_{provider}.yml")),
+            Self::Clients => PathBuf::from(format!(".{name}_clients_inventory_{provider}.yml")),
         }
     }
 
