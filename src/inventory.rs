@@ -14,7 +14,7 @@ use crate::{
         provisioning::{AnsibleProvisioner, PrivateNodeProvisionInventory},
         AnsibleRunner,
     },
-    client::ClientDeployer,
+    clients::ClientsDeployer,
     get_bootstrap_cache_url, get_environment_details, get_genesis_multiaddr,
     s3::S3Repository,
     ssh::SshClient,
@@ -79,8 +79,8 @@ impl From<&TestnetDeployer> for DeploymentInventoryService {
     }
 }
 
-impl From<&ClientDeployer> for DeploymentInventoryService {
-    fn from(item: &ClientDeployer) -> Self {
+impl From<&ClientsDeployer> for DeploymentInventoryService {
+    fn from(item: &ClientsDeployer) -> Self {
         let provider = match item.cloud_provider {
             CloudProvider::Aws => "aws",
             CloudProvider::DigitalOcean => "digital_ocean",
@@ -547,13 +547,13 @@ impl DeploymentInventoryService {
         name: &str,
         force: bool,
         binary_option: Option<BinaryOption>,
-    ) -> Result<ClientDeploymentInventory> {
+    ) -> Result<ClientsDeploymentInventory> {
         println!("===============================================");
         println!("  Generating or Retrieving Client Inventory  ");
         println!("===============================================");
-        let inventory_path = get_data_directory()?.join(format!("{name}-client-inventory.json"));
+        let inventory_path = get_data_directory()?.join(format!("{name}-clients-inventory.json"));
         if inventory_path.exists() && !force {
-            let inventory = ClientDeploymentInventory::read(&inventory_path)?;
+            let inventory = ClientsDeploymentInventory::read(&inventory_path)?;
             return Ok(inventory);
         }
 
@@ -584,7 +584,7 @@ impl DeploymentInventoryService {
             Ok(details) => details,
             Err(Error::EnvironmentDetailsNotFound(_)) => {
                 println!("Environment details not found: treating this as a new deployment");
-                return Ok(ClientDeploymentInventory::empty(
+                return Ok(ClientsDeploymentInventory::empty(
                     name,
                     binary_option.ok_or_else(|| {
                         eyre!("For a new deployment the binary option must be set")
@@ -632,7 +632,7 @@ impl DeploymentInventoryService {
             }
         };
 
-        let inventory = ClientDeploymentInventory {
+        let inventory = ClientsDeploymentInventory {
             binary_option,
             client_vms,
             environment_type: environment_details.environment_type,
@@ -1344,7 +1344,7 @@ impl DeploymentInventory {
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
-pub struct ClientDeploymentInventory {
+pub struct ClientsDeploymentInventory {
     pub binary_option: BinaryOption,
     pub client_vms: Vec<ClientVirtualMachine>,
     pub environment_type: EnvironmentType,
@@ -1358,10 +1358,10 @@ pub struct ClientDeploymentInventory {
     pub uploaded_files: Vec<(String, String)>,
 }
 
-impl ClientDeploymentInventory {
+impl ClientsDeploymentInventory {
     /// Create an inventory for a new Client deployment which is initially empty, other than the name and
     /// binary option, which will have been selected.
-    pub fn empty(name: &str, binary_option: BinaryOption) -> ClientDeploymentInventory {
+    pub fn empty(name: &str, binary_option: BinaryOption) -> ClientsDeploymentInventory {
         Self {
             binary_option,
             client_vms: Default::default(),
@@ -1396,7 +1396,7 @@ impl ClientDeploymentInventory {
     }
 
     pub fn save(&self) -> Result<()> {
-        let path = get_data_directory()?.join(format!("{}-client-inventory.json", self.name));
+        let path = get_data_directory()?.join(format!("{}-clients-inventory.json", self.name));
         let serialized_data = serde_json::to_string_pretty(self)?;
         let mut file = File::create(path)?;
         file.write_all(serialized_data.as_bytes())?;
@@ -1405,7 +1405,7 @@ impl ClientDeploymentInventory {
 
     pub fn read(file_path: &PathBuf) -> Result<Self> {
         let data = std::fs::read_to_string(file_path)?;
-        let deserialized_data: ClientDeploymentInventory = serde_json::from_str(&data)?;
+        let deserialized_data: ClientsDeploymentInventory = serde_json::from_str(&data)?;
         Ok(deserialized_data)
     }
 
@@ -1414,11 +1414,11 @@ impl ClientDeploymentInventory {
     }
 
     pub fn print_report(&self) -> Result<()> {
-        println!("************************************");
-        println!("*                                  *");
-        println!("*     Client Inventory Report      *");
-        println!("*                                  *");
-        println!("************************************");
+        println!("*************************************");
+        println!("*                                   *");
+        println!("*     Clients Inventory Report      *");
+        println!("*                                   *");
+        println!("*************************************");
 
         println!("Environment Name: {}", self.name);
         println!();
@@ -1523,9 +1523,9 @@ impl ClientDeploymentInventory {
         }
 
         let inventory_file_path =
-            get_data_directory()?.join(format!("{}-client-inventory.json", self.name));
+            get_data_directory()?.join(format!("{}-clients-inventory.json", self.name));
         println!(
-            "The full Client inventory is at {}",
+            "The full Clients inventory is at {}",
             inventory_file_path.to_string_lossy()
         );
         println!();

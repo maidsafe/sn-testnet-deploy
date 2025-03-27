@@ -119,8 +119,8 @@ async fn main() -> Result<()> {
             testnet_deployer.clean().await?;
             Ok(())
         }
-        Commands::Client(client_cmd) => {
-            cmd::client::handle_client_command(client_cmd).await?;
+        Commands::Clients(clients_cmd) => {
+            cmd::clients::handle_clients_command(clients_cmd).await?;
             Ok(())
         }
         Commands::Deploy {

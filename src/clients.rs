@@ -12,8 +12,8 @@ use crate::{
     },
     error::{Error, Result},
     get_environment_details,
-    infra::ClientInfraRunOptions,
-    inventory::ClientDeploymentInventory,
+    infra::ClientsInfraRunOptions,
+    inventory::ClientsDeploymentInventory,
     print_duration,
     s3::S3Repository,
     ssh::SshClient,
@@ -28,13 +28,13 @@ use std::{path::PathBuf, time::Instant};
 const ANSIBLE_DEFAULT_FORKS: usize = 50;
 
 #[derive(Clone, Serialize, Deserialize)]
-pub struct ClientDeployOptions {
+pub struct ClientsDeployOptions {
     pub binary_option: BinaryOption,
     pub chunk_size: Option<u64>,
     pub client_env_variables: Option<Vec<(String, String)>>,
     pub client_vm_count: Option<u16>,
     pub client_vm_size: Option<String>,
-    pub current_inventory: ClientDeploymentInventory,
+    pub current_inventory: ClientsDeploymentInventory,
     pub enable_downloaders: bool,
     pub enable_telegraf: bool,
     pub environment_type: EnvironmentType,
@@ -55,7 +55,7 @@ pub struct ClientDeployOptions {
 }
 
 #[derive(Default)]
-pub struct ClientDeployBuilder {
+pub struct ClientsDeployBuilder {
     ansible_forks: Option<usize>,
     ansible_verbose_mode: bool,
     deployment_type: EnvironmentType,
@@ -68,7 +68,7 @@ pub struct ClientDeployBuilder {
     working_directory_path: Option<PathBuf>,
 }
 
-impl ClientDeployBuilder {
+impl ClientsDeployBuilder {
     pub fn new() -> Self {
         Default::default()
     }
@@ -123,7 +123,7 @@ impl ClientDeployBuilder {
         self
     }
 
-    pub fn build(&self) -> Result<ClientDeployer> {
+    pub fn build(&self) -> Result<ClientsDeployer> {
         let provider = self.provider.unwrap_or(CloudProvider::DigitalOcean);
         match provider {
             CloudProvider::DigitalOcean => {
@@ -171,7 +171,7 @@ impl ClientDeployBuilder {
             terraform_binary_path.to_path_buf(),
             working_directory_path
                 .join("terraform")
-                .join("client")
+                .join("clients")
                 .join(provider.to_string()),
             provider,
             &state_bucket_name,
@@ -191,7 +191,7 @@ impl ClientDeployBuilder {
         let ansible_provisioner =
             AnsibleProvisioner::new(ansible_runner, provider, ssh_client.clone());
 
-        let client_deployer = ClientDeployer::new(
+        let client_deployer = ClientsDeployer::new(
             ansible_provisioner,
             provider,
             self.deployment_type.clone(),
@@ -207,7 +207,7 @@ impl ClientDeployBuilder {
 }
 
 #[derive(Clone)]
-pub struct ClientDeployer {
+pub struct ClientsDeployer {
     pub ansible_provisioner: AnsibleProvisioner,
     pub cloud_provider: CloudProvider,
     pub deployment_type: EnvironmentType,
@@ -219,7 +219,7 @@ pub struct ClientDeployer {
     pub working_directory_path: PathBuf,
 }
 
-impl ClientDeployer {
+impl ClientsDeployer {
     #[allow(clippy::too_many_arguments)]
     pub fn new(
         ansible_provisioner: AnsibleProvisioner,
@@ -230,7 +230,7 @@ impl ClientDeployer {
         ssh_client: SshClient,
         terraform_runner: TerraformRunner,
         working_directory_path: PathBuf,
-    ) -> Result<ClientDeployer> {
+    ) -> Result<ClientsDeployer> {
         if environment_name.is_empty() {
             return Err(Error::EnvironmentNameRequired);
         }
@@ -239,7 +239,7 @@ impl ClientDeployer {
             .join("inventory")
             .join("dev_inventory_digital_ocean.yml");
 
-        Ok(ClientDeployer {
+        Ok(ClientsDeployer {
             ansible_provisioner,
             cloud_provider,
             deployment_type,
@@ -252,7 +252,7 @@ impl ClientDeployer {
         })
     }
 
-    pub fn create_or_update_infra(&self, options: &ClientInfraRunOptions) -> Result<()> {
+    pub fn create_or_update_infra(&self, options: &ClientsInfraRunOptions) -> Result<()> {
         let start = Instant::now();
         println!("Selecting {} workspace...", options.name);
         self.terraform_runner.workspace_select(&options.name)?;
@@ -279,7 +279,7 @@ impl ClientDeployer {
         Ok(())
     }
 
-    pub fn plan(&self, options: &ClientInfraRunOptions) -> Result<()> {
+    pub fn plan(&self, options: &ClientsInfraRunOptions) -> Result<()> {
         println!("Selecting {} workspace...", options.name);
         self.terraform_runner.workspace_select(&options.name)?;
 
@@ -290,7 +290,7 @@ impl ClientDeployer {
         Ok(())
     }
 
-    pub async fn deploy(&self, options: ClientDeployOptions) -> Result<()> {
+    pub async fn deploy(&self, options: ClientsDeployOptions) -> Result<()> {
         println!(
             "Deploying client for environment: {}",
             self.environment_name
@@ -306,7 +306,7 @@ impl ClientDeployer {
         let start = Instant::now();
         println!("Initializing infrastructure...");
 
-        let infra_options = ClientInfraRunOptions {
+        let infra_options = ClientsInfraRunOptions {
             client_image_id: None,
             client_vm_count: options.client_vm_count,
             client_vm_size: options.client_vm_size.clone(),
@@ -385,7 +385,7 @@ impl ClientDeployer {
     async fn destroy_infra(&self, environment_details: &EnvironmentDetails) -> Result<()> {
         crate::infra::select_workspace(&self.terraform_runner, &self.environment_name)?;
 
-        let options = ClientInfraRunOptions::generate_existing(
+        let options = ClientsInfraRunOptions::generate_existing(
             &self.environment_name,
             &self.terraform_runner,
             environment_details,

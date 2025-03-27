@@ -80,7 +80,7 @@ impl TestnetDeployer {
                     debug!("Using symmetric rsync args for {:?}", vm.name);
                     debug!("Args for {}: {:?}", vm.name, args);
                     args
-                } else if vm.name.contains("client") {
+                } else if vm.name.contains("ant-client") {
                     let args = self.construct_client_args(vm, &log_base_dir);
                     debug!("Using Client rsync args for {:?} ", vm.name);
                     debug!("Args for {}: {:?}", vm.name, args);

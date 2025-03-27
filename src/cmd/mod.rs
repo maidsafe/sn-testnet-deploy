@@ -4,7 +4,7 @@
 // This SAFE Network Software is licensed under the BSD-3-Clause license.
 // Please see the LICENSE file for more details.
 
-pub mod client;
+pub mod clients;
 pub mod deployments;
 pub mod funds;
 pub mod logs;
@@ -16,7 +16,7 @@ pub mod telegraf;
 pub mod upgrade;
 
 use crate::cmd::{
-    client::ClientCommands, funds::FundsCommand, logs::LogCommands, network::NetworkCommands,
+    clients::ClientsCommands, funds::FundsCommand, logs::LogCommands, network::NetworkCommands,
     provision::ProvisionCommands,
 };
 use alloy::primitives::U256;
@@ -254,8 +254,8 @@ pub enum Commands {
         provider: CloudProvider,
     },
     /// Manage Client for an environment
-    #[clap(name = "client", subcommand)]
-    Client(ClientCommands),
+    #[clap(name = "clients", subcommand)]
+    Clients(ClientsCommands),
     /// Configure a swapfile on all nodes in the environment.
     ConfigureSwapfile {
         /// The name of the environment.
