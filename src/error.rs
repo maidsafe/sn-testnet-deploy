@@ -181,6 +181,8 @@ pub enum Error {
     TerraformShowFailed,
     #[error("Terraform resource not found {0}")]
     TerraformResourceNotFound(String),
+    #[error("Missing terraform resource field for {resource} : {field}")]
+    TerraformResourceFieldMissing { resource: String, field: String },
     #[error("Mismatch of a terraform resource value {expected} != {actual}")]
     TerraformResourceValueMismatch { expected: String, actual: String },
     #[error("The '{0}' binary was not found. It is required for the deploy process. Make sure it is installed.")]
