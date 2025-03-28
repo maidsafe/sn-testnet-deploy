@@ -466,8 +466,10 @@ pub async fn handle_upscale(
         ));
     }
 
-    if desired_client_vm_count.is_some() && ant_version.is_none() {
-        return Err(eyre!("The ant version is required to upscale the Clients"));
+    if desired_client_vm_count.is_some() && ant_version.is_none() && branch.is_none() {
+        return Err(eyre!(
+            "The --ant-version or --branch argument is required when upscaling the Clients"
+        ));
     }
 
     if (desired_client_vm_count.is_some() || desired_uploaders_count.is_some())
