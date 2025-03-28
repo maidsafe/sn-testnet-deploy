@@ -472,14 +472,6 @@ pub async fn handle_upscale(
         ));
     }
 
-    if (desired_client_vm_count.is_some() || desired_uploaders_count.is_some())
-        && funding_wallet_secret_key.is_none()
-    {
-        return Err(eyre!(
-            "The funding wallet secret key is required to upscale the Clients"
-        ));
-    }
-
     println!("Upscaling deployment...");
     let testnet_deployer = TestnetDeployBuilder::default()
         .ansible_verbose_mode(ansible_verbose)
@@ -493,6 +485,14 @@ pub async fn handle_upscale(
         .generate_or_retrieve_inventory(&name, true, None)
         .await?;
 
+    if (desired_client_vm_count.is_some() || desired_uploaders_count.is_some())
+        && funding_wallet_secret_key.is_none()
+        && inventory.environment_details.evm_details.network != EvmNetwork::Anvil
+    {
+        return Err(eyre!(
+            "The funding wallet secret key is required to upscale the Clients"
+        ));
+    }
     if branch.is_some() {
         println!("The upscale will use the binaries built in the original deployment");
         inventory.binary_option = BinaryOption::BuildFromSource {

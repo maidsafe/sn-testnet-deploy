@@ -10,8 +10,8 @@ use crate::{
         provisioning::{PrivateNodeProvisionInventory, ProvisionOptions},
     },
     error::{Error, Result},
-    get_bootstrap_cache_url, get_genesis_multiaddr, get_multiaddr, DeploymentInventory,
-    DeploymentType, InfraRunOptions, NodeType, TestnetDeployer,
+    get_anvil_node_data, get_bootstrap_cache_url, get_genesis_multiaddr, get_multiaddr,
+    DeploymentInventory, DeploymentType, EvmNetwork, InfraRunOptions, NodeType, TestnetDeployer,
 };
 use colored::Colorize;
 use evmlib::common::U256;
@@ -394,6 +394,19 @@ impl TestnetDeployer {
         let should_provision_uploaders =
             options.desired_uploaders_count.is_some() || options.desired_client_vm_count.is_some();
         if should_provision_uploaders {
+            // get anvil funding sk
+            if provision_options.evm_network == EvmNetwork::Anvil {
+                let anvil_node_data =
+                    get_anvil_node_data(&self.ansible_provisioner.ansible_runner, &self.ssh_client)
+                        .map_err(|err| {
+                            println!("Failed to get evm testnet data {err:?}");
+                            err
+                        })?;
+
+                provision_options.funding_wallet_secret_key =
+                    Some(anvil_node_data.deployer_wallet_private_key);
+            }
+
             self.wait_for_ssh_availability_on_new_machines(
                 AnsibleInventoryType::Clients,
                 &options.current_inventory,
