@@ -224,7 +224,7 @@ impl ExtraVarsDocBuilder {
         binary_option: &BinaryOption,
         ant_version: Option<String>,
     ) -> Result<(), Error> {
-        // This applies when upscaling the uploaders.
+        // This applies when upscaling the Clients.
         // In that scenario, the safe version in the binary option is not set to the correct value
         // because it is not recorded in the inventory.
         if let Some(version) = ant_version {
@@ -264,7 +264,7 @@ impl ExtraVarsDocBuilder {
                     );
                     Ok(())
                 }
-                None => Err(Error::NoUploadersError),
+                None => Err(Error::NoClientError),
             },
         }
     }
@@ -441,7 +441,44 @@ pub fn build_symmetric_private_node_config_extra_vars_doc(
     Ok(extra_vars.build())
 }
 
-pub fn build_uploaders_extra_vars_doc(
+pub fn build_downloaders_extra_vars_doc(
+    cloud_provider: &str,
+    options: &ProvisionOptions,
+    genesis_multiaddr: Option<String>,
+    genesis_network_contacts_url: Option<String>,
+) -> Result<String> {
+    let mut extra_vars: ExtraVarsDocBuilder = ExtraVarsDocBuilder::default();
+    extra_vars.add_variable("provider", cloud_provider);
+    extra_vars.add_variable("testnet_name", &options.name);
+    if let Some(genesis_multiaddr) = genesis_multiaddr {
+        extra_vars.add_variable("genesis_multiaddr", &genesis_multiaddr);
+    }
+    if let Some(network_contacts_url) = genesis_network_contacts_url {
+        extra_vars.add_variable("network_contacts_url", &network_contacts_url);
+    }
+
+    if options.enable_downloaders {
+        extra_vars.add_variable("enable_downloaders", "true");
+    }
+
+    extra_vars.add_variable("evm_network_type", &options.evm_network.to_string());
+    if let Some(evm_data_payment_token_address) = &options.evm_data_payments_address {
+        extra_vars.add_variable("evm_data_payments_address", evm_data_payment_token_address);
+    }
+    if let Some(evm_payment_token_address) = &options.evm_payment_token_address {
+        extra_vars.add_variable("evm_payment_token_address", evm_payment_token_address);
+    }
+    if let Some(evm_rpc_url) = &options.evm_rpc_url {
+        extra_vars.add_variable("evm_rpc_url", evm_rpc_url);
+    }
+    if let Some(network_id) = options.network_id {
+        extra_vars.add_variable("network_id", &network_id.to_string());
+    }
+
+    Ok(extra_vars.build())
+}
+
+pub fn build_clients_extra_vars_doc(
     cloud_provider: &str,
     options: &ProvisionOptions,
     genesis_multiaddr: Option<String>,
@@ -458,10 +495,6 @@ pub fn build_uploaders_extra_vars_doc(
         extra_vars.add_variable("network_contacts_url", &network_contacts_url);
     }
 
-    extra_vars.add_variable(
-        "safe_downloader_instances",
-        &options.downloaders_count.to_string(),
-    );
     extra_vars.add_ant_url_or_version(
         &options.name,
         &options.binary_option,
@@ -542,7 +575,7 @@ pub fn build_node_telegraf_upgrade(name: &str, node_type: &NodeType) -> Result<S
     Ok(extra_vars.build())
 }
 
-pub fn build_uploader_telegraf_upgrade(name: &str) -> Result<String> {
+pub fn build_client_telegraf_upgrade(name: &str) -> Result<String> {
     let mut extra_vars: ExtraVarsDocBuilder = ExtraVarsDocBuilder::default();
     extra_vars.add_variable("testnet_name", name);
     Ok(extra_vars.build())

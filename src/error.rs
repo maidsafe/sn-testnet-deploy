@@ -78,11 +78,15 @@ pub enum Error {
     #[error("The number of wallet secret keys ({0}) does not match the number of uploaders ({1})")]
     InvalidWalletCount(usize, usize),
     #[error(
-        "The '{0}' deployment type for the environment is not supported for upscaling uploaders"
+        "The '{0}' deployment type for the environment is not supported for upscaling Clients"
     )]
-    InvalidUploaderUpscaleDeploymentType(String),
+    InvalidClientUpscaleDeploymentType(String),
     #[error("The desired auditor VM count is smaller than the current count. This is invalid for an upscale operation.")]
     InvalidUpscaleDesiredAuditorVmCount,
+    #[error("The desired Client count is smaller than the current count. This is invalid for an upscale operation.")]
+    InvalidUpscaleDesiredClientCount,
+    #[error("The desired Client VM count is smaller than the current count. This is invalid for an upscale operation.")]
+    InvalidUpscaleDesiredClientVmCount,
     #[error("The desired Peer Cache VM count is smaller than the current count. This is invalid for an upscale operation.")]
     InvalidUpscaleDesiredPeerCacheVmCount,
     #[error("The desired Peer Cache node count is smaller than the current count. This is invalid for an upscale operation.")]
@@ -99,10 +103,6 @@ pub enum Error {
     InvalidUpscaleDesiredFullConePrivateNodeCount,
     #[error("The desired symmetric private node count is smaller than the current count. This is invalid for an upscale operation.")]
     InvalidUpscaleDesiredSymmetricPrivateNodeCount,
-    #[error("The desired uploader count is smaller than the current count. This is invalid for an upscale operation.")]
-    InvalidUpscaleDesiredUploaderCount,
-    #[error("The desired uploader VM count is smaller than the current count. This is invalid for an upscale operation.")]
-    InvalidUpscaleDesiredUploaderVmCount,
     #[error("Options were used that are not applicable to a bootstrap deployment")]
     InvalidUpscaleOptionsForBootstrapDeployment,
     #[error("The vm count for the provided custom vms are not equal: {0:?} != {1:?}")]
@@ -135,10 +135,10 @@ pub enum Error {
     NetworkTokenError(#[from] network_token::Error),
     #[error("This deployment does not have an auditor. It may be a bootstrap deployment.")]
     NoAuditorError,
+    #[error("This deployment does not have any Client. It may be a bootstrap deployment.")]
+    NoClientError,
     #[error("This deployment does not have a faucet. It may be a bootstrap deployment.")]
     NoFaucetError,
-    #[error("This deployment does not have any uploaders. It may be a bootstrap deployment.")]
-    NoUploadersError,
     #[error("The node count for the provided custom vms are not equal")]
     NodeCountMismatch,
     #[error("Could not obtain a multiaddr from the node inventory")]

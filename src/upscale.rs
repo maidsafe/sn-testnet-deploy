@@ -10,8 +10,8 @@ use crate::{
         provisioning::{PrivateNodeProvisionInventory, ProvisionOptions},
     },
     error::{Error, Result},
-    get_bootstrap_cache_url, get_genesis_multiaddr, get_multiaddr, DeploymentInventory,
-    DeploymentType, InfraRunOptions, NodeType, TestnetDeployer,
+    get_anvil_node_data, get_bootstrap_cache_url, get_genesis_multiaddr, get_multiaddr,
+    DeploymentInventory, DeploymentType, EvmNetwork, InfraRunOptions, NodeType, TestnetDeployer,
 };
 use colored::Colorize;
 use evmlib::common::U256;
@@ -23,6 +23,7 @@ pub struct UpscaleOptions {
     pub ansible_verbose: bool,
     pub ant_version: Option<String>,
     pub current_inventory: DeploymentInventory,
+    pub desired_client_vm_count: Option<u16>,
     pub desired_full_cone_private_node_count: Option<u16>,
     pub desired_full_cone_private_node_vm_count: Option<u16>,
     pub desired_node_count: Option<u16>,
@@ -31,8 +32,8 @@ pub struct UpscaleOptions {
     pub desired_peer_cache_node_vm_count: Option<u16>,
     pub desired_symmetric_private_node_count: Option<u16>,
     pub desired_symmetric_private_node_vm_count: Option<u16>,
-    pub desired_uploader_vm_count: Option<u16>,
     pub desired_uploaders_count: Option<u16>,
+    pub enable_downloaders: bool,
     pub funding_wallet_secret_key: Option<String>,
     pub gas_amount: Option<U256>,
     pub interval: Duration,
@@ -58,7 +59,7 @@ impl TestnetDeployer {
         if is_bootstrap_deploy
             && (options.desired_peer_cache_node_count.is_some()
                 || options.desired_peer_cache_node_vm_count.is_some()
-                || options.desired_uploader_vm_count.is_some())
+                || options.desired_client_vm_count.is_some())
         {
             return Err(Error::InvalidUpscaleOptionsForBootstrapDeployment);
         }
@@ -101,13 +102,13 @@ impl TestnetDeployer {
         }
         debug!("Using {desired_symmetric_private_node_vm_count} for desired full cone private node VM count");
 
-        let desired_uploader_vm_count = options
-            .desired_uploader_vm_count
-            .unwrap_or(options.current_inventory.uploader_vms.len() as u16);
-        if desired_uploader_vm_count < options.current_inventory.uploader_vms.len() as u16 {
-            return Err(Error::InvalidUpscaleDesiredUploaderVmCount);
+        let desired_client_vm_count = options
+            .desired_client_vm_count
+            .unwrap_or(options.current_inventory.client_vms.len() as u16);
+        if desired_client_vm_count < options.current_inventory.client_vms.len() as u16 {
+            return Err(Error::InvalidUpscaleDesiredClientVmCount);
         }
-        debug!("Using {desired_uploader_vm_count} for desired uploader VM count");
+        debug!("Using {desired_client_vm_count} for desired Client VM count");
 
         let desired_peer_cache_node_count = options
             .desired_peer_cache_node_count
@@ -162,7 +163,7 @@ impl TestnetDeployer {
             Some(desired_full_cone_private_node_vm_count);
         infra_run_options.symmetric_private_node_vm_count =
             Some(desired_symmetric_private_node_vm_count);
-        infra_run_options.uploader_vm_count = Some(desired_uploader_vm_count);
+        infra_run_options.client_vm_count = Some(desired_client_vm_count);
 
         if options.plan {
             self.plan(&infra_run_options)?;
@@ -183,7 +184,7 @@ impl TestnetDeployer {
             binary_option: options.current_inventory.binary_option.clone(),
             chunk_size: None,
             client_env_variables: None,
-            downloaders_count: 0,
+            enable_downloaders: options.enable_downloaders,
             enable_telegraf: true,
             evm_network: options
                 .current_inventory
@@ -390,25 +391,38 @@ impl TestnetDeployer {
             }
         }
 
-        let should_provision_uploaders = options.desired_uploaders_count.is_some()
-            || options.desired_uploader_vm_count.is_some();
+        let should_provision_uploaders =
+            options.desired_uploaders_count.is_some() || options.desired_client_vm_count.is_some();
         if should_provision_uploaders {
+            // get anvil funding sk
+            if provision_options.evm_network == EvmNetwork::Anvil {
+                let anvil_node_data =
+                    get_anvil_node_data(&self.ansible_provisioner.ansible_runner, &self.ssh_client)
+                        .map_err(|err| {
+                            println!("Failed to get evm testnet data {err:?}");
+                            err
+                        })?;
+
+                provision_options.funding_wallet_secret_key =
+                    Some(anvil_node_data.deployer_wallet_private_key);
+            }
+
             self.wait_for_ssh_availability_on_new_machines(
-                AnsibleInventoryType::Uploaders,
+                AnsibleInventoryType::Clients,
                 &options.current_inventory,
             )?;
             let genesis_network_contacts = get_bootstrap_cache_url(&initial_ip_addr);
             self.ansible_provisioner
-                .print_ansible_run_banner("Provision Uploaders");
+                .print_ansible_run_banner("Provision Clients");
             self.ansible_provisioner
-                .provision_uploaders(
+                .provision_clients(
                     &provision_options,
                     Some(initial_multiaddr.clone()),
                     Some(genesis_network_contacts.clone()),
                 )
                 .await
                 .map_err(|err| {
-                    println!("Failed to provision uploaders {err:?}");
+                    println!("Failed to provision Clients {err:?}");
                     err
                 })?;
         }
@@ -425,7 +439,7 @@ impl TestnetDeployer {
         Ok(())
     }
 
-    pub async fn upscale_uploaders(&self, options: &UpscaleOptions) -> Result<()> {
+    pub async fn upscale_clients(&self, options: &UpscaleOptions) -> Result<()> {
         let is_bootstrap_deploy = matches!(
             options
                 .current_inventory
@@ -435,18 +449,18 @@ impl TestnetDeployer {
         );
 
         if is_bootstrap_deploy {
-            return Err(Error::InvalidUploaderUpscaleDeploymentType(
+            return Err(Error::InvalidClientUpscaleDeploymentType(
                 "bootstrap".to_string(),
             ));
         }
 
-        let desired_uploader_vm_count = options
-            .desired_uploader_vm_count
-            .unwrap_or(options.current_inventory.uploader_vms.len() as u16);
-        if desired_uploader_vm_count < options.current_inventory.uploader_vms.len() as u16 {
-            return Err(Error::InvalidUpscaleDesiredUploaderVmCount);
+        let desired_client_vm_count = options
+            .desired_client_vm_count
+            .unwrap_or(options.current_inventory.client_vms.len() as u16);
+        if desired_client_vm_count < options.current_inventory.client_vms.len() as u16 {
+            return Err(Error::InvalidUpscaleDesiredClientVmCount);
         }
-        debug!("Using {desired_uploader_vm_count} for desired uploader VM count");
+        debug!("Using {desired_client_vm_count} for desired Client VM count");
 
         let mut infra_run_options = InfraRunOptions::generate_existing(
             &options.current_inventory.name,
@@ -454,7 +468,7 @@ impl TestnetDeployer {
             Some(&options.current_inventory.environment_details),
         )
         .await?;
-        infra_run_options.uploader_vm_count = Some(desired_uploader_vm_count);
+        infra_run_options.client_vm_count = Some(desired_client_vm_count);
 
         if options.plan {
             self.plan(&infra_run_options)?;
@@ -487,7 +501,7 @@ impl TestnetDeployer {
             binary_option: options.current_inventory.binary_option.clone(),
             chunk_size: None,
             client_env_variables: None,
-            downloaders_count: 0,
+            enable_downloaders: options.enable_downloaders,
             enable_telegraf: true,
             evm_data_payments_address: options
                 .current_inventory
@@ -543,20 +557,20 @@ impl TestnetDeployer {
         };
 
         self.wait_for_ssh_availability_on_new_machines(
-            AnsibleInventoryType::Uploaders,
+            AnsibleInventoryType::Clients,
             &options.current_inventory,
         )?;
         self.ansible_provisioner
-            .print_ansible_run_banner("Provision Uploaders");
+            .print_ansible_run_banner("Provision Clients");
         self.ansible_provisioner
-            .provision_uploaders(
+            .provision_clients(
                 &provision_options,
                 Some(initial_multiaddr),
                 Some(initial_network_contacts_url),
             )
             .await
             .map_err(|err| {
-                println!("Failed to provision uploaders {err:?}");
+                println!("Failed to provision clients {err:?}");
                 err
             })?;
 
@@ -573,6 +587,12 @@ impl TestnetDeployer {
             .ansible_runner
             .get_inventory(inventory_type, true)?;
         let old_set: HashSet<_> = match inventory_type {
+            AnsibleInventoryType::Clients => current_inventory
+                .client_vms
+                .iter()
+                .map(|client_vm| &client_vm.vm)
+                .cloned()
+                .collect(),
             AnsibleInventoryType::PeerCacheNodes => current_inventory
                 .peer_cache_node_vms
                 .iter()
@@ -583,12 +603,6 @@ impl TestnetDeployer {
                 .node_vms
                 .iter()
                 .map(|node_vm| &node_vm.vm)
-                .cloned()
-                .collect(),
-            AnsibleInventoryType::Uploaders => current_inventory
-                .uploader_vms
-                .iter()
-                .map(|uploader_vm| &uploader_vm.vm)
                 .cloned()
                 .collect(),
             AnsibleInventoryType::FullConeNatGateway => current_inventory

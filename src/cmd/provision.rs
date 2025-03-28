@@ -17,6 +17,13 @@ use sn_testnet_deploy::{
 
 #[derive(Subcommand, Debug)]
 pub enum ProvisionCommands {
+    /// Provision Clients for an environment
+    #[clap(name = "clients")]
+    Clients {
+        /// The name of the environment
+        #[arg(short = 'n', long)]
+        name: String,
+    },
     /// Provision full cone private nodes for an environment
     #[clap(name = "full-cone-private-nodes")]
     FullConePrivateNodes {
@@ -41,13 +48,6 @@ pub enum ProvisionCommands {
     /// Provision symmetric private nodes for an environment
     #[clap(name = "symmetric-private-nodes")]
     SymmetricPrivateNodes {
-        /// The name of the environment
-        #[arg(short = 'n', long)]
-        name: String,
-    },
-    /// Provision uploader nodes for an environment
-    #[clap(name = "uploaders")]
-    Uploaders {
         /// The name of the environment
         #[arg(short = 'n', long)]
         name: String,
@@ -167,7 +167,7 @@ pub async fn handle_provision_full_cone_private_nodes(name: String) -> Result<()
     handle_provision_nodes(name, NodeType::FullConePrivateNode).await
 }
 
-pub async fn handle_provision_uploaders(name: String) -> Result<()> {
+pub async fn handle_provision_clients(name: String) -> Result<()> {
     let (_, provision_options, provisioner, ssh_client) = init_provision(&name).await?;
     let (genesis_multiaddr, genesis_ip) =
         get_genesis_multiaddr(&provisioner.ansible_runner, &ssh_client).map_err(|err| {
@@ -176,16 +176,16 @@ pub async fn handle_provision_uploaders(name: String) -> Result<()> {
         })?;
     let genesis_network_contacts = get_bootstrap_cache_url(&genesis_ip);
 
-    provisioner.print_ansible_run_banner("Provision Uploaders");
+    provisioner.print_ansible_run_banner("Provision Clients");
     provisioner
-        .provision_uploaders(
+        .provision_clients(
             &provision_options,
             Some(genesis_multiaddr.clone()),
             Some(genesis_network_contacts.clone()),
         )
         .await
         .map_err(|err| {
-            println!("Failed to provision uploaders {err:?}");
+            println!("Failed to provision Clients {err:?}");
             err
         })?;
     Ok(())

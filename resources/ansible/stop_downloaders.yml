@@ -1,0 +1,18 @@
+---
+- name: ensure all the ANT downloader service are stopped
+  hosts: all
+  become: True
+  tasks:
+    - name: stop all ANT downloader services
+      ansible.builtin.systemd:
+        name: "{{ item }}"
+        state: stopped
+        enabled: true
+      register: downloader_stop
+      retries: 3
+      delay: 5
+      until: downloader_stop is not failed
+      loop:
+        - ant_download_verifier
+        - ant_download_random_verifier
+        - ant_performance_verifier

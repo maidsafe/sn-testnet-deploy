@@ -1,0 +1,18 @@
+---
+- name: ensure the ant ANT downloader services are started
+  hosts: all
+  become: True
+  tasks:
+    - name: start all ANT downloader services
+      ansible.builtin.systemd:
+        name: "{{ item }}"
+        state: started
+        enabled: true
+      register: downloader_start
+      retries: 3
+      delay: 5
+      until: downloader_start is not failed
+      loop:
+        - ant_download_verifier
+        - ant_download_random_verifier
+        - ant_performance_verifier

@@ -1,3 +1,6 @@
+ant_client_droplet_size = "s-2vcpu-4gb"
+ant_client_droplet_image_id = 172724146
+ant_client_vm_count = 1
 evm_node_droplet_size = "s-4vcpu-8gb"
 evm_node_droplet_image_id = 172723723
 evm_node_vm_count = 1
@@ -10,6 +13,3 @@ peer_cache_droplet_image_id = 173264988
 peer_cache_node_vm_count = 5
 private_node_vm_count = 1
 setup_nat_gateway = true
-uploader_droplet_size = "s-2vcpu-4gb"
-uploader_droplet_image_id = 172724146
-uploader_vm_count = 1

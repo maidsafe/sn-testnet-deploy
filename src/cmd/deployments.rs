@@ -198,8 +198,10 @@ pub async fn handle_deploy(
     branch: Option<String>,
     chunk_size: Option<u64>,
     client_env_variables: Option<Vec<(String, String)>>,
+    client_vm_count: Option<u16>,
+    client_vm_size: Option<String>,
     disable_telegraf: bool,
-    downloaders_count: u16,
+    enable_downloaders: bool,
     environment_type: crate::EnvironmentType,
     evm_data_payments_address: Option<String>,
     evm_network_type: EvmNetwork,
@@ -240,8 +242,6 @@ pub async fn handle_deploy(
     repo_owner: Option<String>,
     rewards_address: String,
     to_genesis: bool,
-    uploader_vm_count: Option<u16>,
-    uploader_vm_size: Option<String>,
     uploaders_count: u16,
 ) -> Result<()> {
     if evm_network_type == EvmNetwork::Custom {
@@ -291,6 +291,7 @@ pub async fn handle_deploy(
     let inventory = inventory_service
         .generate_or_retrieve_inventory(&name, true, Some(binary_option.clone()))
         .await?;
+    // let inventory = DeploymentInventory::empty(&name, binary_option.clone());
 
     match testnet_deployer.init().await {
         Ok(_) => {}
@@ -324,8 +325,10 @@ pub async fn handle_deploy(
         binary_option: binary_option.clone(),
         chunk_size,
         client_env_variables,
+        client_vm_count,
+        client_vm_size,
         current_inventory: inventory,
-        downloaders_count,
+        enable_downloaders,
         enable_telegraf: !disable_telegraf,
         environment_type: environment_type.clone(),
         evm_data_payments_address,
@@ -377,8 +380,6 @@ pub async fn handle_deploy(
                 symmetric_private_node_count,
             ))
         }),
-        uploader_vm_count,
-        uploader_vm_size,
         uploaders_count,
     };
 
@@ -429,6 +430,7 @@ pub async fn handle_upscale(
     antctl_version: Option<String>,
     antnode_version: Option<String>,
     branch: Option<String>,
+    desired_client_vm_count: Option<u16>,
     desired_node_count: Option<u16>,
     desired_full_cone_private_node_count: Option<u16>,
     desired_full_cone_private_node_vm_count: Option<u16>,
@@ -437,8 +439,8 @@ pub async fn handle_upscale(
     desired_peer_cache_node_vm_count: Option<u16>,
     desired_symmetric_private_node_count: Option<u16>,
     desired_symmetric_private_node_vm_count: Option<u16>,
-    desired_uploader_vm_count: Option<u16>,
     desired_uploaders_count: Option<u16>,
+    enable_downloaders: bool,
     funding_wallet_secret_key: Option<String>,
     infra_only: bool,
     interval: Duration,
@@ -464,17 +466,9 @@ pub async fn handle_upscale(
         ));
     }
 
-    if desired_uploader_vm_count.is_some() && ant_version.is_none() {
+    if desired_client_vm_count.is_some() && ant_version.is_none() && branch.is_none() {
         return Err(eyre!(
-            "The ant version is required to upscale the uploaders"
-        ));
-    }
-
-    if (desired_uploader_vm_count.is_some() || desired_uploaders_count.is_some())
-        && funding_wallet_secret_key.is_none()
-    {
-        return Err(eyre!(
-            "The funding wallet secret key is required to upscale the uploaders"
+            "The --ant-version or --branch argument is required when upscaling the Clients"
         ));
     }
 
@@ -491,6 +485,14 @@ pub async fn handle_upscale(
         .generate_or_retrieve_inventory(&name, true, None)
         .await?;
 
+    if (desired_client_vm_count.is_some() || desired_uploaders_count.is_some())
+        && funding_wallet_secret_key.is_none()
+        && inventory.environment_details.evm_details.network != EvmNetwork::Anvil
+    {
+        return Err(eyre!(
+            "The funding wallet secret key is required to upscale the Clients"
+        ));
+    }
     if branch.is_some() {
         println!("The upscale will use the binaries built in the original deployment");
         inventory.binary_option = BinaryOption::BuildFromSource {
@@ -546,6 +548,7 @@ pub async fn handle_upscale(
             ansible_verbose,
             ant_version,
             current_inventory: inventory,
+            desired_client_vm_count,
             desired_node_count,
             desired_full_cone_private_node_count,
             desired_full_cone_private_node_vm_count,
@@ -554,8 +557,8 @@ pub async fn handle_upscale(
             desired_peer_cache_node_vm_count,
             desired_symmetric_private_node_count,
             desired_symmetric_private_node_vm_count,
-            desired_uploader_vm_count,
             desired_uploaders_count,
+            enable_downloaders,
             funding_wallet_secret_key,
             gas_amount: None,
             infra_only,

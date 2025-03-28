@@ -119,6 +119,10 @@ async fn main() -> Result<()> {
             testnet_deployer.clean().await?;
             Ok(())
         }
+        Commands::Clients(clients_cmd) => {
+            cmd::clients::handle_clients_command(clients_cmd).await?;
+            Ok(())
+        }
         Commands::Deploy {
             ansible_verbose,
             ant_version,
@@ -128,8 +132,10 @@ async fn main() -> Result<()> {
             branch,
             chunk_size,
             client_env_variables,
-            downloaders_count,
+            client_vm_count,
+            client_vm_size,
             disable_telegraf,
+            enable_downloaders,
             environment_type,
             evm_data_payments_address,
             evm_network_type,
@@ -170,8 +176,6 @@ async fn main() -> Result<()> {
             repo_owner,
             rewards_address,
             to_genesis,
-            uploader_vm_count,
-            uploader_vm_size,
             uploaders_count,
         } => {
             cmd::deployments::handle_deploy(
@@ -183,8 +187,10 @@ async fn main() -> Result<()> {
                 branch,
                 chunk_size,
                 client_env_variables,
+                client_vm_count,
+                client_vm_size,
                 disable_telegraf,
-                downloaders_count,
+                enable_downloaders,
                 environment_type,
                 evm_data_payments_address,
                 evm_network_type,
@@ -225,8 +231,6 @@ async fn main() -> Result<()> {
                 repo_owner,
                 rewards_address,
                 to_genesis,
-                uploader_vm_count,
-                uploader_vm_size,
                 uploaders_count,
             )
             .await?;
@@ -471,6 +475,14 @@ async fn main() -> Result<()> {
             .await?;
             Ok(())
         }
+        Commands::UpgradeClientTelegrafConfig {
+            forks,
+            name,
+            provider,
+        } => {
+            telegraf::handle_upgrade_client_telegraf_config(forks, name, provider).await?;
+            Ok(())
+        }
         Commands::UpgradeAntctl {
             custom_inventory,
             name,
@@ -496,24 +508,14 @@ async fn main() -> Result<()> {
             telegraf::handle_upgrade_node_telegraf_config(forks, name, provider).await?;
             Ok(())
         }
-        Commands::UpgradeUploaderTelegrafConfig {
-            forks,
-            name,
-            provider,
-        } => {
-            telegraf::handle_upgrade_uploader_telegraf_config(forks, name, provider).await?;
-            Ok(())
-        }
-        Commands::Uploaders(uploaders_cmd) => {
-            cmd::uploaders::handle_uploaders_command(uploaders_cmd).await?;
-            Ok(())
-        }
+
         Commands::Upscale {
             ansible_verbose,
             ant_version,
             antctl_version,
             antnode_version,
             branch,
+            desired_client_vm_count,
             desired_node_count,
             desired_full_cone_private_node_count,
             desired_full_cone_private_node_vm_count,
@@ -522,8 +524,8 @@ async fn main() -> Result<()> {
             desired_peer_cache_node_vm_count,
             desired_symmetric_private_node_count,
             desired_symmetric_private_node_vm_count,
-            desired_uploader_vm_count,
             desired_uploaders_count,
+            enable_downloaders,
             funding_wallet_secret_key,
             infra_only,
             interval,
@@ -541,6 +543,7 @@ async fn main() -> Result<()> {
                 antctl_version,
                 antnode_version,
                 branch,
+                desired_client_vm_count,
                 desired_node_count,
                 desired_full_cone_private_node_count,
                 desired_full_cone_private_node_vm_count,
@@ -549,8 +552,8 @@ async fn main() -> Result<()> {
                 desired_peer_cache_node_vm_count,
                 desired_symmetric_private_node_count,
                 desired_symmetric_private_node_vm_count,
-                desired_uploader_vm_count,
                 desired_uploaders_count,
+                enable_downloaders,
                 funding_wallet_secret_key,
                 infra_only,
                 interval,
@@ -620,8 +623,8 @@ async fn main() -> Result<()> {
                 cmd::provision::handle_provision_symmetric_private_nodes(name).await?;
                 Ok(())
             }
-            ProvisionCommands::Uploaders { name } => {
-                cmd::provision::handle_provision_uploaders(name).await?;
+            ProvisionCommands::Clients { name } => {
+                cmd::provision::handle_provision_clients(name).await?;
                 Ok(())
             }
         },

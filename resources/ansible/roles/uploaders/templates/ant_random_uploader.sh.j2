@@ -1,0 +1,239 @@
+#!/usr/bin/env bash
+LOG_OUTPUT_DEST="{{ log_output_dest }}"
+UPLOAD_METRIC_DIR="/mnt/ant-storage/logs/upload_files/random_uploader/${USER}"
+
+mkdir -p "${UPLOAD_METRIC_DIR}"
+
+if [[ -n "${SECRET_KEY}" ]] && ! grep -q "export SECRET_KEY=" ~/.profile; then
+  echo "export SECRET_KEY=${SECRET_KEY}" >> ~/.profile
+fi
+
+if [[ -n "${RPC_URL}" ]] && ! grep -q "export RPC_URL=" ~/.profile; then
+  echo "export RPC_URL=${RPC_URL}" >> ~/.profile
+fi
+
+if [[ -n "${PAYMENT_TOKEN_ADDRESS}" ]] && ! grep -q "export PAYMENT_TOKEN_ADDRESS=" ~/.profile; then
+  echo "export PAYMENT_TOKEN_ADDRESS=${PAYMENT_TOKEN_ADDRESS}" >> ~/.profile
+fi
+
+if [[ -n "${DATA_PAYMENTS_ADDRESS}" ]] && ! grep -q "export DATA_PAYMENTS_ADDRESS=" ~/.profile; then
+  echo "export DATA_PAYMENTS_ADDRESS=${DATA_PAYMENTS_ADDRESS}" >> ~/.profile
+fi
+
+if [[ -n "${EVM_NETWORK}" ]] && ! grep -q "export EVM_NETWORK=" ~/.profile; then
+  echo "export EVM_NETWORK=${EVM_NETWORK}" >> ~/.profile
+fi
+
+
+CONTACT_PEER_ARG=""
+NETWORK_CONTACTS_URL_ARG=""
+NETWORK_ID_ARG=""
+TESTNET_ARG=""
+
+if [ -n "${1:-}" ]; then
+  echo "Setting contact peer arg to ${1:-}"
+  CONTACT_PEER_ARG="--peer ${1:-}"
+fi
+if [ -n "${2:-}" ]; then
+  echo "Setting network contacts URL arg to ${2:-}"
+  NETWORK_CONTACTS_URL_ARG="--network-contacts-url ${2:-}"
+fi
+if [ -n "${3:-}" ]; then
+  echo "Setting network ID arg to ${3:-}"
+  NETWORK_ID_ARG="--network-id ${3:-}"
+  echo "Setting --testnet arg"
+  TESTNET_ARG="--testnet"
+fi
+
+
+if ! command -v ant &> /dev/null; then
+  echo "Error: 'ant' not found in PATH."
+  exit 1
+fi
+
+
+get_error_enum() {
+  local exit_code=$1
+  case $exit_code in
+    0)
+      echo "SUCCESS"
+      ;;
+    6)
+      echo "INVALID_INPUT"
+      ;;
+    11)
+      echo "SERIALIZATION_ERROR"
+      ;;
+    12)
+      echo "IO_ERROR"
+      ;;
+    13)
+      echo "NETWORK_ERROR"
+      ;;
+    14)
+      echo "PROTOCOL_ERROR"
+      ;;
+    15)
+      echo "SELF_ENCRYPTION_ERROR"
+      ;;
+    21)
+      echo "EVM_WALLET_NETWORK_MISMATCH"
+      ;;
+    22)
+      echo "EVM_WALLET_ERROR"
+      ;;
+    23)
+      echo "PAY_COST_ERROR"
+      ;;
+    31)
+      echo "INVALID_DATA_MAP"
+      ;;
+    32)
+      echo "DECRYPTION_ERROR"
+      ;;
+    36)
+      echo "UNRECOGNIZED_INPUT"
+      ;;
+    37)
+      echo "FAILED_GET"
+      ;;
+    41)
+      echo "PUT_COST_ERROR"
+      ;;
+    42)
+      echo "WALLET_ERROR"
+      ;;
+    43)
+      echo "SCRATCHPAD_BAD_OWNER"
+      ;;
+    44)
+      echo "PAYMENT_UNEXPECTEDLY_INVALID"
+      ;;
+    45)
+      echo "PAYEES_MISSING"
+      ;;
+    51)
+      echo "NO_BOOTSTRAP_PEERS_FOUND"
+      ;;
+    52)
+      echo "FAILED_TO_PARSE_CACHE_DATA"
+      ;;
+    53)
+      echo "COULD_NOT_OBTAIN_DATA_DIR"
+      ;;
+    54)
+      echo "FAILED_TO_OBTAIN_ADDRS_FROM_URL"
+      ;;
+    55)
+      echo "FAILED_TO_PARSE_URL"
+      ;;
+    56)
+      echo "JSON_ERROR"
+      ;;
+    57) 
+      echo "HTTP_ERROR"
+      ;;
+    58)
+      echo "LOCK_ERROR"
+      ;;
+    59)
+      echo "CONNECTION_TIMED_OUT"
+      ;;
+    60)
+      echo "CONNECTION_TIMED_OUT_WITH_INCOMPATIBLE_PROTOCOL"
+      ;;
+    61)
+      echo "FAILED_TO_GET_EVM_NETWORK"
+      ;;
+    *)
+      echo "UNKNOWN_ERROR"
+      ;;
+  esac
+}
+
+generate_random_data_file_and_upload() {
+  tmpfile=$(mktemp)
+  dd if=/dev/urandom of="$tmpfile" bs=100M count=1 iflag=fullblock &> /dev/null
+
+  file_size_kb=$(du -k "$tmpfile" | cut -f1)
+  file_hash=$(sha256sum "$tmpfile" | awk '{ print $1 }')
+  echo "Generated random data file at $tmpfile with size $file_size_kb KB and SHA-256 hash $file_hash"
+
+  timestamp=$(date +"%Y%m%d_%H%M%S")
+  log_file_path="${LOG_OUTPUT_DEST}/${timestamp}"
+  LOG_OUTPUT_ARG="--log-output-dest $log_file_path"
+  
+  start_time=$(date +%s%N)
+  stdout=$(ant \
+    $CONTACT_PEER_ARG \
+    $NETWORK_CONTACTS_URL_ARG \
+    $TESTNET_ARG \
+    $NETWORK_ID_ARG \
+    $LOG_OUTPUT_ARG \
+    file upload "$tmpfile" 2>&1)
+  exit_code=$?
+  end_time=$(date +%s%N)
+  echo "$stdout"
+  echo "Exit code: $exit_code"
+  version_stdout=$(ant --version 2>&1)
+  package_version=$(echo "$version_stdout" | grep "Package version:" | awk '{print $3}')
+  build_date=$(echo "$version_stdout" | grep "Git info:" | awk '{print $7}')
+  echo "Package version: $package_version"
+  echo "Build date: $build_date"
+
+  elapsed=$(echo "scale=2; ($end_time - $start_time) / 1000000000" | bc)
+  echo "Elapsed time: $elapsed seconds"
+  error_enum=$(get_error_enum $exit_code)
+
+  if [ $exit_code -eq 0 ]; then
+    echo "Successfully uploaded $tmpfile using ANT CLI"
+    success_file="$UPLOAD_METRIC_DIR/metrics_success.csv"
+
+    uploaded_address=$(echo "$stdout" | grep -oP 'At address: \K\S+')
+    number_of_chunks=$(echo "$stdout" | rg -o 'Number of chunks uploaded: [0-9]+' | rg -o '[0-9]+')
+    already_uploaded_chunks=$(echo "$stdout" | rg -o 'Number of chunks already paid/uploaded: [0-9]+' | rg -o '[0-9]+')
+    store_cost=$(echo "$stdout" | rg -o 'Total cost: [0-9]+' | rg -o '[0-9]+' | head -n 1)
+
+    if [ ! -f "$success_file" ]; then
+      echo "TIMESTAMP_START,TIMESTAMP_FINISH,DATA_ADDRESS,DURATION,RETRIES,RECORDS_UPLOADED,RECORDS_ALREADY_PAID,TOTAL_RECORDS,EXIT_STATUS,SERVICE_TYPE,ANT_USER,SERVICE_NUMBER,STORE_COST,EXPECTED_TOTAL_SIZE,ACTUAL_TOTAL_SIZE,SHA256_HASH,ANT_PACKAGE_VERSION,ANT_PACKAGE_BUILD_DATE" > "$success_file"
+    fi
+    echo "$start_time,$end_time,$uploaded_address,$elapsed,0,$number_of_chunks,$already_uploaded_chunks,0,$error_enum,UPLOADER,$USER,1,$store_cost,0,$file_size_kb,$file_hash,$package_version,$build_date" >> "$success_file"
+
+  else
+    echo "Failed to upload $tmpfile using ANT CLI"
+    failure_file="$UPLOAD_METRIC_DIR/metrics_failure.csv"
+
+
+    if [ ! -f "$failure_file" ]; then
+      echo "TIMESTAMP_START,TIMESTAMP_FINISH,DATA_ADDRESS,DURATION,RETRIES,RECORDS_UPLOADED,RECORDS_ALREADY_PAID,TOTAL_RECORDS,EXIT_STATUS,SERVICE_TYPE,ANT_USER,SERVICE_NUMBER,STORE_COST,EXPECTED_TOTAL_SIZE,ACTUAL_TOTAL_SIZE,SHA256_HASH,ANT_PACKAGE_VERSION,ANT_PACKAGE_BUILD_DATE" > "$failure_file"
+    fi
+    echo "$start_time,$end_time,0,$elapsed,0,0,0,0,$error_enum,UPLOADER,$USER,1,0,0,$file_size_kb,$file_hash,$package_version,$build_date" >> "$failure_file"
+  fi
+
+  rm "$tmpfile"
+}
+
+upload_count=0
+while true; do
+  echo "================================"
+  echo "Generating and uploading file..."
+  echo "================================"
+  echo "$(date +"%A, %B %d, %Y %H:%M:%S")"
+  generate_random_data_file_and_upload
+  
+  upload_count=$((upload_count + 1))
+  
+  {% if max_uploads is defined %}
+  if [ $upload_count -ge {{ max_uploads }} ]; then
+    # Sleeping indefinitely allows the service restart policy to be retained
+    # such that the service would restart on errors.
+    echo "Reached maximum upload count of {{ max_uploads }}, pausing uploads."
+    while true; do
+      sleep 3600
+      echo "Maximum uploads ({{ max_uploads }}) reached. Service remains active but not uploading."
+    done
+  fi
+  {% endif %}
+  
+  sleep 10
+done
