@@ -89,15 +89,11 @@ impl InfraRunOptions {
         let (peer_cache_node_volume_size, peer_cache_node_vm_size, peer_cache_image_id) =
             if peer_cache_node_vm_count > 0 {
                 let volume_size =
-                    get_value_for_resource(&resources, PEER_CACHE_NODE_ATTACHED_VOLUME, SIZE)?
-                        .and_then(|size| size.as_u64())
-                        .map(|size| size as u16);
+                    get_value_for_resource(&resources, PEER_CACHE_NODE_ATTACHED_VOLUME, SIZE)?;
                 debug!("Peer cache node volume size: {volume_size:?}");
-                let vm_size = get_value_for_resource(&resources, PEER_CACHE_NODE, SIZE)?
-                    .map(|size| size.to_string());
+                let vm_size = get_value_for_resource(&resources, PEER_CACHE_NODE, SIZE)?;
                 debug!("Peer cache node size: {vm_size:?}");
-                let image_id = get_value_for_resource(&resources, PEER_CACHE_NODE, IMAGE)?
-                    .map(|image_id| image_id.to_string());
+                let image_id = get_value_for_resource(&resources, PEER_CACHE_NODE, IMAGE)?;
                 debug!("Peer cache node image id: {image_id:?}");
 
                 (volume_size, vm_size, image_id)
@@ -109,8 +105,6 @@ impl InfraRunOptions {
         debug!("Genesis node count: {genesis_node_vm_count}");
         let genesis_node_volume_size = if genesis_node_vm_count > 0 {
             get_value_for_resource(&resources, GENESIS_NODE_ATTACHED_VOLUME, SIZE)?
-                .and_then(|size| size.as_u64())
-                .map(|size| size as u16)
         } else {
             None
         };
@@ -120,14 +114,12 @@ impl InfraRunOptions {
         debug!("Node count: {node_vm_count}");
         let node_volume_size = if node_vm_count > 0 {
             get_value_for_resource(&resources, NODE_ATTACHED_VOLUME, SIZE)?
-                .and_then(|size| size.as_u64())
-                .map(|size| size as u16)
         } else {
             None
         };
         debug!("Node volume size: {node_volume_size:?}");
 
-        let mut nat_gateway_image_id = None;
+        let mut nat_gateway_image_id: Option<String> = None;
         let symmetric_private_node_vm_count = resource_count(SYMMETRIC_PRIVATE_NODE);
         debug!("Symmetric private node count: {symmetric_private_node_vm_count}");
         let (symmetric_private_node_volume_size, symmetric_nat_gateway_vm_size) =
@@ -136,25 +128,19 @@ impl InfraRunOptions {
                     &resources,
                     SYMMETRIC_PRIVATE_NODE_ATTACHED_VOLUME,
                     SIZE,
-                )?
-                .and_then(|size| size.as_u64())
-                .map(|size| size as u16);
+                )?;
                 debug!(
                     "Symmetric private node volume size: {symmetric_private_node_volume_size:?}"
                 );
                 // gateways should exists if private nodes exist
                 let symmetric_nat_gateway_vm_size =
-                    get_value_for_resource(&resources, SYMMETRIC_NAT_GATEWAY, SIZE)?
-                        .map(|size| size.to_string());
+                    get_value_for_resource(&resources, SYMMETRIC_NAT_GATEWAY, SIZE)?;
 
                 debug!("Symmetric nat gateway size: {symmetric_nat_gateway_vm_size:?}");
 
-                if let Some(nat_gateway_image) =
-                    get_value_for_resource(&resources, SYMMETRIC_NAT_GATEWAY, IMAGE)?
-                {
-                    debug!("Nat gateway image: {nat_gateway_image}");
-                    nat_gateway_image_id = Some(nat_gateway_image.to_string());
-                }
+                nat_gateway_image_id =
+                    get_value_for_resource(&resources, SYMMETRIC_NAT_GATEWAY, IMAGE)?;
+                debug!("Nat gateway image: {nat_gateway_image_id:?}");
 
                 (
                     symmetric_private_node_volume_size,
@@ -172,24 +158,18 @@ impl InfraRunOptions {
                     &resources,
                     FULL_CONE_PRIVATE_NODE_ATTACHED_VOLUME,
                     SIZE,
-                )?
-                .and_then(|size| size.as_u64())
-                .map(|size| size as u16);
+                )?;
                 debug!(
                     "Full cone private node volume size: {full_cone_private_node_volume_size:?}"
                 );
                 // gateways should exists if private nodes exist
                 let full_cone_nat_gateway_vm_size =
-                    get_value_for_resource(&resources, FULL_CONE_NAT_GATEWAY, SIZE)?
-                        .map(|size| size.to_string());
+                    get_value_for_resource(&resources, FULL_CONE_NAT_GATEWAY, SIZE)?;
                 debug!("Full cone nat gateway size: {full_cone_nat_gateway_vm_size:?}");
 
-                if let Some(nat_gateway_image) =
-                    get_value_for_resource(&resources, FULL_CONE_NAT_GATEWAY, IMAGE)?
-                {
-                    debug!("Nat gateway image: {nat_gateway_image}");
-                    nat_gateway_image_id = Some(nat_gateway_image.to_string());
-                }
+                nat_gateway_image_id =
+                    get_value_for_resource(&resources, FULL_CONE_NAT_GATEWAY, IMAGE)?;
+                debug!("Nat gateway image: {nat_gateway_image_id:?}");
 
                 (
                     full_cone_private_node_volume_size,
@@ -202,11 +182,9 @@ impl InfraRunOptions {
         let uploader_vm_count = resource_count(UPLOADER);
         debug!("Uploader count: {uploader_vm_count}");
         let (uploader_vm_size, uploader_image_id) = if uploader_vm_count > 0 {
-            let vm_size =
-                get_value_for_resource(&resources, UPLOADER, SIZE)?.map(|size| size.to_string());
+            let vm_size = get_value_for_resource(&resources, UPLOADER, SIZE)?;
             debug!("Uploader size: {vm_size:?}");
-            let image_id = get_value_for_resource(&resources, UPLOADER, IMAGE)?
-                .map(|image_id| image_id.to_string());
+            let image_id = get_value_for_resource(&resources, UPLOADER, IMAGE)?;
             debug!("Uploader image id: {image_id:?}");
             (vm_size, image_id)
         } else {
@@ -219,27 +197,21 @@ impl InfraRunOptions {
 
         // Node VM size var is re-used for nodes, evm nodes, symmetric and full cone private nodes
         let (node_vm_size, node_image_id) = if node_vm_count > 0 {
-            let vm_size =
-                get_value_for_resource(&resources, NODE, SIZE)?.map(|size| size.to_string());
+            let vm_size = get_value_for_resource(&resources, NODE, SIZE)?;
             debug!("Node size obtained from {NODE}: {vm_size:?}");
-            let image_id = get_value_for_resource(&resources, NODE, IMAGE)?
-                .map(|image_id| image_id.to_string());
+            let image_id = get_value_for_resource(&resources, NODE, IMAGE)?;
             debug!("Node image id obtained from {NODE}: {image_id:?}");
             (vm_size, image_id)
         } else if symmetric_private_node_vm_count > 0 {
-            let vm_size = get_value_for_resource(&resources, SYMMETRIC_PRIVATE_NODE, SIZE)?
-                .map(|size| size.to_string());
+            let vm_size = get_value_for_resource(&resources, SYMMETRIC_PRIVATE_NODE, SIZE)?;
             debug!("Node size obtained from {SYMMETRIC_PRIVATE_NODE}: {vm_size:?}");
-            let image_id = get_value_for_resource(&resources, SYMMETRIC_PRIVATE_NODE, IMAGE)?
-                .map(|image_id| image_id.to_string());
+            let image_id = get_value_for_resource(&resources, SYMMETRIC_PRIVATE_NODE, IMAGE)?;
             debug!("Node image id obtained from {SYMMETRIC_PRIVATE_NODE}: {image_id:?}");
             (vm_size, image_id)
         } else if full_cone_private_node_vm_count > 0 {
-            let vm_size = get_value_for_resource(&resources, FULL_CONE_PRIVATE_NODE, SIZE)?
-                .map(|size| size.to_string());
+            let vm_size = get_value_for_resource(&resources, FULL_CONE_PRIVATE_NODE, SIZE)?;
             debug!("Node size obtained from {FULL_CONE_PRIVATE_NODE}: {vm_size:?}");
-            let image_id = get_value_for_resource(&resources, FULL_CONE_PRIVATE_NODE, IMAGE)?
-                .map(|image_id| image_id.to_string());
+            let image_id = get_value_for_resource(&resources, FULL_CONE_PRIVATE_NODE, IMAGE)?;
             debug!("Node image id obtained from {FULL_CONE_PRIVATE_NODE}: {image_id:?}");
             (vm_size, image_id)
         } else {
@@ -249,11 +221,9 @@ impl InfraRunOptions {
         let evm_node_count = resource_count(EVM_NODE);
         debug!("EVM node count: {evm_node_count}");
         let (evm_node_vm_size, evm_node_image_id) = if evm_node_count > 0 {
-            let emv_node_vm_size =
-                get_value_for_resource(&resources, EVM_NODE, SIZE)?.map(|size| size.to_string());
+            let emv_node_vm_size = get_value_for_resource(&resources, EVM_NODE, SIZE)?;
             debug!("EVM node size: {emv_node_vm_size:?}");
-            let evm_node_image_id = get_value_for_resource(&resources, EVM_NODE, IMAGE)?
-                .map(|image_id| image_id.to_string());
+            let evm_node_image_id = get_value_for_resource(&resources, EVM_NODE, IMAGE)?;
             debug!("EVM node image id: {evm_node_image_id:?}");
             (emv_node_vm_size, evm_node_image_id)
         } else {
@@ -341,11 +311,9 @@ impl UploaderInfraRunOptions {
         let uploader_vm_count = resource_count(UPLOADER);
         debug!("Uploader count: {uploader_vm_count}");
         let (uploader_vm_size, uploader_image_id) = if uploader_vm_count > 0 {
-            let vm_size =
-                get_value_for_resource(&resources, UPLOADER, SIZE)?.map(|size| size.to_string());
+            let vm_size = get_value_for_resource(&resources, UPLOADER, SIZE)?;
             debug!("Uploader size: {vm_size:?}");
-            let image_id = get_value_for_resource(&resources, UPLOADER, IMAGE)?
-                .map(|image_id| image_id.to_string());
+            let image_id = get_value_for_resource(&resources, UPLOADER, IMAGE)?;
             debug!("Uploader image id: {image_id:?}");
             (vm_size, image_id)
         } else {
@@ -399,35 +367,6 @@ impl UploaderInfraRunOptions {
 
         Ok(args)
     }
-}
-
-/// Extract a specific field value from terraform resources.
-fn get_value_for_resource(
-    resources: &[TerraformResource],
-    resource_name: &str,
-    field_name: &str,
-) -> Result<Option<serde_json::Value>, Error> {
-    let field_value = resources
-        .iter()
-        .filter(|r| r.resource_name == resource_name)
-        .try_fold(None, |acc_value: Option<serde_json::Value>, r| {
-            if let Some(value) = r.values.get(field_name) {
-                match acc_value {
-                    Some(ref existing_value) if existing_value != value => {
-                        log::error!("Expected value: {existing_value}, got value: {value}");
-                        Err(Error::TerraformResourceValueMismatch {
-                            expected: existing_value.to_string(),
-                            actual: value.to_string(),
-                        })
-                    }
-                    _ => Ok(Some(value.clone())),
-                }
-            } else {
-                Ok(acc_value)
-            }
-        })?;
-
-    Ok(field_value)
 }
 
 /// Build the terraform arguments from InfraRunOptions
@@ -610,4 +549,85 @@ pub fn delete_workspace(terraform_runner: &TerraformRunner, name: &str) -> Resul
     terraform_runner.workspace_delete(name)?;
     println!("Deleted {name} workspace");
     Ok(())
+}
+
+/// Extract a specific field value from terraform resources with proper type conversion.
+fn get_value_for_resource<T>(
+    resources: &[TerraformResource],
+    resource_name: &str,
+    field_name: &str,
+) -> Result<Option<T>, Error>
+where
+    T: From<TerraformValue>,
+{
+    let field_value = resources
+        .iter()
+        .filter(|r| r.resource_name == resource_name)
+        .try_fold(None, |acc_value: Option<serde_json::Value>, r| {
+            if let Some(value) = r.values.get(field_name) {
+                match acc_value {
+                    Some(ref existing_value) if existing_value != value => {
+                        log::error!("Expected value: {existing_value}, got value: {value}");
+                        Err(Error::TerraformResourceValueMismatch {
+                            expected: existing_value.to_string(),
+                            actual: value.to_string(),
+                        })
+                    }
+                    _ => Ok(Some(value.clone())),
+                }
+            } else {
+                Ok(acc_value)
+            }
+        })?;
+
+    Ok(field_value.map(TerraformValue::from).map(T::from))
+}
+
+/// Wrapper for terraform values to ensure proper conversion
+#[derive(Debug, Clone)]
+enum TerraformValue {
+    String(String),
+    Number(u64),
+    Bool(bool),
+    Other(serde_json::Value),
+}
+
+impl From<serde_json::Value> for TerraformValue {
+    fn from(value: serde_json::Value) -> Self {
+        if value.is_string() {
+            // Extract the inner string without quotes
+            // Unwrap is safe here because we checked is_string above
+            TerraformValue::String(value.as_str().unwrap().to_string())
+        } else if value.is_u64() {
+            // Unwrap is safe here because we checked is_u64 above
+            TerraformValue::Number(value.as_u64().unwrap())
+        } else if value.is_boolean() {
+            // Unwrap is safe here because we checked is_boolean above
+            TerraformValue::Bool(value.as_bool().unwrap())
+        } else {
+            TerraformValue::Other(value)
+        }
+    }
+}
+
+// Implement From<TerraformValue> for the types you need
+impl From<TerraformValue> for String {
+    fn from(value: TerraformValue) -> Self {
+        match value {
+            TerraformValue::String(s) => s,
+            TerraformValue::Number(n) => n.to_string(),
+            TerraformValue::Bool(b) => b.to_string(),
+            TerraformValue::Other(v) => v.to_string(),
+        }
+    }
+}
+
+impl From<TerraformValue> for u16 {
+    fn from(value: TerraformValue) -> Self {
+        match value {
+            TerraformValue::Number(n) => n as u16,
+            TerraformValue::String(s) => s.parse().unwrap_or(0),
+            _ => 0,
+        }
+    }
 }
