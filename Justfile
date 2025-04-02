@@ -1,14 +1,14 @@
 #!/usr/bin/env just --justfile
 
-build-rust-build-image:
+build-rust-build-image region="lon1":
   #!/usr/bin/env bash
   (
     cd resources/packer/build
     packer init .
-    packer build build.pkr.hcl
+    packer build -var 'region={{region}}' build.pkr.hcl
   )
 
-build-evm-node-image:
+build-evm-node-image region="lon1":
   #!/usr/bin/env bash
   (
     cd resources/packer/build
@@ -16,39 +16,40 @@ build-evm-node-image:
     packer build \
       -var 'size=s-4vcpu-8gb' \
       -var 'snapshot_name=evm-node' \
+      -var 'region={{region}}' \
       build.pkr.hcl
   )
 
-build-peer-cache-image:
+build-peer-cache-image region="lon1":
   #!/usr/bin/env bash
   (
     cd resources/packer/node
     packer init .
-    packer build -var 'size=s-1vcpu-2gb' node.pkr.hcl
+    packer build -var 'size=s-1vcpu-2gb' -var 'region={{region}}' node.pkr.hcl
   )
 
-build-node-image:
+build-node-image region="lon1":
   #!/usr/bin/env bash
   (
     cd resources/packer/node
     packer init .
-    packer build -var 'size=s-2vcpu-4gb' node.pkr.hcl
+    packer build -var 'size=s-2vcpu-4gb' -var 'region={{region}}' node.pkr.hcl
   )
 
-build-client-image:
+build-client-image region="lon1":
   #!/usr/bin/env bash
   (
     cd resources/packer/node
     packer init .
-    packer build -var 'size=s-2vcpu-4gb' node.pkr.hcl
+    packer build -var 'size=s-2vcpu-4gb' -var 'region={{region}}' node.pkr.hcl
   )
 
-build-nat-gateway-image:
+build-nat-gateway-image region="lon1":
   #!/usr/bin/env bash
   (
     cd resources/packer/node
     packer init .
-    packer build -var 'size=s-1vcpu-2gb' node.pkr.hcl
+    packer build -var 'size=s-1vcpu-2gb' -var 'region={{region}}' node.pkr.hcl
   )
 
 # This target has been copied from another repository. On other repositories, more than one
@@ -123,3 +124,19 @@ package-release-assets:
   mkdir -p deploy/$bin
   mv *.tar.gz deploy/$bin
   mv *.zip deploy/$bin
+
+build-all-images region:
+  #!/usr/bin/env bash
+  set -e
+  just build-rust-build-image {{region}}
+  just build-evm-node-image {{region}}
+  just build-peer-cache-image {{region}}
+  just build-node-image {{region}}
+  just build-client-image {{region}}
+  just build-nat-gateway-image {{region}}
+
+build-lon1-images:
+  just build-all-images lon1
+
+build-ams3-images:
+  just build-all-images ams3

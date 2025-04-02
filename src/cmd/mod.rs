@@ -209,6 +209,11 @@ pub enum Commands {
         /// Valid values are "aws" or "digital-ocean".
         #[clap(long, default_value_t = CloudProvider::DigitalOcean, value_parser = parse_provider, verbatim_doc_comment)]
         provider: CloudProvider,
+        /// The region to deploy to.
+        ///
+        /// Defaults to "lon1" for Digital Ocean.
+        #[clap(long, default_value = "lon1")]
+        region: String,
         /// The owner/org of the Github repository to build from.
         ///
         /// If used, all binaries will be built from this repository. It is typically used for
@@ -571,6 +576,9 @@ pub enum Commands {
         /// Set to disable Telegraf metrics collection on all nodes.
         #[clap(long)]
         disable_telegraf: bool,
+        /// The region to deploy to.
+        #[clap(long, default_value = "lon1")]
+        region: String,
     },
     ExtendVolumeSize {
         /// Set to run Ansible with more verbose output.

@@ -45,11 +45,13 @@ impl TerraformRunner {
     pub fn apply(
         &self,
         vars: Vec<(String, String)>,
-        tfvars_filename: Option<String>,
+        tfvars_filenames: Option<Vec<String>>,
     ) -> Result<()> {
         let mut args = vec!["apply".to_string(), "-auto-approve".to_string()];
-        if let Some(tfvars_filename) = tfvars_filename {
-            args.push(format!("-var-file={}", tfvars_filename));
+        if let Some(filenames) = tfvars_filenames {
+            for filename in filenames {
+                args.push(format!("-var-file={}", filename));
+            }
         }
         for var in vars.iter() {
             args.push("-var".to_string());
@@ -68,11 +70,13 @@ impl TerraformRunner {
     pub fn plan(
         &self,
         vars: Option<Vec<(String, String)>>,
-        tfvars_filename: Option<String>,
+        tfvars_filenames: Option<Vec<String>>,
     ) -> Result<()> {
         let mut args = vec!["plan".to_string()];
-        if let Some(tfvars_filename) = tfvars_filename {
-            args.push(format!("-var-file={}", tfvars_filename));
+        if let Some(filenames) = tfvars_filenames {
+            for filename in filenames {
+                args.push(format!("-var-file={}", filename));
+            }
         }
         if let Some(vars) = vars {
             for var in vars.iter() {
@@ -93,11 +97,13 @@ impl TerraformRunner {
     pub fn destroy(
         &self,
         vars: Option<Vec<(String, String)>>,
-        tfvars_filename: Option<String>,
+        tfvars_filenames: Option<Vec<String>>,
     ) -> Result<()> {
         let mut args = vec!["destroy".to_string(), "-auto-approve".to_string()];
-        if let Some(tfvars_filename) = tfvars_filename {
-            args.push(format!("-var-file={}", tfvars_filename));
+        if let Some(filenames) = tfvars_filenames {
+            for filename in filenames {
+                args.push(format!("-var-file={}", filename));
+            }
         }
         if let Some(vars) = vars {
             for var in vars.iter() {

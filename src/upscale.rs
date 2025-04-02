@@ -153,6 +153,7 @@ impl TestnetDeployer {
 
         let mut infra_run_options = InfraRunOptions::generate_existing(
             &options.current_inventory.name,
+            &options.current_inventory.environment_details.region,
             &self.terraform_runner,
             Some(&options.current_inventory.environment_details),
         )
@@ -464,6 +465,7 @@ impl TestnetDeployer {
 
         let mut infra_run_options = InfraRunOptions::generate_existing(
             &options.current_inventory.name,
+            &options.current_inventory.environment_details.region,
             &self.terraform_runner,
             Some(&options.current_inventory.environment_details),
         )

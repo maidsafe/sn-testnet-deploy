@@ -46,6 +46,7 @@ pub async fn handle_bootstrap(
     node_volume_size: Option<u16>,
     peer: Option<String>,
     provider: CloudProvider,
+    region: String,
     repo_owner: Option<String>,
     rewards_address: String,
     symmetric_private_node_count: Option<u16>,
@@ -137,10 +138,8 @@ pub async fn handle_bootstrap(
     testnet_deployer
         .bootstrap(&BootstrapOptions {
             binary_option,
-            network_contacts_url,
-            peer,
+            chunk_size,
             environment_type: environment_type.clone(),
-            node_env_variables: env_variables,
             evm_data_payments_address,
             evm_network: evm_network_type,
             evm_payment_token_address,
@@ -154,28 +153,31 @@ pub async fn handle_bootstrap(
             }),
             interval,
             log_format,
+            max_archived_log_files,
+            max_log_files,
             name: name.clone(),
+            network_contacts_url,
             network_id,
             node_count,
+            node_env_variables: env_variables,
             node_vm_count,
             node_vm_size,
             node_volume_size: node_volume_size
                 .or_else(|| Some(calculate_size_per_attached_volume(node_count))),
-            max_archived_log_files,
-            max_log_files,
             output_inventory_dir_path: inventory_service
                 .working_directory_path
                 .join("ansible")
                 .join("inventory"),
-            symmetric_private_node_vm_count,
+            peer,
+            region,
+            rewards_address,
             symmetric_private_node_count,
+            symmetric_private_node_vm_count,
             symmetric_private_node_volume_size: symmetric_private_node_volume_size.or_else(|| {
                 Some(calculate_size_per_attached_volume(
                     symmetric_private_node_count,
                 ))
             }),
-            rewards_address,
-            chunk_size,
         })
         .await?;
 
@@ -239,6 +241,7 @@ pub async fn handle_deploy(
     symmetric_private_node_volume_size: Option<u16>,
     provider: crate::CloudProvider,
     public_rpc: bool,
+    region: String,
     repo_owner: Option<String>,
     rewards_address: String,
     to_genesis: bool,
@@ -381,6 +384,7 @@ pub async fn handle_deploy(
             ))
         }),
         uploaders_count,
+        region,
     };
 
     if to_genesis {

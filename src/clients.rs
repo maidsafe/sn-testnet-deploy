@@ -61,6 +61,7 @@ pub struct ClientsDeployBuilder {
     deployment_type: EnvironmentType,
     environment_name: String,
     provider: Option<CloudProvider>,
+    region: Option<String>,
     ssh_secret_key_path: Option<PathBuf>,
     state_bucket_name: Option<String>,
     terraform_binary_path: Option<PathBuf>,
@@ -123,6 +124,11 @@ impl ClientsDeployBuilder {
         self
     }
 
+    pub fn region(&mut self, region: String) -> &mut Self {
+        self.region = Some(region);
+        self
+    }
+
     pub fn build(&self) -> Result<ClientsDeployer> {
         let provider = self.provider.unwrap_or(CloudProvider::DigitalOcean);
         match provider {
@@ -167,6 +173,11 @@ impl ClientsDeployBuilder {
             None => PathBuf::from(std::env::var("ANSIBLE_VAULT_PASSWORD_PATH")?),
         };
 
+        let region = match self.region {
+            Some(ref region) => region.clone(),
+            None => "lon1".to_string(),
+        };
+
         let terraform_runner = TerraformRunner::new(
             terraform_binary_path.to_path_buf(),
             working_directory_path
@@ -200,6 +211,7 @@ impl ClientsDeployBuilder {
             ssh_client,
             terraform_runner,
             working_directory_path,
+            region,
         )?;
 
         Ok(client_deployer)
@@ -213,6 +225,7 @@ pub struct ClientsDeployer {
     pub deployment_type: EnvironmentType,
     pub environment_name: String,
     pub inventory_file_path: PathBuf,
+    pub region: String,
     pub s3_repository: S3Repository,
     pub ssh_client: SshClient,
     pub terraform_runner: TerraformRunner,
@@ -230,6 +243,7 @@ impl ClientsDeployer {
         ssh_client: SshClient,
         terraform_runner: TerraformRunner,
         working_directory_path: PathBuf,
+        region: String,
     ) -> Result<ClientsDeployer> {
         if environment_name.is_empty() {
             return Err(Error::EnvironmentNameRequired);
@@ -245,6 +259,7 @@ impl ClientsDeployer {
             deployment_type,
             environment_name: environment_name.to_string(),
             inventory_file_path,
+            region,
             s3_repository,
             ssh_client,
             terraform_runner,
@@ -261,7 +276,7 @@ impl ClientsDeployer {
 
         println!("Running terraform apply...");
         self.terraform_runner
-            .apply(args, Some(options.tfvars_filename.clone()))?;
+            .apply(args, Some(options.tfvars_filenames.clone()))?;
         print_duration(start.elapsed());
         Ok(())
     }
@@ -286,7 +301,7 @@ impl ClientsDeployer {
         let args = options.build_terraform_args()?;
 
         self.terraform_runner
-            .plan(Some(args), Some(options.tfvars_filename.clone()))?;
+            .plan(Some(args), Some(options.tfvars_filenames.clone()))?;
         Ok(())
     }
 
@@ -312,7 +327,7 @@ impl ClientsDeployer {
             client_vm_size: options.client_vm_size.clone(),
             enable_build_vm: build_custom_binaries,
             name: options.name.clone(),
-            tfvars_filename: options.current_inventory.get_tfvars_filename(),
+            tfvars_filenames: options.current_inventory.get_tfvars_filenames(),
         };
 
         self.create_or_update_infra(&infra_options)?;
@@ -331,6 +346,7 @@ impl ClientsDeployer {
                 },
                 funding_wallet_address: None,
                 network_id: options.network_id,
+                region: self.region.clone(),
                 rewards_address: None,
             },
         )
@@ -405,7 +421,7 @@ impl ClientsDeployer {
         ));
 
         self.terraform_runner
-            .destroy(Some(args), Some(options.tfvars_filename.clone()))?;
+            .destroy(Some(args), Some(options.tfvars_filenames.clone()))?;
 
         crate::infra::delete_workspace(&self.terraform_runner, &self.environment_name)?;
 
