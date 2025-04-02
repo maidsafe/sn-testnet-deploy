@@ -63,6 +63,7 @@ pub struct DeployOptions {
     pub symmetric_private_node_vm_count: Option<u16>,
     pub symmetric_private_node_volume_size: Option<u16>,
     pub public_rpc: bool,
+    pub region: String,
     pub rewards_address: String,
     pub uploaders_count: u16,
 }
@@ -107,10 +108,15 @@ impl TestnetDeployer {
             peer_cache_node_vm_count: options.peer_cache_node_vm_count,
             peer_cache_node_vm_size: options.peer_cache_node_vm_size.clone(),
             peer_cache_node_volume_size: options.peer_cache_node_volume_size,
+            region: options.region.clone(),
             symmetric_nat_gateway_vm_size: options.symmetric_nat_gateway_vm_size.clone(),
             symmetric_private_node_vm_count: options.symmetric_private_node_vm_count,
             symmetric_private_node_volume_size: options.symmetric_private_node_volume_size,
-            tfvars_filename: Some(options.environment_type.get_tfvars_filename(&options.name)),
+            tfvars_filenames: Some(
+                options
+                    .environment_type
+                    .get_tfvars_filenames(&options.name, &options.region),
+            ),
         })
         .map_err(|err| {
             println!("Failed to create infra {err:?}");
@@ -131,6 +137,7 @@ impl TestnetDeployer {
                 },
                 funding_wallet_address: None,
                 network_id: options.network_id,
+                region: options.region.clone(),
                 rewards_address: Some(options.rewards_address.clone()),
             },
         )
@@ -193,6 +200,7 @@ impl TestnetDeployer {
                 },
                 funding_wallet_address,
                 network_id: options.network_id,
+                region: options.region.clone(),
                 rewards_address: Some(options.rewards_address.clone()),
             },
         )

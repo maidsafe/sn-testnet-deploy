@@ -545,6 +545,7 @@ impl DeploymentInventoryService {
     pub async fn generate_or_retrieve_client_inventory(
         &self,
         name: &str,
+        region: &str,
         force: bool,
         binary_option: Option<BinaryOption>,
     ) -> Result<ClientsDeploymentInventory> {
@@ -589,6 +590,7 @@ impl DeploymentInventoryService {
                     binary_option.ok_or_else(|| {
                         eyre!("For a new deployment the binary option must be set")
                     })?,
+                    region,
                 ));
             }
             Err(e) => return Err(e.into()),
@@ -641,6 +643,7 @@ impl DeploymentInventoryService {
             network_id: environment_details.network_id,
             failed_node_registry_vms: Vec::new(),
             name: name.to_string(),
+            region: environment_details.region,
             ssh_user: self.cloud_provider.get_ssh_user(),
             ssh_private_key_path: self.ssh_client.private_key_path.clone(),
             uploaded_files: Vec::new(),
@@ -869,13 +872,13 @@ impl DeploymentInventory {
         }
     }
 
-    pub fn get_tfvars_filename(&self) -> String {
-        let filename = self
+    pub fn get_tfvars_filenames(&self) -> Vec<String> {
+        let filenames = self
             .environment_details
             .environment_type
-            .get_tfvars_filename(&self.name);
-        debug!("Using tfvars file {filename}",);
-        filename
+            .get_tfvars_filenames(&self.name, &self.environment_details.region);
+        debug!("Using tfvars files {filenames:?}");
+        filenames
     }
 
     pub fn is_empty(&self) -> bool {
@@ -1353,6 +1356,7 @@ pub struct ClientsDeploymentInventory {
     pub network_id: Option<u8>,
     pub failed_node_registry_vms: Vec<String>,
     pub name: String,
+    pub region: String,
     pub ssh_user: String,
     pub ssh_private_key_path: PathBuf,
     pub uploaded_files: Vec<(String, String)>,
@@ -1361,7 +1365,11 @@ pub struct ClientsDeploymentInventory {
 impl ClientsDeploymentInventory {
     /// Create an inventory for a new Client deployment which is initially empty, other than the name and
     /// binary option, which will have been selected.
-    pub fn empty(name: &str, binary_option: BinaryOption) -> ClientsDeploymentInventory {
+    pub fn empty(
+        name: &str,
+        binary_option: BinaryOption,
+        region: &str,
+    ) -> ClientsDeploymentInventory {
         Self {
             binary_option,
             client_vms: Default::default(),
@@ -1371,17 +1379,20 @@ impl ClientsDeploymentInventory {
             network_id: None,
             failed_node_registry_vms: Default::default(),
             name: name.to_string(),
+            region: region.to_string(),
             ssh_user: "root".to_string(),
             ssh_private_key_path: Default::default(),
             uploaded_files: Default::default(),
         }
     }
 
-    pub fn get_tfvars_filename(&self) -> String {
+    pub fn get_tfvars_filenames(&self) -> Vec<String> {
         debug!("Environment type: {:?}", self.environment_type);
-        let filename = self.environment_type.get_tfvars_filename(&self.name);
-        debug!("Using tfvars file {filename}",);
-        filename
+        let filenames = self
+            .environment_type
+            .get_tfvars_filenames(&self.name, &self.region);
+        debug!("Using tfvars files {filenames:?}");
+        filenames
     }
 
     pub fn is_empty(&self) -> bool {

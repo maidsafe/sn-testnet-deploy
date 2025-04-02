@@ -49,27 +49,23 @@ variable "build_machine_size" {
 }
 
 variable "build_droplet_image_id" {
-  default = "172723670"
+  description = "The ID of the image for the build machine. Varies per region."
 }
 
 variable "peer_cache_droplet_image_id" {
   description = "The ID of the Peer Cache node droplet image. Varies per environment type."
-  default = 173264988
 }
 
 variable "nat_gateway_droplet_image_id" {
   description = "The ID of the gateway droplet image. Varies per environment type."
-  default = 178052140
 }
 
 variable "node_droplet_image_id" {
   description = "The ID of the node droplet image. Varies per environment type."
-  default = 173265007
 }
 
 variable "ant_client_droplet_image_id" {
   description = "The ID of the ANT Client droplet image. Varies per environment type."
-  default = 172724146
 }
 
 variable "region" {
@@ -124,7 +120,6 @@ variable "evm_node_droplet_size" {
 
 variable "evm_node_droplet_image_id" {
   description = "The ID of the EVM node droplet image. Varies per environment type."
-  default = 172723723
 }
 
 variable "volumes_per_node" {

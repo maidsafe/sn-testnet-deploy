@@ -209,6 +209,7 @@ pub struct EnvironmentDetails {
     pub evm_details: EvmDetails,
     pub funding_wallet_address: Option<String>,
     pub network_id: Option<u8>,
+    pub region: String,
     pub rewards_address: Option<String>,
 }
 
@@ -221,12 +222,21 @@ pub enum EnvironmentType {
 }
 
 impl EnvironmentType {
-    pub fn get_tfvars_filename(&self, name: &str) -> String {
+    pub fn get_tfvars_filenames(&self, name: &str, region: &str) -> Vec<String> {
         match self {
-            EnvironmentType::Development => "dev.tfvars".to_string(),
-            EnvironmentType::Staging => "staging.tfvars".to_string(),
+            EnvironmentType::Development => vec![
+                "dev.tfvars".to_string(),
+                format!("dev-images-{region}.tfvars", region = region),
+            ],
+            EnvironmentType::Staging => vec![
+                "staging.tfvars".to_string(),
+                format!("staging-images-{region}.tfvars", region = region),
+            ],
             EnvironmentType::Production => {
-                format!("{name}.tfvars",)
+                vec![
+                    format!("{name}.tfvars", name = name),
+                    format!("production-images-{region}.tfvars", region = region),
+                ]
             }
         }
     }
@@ -435,6 +445,7 @@ pub struct TestnetDeployBuilder {
     deployment_type: EnvironmentType,
     environment_name: String,
     provider: Option<CloudProvider>,
+    region: Option<String>,
     ssh_secret_key_path: Option<PathBuf>,
     state_bucket_name: Option<String>,
     terraform_binary_path: Option<PathBuf>,
@@ -497,6 +508,11 @@ impl TestnetDeployBuilder {
         self
     }
 
+    pub fn region(&mut self, region: String) -> &mut Self {
+        self.region = Some(region);
+        self
+    }
+
     pub fn build(&self) -> Result<TestnetDeployer> {
         let provider = self.provider.unwrap_or(CloudProvider::DigitalOcean);
         match provider {
@@ -539,6 +555,11 @@ impl TestnetDeployBuilder {
         let vault_password_path = match self.vault_password_path {
             Some(ref vault_pw_path) => vault_pw_path.clone(),
             None => PathBuf::from(std::env::var("ANSIBLE_VAULT_PASSWORD_PATH")?),
+        };
+
+        let region = match self.region {
+            Some(ref region) => region.clone(),
+            None => "lon1".to_string(),
         };
 
         let terraform_runner = TerraformRunner::new(
@@ -584,6 +605,7 @@ impl TestnetDeployBuilder {
             ssh_client,
             terraform_runner,
             working_directory_path,
+            region,
         )?;
 
         Ok(testnet)
@@ -597,6 +619,7 @@ pub struct TestnetDeployer {
     pub deployment_type: EnvironmentType,
     pub environment_name: String,
     pub inventory_file_path: PathBuf,
+    pub region: String,
     pub rpc_client: RpcClient,
     pub s3_repository: S3Repository,
     pub ssh_client: SshClient,
@@ -616,6 +639,7 @@ impl TestnetDeployer {
         ssh_client: SshClient,
         terraform_runner: TerraformRunner,
         working_directory_path: PathBuf,
+        region: String,
     ) -> Result<TestnetDeployer> {
         if environment_name.is_empty() {
             return Err(Error::EnvironmentNameRequired);
@@ -630,6 +654,7 @@ impl TestnetDeployer {
             deployment_type,
             environment_name: environment_name.to_string(),
             inventory_file_path,
+            region,
             rpc_client,
             ssh_client,
             s3_repository,
@@ -691,7 +716,7 @@ impl TestnetDeployer {
         let args = build_terraform_args(options)?;
 
         self.terraform_runner
-            .plan(Some(args), options.tfvars_filename.clone())?;
+            .plan(Some(args), options.tfvars_filenames.clone())?;
         Ok(())
     }
 
@@ -968,14 +993,20 @@ impl TestnetDeployer {
 
         let options = InfraRunOptions::generate_existing(
             &self.environment_name,
+            &self.region,
             &self.terraform_runner,
             environment_details.as_ref(),
         )
         .await?;
 
         let args = build_terraform_args(&options)?;
+        let tfvars_filenames = if let Some(environment_details) = &environment_details {
+            environment_details.environment_type.get_tfvars_filenames(&self.environment_name, &self.region)
+        } else {
+            vec![]
+        };
 
-        self.terraform_runner.destroy(Some(args), None)?;
+        self.terraform_runner.destroy(Some(args), Some(tfvars_filenames))?;
 
         infra::delete_workspace(&self.terraform_runner, &self.environment_name)?;
 

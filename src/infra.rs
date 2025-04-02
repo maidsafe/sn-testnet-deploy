@@ -62,16 +62,18 @@ pub struct InfraRunOptions {
     pub peer_cache_node_vm_count: Option<u16>,
     pub peer_cache_node_vm_size: Option<String>,
     pub peer_cache_node_volume_size: Option<u16>,
+    pub region: String,
     pub symmetric_nat_gateway_vm_size: Option<String>,
     pub symmetric_private_node_vm_count: Option<u16>,
     pub symmetric_private_node_volume_size: Option<u16>,
-    pub tfvars_filename: Option<String>,
+    pub tfvars_filenames: Option<Vec<String>>,
 }
 
 impl InfraRunOptions {
     /// Generate the options for an existing deployment.
     pub async fn generate_existing(
         name: &str,
+        region: &str,
         terraform_runner: &TerraformRunner,
         environment_details: Option<&EnvironmentDetails>,
     ) -> Result<Self> {
@@ -253,11 +255,12 @@ impl InfraRunOptions {
             peer_cache_node_vm_count: Some(peer_cache_node_vm_count),
             peer_cache_node_vm_size,
             peer_cache_node_volume_size,
+            region: region.to_string(),
             symmetric_nat_gateway_vm_size,
             symmetric_private_node_vm_count: Some(symmetric_private_node_vm_count),
             symmetric_private_node_volume_size,
-            tfvars_filename: environment_details
-                .map(|details| details.environment_type.get_tfvars_filename(name)),
+            tfvars_filenames: environment_details
+                .map(|details| details.environment_type.get_tfvars_filenames(name, region)),
         };
 
         Ok(options)
@@ -275,7 +278,7 @@ impl TestnetDeployer {
 
         println!("Running terraform apply...");
         self.terraform_runner
-            .apply(args, options.tfvars_filename.clone())?;
+            .apply(args, options.tfvars_filenames.clone())?;
         print_duration(start.elapsed());
         Ok(())
     }
@@ -289,7 +292,7 @@ pub struct ClientsInfraRunOptions {
     /// Set to None for new deployments, as the value will be fetched from tfvars.
     pub enable_build_vm: bool,
     pub name: String,
-    pub tfvars_filename: String,
+    pub tfvars_filenames: Vec<String>,
 }
 
 impl ClientsInfraRunOptions {
@@ -330,9 +333,9 @@ impl ClientsInfraRunOptions {
             client_vm_size,
             enable_build_vm,
             name: name.to_string(),
-            tfvars_filename: environment_details
+            tfvars_filenames: environment_details
                 .environment_type
-                .get_tfvars_filename(name),
+                .get_tfvars_filenames(name, &environment_details.region),
         };
 
         Ok(options)
@@ -372,6 +375,8 @@ impl ClientsInfraRunOptions {
 /// Build the terraform arguments from InfraRunOptions
 pub fn build_terraform_args(options: &InfraRunOptions) -> Result<Vec<(String, String)>> {
     let mut args = Vec::new();
+
+    args.push(("region".to_string(), options.region.clone()));
 
     if let Some(client_image_id) = &options.client_image_id {
         args.push((

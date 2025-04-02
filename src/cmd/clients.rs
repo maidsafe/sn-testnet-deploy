@@ -166,6 +166,11 @@ pub enum ClientsCommands {
         /// Valid values are "aws" or "digital-ocean".
         #[clap(long, default_value_t = CloudProvider::DigitalOcean, value_parser = parse_provider, verbatim_doc_comment)]
         provider: CloudProvider,
+        /// The region to deploy to.
+        ///
+        /// Defaults to "lon1" for Digital Ocean.
+        #[clap(long, default_value = "lon1")]
+        region: String,
         /// The owner/org of the Github repository to build from.
         ///
         /// If used, all binaries will be built from this repository. It is typically used for
@@ -350,6 +355,7 @@ pub async fn handle_clients_command(cmd: ClientsCommands) -> Result<()> {
             network_contacts_url,
             peer,
             provider,
+            region,
             repo_owner,
             uploaders_count,
             wallet_secret_key,
@@ -417,7 +423,12 @@ pub async fn handle_clients_command(cmd: ClientsCommands) -> Result<()> {
 
             let inventory_service = DeploymentInventoryService::from(&client_deployer);
             let inventory = inventory_service
-                .generate_or_retrieve_client_inventory(&name, true, Some(binary_option.clone()))
+                .generate_or_retrieve_client_inventory(
+                    &name,
+                    &region,
+                    true,
+                    Some(binary_option.clone()),
+                )
                 .await?;
             let evm_details = EvmDetails {
                 network: evm_network_type,

@@ -41,6 +41,7 @@ pub struct BootstrapOptions {
     pub node_volume_size: Option<u16>,
     pub output_inventory_dir_path: PathBuf,
     pub peer: Option<String>,
+    pub region: String,
     pub rewards_address: String,
     pub symmetric_private_node_count: u16,
     pub symmetric_private_node_vm_count: Option<u16>,
@@ -70,6 +71,7 @@ impl TestnetDeployer {
                 },
                 funding_wallet_address: None,
                 network_id: Some(options.network_id),
+                region: options.region.clone(),
                 rewards_address: Some(options.rewards_address.clone()),
             },
         )
@@ -98,14 +100,14 @@ impl TestnetDeployer {
             peer_cache_node_vm_count: Some(0),
             peer_cache_node_vm_size: None,
             peer_cache_node_volume_size: None,
+            region: options.region.clone(),
             symmetric_nat_gateway_vm_size: None, // We can take the value from tfvars for bootstrap deployments.
             symmetric_private_node_vm_count: options.symmetric_private_node_vm_count,
             symmetric_private_node_volume_size: options.symmetric_private_node_volume_size,
-            tfvars_filename: Some(
+            tfvars_filenames: Some(
                 options
                     .environment_type
-                    .get_tfvars_filename(&options.name)
-                    .to_string(),
+                    .get_tfvars_filenames(&options.name, &options.region),
             ),
         })
         .map_err(|err| {

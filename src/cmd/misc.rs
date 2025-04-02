@@ -44,13 +44,14 @@ pub async fn handle_extend_volume_size(
         .build()?;
     testnet_deployer.init().await?;
 
-    let environemt_details =
+    let environment_details =
         get_environment_details(&name, &testnet_deployer.s3_repository).await?;
 
     let mut infra_run_options = InfraRunOptions::generate_existing(
         &name,
+        &environment_details.region,
         &testnet_deployer.terraform_runner,
-        Some(&environemt_details),
+        Some(&environment_details),
     )
     .await?;
     println!("Obtained infra run options from previous deployment {infra_run_options:?}");
