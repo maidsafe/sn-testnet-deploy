@@ -404,7 +404,7 @@ pub fn generate_symmetric_private_node_static_environment_inventory(
     let mut file = File::create(&dest_path)?;
 
     for (privat_node_vm, nat_gateway_vm) in private_node_nat_gateway_map.iter() {
-        let node_number = privat_node_vm.name.split('-').last().unwrap();
+        let node_number = privat_node_vm.name.split('-').next_back().unwrap();
         writeln!(file, "[symmetric_private_node_{}]", node_number)?;
         writeln!(file, "{}", privat_node_vm.private_ip_addr)?;
         writeln!(file, "[symmetric_private_node_{}:vars]", node_number)?;
@@ -457,7 +457,7 @@ pub fn generate_full_cone_private_node_static_environment_inventory(
     let mut file = File::create(&dest_path)?;
 
     for (privat_node_vm, nat_gateway_vm) in private_node_nat_gateway_map.iter() {
-        let node_number = privat_node_vm.name.split('-').last().unwrap();
+        let node_number = privat_node_vm.name.split('-').next_back().unwrap();
         writeln!(file, "[full_cone_private_node_{}]", node_number)?;
 
         writeln!(file, "{}", privat_node_vm.private_ip_addr)?;

@@ -213,8 +213,8 @@ impl PrivateNodeProvisionInventory {
             let nat_gateway = nat_gateway_vms
                 .iter()
                 .find(|vm| {
-                    let private_node_name = private_vm.name.split('-').last().unwrap();
-                    let nat_gateway_name = vm.name.split('-').last().unwrap();
+                    let private_node_name = private_vm.name.split('-').next_back().unwrap();
+                    let nat_gateway_name = vm.name.split('-').next_back().unwrap();
                     private_node_name == nat_gateway_name
                 })
                 .ok_or_else(|| {
@@ -625,20 +625,20 @@ impl AnsibleProvisioner {
             let mut names_to_keep = Vec::new();
 
             for vm in new_full_cone_nat_gateway_new_vms_for_upscale.iter() {
-                let nat_gateway_name = vm.name.split('-').last().unwrap();
+                let nat_gateway_name = vm.name.split('-').next_back().unwrap();
                 names_to_keep.push(nat_gateway_name);
             }
 
             modified_private_node_inventory
                 .full_cone_nat_gateway_vms
                 .retain(|vm| {
-                    let nat_gateway_name = vm.name.split('-').last().unwrap();
+                    let nat_gateway_name = vm.name.split('-').next_back().unwrap();
                     names_to_keep.contains(&nat_gateway_name)
                 });
             modified_private_node_inventory
                 .full_cone_private_node_vms
                 .retain(|vm| {
-                    let nat_gateway_name = vm.name.split('-').last().unwrap();
+                    let nat_gateway_name = vm.name.split('-').next_back().unwrap();
                     names_to_keep.contains(&nat_gateway_name)
                 });
             debug!("New inventory after removing existing full cone NAT Gateway and private node VMs: {modified_private_node_inventory:?}");
