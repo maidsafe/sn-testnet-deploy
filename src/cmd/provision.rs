@@ -17,7 +17,7 @@ use sn_testnet_deploy::{
 
 #[derive(Subcommand, Debug)]
 pub enum ProvisionCommands {
-    /// Provision Clients for an environment
+    /// Provision clients for an environment
     #[clap(name = "clients")]
     Clients {
         /// The name of the environment
@@ -185,8 +185,23 @@ pub async fn handle_provision_clients(name: String) -> Result<()> {
         )
         .await
         .map_err(|err| {
-            println!("Failed to provision Clients {err:?}");
+            println!("Failed to provision clients: {err:?}");
             err
         })?;
+
+    provisioner.print_ansible_run_banner("Provision Downloaders");
+    provisioner
+        .provision_downloaders(
+            &provision_options,
+            Some(genesis_multiaddr.clone()),
+            Some(genesis_network_contacts.clone()),
+        )
+        .await
+        .map_err(|err| {
+            println!("Failed to provision downloaders: {err:?}");
+            err
+        })?;
+
     Ok(())
 }
+
