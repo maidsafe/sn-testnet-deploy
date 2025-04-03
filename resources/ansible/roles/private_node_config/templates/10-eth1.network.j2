@@ -1,0 +1,24 @@
+[Match]
+Name=eth1
+
+[Network]
+Address={{ eth1_ip_address.stdout }}/16
+
+[Route]
+Destination=10.0.0.0/8
+Gateway={{ nat_gateway_private_ip_eth1 }}
+Metric=101
+
+[Route]
+Destination=172.16.0.0/12
+Gateway={{ nat_gateway_private_ip_eth1 }}
+Metric=101
+
+[Route]
+Destination=192.168.0.0/16
+Gateway={{ nat_gateway_private_ip_eth1 }}
+Metric=101
+
+[Route]
+Destination=0.0.0.0/0
+Gateway={{ nat_gateway_private_ip_eth1 }}
