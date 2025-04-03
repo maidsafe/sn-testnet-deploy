@@ -1155,7 +1155,7 @@ pub async fn get_and_extract_archive_from_s3(
 ) -> Result<()> {
     // In this case, not using unwrap leads to having to provide a very trivial error variant that
     // doesn't seem very valuable.
-    let archive_file_name = archive_bucket_path.split('/').last().unwrap();
+    let archive_file_name = archive_bucket_path.split('/').next_back().unwrap();
     let archive_dest_path = dest_path.join(archive_file_name);
     s3_repository
         .download_object(bucket_name, archive_bucket_path, &archive_dest_path)
