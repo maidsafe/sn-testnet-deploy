@@ -1001,12 +1001,15 @@ impl TestnetDeployer {
 
         let args = build_terraform_args(&options)?;
         let tfvars_filenames = if let Some(environment_details) = &environment_details {
-            environment_details.environment_type.get_tfvars_filenames(&self.environment_name, &self.region)
+            environment_details
+                .environment_type
+                .get_tfvars_filenames(&self.environment_name, &self.region)
         } else {
             vec![]
         };
 
-        self.terraform_runner.destroy(Some(args), Some(tfvars_filenames))?;
+        self.terraform_runner
+            .destroy(Some(args), Some(tfvars_filenames))?;
 
         infra::delete_workspace(&self.terraform_runner, &self.environment_name)?;
 

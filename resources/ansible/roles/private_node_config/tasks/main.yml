@@ -10,7 +10,7 @@
   command: ip route show
   register: ip_route_output
 
-- name: Retrieve private IP of the corresponding nat gateway
+- name: retrieve private ip of the corresponding nat gateway
   set_fact:
     nat_gateway_private_ip_eth1: "{{ nat_gateway_private_ip_map[inventory_hostname] }}"
 
@@ -19,25 +19,81 @@
     nat_gateway_is_configured: true
   when: ip_route_output.stdout.find(nat_gateway_private_ip_eth1) != -1
 
-- name: Check if a backup netplan conf file exists
-  stat:
-    path: /etc/netplan/50-cloud-init.yaml.backup
-  register: netplan_conf_backup
-
-- name: obtain DO gateway ip
+- name: obtain do gateway ip
   command: curl -s http://169.254.169.254/metadata/v1/interfaces/public/0/ipv4/gateway
   register: do_gateway_ip
-  when: not nat_gateway_is_configured and not netplan_conf_backup.stat.exists
+  when: not nat_gateway_is_configured
 
-- name: backup and configure the new netplan configuration file
-  shell: |
-    cp /etc/netplan/50-cloud-init.yaml /etc/netplan/50-cloud-init.yaml.backup
-    sed -i '/eth0:/,/set-name: eth0/{/routes:/,/set-name: eth0/d}' /etc/netplan/50-cloud-init.yaml
-    sed -i '/set-name: eth1/a\ \ \ \ \ \ \ \ \ \ \ \ routes:\n\ \ \ \ \ \ \ \ \ \ \ \ - \ \ to: 0.0.0.0/0\n\ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ via: {{ nat_gateway_private_ip_eth1 }}' /etc/netplan/50-cloud-init.yaml
-    sed -i '/eth0:/a\ \ \ \ \ \ \ \ \ \ \ \ routes:\n\ \ \ \ \ \ \ \ \ \ \ \ - \ \ \ to: 169.254.169.254\n\ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ via: {{ do_gateway_ip.stdout }}\n\ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ on-link: true' /etc/netplan/50-cloud-init.yaml
-    sed -i '/^[ \t]*- [0-9.]*\/20[ \t]*$/d' /etc/netplan/50-cloud-init.yaml
-  when: not nat_gateway_is_configured and not netplan_conf_backup.stat.exists
+- name: retrieve eth1 ip address
+  shell: ip -f inet addr show eth1 | grep -Po 'inet \K[\d.]+'
+  register: eth1_ip_address
+  when: not nat_gateway_is_configured
+
+- name: remove existing routes from eth0
+  block:
+    - name: retrieve current netplan config
+      slurp:
+        src: /etc/netplan/50-cloud-init.yaml
+      register: netplan_content
+      
+    - name: parse netplan yaml
+      set_fact:
+        netplan_config: "{{ netplan_content.content | b64decode | from_yaml }}"
+        
+    - name: remove public ip with /20 subnet from addresses
+      set_fact:
+        eth0_addresses: "{{ netplan_config.network.ethernets.eth0.addresses | reject('match', '^[0-9.]+/20$') | list }}"
+        
+    - name: update eth0 config with metadata route
+      set_fact:
+        updated_eth0: "{{ netplan_config.network.ethernets.eth0 | combine({
+          'addresses': eth0_addresses,
+          'routes': [
+            {
+              'to': '169.254.169.254',
+              'via': do_gateway_ip.stdout,
+              'on-link': true
+            }
+          ]
+        }) }}"
+        
+    - name: update eth1 config with default route
+      set_fact:
+        updated_eth1: "{{ netplan_config.network.ethernets.eth1 | combine({
+          'routes': [
+            {
+              'to': '0.0.0.0/0',
+              'via': nat_gateway_private_ip_eth1
+            }
+          ]
+        }) }}"
+        
+    - name: update full config
+      set_fact:
+        updated_netplan: "{{ netplan_config | combine({
+          'network': {
+            'ethernets': {
+              'eth0': updated_eth0,
+              'eth1': updated_eth1
+            }
+          }
+        }, recursive=true) }}"
+        
+    - name: write updated netplan config
+      copy:
+        content: "{{ updated_netplan | to_nice_yaml }}"
+        dest: /etc/netplan/50-cloud-init.yaml
+  when: not nat_gateway_is_configured
 
 - name: apply the netplan rules
   command: netplan apply -debug
+  when: not nat_gateway_is_configured
+
+- name: create systemd network config for eth1 with vpc peering routes
+  template:
+    src: 10-eth1.network.j2
+    dest: /etc/systemd/network/10-eth1.network
+    owner: root
+    group: root
+    mode: '0644'
   when: not nat_gateway_is_configured
