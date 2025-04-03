@@ -117,13 +117,16 @@ pub enum Commands {
         /// The default value from ansible.cfg is 50.
         #[clap(long)]
         forks: Option<usize>,
-        /// The number of antnode services to be run behind a Full Cone NAT Gateway on each private node VM.
+        /// The number of antnode services to run behind a full-cone NAT gateway.
+        ///
+        /// The number applies to each VM, so the total number of nodes will be the number of VMs
+        /// multiplied by this number.
         ///
         /// If the argument is not used, the value will be determined by the 'environment-type'
         /// argument.
         #[clap(long, verbatim_doc_comment)]
         full_cone_private_node_count: Option<u16>,
-        /// The number of private node VMs to create. The private nodes will be behind a Full Cone NAT Gateway.
+        /// The number of VMs to use for hosting nodes behind a full-cone NAT gateway.
         ///
         /// Each VM will run many antnode services.
         ///
@@ -228,13 +231,13 @@ pub enum Commands {
         /// The rewards address for each of the antnode services.
         #[arg(long, required = true)]
         rewards_address: String,
-        /// The number of antnode services to be run behind a Symmetric NAT Gateway on each private node VM.
+        /// The number of antnode services to run behind a symmetric NAT gateway on each VM.
         ///
         /// If the argument is not used, the value will be determined by the 'environment-type'
         /// argument.
         #[clap(long, verbatim_doc_comment)]
         symmetric_private_node_count: Option<u16>,
-        /// The number of private node VMs to create. The private nodes will be behind a Symmetric NAT Gateway.
+        /// The number of VMs to use for hosting nodes behind a symmetric NAT gateway.
         ///
         /// Each VM will run many antnode services.
         ///
@@ -269,7 +272,7 @@ pub enum Commands {
         /// The size of the swapfile in GB.
         #[arg(short = 's', long)]
         size: u16,
-        /// Set to also configure swapfile on the PeerCache nodes.
+        /// Set to also configure swapfile on the peer cache nodes.
         #[arg(long)]
         peer_cache: bool,
         /// The cloud provider for the environment.
@@ -323,58 +326,12 @@ pub enum Commands {
         /// arguments. You can only supply version numbers or a custom branch, not both.
         #[arg(long, verbatim_doc_comment)]
         branch: Option<String>,
-        /// The number of Client VMs to create.
-        ///
-        /// If the argument is not used, the value will be determined by the 'environment-type'
-        /// argument.
-        #[clap(long)]
-        client_vm_count: Option<u16>,
-        /// Override the size of the Client VMs.
-        #[clap(long)]
-        client_vm_size: Option<String>,
-        /// Set to enable the all the downloader types on the VMs.
-        ///
-        /// This will setup 'download-verifier', 'random-verifier' and 'performance-verifier' downloaders.
-        #[clap(long)]
-        enable_downloaders: bool,
-        /// The number of antnode services to run on each Peer Cache VM.
-        ///
-        /// If the argument is not used, the value will be determined by the 'environment-type'
-        /// argument.
-        #[clap(long)]
-        peer_cache_node_count: Option<u16>,
-        /// The number of Peer Cache node VMs to create.
-        ///
-        /// Each VM will run many antnode services.
-        ///
-        /// If the argument is not used, the value will be determined by the 'environment-type'
-        /// argument.
-        #[clap(long)]
-        peer_cache_node_vm_count: Option<u16>,
-        /// Override the size of the Peer Cache node VMs.
-        #[clap(long)]
-        peer_cache_node_vm_size: Option<String>,
-        /// The size of the volumes to attach to each Peer Cache node VM. This argument will set the size of all the
-        /// 7 attached volumes.
-        ///
-        /// If the argument is not used, the value will be determined by the 'environment-type'
-        /// argument.
-        #[clap(long)]
-        peer_cache_node_volume_size: Option<u16>,
         /// Specify the chunk size for the custom binaries using a 64-bit integer.
         ///
         /// This option only applies if the --branch and --repo-owner arguments are used.
         #[clap(long, value_parser = parse_chunk_size)]
         chunk_size: Option<u64>,
-        /// Provide environment variables for the antnode service.
-        ///
-        /// This is useful to set the antnode's log levels. Each variable should be comma
-        /// separated without any space.
-        ///
-        /// Example: --node-env ANT_LOG=all,RUST_LOG=libp2p=debug
-        #[clap(name = "node-env", long, use_value_delimiter = true, value_parser = parse_environment_variables, verbatim_doc_comment)]
-        node_env_variables: Option<Vec<(String, String)>>,
-        /// Provide environment variables for the antnode RPC client.
+        /// Provide environment variables for the ant binary.
         ///
         /// This is useful to set the client's log levels. Each variable should be comma
         /// separated without any space.
@@ -382,6 +339,22 @@ pub enum Commands {
         /// Example: --client-env CLIENT_LOG=all,RUST_LOG=debug
         #[clap(name = "client-env", long, use_value_delimiter = true, value_parser = parse_environment_variables, verbatim_doc_comment)]
         client_env_variables: Option<Vec<(String, String)>>,
+        /// The number of client VMs to create.
+        ///
+        /// If it is not used, the value will be determined by the 'environment-type' argument.
+        #[clap(long)]
+        client_vm_count: Option<u16>,
+        /// Override the size of the client VMs.
+        #[clap(long)]
+        client_vm_size: Option<String>,
+        /// Set to disable Telegraf metrics collection on all nodes.
+        #[clap(long)]
+        disable_telegraf: bool,
+        /// Set to enable the all the downloader types on the VMs.
+        ///
+        /// This will setup 'download-verifier', 'random-verifier' and 'performance-verifier' downloaders.
+        #[clap(long)]
+        enable_downloaders: bool,
         /// The type of deployment.
         ///
         /// Possible values are 'development', 'production' or 'staging'. The value used will
@@ -402,12 +375,12 @@ pub enum Commands {
         /// If not used, the default is 'arbitrum-one'.
         #[clap(long, default_value = "arbitrum-one", value_parser = parse_evm_network)]
         evm_network_type: EvmNetwork,
-        /// The address of the payment token contract.
-        #[arg(long)]
-        evm_payment_token_address: Option<String>,
         /// Override the size of the EVM node VMs.
         #[clap(long)]
         evm_node_vm_size: Option<String>,
+        /// The address of the payment token contract.
+        #[arg(long)]
+        evm_payment_token_address: Option<String>,
         /// The RPC URL for the EVM network.
         ///
         /// This argument only applies if the EVM network type is 'custom'.
@@ -418,27 +391,29 @@ pub enum Commands {
         /// The default value from ansible.cfg is 50.
         #[clap(long)]
         forks: Option<usize>,
-        /// Override the size of the Full Cone NAT gateway VM.
+        /// Override the size of the full-cone NAT gateway VM.
         #[clap(long)]
         full_cone_nat_gateway_vm_size: Option<String>,
-        /// The number of antnode services to be run behind a Full Cone NAT Gateway on each private node VM.
+        /// The number of antnode services to run behind a full-cone NAT gateway.
         ///
-        /// If the argument is not used, the value will be determined by the 'environment-type'
-        /// argument.
+        /// The number applies to each VM, so the total number of nodes will be the number of VMs
+        /// multiplied by this number.
+        ///
+        /// If it is not used, the value will be determined by the 'environment-type' argument.
         #[clap(long, verbatim_doc_comment)]
         full_cone_private_node_count: Option<u16>,
-        /// The number of private node VMs to create. The private nodes will be behind a Full Cone NAT Gateway.
+        /// The number of VMs to use for hosting nodes behind a full-cone NAT gateway.
         ///
         /// Each VM will run many antnode services.
         ///
-        /// If the argument is not used, the value will be determined by the 'environment-type'
+        /// If it is not used, the value will be determined by the 'environment-type' argument.
         #[clap(long, verbatim_doc_comment)]
         full_cone_private_node_vm_count: Option<u16>,
-        /// The size of the volumes to attach to each private node VM. This argument will set the size of all the
-        /// 7 attached volumes.
+        /// The size of the volumes to attach to each private node VM.
         ///
-        /// If the argument is not used, the value will be determined by the 'environment-type'
-        /// argument.
+        /// This argument will set the size of all 7 attached volumes.
+        ///
+        /// If it is not used, the value will be determined by the 'environment-type' argument.
         #[clap(long)]
         full_cone_private_node_volume_size: Option<u16>,
         /// The secret key for the wallet that will fund all the ANT instances.
@@ -446,11 +421,11 @@ pub enum Commands {
         /// This argument only applies when Arbitrum or Sepolia networks are used.
         #[clap(long)]
         funding_wallet_secret_key: Option<String>,
-        /// The size of the volumes to attach to each genesis node VM. This argument will set the size of all the
-        /// 7 attached volumes.
+        /// The size of the volumes to attach to each genesis node VM.
         ///
-        /// If the argument is not used, the value will be determined by the 'environment-type'
-        /// argument.
+        /// This argument will set the size of all the 7 attached volumes.
+        ///
+        /// If it is not used, the value will be determined by the 'environment-type' argument.
         #[clap(long)]
         genesis_node_volume_size: Option<u16>,
         /// The amount of gas to initially transfer to each ANT instance, in U256
@@ -482,10 +457,11 @@ pub enum Commands {
         /// The name of the environment
         #[arg(short = 'n', long)]
         name: String,
-        /// Specify the network ID to use for the node services. This is used to partition the network and will not allow
-        /// nodes with different network IDs to join.
+        /// Specify the network ID to use for the node services.
         ///
-        /// By default, the network ID is set to 1, which represents the mainnet.
+        /// This is used to isolate the network and prevent nodes from other networks joining.
+        ///
+        /// The default value is 1, which represents the mainnet.
         #[clap(long, verbatim_doc_comment)]
         network_id: Option<u8>,
         /// Provide a name for the network contacts file to be uploaded to S3.
@@ -493,30 +469,61 @@ pub enum Commands {
         /// If not used, the contacts file will have the same name as the environment.
         #[arg(long)]
         network_contacts_file_name: Option<String>,
+        /// Provide environment variables for the antnode service.
+        ///
+        /// This is useful to set the antnode's log levels. Each variable should be comma
+        /// separated without any space.
+        ///
+        /// Example: --node-env ANT_LOG=all,RUST_LOG=libp2p=debug
+        #[clap(name = "node-env", long, use_value_delimiter = true, value_parser = parse_environment_variables, verbatim_doc_comment)]
+        node_env_variables: Option<Vec<(String, String)>>,
         /// The number of antnode services to run on each VM.
         ///
-        /// If the argument is not used, the value will be determined by the 'environment-type'
-        /// argument.
+        /// If it is not used, the value will be determined by the 'environment-type' argument.
         #[clap(long)]
         node_count: Option<u16>,
         /// The number of node VMs to create.
         ///
         /// Each VM will run many antnode services.
         ///
-        /// If the argument is not used, the value will be determined by the 'environment-type'
-        /// argument.
+        /// If it is not used, the value will be determined by the 'environment-type' argument.
         #[clap(long)]
         node_vm_count: Option<u16>,
         /// Override the size of the node VMs.
         #[clap(long)]
         node_vm_size: Option<String>,
-        /// The size of the volumes to attach to each node VM. This argument will set the size of all the 7 attached
-        /// volumes.
+        /// The size of the volumes to attach to each node VM.
         ///
-        /// If the argument is not used, the value will be determined by the 'environment-type'
-        /// argument.
+        /// This argument will set the size of all 7 attached volumes.
+        ///
+        /// If it is not used, the value will be determined by the 'environment-type' argument.
         #[clap(long)]
         node_volume_size: Option<u16>,
+        /// The number of antnode services to run on the peer-cache hosts.
+        ///
+        /// The number applies to each VM, so the total number of nodes will be the number of VMs
+        /// multiplied by this number.
+        ///
+        /// If it is not used, the value will be determined by the 'environment-type' argument.
+        #[clap(long)]
+        peer_cache_node_count: Option<u16>,
+        /// The number of VMs to use for hosting nodes that provide a peer cache.
+        ///
+        /// Each VM will run many antnode services.
+        ///
+        /// If it is not used, the value will be determined by the 'environment-type' argument.
+        #[clap(long)]
+        peer_cache_node_vm_count: Option<u16>,
+        /// Override the size of the peer-cache node VMs.
+        #[clap(long)]
+        peer_cache_node_vm_size: Option<String>,
+        /// The size of the volumes to attach to each peer-cache node VM.
+        ///
+        /// This argument will set the size of the 7 attached volumes.
+        ///
+        /// If it is not used, the value will be determined by the 'environment-type' argument.
+        #[clap(long)]
+        peer_cache_node_volume_size: Option<u16>,
         /// The cloud provider to deploy to.
         ///
         /// Valid values are "aws" or "digital-ocean".
@@ -528,6 +535,11 @@ pub enum Commands {
         /// security reasons.
         #[clap(long, default_value_t = false, verbatim_doc_comment)]
         public_rpc: bool,
+        /// The region to deploy to.
+        ///
+        /// Defaults to "lon1" for Digital Ocean.
+        #[clap(long, default_value = "lon1")]
+        region: String,
         /// The owner/org of the Github repository to build from.
         ///
         /// If used, all binaries will be built from this repository. It is typically used for
@@ -542,43 +554,39 @@ pub enum Commands {
         /// The rewards address for each of the antnode services.
         #[arg(long, required = true)]
         rewards_address: String,
-        /// Override the size of the Symmetric NAT gateway VM.
+        /// Override the size of the symmetric NAT gateway VM.
         #[clap(long)]
         symmetric_nat_gateway_vm_size: Option<String>,
-        /// The number of antnode services to be run behind a Symmetric NAT Gateway on each private node VM.
+        /// The number of antnode services to run behind a symmetric NAT gateway.
         ///
-        /// If the argument is not used, the value will be determined by the 'environment-type'
-        /// argument.
+        /// The number applies to each VM, so the total number of nodes will be the number of VMs
+        /// multiplied by this number.
+        ///
+        /// If it is not used, the value will be determined by the 'environment-type' argument.
         #[clap(long, verbatim_doc_comment)]
         symmetric_private_node_count: Option<u16>,
-        /// The number of private node VMs to create. The private nodes will be behind a Symmetric NAT Gateway.
+        /// The number of VMs to use for hosting nodes behind a symmetric NAT gateway.
         ///
         /// Each VM will run many antnode services.
         ///
-        /// If the argument is not used, the value will be determined by the 'environment-type'
+        /// If it is not used, the value will be determined by the 'environment-type' argument.
         #[clap(long, verbatim_doc_comment)]
         symmetric_private_node_vm_count: Option<u16>,
-        /// The size of the volumes to attach to each private node VM. This argument will set the size of all the
-        /// 7 attached volumes.
+        /// The size of the volumes to attach to each private node VM.
         ///
-        /// If the argument is not used, the value will be determined by the 'environment-type'
-        /// argument.
+        /// This argument will set the size of all 7 attached volumes.
+        ///
+        /// If it is not used, the value will be determined by the 'environment-type' argument.
         #[clap(long)]
         symmetric_private_node_volume_size: Option<u16>,
-        /// The desired number of uploaders per VM.
-        #[clap(long, default_value_t = 1)]
-        uploaders_count: u16,
-        /// Set to only deploy up to the genesis node.
+        /// Set to only deploy up to point where the genesis node is created.
         ///
         /// This will provision all infrastructure but only deploy and start the genesis node.
         #[clap(long, default_value_t = false)]
         to_genesis: bool,
-        /// Set to disable Telegraf metrics collection on all nodes.
-        #[clap(long)]
-        disable_telegraf: bool,
-        /// The region to deploy to.
-        #[clap(long, default_value = "lon1")]
-        region: String,
+        /// The desired number of uploaders per VM.
+        #[clap(long, default_value_t = 1)]
+        uploaders_count: u16,
     },
     ExtendVolumeSize {
         /// Set to run Ansible with more verbose output.
