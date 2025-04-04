@@ -277,11 +277,11 @@ while true; do
         file_size=$(echo "$first_file" | cut -d ',' -f $FILE_SIZE_INDEX | head -n 1 )
         ;;
       verifier)
-        # downloads the 10th latest file
-        third_latest_file=$(tail -n 10 "$SUCCESSFUL_UPLOAD_METRIC_FILE" | head -n 1)
-        file_ref=$(echo "$third_latest_file" | cut -d ',' -f $FILE_REF_INDEX | head -n 1)
-        file_hash=$(echo "$third_latest_file" | cut -d ',' -f $FILE_HASH_INDEX | head -n 1 )
-        file_size=$(echo "$third_latest_file" | cut -d ',' -f $FILE_SIZE_INDEX | head -n 1 )
+        # downloads the 10th latest file. Exclude line containing "TIMESTAMP_START" (i.e, header) if less than 10 lines
+        tenth_latest_file=$(grep -v "^TIMESTAMP_START" "$SUCCESSFUL_UPLOAD_METRIC_FILE" | tail -n 10 | head -n 1)
+        file_ref=$(echo "$tenth_latest_file" | cut -d ',' -f $FILE_REF_INDEX | head -n 1)
+        file_hash=$(echo "$tenth_latest_file" | cut -d ',' -f $FILE_HASH_INDEX | head -n 1 )
+        file_size=$(echo "$tenth_latest_file" | cut -d ',' -f $FILE_SIZE_INDEX | head -n 1 )
         ;;
       random)
         # downloads a random line from the file, except the first line
