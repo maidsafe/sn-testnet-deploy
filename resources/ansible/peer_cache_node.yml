@@ -12,7 +12,7 @@
     - role: setup_striped_storage
       become: True
     - antctl
-    - role: telegraf-configuration
+    - role: telegraf-node
       become: True
     - role: telegraf-geoip
       become: True

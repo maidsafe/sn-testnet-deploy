@@ -8,7 +8,7 @@
       become: True
       vars:
         mount_base: /mnt/client-logs
-    - role: client-metrics
+    - role: telegraf-client
       become: True
     - role: uploaders
       become: True

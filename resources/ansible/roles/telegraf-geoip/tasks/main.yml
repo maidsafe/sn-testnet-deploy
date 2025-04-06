@@ -1,5 +1,5 @@
 ---
-# This role has to be run after the telegraf-configuration role.
+# This role has to be run after the telegraf-node role.
 - name: stop telegraf service
   systemd:
     name: telegraf

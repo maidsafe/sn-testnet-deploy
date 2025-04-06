@@ -2,11 +2,11 @@
 - name: upgrade the node telegraf configuration
   hosts: all
   roles:
-    - role: telegraf-configuration
+    - role: telegraf-node
       become: True
   tasks:
     - name: restart telegraf service
-      systemd:
+      ansible.builtin.systemd:
         name: telegraf
         enabled: yes
         state: restarted
