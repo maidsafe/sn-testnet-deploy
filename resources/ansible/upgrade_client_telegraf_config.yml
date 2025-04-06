@@ -2,7 +2,7 @@
 - name: upgrade the client telegraf configuration
   hosts: all
   roles:
-    - role: client-metrics
+    - role: telegraf-client
       become: True
   tasks:
     - name: restart telegraf service
