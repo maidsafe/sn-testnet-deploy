@@ -17,7 +17,7 @@ pub mod upgrade;
 
 use crate::cmd::{
     clients::ClientsCommands, funds::FundsCommand, logs::LogCommands, network::NetworkCommands,
-    provision::ProvisionCommands,
+    provision::ProvisionCommands, telegraf::TelegrafCommands,
 };
 use alloy::primitives::U256;
 use ant_releases::{AntReleaseRepoActions, ReleaseType};
@@ -674,6 +674,51 @@ pub enum Commands {
     /// Run Ansible provisions for existing infrastructure
     #[clap(name = "provision", subcommand)]
     Provision(ProvisionCommands),
+    /// Reset nodes to a specified count.
+    ///
+    /// This will stop all nodes, clear their data, and start the specified number of nodes.
+    #[clap(name = "reset-to-n-nodes")]
+    ResetToNNodes {
+        /// Provide a list of VM names to use as a custom inventory.
+        ///
+        /// This will reset nodes on a particular subset of VMs.
+        #[clap(name = "custom-inventory", long, use_value_delimiter = true)]
+        custom_inventory: Option<Vec<String>>,
+        /// The EVM network to use.
+        ///
+        /// Valid values are "arbitrum-one", "arbitrum-sepolia", or "custom".
+        #[clap(long, value_parser = parse_evm_network)]
+        evm_network_type: EvmNetwork,
+        /// Maximum number of forks Ansible will use to execute tasks on target hosts.
+        #[clap(long, default_value_t = 50)]
+        forks: usize,
+        /// The name of the environment.
+        #[arg(short = 'n', long)]
+        name: String,
+        /// The number of nodes to run after reset.
+        #[arg(long)]
+        node_count: u16,
+        /// Specify the type of node VM to reset the nodes on. If not provided, the nodes on
+        /// all the node VMs will be reset. This is mutually exclusive with the '--custom-inventory' argument.
+        ///
+        /// Valid values are "peer-cache", "genesis", "generic" and "private".
+        #[arg(long, conflicts_with = "custom-inventory")]
+        node_type: Option<NodeType>,
+        /// The cloud provider for the environment.
+        #[clap(long, value_parser = parse_provider, verbatim_doc_comment, default_value_t = CloudProvider::DigitalOcean)]
+        provider: CloudProvider,
+        /// The interval between starting each node in milliseconds.
+        #[clap(long, value_parser = |t: &str| -> Result<Duration> { Ok(t.parse().map(Duration::from_millis)?)}, default_value = "2000")]
+        start_interval: Duration,
+        /// The interval between stopping each node in milliseconds.
+        #[clap(long, value_parser = |t: &str| -> Result<Duration> { Ok(t.parse().map(Duration::from_millis)?)}, default_value = "2000")]
+        stop_interval: Duration,
+        /// Supply a version number for the antnode binary.
+        ///
+        /// If not provided, the latest version will be used.
+        #[arg(long)]
+        version: Option<String>,
+    },
     Setup {},
     /// Start all nodes in an environment.
     ///
@@ -717,32 +762,6 @@ pub enum Commands {
         #[clap(long, value_parser = parse_provider, verbatim_doc_comment, default_value_t = CloudProvider::DigitalOcean)]
         provider: CloudProvider,
     },
-    /// Start the Telegraf service on all machines in the environment.
-    ///
-    /// This may be necessary for performing upgrades.
-    #[clap(name = "start-telegraf")]
-    StartTelegraf {
-        /// Provide a list of VM names to use as a custom inventory.
-        ///
-        /// This will stop Telegraf on a particular subset of VMs.
-        #[clap(name = "custom-inventory", long, use_value_delimiter = true)]
-        custom_inventory: Option<Vec<String>>,
-        /// Maximum number of forks Ansible will use to execute tasks on target hosts.
-        #[clap(long, default_value_t = 50)]
-        forks: usize,
-        /// The name of the environment.
-        #[arg(short = 'n', long)]
-        name: String,
-        /// Specify the type of node VM to start the telegraf services on. If not provided, the telegraf services on
-        /// all the node VMs will be started. This is mutually exclusive with the '--custom-inventory' argument.
-        ///
-        /// Valid values are "peer-cache", "genesis", "generic" and "private".
-        #[arg(long, conflicts_with = "custom-inventory")]
-        node_type: Option<NodeType>,
-        /// The cloud provider for the environment.
-        #[clap(long, value_parser = parse_provider, verbatim_doc_comment, default_value_t = CloudProvider::DigitalOcean)]
-        provider: CloudProvider,
-    },
     /// Stop all nodes in an environment.
     #[clap(name = "stop")]
     Stop {
@@ -778,28 +797,30 @@ pub enum Commands {
         #[clap(long)]
         service_name: Option<Vec<String>>,
     },
-    /// Stop the Telegraf service on all machines in the environment.
+    /// Manage Telegraf services and configuration
+    #[clap(name = "telegraf", subcommand)]
+    Telegraf(TelegrafCommands),
+    /// Update the peer multiaddr in the node registry.
     ///
-    /// This may be necessary for performing upgrades.
-    #[clap(name = "stop-telegraf")]
-    StopTelegraf {
+    /// This will then cause the service definitions to be updated when an upgrade is performed.
+    UpdatePeer {
         /// Provide a list of VM names to use as a custom inventory.
         ///
-        /// This will stop Telegraf on a particular subset of VMs.
+        /// This will update the peer on a particular subset of VMs.
         #[clap(name = "custom-inventory", long, use_value_delimiter = true)]
         custom_inventory: Option<Vec<String>>,
-        /// Maximum number of forks Ansible will use to execute tasks on target hosts.
-        #[clap(long, default_value_t = 50)]
-        forks: usize,
         /// The name of the environment.
         #[arg(short = 'n', long)]
         name: String,
-        /// Specify the type of node VM to stop the telegraf services on. If not provided, the telegraf services on
-        /// all the node VMs will be stopped. This is mutually exclusive with the '--custom-inventory' argument.
+        /// Specify the type of node VM to update the peer on. If not provided, the peer will be updated on
+        /// all the node VMs. This is mutually exclusive with the '--custom-inventory' argument.
         ///
         /// Valid values are "peer-cache", "genesis", "generic" and "private".
         #[arg(long, conflicts_with = "custom-inventory")]
         node_type: Option<NodeType>,
+        /// The new peer multiaddr to use.
+        #[arg(long)]
+        peer: String,
         /// The cloud provider for the environment.
         #[clap(long, value_parser = parse_provider, verbatim_doc_comment, default_value_t = CloudProvider::DigitalOcean)]
         provider: CloudProvider,
@@ -898,32 +919,6 @@ pub enum Commands {
         /// There should be no 'v' prefix.
         #[arg(short = 'v', long)]
         version: String,
-    },
-    /// Upgrade the node Telegraf configuration on an environment.
-    #[clap(name = "upgrade-node-telegraf-config")]
-    UpgradeNodeTelegrafConfig {
-        /// Maximum number of forks Ansible will use to execute tasks on target hosts.
-        #[clap(long, default_value_t = 50)]
-        forks: usize,
-        /// The name of the environment.
-        #[arg(short = 'n', long)]
-        name: String,
-        /// The cloud provider for the environment.
-        #[clap(long, value_parser = parse_provider, verbatim_doc_comment, default_value_t = CloudProvider::DigitalOcean)]
-        provider: CloudProvider,
-    },
-    /// Upgrade the client Telegraf configuration on an environment.
-    #[clap(name = "upgrade-client-telegraf-config")]
-    UpgradeClientTelegrafConfig {
-        /// Maximum number of forks Ansible will use to execute tasks on target hosts.
-        #[clap(long, default_value_t = 50)]
-        forks: usize,
-        /// The name of the environment.
-        #[arg(short = 'n', long)]
-        name: String,
-        /// The cloud provider for the environment.
-        #[clap(long, value_parser = parse_provider, verbatim_doc_comment, default_value_t = CloudProvider::DigitalOcean)]
-        provider: CloudProvider,
     },
     /// Upscale VMs and node services for an existing network.
     Upscale {
@@ -1083,76 +1078,6 @@ pub enum Commands {
         /// exclusive with the version arguments.
         #[arg(long, verbatim_doc_comment)]
         repo_owner: Option<String>,
-    },
-    /// Update the peer multiaddr in the node registry.
-    ///
-    /// This will then cause the service definitions to be updated when an upgrade is performed.
-    UpdatePeer {
-        /// Provide a list of VM names to use as a custom inventory.
-        ///
-        /// This will update the peer on a particular subset of VMs.
-        #[clap(name = "custom-inventory", long, use_value_delimiter = true)]
-        custom_inventory: Option<Vec<String>>,
-        /// The name of the environment.
-        #[arg(short = 'n', long)]
-        name: String,
-        /// Specify the type of node VM to update the peer on. If not provided, the peer will be updated on
-        /// all the node VMs. This is mutually exclusive with the '--custom-inventory' argument.
-        ///
-        /// Valid values are "peer-cache", "genesis", "generic" and "private".
-        #[arg(long, conflicts_with = "custom-inventory")]
-        node_type: Option<NodeType>,
-        /// The new peer multiaddr to use.
-        #[arg(long)]
-        peer: String,
-        /// The cloud provider for the environment.
-        #[clap(long, value_parser = parse_provider, verbatim_doc_comment, default_value_t = CloudProvider::DigitalOcean)]
-        provider: CloudProvider,
-    },
-    /// Reset nodes to a specified count.
-    ///
-    /// This will stop all nodes, clear their data, and start the specified number of nodes.
-    #[clap(name = "reset-to-n-nodes")]
-    ResetToNNodes {
-        /// Provide a list of VM names to use as a custom inventory.
-        ///
-        /// This will reset nodes on a particular subset of VMs.
-        #[clap(name = "custom-inventory", long, use_value_delimiter = true)]
-        custom_inventory: Option<Vec<String>>,
-        /// The EVM network to use.
-        ///
-        /// Valid values are "arbitrum-one", "arbitrum-sepolia", or "custom".
-        #[clap(long, value_parser = parse_evm_network)]
-        evm_network_type: EvmNetwork,
-        /// Maximum number of forks Ansible will use to execute tasks on target hosts.
-        #[clap(long, default_value_t = 50)]
-        forks: usize,
-        /// The name of the environment.
-        #[arg(short = 'n', long)]
-        name: String,
-        /// The number of nodes to run after reset.
-        #[arg(long)]
-        node_count: u16,
-        /// Specify the type of node VM to reset the nodes on. If not provided, the nodes on
-        /// all the node VMs will be reset. This is mutually exclusive with the '--custom-inventory' argument.
-        ///
-        /// Valid values are "peer-cache", "genesis", "generic" and "private".
-        #[arg(long, conflicts_with = "custom-inventory")]
-        node_type: Option<NodeType>,
-        /// The cloud provider for the environment.
-        #[clap(long, value_parser = parse_provider, verbatim_doc_comment, default_value_t = CloudProvider::DigitalOcean)]
-        provider: CloudProvider,
-        /// The interval between starting each node in milliseconds.
-        #[clap(long, value_parser = |t: &str| -> Result<Duration> { Ok(t.parse().map(Duration::from_millis)?)}, default_value = "2000")]
-        start_interval: Duration,
-        /// The interval between stopping each node in milliseconds.
-        #[clap(long, value_parser = |t: &str| -> Result<Duration> { Ok(t.parse().map(Duration::from_millis)?)}, default_value = "2000")]
-        stop_interval: Duration,
-        /// Supply a version number for the antnode binary.
-        ///
-        /// If not provided, the latest version will be used.
-        #[arg(long)]
-        version: Option<String>,
     },
 }
 

@@ -9,7 +9,8 @@ use crate::cmd::{
     network::{ChurnCommands, NetworkCommands},
     nodes,
     provision::ProvisionCommands,
-    telegraf, Commands,
+    telegraf::TelegrafCommands,
+    Commands,
 };
 use clap::Parser;
 use color_eyre::Result;
@@ -376,23 +377,6 @@ async fn main() -> Result<()> {
             .await?;
             Ok(())
         }
-        Commands::StartTelegraf {
-            custom_inventory,
-            forks,
-            name,
-            node_type,
-            provider,
-        } => {
-            telegraf::handle_start_telegraf_command(
-                custom_inventory,
-                forks,
-                name,
-                node_type,
-                provider,
-            )
-            .await?;
-            Ok(())
-        }
         Commands::Status {
             forks,
             name,
@@ -420,23 +404,6 @@ async fn main() -> Result<()> {
                 node_type,
                 provider,
                 service_name,
-            )
-            .await?;
-            Ok(())
-        }
-        Commands::StopTelegraf {
-            custom_inventory,
-            forks,
-            name,
-            node_type,
-            provider,
-        } => {
-            telegraf::handle_stop_telegraf_command(
-                custom_inventory,
-                forks,
-                name,
-                node_type,
-                provider,
             )
             .await?;
             Ok(())
@@ -479,14 +446,6 @@ async fn main() -> Result<()> {
             .await?;
             Ok(())
         }
-        Commands::UpgradeClientTelegrafConfig {
-            forks,
-            name,
-            provider,
-        } => {
-            telegraf::handle_upgrade_client_telegraf_config(forks, name, provider).await?;
-            Ok(())
-        }
         Commands::UpgradeAntctl {
             custom_inventory,
             name,
@@ -504,15 +463,6 @@ async fn main() -> Result<()> {
             .await?;
             Ok(())
         }
-        Commands::UpgradeNodeTelegrafConfig {
-            forks,
-            name,
-            provider,
-        } => {
-            telegraf::handle_upgrade_node_telegraf_config(forks, name, provider).await?;
-            Ok(())
-        }
-
         Commands::Upscale {
             ansible_verbose,
             ant_version,
@@ -632,5 +582,40 @@ async fn main() -> Result<()> {
                 Ok(())
             }
         },
+        Commands::Telegraf(telegraf_cmd) => match telegraf_cmd {
+            TelegrafCommands::Start {
+                custom_inventory,
+                forks,
+                name,
+                node_type,
+                provider,
+            } => {
+                cmd::telegraf::handle_start_telegraf_command(custom_inventory, forks, name, node_type, provider).await
+            }
+            TelegrafCommands::Stop {
+                custom_inventory,
+                forks,
+                name,
+                node_type,
+                provider,
+            } => {
+                cmd::telegraf::handle_stop_telegraf_command(custom_inventory, forks, name, node_type, provider).await
+            }
+            TelegrafCommands::UpgradeClientConfig {
+                forks,
+                name,
+                provider,
+            } => {
+                cmd::telegraf::handle_upgrade_client_telegraf_config(forks, name, provider).await
+            }
+            TelegrafCommands::UpgradeNodeConfig {
+                forks,
+                name,
+                provider,
+            } => {
+                cmd::telegraf::handle_upgrade_node_telegraf_config(forks, name, provider).await
+            }
+        }
     }
 }
+
