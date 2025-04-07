@@ -590,7 +590,14 @@ async fn main() -> Result<()> {
                 node_type,
                 provider,
             } => {
-                cmd::telegraf::handle_start_telegraf_command(custom_inventory, forks, name, node_type, provider).await
+                cmd::telegraf::handle_start_telegraf_command(
+                    custom_inventory,
+                    forks,
+                    name,
+                    node_type,
+                    provider,
+                )
+                .await
             }
             TelegrafCommands::Stop {
                 custom_inventory,
@@ -599,23 +606,30 @@ async fn main() -> Result<()> {
                 node_type,
                 provider,
             } => {
-                cmd::telegraf::handle_stop_telegraf_command(custom_inventory, forks, name, node_type, provider).await
+                cmd::telegraf::handle_stop_telegraf_command(
+                    custom_inventory,
+                    forks,
+                    name,
+                    node_type,
+                    provider,
+                )
+                .await
             }
             TelegrafCommands::UpgradeClientConfig {
                 forks,
                 name,
                 provider,
-            } => {
-                cmd::telegraf::handle_upgrade_client_telegraf_config(forks, name, provider).await
-            }
+            } => cmd::telegraf::handle_upgrade_client_telegraf_config(forks, name, provider).await,
+            TelegrafCommands::UpgradeGeoIpConfig {
+                forks,
+                name,
+                provider,
+            } => cmd::telegraf::handle_upgrade_geoip_telegraf_config(forks, name, provider).await,
             TelegrafCommands::UpgradeNodeConfig {
                 forks,
                 name,
                 provider,
-            } => {
-                cmd::telegraf::handle_upgrade_node_telegraf_config(forks, name, provider).await
-            }
-        }
+            } => cmd::telegraf::handle_upgrade_node_telegraf_config(forks, name, provider).await,
+        },
     }
 }
-

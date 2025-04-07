@@ -76,6 +76,18 @@ pub enum TelegrafCommands {
         #[clap(long, default_value_t = sn_testnet_deploy::CloudProvider::DigitalOcean, value_parser = super::parse_provider, verbatim_doc_comment)]
         provider: sn_testnet_deploy::CloudProvider,
     },
+    /// Upgrade the GeoIP Telegraf configuration on an environment.
+    UpgradeGeoIpConfig {
+        /// Maximum number of forks Ansible will use to execute tasks on target hosts.
+        #[clap(long, default_value_t = 50)]
+        forks: usize,
+        /// The name of the environment.
+        #[arg(short = 'n', long)]
+        name: String,
+        /// The cloud provider for the environment.
+        #[clap(long, default_value_t = sn_testnet_deploy::CloudProvider::DigitalOcean, value_parser = super::parse_provider, verbatim_doc_comment)]
+        provider: sn_testnet_deploy::CloudProvider,
+    },
 }
 
 pub async fn handle_start_telegraf_command(
@@ -200,6 +212,33 @@ pub async fn handle_upgrade_node_telegraf_config(
     }
 
     testnet_deployer.upgrade_node_telegraf(&name)?;
+
+    Ok(())
+}
+
+pub async fn handle_upgrade_geoip_telegraf_config(
+    forks: usize,
+    name: String,
+    provider: sn_testnet_deploy::CloudProvider,
+) -> Result<()> {
+    let testnet_deployer = TestnetDeployBuilder::default()
+        .ansible_forks(forks)
+        .environment_name(&name)
+        .provider(provider)
+        .build()?;
+
+    // This is required in the case where the command runs in a remote environment, where
+    // there won't be an existing inventory, which is required to retrieve the node
+    // registry files used to determine the status.
+    let inventory_service = DeploymentInventoryService::from(&testnet_deployer);
+    let inventory = inventory_service
+        .generate_or_retrieve_inventory(&name, true, None)
+        .await?;
+    if inventory.is_empty() {
+        return Err(eyre!("The {name} environment does not exist"));
+    }
+
+    testnet_deployer.upgrade_geoip_telegraf(&name)?;
 
     Ok(())
 }
