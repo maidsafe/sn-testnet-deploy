@@ -235,7 +235,12 @@ impl DeploymentInventoryService {
             .ansible_runner
             .get_inventory(AnsibleInventoryType::PeerCacheNodes, false)?;
 
-        let client_vms = if environment_details.deployment_type != DeploymentType::Bootstrap {
+        let client_inventories = self
+            .ansible_runner
+            .get_inventory(AnsibleInventoryType::Clients, true)?;
+        let client_vms = if !client_inventories.is_empty()
+            && environment_details.deployment_type != DeploymentType::Bootstrap
+        {
             let client_and_sks = self.ansible_provisioner.get_client_secret_keys()?;
             client_and_sks
                 .iter()
@@ -339,7 +344,9 @@ impl DeploymentInventoryService {
                 (Some(antnode_version), Some(antctl_version))
             };
 
-            let ant_version = if environment_details.deployment_type != DeploymentType::Bootstrap {
+            let ant_version = if !client_vms.is_empty()
+                && environment_details.deployment_type != DeploymentType::Bootstrap
+            {
                 let random_client_vm = client_vms
                     .choose(&mut rand::thread_rng())
                     .ok_or_else(|| eyre!("No Client VMs available to retrieve ant version"))?;
