@@ -1433,6 +1433,18 @@ impl AnsibleProvisioner {
         Ok(())
     }
 
+    pub fn upgrade_geoip_telegraf(&self, name: &str) -> Result<()> {
+        self.ansible_runner.run_playbook(
+            AnsiblePlaybook::UpgradeGeoIpTelegrafConfig,
+            AnsibleInventoryType::PeerCacheNodes,
+            Some(extra_vars::build_node_telegraf_upgrade(
+                name,
+                &NodeType::PeerCache,
+            )?),
+        )?;
+        Ok(())
+    }
+
     pub fn print_ansible_run_banner(&self, s: &str) {
         let ansible_run_msg = "Ansible Run: ";
         let line = "=".repeat(s.len() + ansible_run_msg.len());

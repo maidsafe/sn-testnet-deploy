@@ -199,6 +199,8 @@ pub enum AnsiblePlaybook {
     ///
     /// Use in combination with `AnsibleInventoryType::Clients`.
     UpgradeClientTelegrafConfig,
+    /// Update the GeoIP Telegraf configuration to the latest version in the repository.
+    UpgradeGeoIpTelegrafConfig,
     /// The uploader playbook will setup the uploader scripts on the uploader VMs.
     ///
     /// Use in combination with `AnsibleInventoryType::Clients`.
@@ -244,6 +246,9 @@ impl AnsiblePlaybook {
             AnsiblePlaybook::UpgradeClients => "upgrade_clients.yml".to_string(),
             AnsiblePlaybook::UpgradeClientTelegrafConfig => {
                 "upgrade_client_telegraf_config.yml".to_string()
+            }
+            AnsiblePlaybook::UpgradeGeoIpTelegrafConfig => {
+                "upgrade_geoip_telegraf_config.yml".to_string()
             }
             AnsiblePlaybook::UpgradeNodes => "upgrade_nodes.yml".to_string(),
             AnsiblePlaybook::UpgradeNodeTelegrafConfig => {

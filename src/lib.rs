@@ -943,6 +943,11 @@ impl TestnetDeployer {
         Ok(())
     }
 
+    pub fn upgrade_geoip_telegraf(&self, name: &str) -> Result<()> {
+        self.ansible_provisioner.upgrade_geoip_telegraf(name)?;
+        Ok(())
+    }
+
     pub fn upgrade_node_telegraf(&self, name: &str) -> Result<()> {
         self.ansible_provisioner.upgrade_node_telegraf(name)?;
         Ok(())
