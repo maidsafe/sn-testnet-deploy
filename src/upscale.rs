@@ -33,7 +33,9 @@ pub struct UpscaleOptions {
     pub desired_symmetric_private_node_count: Option<u16>,
     pub desired_symmetric_private_node_vm_count: Option<u16>,
     pub desired_uploaders_count: Option<u16>,
-    pub enable_downloaders: bool,
+    pub enable_download_verifier: bool,
+    pub enable_random_verifier: bool,
+    pub enable_performance_verifier: bool,
     pub funding_wallet_secret_key: Option<String>,
     pub gas_amount: Option<U256>,
     pub interval: Duration,
@@ -185,7 +187,9 @@ impl TestnetDeployer {
             binary_option: options.current_inventory.binary_option.clone(),
             chunk_size: None,
             client_env_variables: None,
-            enable_downloaders: options.enable_downloaders,
+            enable_download_verifier: options.enable_download_verifier,
+            enable_random_verifier: options.enable_random_verifier,
+            enable_performance_verifier: options.enable_performance_verifier,
             enable_telegraf: true,
             evm_network: options
                 .current_inventory
@@ -503,7 +507,9 @@ impl TestnetDeployer {
             binary_option: options.current_inventory.binary_option.clone(),
             chunk_size: None,
             client_env_variables: None,
-            enable_downloaders: options.enable_downloaders,
+            enable_download_verifier: options.enable_download_verifier,
+            enable_random_verifier: options.enable_random_verifier,
+            enable_performance_verifier: options.enable_performance_verifier,
             enable_telegraf: true,
             evm_data_payments_address: options
                 .current_inventory

@@ -261,7 +261,7 @@ pub enum Commands {
         #[clap(long, value_parser = parse_provider, verbatim_doc_comment, default_value_t = CloudProvider::DigitalOcean)]
         provider: CloudProvider,
     },
-    /// Manage Client for an environment
+    /// Manage clients for an environment
     #[clap(name = "clients", subcommand)]
     Clients(ClientsCommands),
     /// Configure a swapfile on all nodes in the environment.
@@ -347,14 +347,18 @@ pub enum Commands {
         /// Override the size of the client VMs.
         #[clap(long)]
         client_vm_size: Option<String>,
+        /// Set to disable the download-verifier downloader on the VMs.
+        #[clap(long)]
+        disable_download_verifier: bool,
+        /// Set to disable the performance-verifier downloader on the VMs.
+        #[clap(long)]
+        disable_performance_verifier: bool,
+        /// Set to disable the random-verifier downloader on the VMs.
+        #[clap(long)]
+        disable_random_verifier: bool,
         /// Set to disable Telegraf metrics collection on all nodes.
         #[clap(long)]
         disable_telegraf: bool,
-        /// Set to enable the all the downloader types on the VMs.
-        ///
-        /// This will setup 'download-verifier', 'random-verifier' and 'performance-verifier' downloaders.
-        #[clap(long)]
-        enable_downloaders: bool,
         /// The type of deployment.
         ///
         /// Possible values are 'development', 'production' or 'staging'. The value used will
@@ -1027,11 +1031,15 @@ pub enum Commands {
         /// If you want each Client VM to run multiple uploader services, specify the total desired count.
         #[clap(long, verbatim_doc_comment)]
         desired_uploaders_count: Option<u16>,
-        /// Set to enable the all the downloader types on the VMs.
-        ///
-        /// This will setup 'download-verifier', 'random-verifier' and 'performance-verifier' downloaders.
+        /// Set to disable the download-verifier downloader on the VMs.
         #[clap(long)]
-        enable_downloaders: bool,
+        disable_download_verifier: bool,
+        /// Set to disable the performance-verifier downloader on the VMs.
+        #[clap(long)]
+        disable_performance_verifier: bool,
+        /// Set to disable the random-verifier downloader on the VMs.
+        #[clap(long)]
+        disable_random_verifier: bool,
         /// The secret key for the wallet that will fund all the ANT instances.
         ///
         /// This argument only applies when Arbitrum or Sepolia networks are used.

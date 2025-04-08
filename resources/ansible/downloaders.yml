@@ -6,7 +6,6 @@
   roles:
     - role: downloaders
       become: True
-      when: enable_downloaders | bool
 
   tasks:
     # Something is wrong with the journal service on Ubuntu that causes no
