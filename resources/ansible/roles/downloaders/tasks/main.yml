@@ -21,6 +21,7 @@
     group: ant
     recurse: yes
   become: true
+  when: enable_random_verifier | bool
 
 - name: ensure the ant users can write to the download_verifier metrics directory
   ansible.builtin.file:
@@ -31,6 +32,7 @@
     group: ant
     recurse: yes
   become: true
+  when: enable_download_verifier | bool
 
 - name: ensure the ant users can write to the performance_verifier metrics directory
   ansible.builtin.file:
@@ -41,6 +43,7 @@
     group: ant
     recurse: yes
   become: true
+  when: enable_performance_verifier | bool
 
 - name: Check if systemd ant_download_random_verifier service file exists
   ansible.builtin.stat:
@@ -65,7 +68,7 @@
     group: ant
     mode: '0644'
   become: true
-  when: not ant_download_random_verifier_stat.stat.exists
+  when: not ant_download_random_verifier_stat.stat.exists and enable_random_verifier | bool
 
 - name: create ant_download_verifier systemd service file
   ansible.builtin.template:
@@ -75,7 +78,7 @@
     group: ant
     mode: '0644'
   become: true
-  when: not ant_download_verifier_stat.stat.exists
+  when: not ant_download_verifier_stat.stat.exists and enable_download_verifier | bool
 
 - name: create ant_performance_verifier systemd service file
   ansible.builtin.template:
@@ -85,7 +88,7 @@
     group: ant
     mode: '0644'
   become: true
-  when: not ant_performance_verifier_stat.stat.exists
+  when: not ant_performance_verifier_stat.stat.exists and enable_performance_verifier | bool
 
 - name: start and enable ant_download_random_verifier services
   ansible.builtin.systemd:
@@ -93,6 +96,7 @@
     state: started
     enabled: yes
   become: true
+  when: enable_random_verifier | bool
 
 - name: start and enable ant_download_verifier services
   ansible.builtin.systemd:
@@ -100,6 +104,7 @@
     state: started
     enabled: yes
   become: true
+  when: enable_download_verifier | bool
 
 - name: start and enable ant_performance_verifier services
   ansible.builtin.systemd:
@@ -107,3 +112,4 @@
     state: started
     enabled: yes
   become: true
+  when: enable_performance_verifier | bool

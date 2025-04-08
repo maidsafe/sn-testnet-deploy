@@ -74,14 +74,18 @@ pub enum ClientsCommands {
         /// Override the size of the client VMs.
         #[clap(long)]
         client_vm_size: Option<String>,
+        /// Set to disable the download-verifier downloader on the VMs.
+        #[clap(long)]
+        disable_download_verifier: bool,
+        /// Set to disable the performance-verifier downloader on the VMs.
+        #[clap(long)]
+        disable_performance_verifier: bool,
+        /// Set to disable the random-verifier downloader on the VMs.
+        #[clap(long)]
+        disable_random_verifier: bool,
         /// Set to disable Telegraf metrics collection on all nodes.
         #[clap(long)]
         disable_telegraf: bool,
-        /// Set to enable the all the downloader types on the VMs.
-        ///
-        /// This will setup 'download-verifier', 'random-verifier' and 'performance-verifier' downloaders.
-        #[clap(long)]
-        enable_downloaders: bool,
         /// The type of deployment.
         ///
         /// Possible values are 'development', 'production' or 'staging'. The value used will
@@ -263,11 +267,15 @@ pub enum ClientsCommands {
         /// If you want each Client VM to run multiple uploader services, specify the total desired count.
         #[clap(long, verbatim_doc_comment)]
         desired_uploaders_count: Option<u16>,
-        /// Set to enable the all the downloader types on the new VMs after the upscale.
-        ///
-        /// This will setup 'download-verifier', 'random-verifier' and 'performance-verifier' downloaders.
+        /// Set to disable the download-verifier downloader on the VMs.
         #[clap(long)]
-        enable_downloaders: bool,
+        disable_download_verifier: bool,
+        /// Set to disable the performance-verifier downloader on the VMs.
+        #[clap(long)]
+        disable_performance_verifier: bool,
+        /// Set to disable the random-verifier downloader on the VMs.
+        #[clap(long)]
+        disable_random_verifier: bool,
         /// The secret key for the wallet that will fund all the ANT instances.
         ///
         /// This argument only applies when Arbitrum or Sepolia networks are used.
@@ -339,7 +347,9 @@ pub async fn handle_clients_command(cmd: ClientsCommands) -> Result<()> {
             client_vm_count,
             client_vm_size,
             disable_telegraf,
-            enable_downloaders,
+            disable_download_verifier,
+            disable_random_verifier,
+            disable_performance_verifier,
             environment_type,
             evm_data_payments_address,
             evm_network_type,
@@ -444,7 +454,9 @@ pub async fn handle_clients_command(cmd: ClientsCommands) -> Result<()> {
                 client_vm_count,
                 client_vm_size,
                 current_inventory: inventory,
-                enable_downloaders,
+                enable_download_verifier: !disable_download_verifier,
+                enable_random_verifier: !disable_random_verifier,
+                enable_performance_verifier: !disable_performance_verifier,
                 enable_telegraf: !disable_telegraf,
                 environment_type,
                 evm_details,
@@ -580,7 +592,9 @@ pub async fn handle_clients_command(cmd: ClientsCommands) -> Result<()> {
             autonomi_version,
             desired_client_vm_count,
             desired_uploaders_count,
-            enable_downloaders,
+            disable_download_verifier,
+            disable_random_verifier,
+            disable_performance_verifier,
             funding_wallet_secret_key,
             gas_amount,
             infra_only,
@@ -629,7 +643,9 @@ pub async fn handle_clients_command(cmd: ClientsCommands) -> Result<()> {
                     desired_symmetric_private_node_count: None,
                     desired_symmetric_private_node_vm_count: None,
                     desired_uploaders_count,
-                    enable_downloaders,
+                    enable_download_verifier: !disable_download_verifier,
+                    enable_random_verifier: !disable_random_verifier,
+                    enable_performance_verifier: !disable_performance_verifier,
                     funding_wallet_secret_key,
                     gas_amount,
                     max_archived_log_files: 1,

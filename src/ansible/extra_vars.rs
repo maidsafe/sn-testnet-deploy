@@ -457,7 +457,9 @@ pub fn build_downloaders_extra_vars_doc(
         extra_vars.add_variable("network_contacts_url", &network_contacts_url);
     }
 
-    extra_vars.add_boolean_variable("enable_downloaders", options.enable_downloaders);
+    extra_vars.add_boolean_variable("enable_download_verifier", options.enable_download_verifier);
+    extra_vars.add_boolean_variable("enable_random_verifier", options.enable_random_verifier);
+    extra_vars.add_boolean_variable("enable_performance_verifier", options.enable_performance_verifier);
 
     extra_vars.add_variable("evm_network_type", &options.evm_network.to_string());
     if let Some(evm_data_payment_token_address) = &options.evm_data_payments_address {
