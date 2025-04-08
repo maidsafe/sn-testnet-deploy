@@ -56,7 +56,7 @@ esac
 mkdir -p "${DOWNLOAD_DIR}"
 mkdir -p "${DOWNLOAD_METRICS_DIR}"
 
-# Process command line arguments
+LOG_FILE_ARG="--log-output-dest $DOWNLOAD_METRICS_DIR/ant.log"
 CONTACT_PEER_ARG=""
 NETWORK_CONTACTS_URL_ARG=""
 NETWORK_ID_ARG=""
@@ -200,7 +200,13 @@ download_file() {
     fi
     
     start_time=$(date +%s%N)
-    stdout=$(ant $CONTACT_PEER_ARG $NETWORK_CONTACTS_URL_ARG $TESTNET_ARG $NETWORK_ID_ARG file download "$file_ref" "$download_path" $QUORUM_ARG 2>&1)
+    stdout=$(ant \
+        $CONTACT_PEER_ARG \
+        $NETWORK_CONTACTS_URL_ARG \
+        $TESTNET_ARG \
+        $NETWORK_ID_ARG \
+        $LOG_FILE_ARG \
+        file download "$file_ref" "$download_path" $QUORUM_ARG 2>&1)
     exit_code=$?
     end_time=$(date +%s%N)
     echo "$stdout"

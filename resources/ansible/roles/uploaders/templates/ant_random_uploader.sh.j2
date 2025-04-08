@@ -1,5 +1,4 @@
 #!/usr/bin/env bash
-LOG_OUTPUT_DEST="{{ log_output_dest }}"
 UPLOAD_METRIC_DIR="/mnt/ant-storage/logs/upload_files/random_uploader/${USER}"
 
 mkdir -p "${UPLOAD_METRIC_DIR}"
@@ -24,7 +23,7 @@ if [[ -n "${EVM_NETWORK}" ]] && ! grep -q "export EVM_NETWORK=" ~/.profile; then
   echo "export EVM_NETWORK=${EVM_NETWORK}" >> ~/.profile
 fi
 
-
+LOG_FILE_ARG="--log-output-dest $UPLOAD_METRIC_DIR/ant.log"
 CONTACT_PEER_ARG=""
 NETWORK_CONTACTS_URL_ARG=""
 NETWORK_ID_ARG=""
@@ -160,8 +159,6 @@ generate_random_data_file_and_upload() {
   echo "Generated random data file at $tmpfile with size $file_size_kb KB and SHA-256 hash $file_hash"
 
   timestamp=$(date +"%Y%m%d_%H%M%S")
-  log_file_path="${LOG_OUTPUT_DEST}/${timestamp}"
-  LOG_OUTPUT_ARG="--log-output-dest $log_file_path"
   
   start_time=$(date +%s%N)
   stdout=$(ant \
@@ -169,7 +166,7 @@ generate_random_data_file_and_upload() {
     $NETWORK_CONTACTS_URL_ARG \
     $TESTNET_ARG \
     $NETWORK_ID_ARG \
-    $LOG_OUTPUT_ARG \
+    $LOG_FILE_ARG \
     file upload "$tmpfile" 2>&1)
   exit_code=$?
   end_time=$(date +%s%N)
