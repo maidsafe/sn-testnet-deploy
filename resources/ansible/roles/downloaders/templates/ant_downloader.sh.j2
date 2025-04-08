@@ -8,8 +8,7 @@
 #   network_contacts_url: Optional network contacts URL
 #   network_id: Optional network ID (also enables testnet mode)
 
-# Require first argument to be mode
-if [ $# -eq 0 ]; then
+if [[ $# -eq 0 ]]; then
   echo "Error: Mode is required as the first argument"
   echo "Usage: $0 mode [peer] [network_contacts_url] [network_id]"
   echo "  mode: Must be one of: performance, verifier, random"
@@ -18,7 +17,6 @@ fi
 
 MODE="$1"
 
-# Validate mode
 if [[ "$MODE" != "performance" && "$MODE" != "verifier" && "$MODE" != "random" ]]; then
   echo "Error: Invalid mode '$MODE'. Must be one of: performance, verifier, random"
   exit 1
@@ -31,8 +29,6 @@ FILE_REF_INDEX=3
 FILE_HASH_INDEX=16
 FILE_SIZE_INDEX=15
 
-
-# Set the download metrics dir based on mode
 case "$MODE" in
   performance)
     DOWNLOAD_METRICS_DIR="/mnt/ant-storage/logs/download_files/performance_verifier/${USER}"
@@ -52,25 +48,23 @@ case "$MODE" in
     ;;
 esac
 
-# Create directories
 mkdir -p "${DOWNLOAD_DIR}"
 mkdir -p "${DOWNLOAD_METRICS_DIR}"
 
-# Process command line arguments
 CONTACT_PEER_ARG=""
 NETWORK_CONTACTS_URL_ARG=""
 NETWORK_ID_ARG=""
 TESTNET_ARG=""
 
-if [ -n "${2:-}" ]; then
+if [[ -n "${2:-}" ]]; then
   echo "Setting contact peer arg to ${2:-}"
   CONTACT_PEER_ARG="--peer ${2:-}"
 fi
-if [ -n "${3:-}" ]; then
+if [[ -n "${3:-}" ]]; then
   echo "Setting network contacts URL arg to ${3:-}"
   NETWORK_CONTACTS_URL_ARG="--network-contacts-url ${3:-}"
 fi
-if [ -n "${4:-}" ]; then
+if [[ -n "${4:-}" ]]; then
   echo "Setting network ID arg to ${4:-}"
   NETWORK_ID_ARG="--network-id ${4:-}"
   echo "Setting --testnet arg"
@@ -193,7 +187,6 @@ download_file() {
     download_path="$DOWNLOAD_DIR/$download_filename"
     echo "Downloading file: $file_ref" 
     
-    # Add quorum majority flag for download mode
     QUORUM_ARG=""
     if [[ "$MODE" == "verifier" ]]; then
       QUORUM_ARG="--quorum majority"
@@ -217,57 +210,51 @@ download_file() {
     
     actual_hash="0x0"
     actual_file_size_kb=0
-    # Only verify hash if download was successful
-    if [ $exit_code -eq 0 ] && [ -n "$expected_hash" ]; then
-        # Find the first file in the download directory
-        first_file=$(find "$download_path" -type f | head -n 1)
+    if [[ $exit_code -eq 0 && -n "$expected_hash" ]]; then
+      first_file=$(find "$download_path" -type f | head -n 1)
+      
+      if [[ -n "$first_file" ]]; then
+        actual_hash=$(sha256sum "$first_file" | awk '{print $1}')
+        actual_file_size_kb=$(du -k "$first_file" | cut -f1)
         
-        if [ -n "$first_file" ]; then
-            # Calculate hash of the first file
-            actual_hash=$(sha256sum "$first_file" | awk '{print $1}')
-            actual_file_size_kb=$(du -k "$first_file" | cut -f1)
-            
-            # Compare hashes
-            if [ "$actual_hash" != "$expected_hash" ]; then
-                echo "Hash mismatch! Expected: $expected_hash, Got: $actual_hash"
-                exit_code=1 # Set to non zero
-                error_enum=HASH_MISMATCH
-            else
-                echo "Hash verification successful"
-            fi
+        if [[ "$actual_hash" != "$expected_hash" ]]; then
+          echo "Hash mismatch! Expected: $expected_hash, Got: $actual_hash"
+          exit_code=1
+          error_enum=HASH_MISMATCH
         else
-            echo "No files found in $download_path"
-            exit_code=1
-            error_enum=NO_FILES_FOUND
+          echo "Hash verification successful"
         fi
+      else
+        echo "No files found in $download_path"
+        exit_code=1
+        error_enum=NO_FILES_FOUND
+      fi
     fi
 
     rm -rf "$download_path"
 
-    if [ $exit_code -eq 0 ]; then
-        echo "Successfully downloaded $file_ref using ANT CLI"
-        success_file="$DOWNLOAD_METRICS_DIR/metrics_success.csv"
+    if [[ $exit_code -eq 0 ]]; then
+      echo "Successfully downloaded $file_ref using ANT CLI"
+      success_file="$DOWNLOAD_METRICS_DIR/metrics_success.csv"
 
-        if [ ! -f "$success_file" ]; then
+      if [[ ! -f "$success_file" ]]; then
         echo "TIMESTAMP_START,TIMESTAMP_FINISH,DATA_ADDRESS,DURATION,RETRIES,FETCHED_RECORDS,TOTAL_RECORDS,EXIT_STATUS,SERVICE_TYPE,ANT_USER,SERVICE_NUMBER,EXPECTED_TOTAL_SIZE,ACTUAL_TOTAL_SIZE,ACTUAL_SHA256_HASH,EXPECTED_SHA256_HASH,ANT_PACKAGE_VERSION,ANT_PACKAGE_BUILD_DATE" > "$success_file"
-        fi
-        echo "$start_time,$end_time,$file_ref,$elapsed,0,0,0,$error_enum,$SERVICE_TYPE,$USER,1,$expected_file_size,$actual_file_size_kb,$actual_hash,$expected_hash,$package_version,$build_date" >> "$success_file"
+      fi
+      echo "$start_time,$end_time,$file_ref,$elapsed,0,0,0,$error_enum,$SERVICE_TYPE,$USER,1,$expected_file_size,$actual_file_size_kb,$actual_hash,$expected_hash,$package_version,$build_date" >> "$success_file"
     else
-        echo "Failed to download $file_ref using ANT CLI"
-        failure_file="$DOWNLOAD_METRICS_DIR/metrics_failure.csv"
+      echo "Failed to download $file_ref using ANT CLI"
+      failure_file="$DOWNLOAD_METRICS_DIR/metrics_failure.csv"
 
-        if [ ! -f "$failure_file" ]; then
+      if [[ ! -f "$failure_file" ]]; then
         echo "TIMESTAMP_START,TIMESTAMP_FINISH,DATA_ADDRESS,DURATION,RETRIES,FETCHED_RECORDS,TOTAL_RECORDS,EXIT_STATUS,SERVICE_TYPE,ANT_USER,SERVICE_NUMBER,EXPECTED_TOTAL_SIZE,ACTUAL_TOTAL_SIZE,ACTUAL_SHA256_HASH,EXPECTED_SHA256_HASH,ANT_PACKAGE_VERSION,ANT_PACKAGE_BUILD_DATE" > "$failure_file"
-        fi
-        echo "$start_time,$end_time,$file_ref,$elapsed,0,0,0,$error_enum,$SERVICE_TYPE,$USER,1,$expected_file_size,$actual_file_size_kb,$actual_hash,$expected_hash,$package_version,$build_date" >> "$failure_file"
+      fi
+      echo "$start_time,$end_time,$file_ref,$elapsed,0,0,0,$error_enum,$SERVICE_TYPE,$USER,1,$expected_file_size,$actual_file_size_kb,$actual_hash,$expected_hash,$package_version,$build_date" >> "$failure_file"
     fi
   )
 }
 
-# Main loop
 while true; do
   if [[ -f "$SUCCESSFUL_UPLOAD_METRIC_FILE" && -s "$SUCCESSFUL_UPLOAD_METRIC_FILE" ]]; then
-    # Select file based on mode
     case "$MODE" in
       performance)
         # downloads the same file repeatedly - second line of the file
