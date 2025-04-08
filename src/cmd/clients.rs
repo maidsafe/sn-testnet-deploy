@@ -19,16 +19,7 @@ use sn_testnet_deploy::{
 #[derive(Subcommand, Debug)]
 #[allow(clippy::large_enum_variant)]
 pub enum ClientsCommands {
-    /// Enable downloaders on the Client environment.
-    EnableDownloaders {
-        /// The name of the environment
-        #[arg(long)]
-        name: String,
-        /// The cloud provider that was used.
-        #[clap(long, default_value_t = CloudProvider::DigitalOcean, value_parser = parse_provider, verbatim_doc_comment)]
-        provider: CloudProvider,
-    },
-    /// Clean a deployed Client environment.
+    /// Clean a deployed client environment.
     Clean {
         /// The name of the environment.
         #[arg(short = 'n', long)]
@@ -37,7 +28,7 @@ pub enum ClientsCommands {
         #[clap(long, value_parser = parse_provider, verbatim_doc_comment, default_value_t = CloudProvider::DigitalOcean)]
         provider: CloudProvider,
     },
-    /// Deploy a new Client environment.
+    /// Deploy a new client environment.
     Deploy {
         /// Set to run Ansible with more verbose output.
         #[arg(long)]
@@ -74,13 +65,13 @@ pub enum ClientsCommands {
         /// Example: --client-env CLIENT_LOG=all,RUST_LOG=debug
         #[clap(name = "client-env", long, use_value_delimiter = true, value_parser = parse_environment_variables, verbatim_doc_comment)]
         client_env_variables: Option<Vec<(String, String)>>,
-        /// The number of Client VMs to create.
+        /// The number of client VMs to create.
         ///
         /// If the argument is not used, the value will be determined by the 'environment-type'
         /// argument.
         #[clap(long)]
         client_vm_count: Option<u16>,
-        /// Override the size of the Client VMs.
+        /// Override the size of the client VMs.
         #[clap(long)]
         client_vm_size: Option<String>,
         /// Set to disable Telegraf metrics collection on all nodes.
@@ -182,7 +173,7 @@ pub enum ClientsCommands {
         /// arguments. You can only supply version numbers or a custom branch, not both.
         #[arg(long, verbatim_doc_comment)]
         repo_owner: Option<String>,
-        /// The desired number of uploaders per Client VM.
+        /// The desired number of uploaders per client VM.
         #[clap(long, default_value_t = 1)]
         uploaders_count: u16,
         /// Pre-funded wallet secret keys to use for the ANT instances.
@@ -193,7 +184,16 @@ pub enum ClientsCommands {
         #[clap(long, value_name = "SECRET_KEY", number_of_values = 1)]
         wallet_secret_key: Vec<String>,
     },
-    /// Start all downloaders for an environment.
+    /// Enable downloaders on all client VMs in an environment.
+    EnableDownloaders {
+        /// The name of the environment
+        #[arg(long)]
+        name: String,
+        /// The cloud provider that was used.
+        #[clap(long, default_value_t = CloudProvider::DigitalOcean, value_parser = parse_provider, verbatim_doc_comment)]
+        provider: CloudProvider,
+    },
+    /// Start all downloaders on all client VMs in an environment.
     StartDownloaders {
         /// The name of the environment
         #[arg(long)]
@@ -202,7 +202,7 @@ pub enum ClientsCommands {
         #[clap(long, default_value_t = CloudProvider::DigitalOcean, value_parser = parse_provider, verbatim_doc_comment)]
         provider: CloudProvider,
     },
-    /// Start all uploaders for an environment
+    /// Start all uploaders on all client VMs in an environment.
     StartUploaders {
         /// The name of the environment
         #[arg(long)]
@@ -211,7 +211,7 @@ pub enum ClientsCommands {
         #[clap(long, default_value_t = CloudProvider::DigitalOcean, value_parser = parse_provider, verbatim_doc_comment)]
         provider: CloudProvider,
     },
-    /// Stop all downloaders for an environment.
+    /// Stop all downloaders on all client VMs in an environment.
     StopDownloaders {
         /// The name of the environment
         #[arg(long)]
@@ -220,7 +220,7 @@ pub enum ClientsCommands {
         #[clap(long, default_value_t = CloudProvider::DigitalOcean, value_parser = parse_provider, verbatim_doc_comment)]
         provider: CloudProvider,
     },
-    /// Stop all uploaders for an environment.
+    /// Stop all uploaders on all client VMs in an environment.
     StopUploaders {
         /// The name of the environment
         #[arg(long)]
@@ -229,7 +229,7 @@ pub enum ClientsCommands {
         #[clap(long, default_value_t = CloudProvider::DigitalOcean, value_parser = parse_provider, verbatim_doc_comment)]
         provider: CloudProvider,
     },
-    /// Upgrade the Ant binary for a given environment.
+    /// Upgrade the Ant binary on all client VMs in an environment.
     Upgrade {
         /// The name of the environment.
         #[arg(short = 'n', long)]
@@ -245,7 +245,7 @@ pub enum ClientsCommands {
         #[arg(long)]
         version: Option<String>,
     },
-    /// Upscale Clients for an existing network.
+    /// Upscale clients for an existing environment.
     Upscale {
         /// Supply a version number for the autonomi binary to be used for new Client VMs.
         ///
