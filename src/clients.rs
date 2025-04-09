@@ -39,8 +39,12 @@ pub struct ClientsDeployOptions {
     pub enable_performance_verifier: bool,
     pub enable_random_verifier: bool,
     pub enable_telegraf: bool,
+    pub enable_uploaders: bool,
     pub environment_type: EnvironmentType,
     pub evm_details: EvmDetails,
+    pub file_address: Option<String>,
+    pub expected_hash: Option<String>,
+    pub expected_size: Option<u64>,
     pub funding_wallet_secret_key: Option<String>,
     pub initial_gas: Option<U256>,
     pub initial_tokens: Option<U256>,
@@ -49,9 +53,9 @@ pub struct ClientsDeployOptions {
     pub max_uploads: Option<u32>,
     pub name: String,
     pub network_id: Option<u8>,
-    pub network_contacts_url: String,
+    pub network_contacts_url: Option<String>,
     pub output_inventory_dir_path: PathBuf,
-    pub peer: String,
+    pub peer: Option<String>,
     pub uploaders_count: u16,
     pub wallet_secret_keys: Option<Vec<String>>,
 }
@@ -373,8 +377,8 @@ impl ClientsDeployer {
         self.ansible_provisioner
             .provision_clients(
                 &provision_options,
-                Some(options.peer.clone()),
-                Some(options.network_contacts_url.clone()),
+                options.peer.clone(),
+                options.network_contacts_url.clone(),
             )
             .await
             .map_err(|err| {
@@ -387,8 +391,8 @@ impl ClientsDeployer {
         self.ansible_provisioner
             .provision_downloaders(
                 &provision_options,
-                Some(options.peer.clone()),
-                Some(options.network_contacts_url.clone()),
+                options.peer.clone(),
+                options.network_contacts_url.clone(),
             )
             .await
             .map_err(|err| {

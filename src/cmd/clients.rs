@@ -86,6 +86,9 @@ pub enum ClientsCommands {
         /// Set to disable Telegraf metrics collection on all nodes.
         #[clap(long)]
         disable_telegraf: bool,
+        /// Set to disable uploaders on the VMs. Use this when you only want to run downloader services.
+        #[clap(long)]
+        disable_uploaders: bool,
         /// The type of deployment.
         ///
         /// Possible values are 'development', 'production' or 'staging'. The value used will
@@ -114,6 +117,21 @@ pub enum ClientsCommands {
         /// This argument only applies if the EVM network type is 'custom'.
         #[arg(long)]
         evm_rpc_url: Option<String>,
+        /// The expected hash of the file to download for verification.
+        ///
+        /// This is only used when --file-address is provided.
+        #[arg(long)]
+        expected_hash: Option<String>,
+        /// The expected size of the file to download for verification.
+        ///
+        /// This is only used when --file-address is provided.
+        #[arg(long)]
+        expected_size: Option<u64>,
+        /// The address of the file to download for verification.
+        ///
+        /// If provided, both --expected-hash and --expected-size must also be provided.
+        #[arg(long)]
+        file_address: Option<String>,
         /// Override the maximum number of forks Ansible will use to execute tasks on target hosts.
         ///
         /// The default value from ansible.cfg is 50.
@@ -150,12 +168,12 @@ pub enum ClientsCommands {
         network_id: Option<u8>,
         /// The networks contacts URL from an existing network.
         #[arg(long)]
-        network_contacts_url: String,
-        /// A peer from an existing network that the Ant Client can connect to.
+        network_contacts_url: Option<String>,
+        /// A peer from an existing network that the Ant client can connect to.
         ///
         /// Should be in the form of a multiaddr.
         #[arg(long)]
-        peer: String,
+        peer: Option<String>,
         /// The cloud provider to deploy to.
         ///
         /// Valid values are "aws" or "digital-ocean".
@@ -350,6 +368,7 @@ pub async fn handle_clients_command(cmd: ClientsCommands) -> Result<()> {
             disable_download_verifier,
             disable_random_verifier,
             disable_performance_verifier,
+            disable_uploaders,
             environment_type,
             evm_data_payments_address,
             evm_network_type,
@@ -369,6 +388,9 @@ pub async fn handle_clients_command(cmd: ClientsCommands) -> Result<()> {
             repo_owner,
             uploaders_count,
             wallet_secret_key,
+            file_address,
+            expected_hash,
+            expected_size,
         } => {
             if (branch.is_some() && repo_owner.is_none())
                 || (branch.is_none() && repo_owner.is_some())
@@ -404,6 +426,12 @@ pub async fn handle_clients_command(cmd: ClientsCommands) -> Result<()> {
             {
                 return Err(eyre!(
                     "For Sepolia or Arbitrum One, either a funding wallet secret key or pre-funded wallet secret keys are required"
+                ));
+            }
+
+            if file_address.is_some() && (expected_hash.is_none() || expected_size.is_none()) {
+                return Err(eyre!(
+                    "When --file-address is provided, both --expected-hash and --expected-size must also be provided"
                 ));
             }
 
@@ -458,8 +486,12 @@ pub async fn handle_clients_command(cmd: ClientsCommands) -> Result<()> {
                 enable_random_verifier: !disable_random_verifier,
                 enable_performance_verifier: !disable_performance_verifier,
                 enable_telegraf: !disable_telegraf,
+                enable_uploaders: !disable_uploaders,
                 environment_type,
                 evm_details,
+                expected_hash,
+                expected_size,
+                file_address,
                 funding_wallet_secret_key,
                 initial_gas,
                 initial_tokens,

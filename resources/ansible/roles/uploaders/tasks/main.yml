@@ -105,3 +105,4 @@
     enabled: yes
   become: true
   loop: "{{ range(1, ant_uploader_instances | int + 1) | list }}"
+  when: enable_uploaders | default(true) | bool

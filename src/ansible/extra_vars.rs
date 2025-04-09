@@ -444,22 +444,32 @@ pub fn build_symmetric_private_node_config_extra_vars_doc(
 pub fn build_downloaders_extra_vars_doc(
     cloud_provider: &str,
     options: &ProvisionOptions,
-    genesis_multiaddr: Option<String>,
-    genesis_network_contacts_url: Option<String>,
+    peer: Option<String>,
+    network_contacts_url: Option<String>,
 ) -> Result<String> {
     let mut extra_vars: ExtraVarsDocBuilder = ExtraVarsDocBuilder::default();
     extra_vars.add_variable("provider", cloud_provider);
     extra_vars.add_variable("testnet_name", &options.name);
-    if let Some(genesis_multiaddr) = genesis_multiaddr {
-        extra_vars.add_variable("genesis_multiaddr", &genesis_multiaddr);
+    if let Some(peer) = peer {
+        extra_vars.add_variable("peer", &peer);
     }
-    if let Some(network_contacts_url) = genesis_network_contacts_url {
+    if let Some(network_contacts_url) = network_contacts_url {
         extra_vars.add_variable("network_contacts_url", &network_contacts_url);
     }
 
     extra_vars.add_boolean_variable("enable_download_verifier", options.enable_download_verifier);
     extra_vars.add_boolean_variable("enable_random_verifier", options.enable_random_verifier);
     extra_vars.add_boolean_variable("enable_performance_verifier", options.enable_performance_verifier);
+
+    if let Some(file_address) = &options.file_address {
+        extra_vars.add_variable("file_address", file_address);
+        if let Some(expected_hash) = &options.expected_hash {
+            extra_vars.add_variable("expected_hash", expected_hash);
+        }
+        if let Some(expected_size) = &options.expected_size {
+            extra_vars.add_variable("expected_size", &expected_size.to_string());
+        }
+    }
 
     extra_vars.add_variable("evm_network_type", &options.evm_network.to_string());
     if let Some(evm_data_payment_token_address) = &options.evm_data_payments_address {
@@ -481,17 +491,17 @@ pub fn build_downloaders_extra_vars_doc(
 pub fn build_clients_extra_vars_doc(
     cloud_provider: &str,
     options: &ProvisionOptions,
-    genesis_multiaddr: Option<String>,
-    genesis_network_contacts_url: Option<String>,
+    peer: Option<String>,
+    network_contacts_url: Option<String>,
     sk_map: &HashMap<VirtualMachine, Vec<PrivateKeySigner>>,
 ) -> Result<String> {
     let mut extra_vars = ExtraVarsDocBuilder::default();
     extra_vars.add_variable("provider", cloud_provider);
     extra_vars.add_variable("testnet_name", &options.name);
-    if let Some(genesis_multiaddr) = genesis_multiaddr {
-        extra_vars.add_variable("genesis_multiaddr", &genesis_multiaddr);
+    if let Some(peer) = peer {
+        extra_vars.add_variable("peer", &peer);
     }
-    if let Some(network_contacts_url) = genesis_network_contacts_url {
+    if let Some(network_contacts_url) = network_contacts_url {
         extra_vars.add_variable("network_contacts_url", &network_contacts_url);
     }
 
@@ -522,6 +532,7 @@ pub fn build_clients_extra_vars_doc(
     }
 
     extra_vars.add_variable("enable_telegraf", &options.enable_telegraf.to_string());
+    extra_vars.add_variable("enable_uploaders", &options.enable_uploaders.to_string());
 
     let mut serde_map = serde_json::Map::new();
     for (k, v) in sk_map {

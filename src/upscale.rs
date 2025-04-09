@@ -190,6 +190,7 @@ impl TestnetDeployer {
             enable_download_verifier: options.enable_download_verifier,
             enable_random_verifier: options.enable_random_verifier,
             enable_performance_verifier: options.enable_performance_verifier,
+            enable_uploaders: true,
             enable_telegraf: true,
             evm_network: options
                 .current_inventory
@@ -215,6 +216,9 @@ impl TestnetDeployer {
                 .evm_details
                 .rpc_url
                 .clone(),
+            expected_hash: None,
+            expected_size: None,
+            file_address: None,
             full_cone_private_node_count: desired_full_cone_private_node_count,
             funding_wallet_secret_key: options.funding_wallet_secret_key.clone(),
             interval: Some(options.interval),
@@ -511,6 +515,7 @@ impl TestnetDeployer {
             enable_random_verifier: options.enable_random_verifier,
             enable_performance_verifier: options.enable_performance_verifier,
             enable_telegraf: true,
+            enable_uploaders: true,
             evm_data_payments_address: options
                 .current_inventory
                 .environment_details
@@ -535,6 +540,9 @@ impl TestnetDeployer {
                 .evm_details
                 .rpc_url
                 .clone(),
+            expected_hash: None,
+            expected_size: None,
+            file_address: None,
             full_cone_private_node_count: 0,
             funding_wallet_secret_key: options.funding_wallet_secret_key.clone(),
             gas_amount: options.gas_amount,
