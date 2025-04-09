@@ -169,37 +169,83 @@ impl DeploymentInventoryService {
             Err(e) => return Err(e.into()),
         };
 
-        let genesis_vm = self
-            .ansible_runner
-            .get_inventory(AnsibleInventoryType::Genesis, false)?;
+        let ansible_runner = self.ansible_runner.clone();
+        let genesis_handle = std::thread::spawn(move || {
+            ansible_runner.get_inventory(AnsibleInventoryType::Genesis, false)
+        });
+        let ansible_runner = self.ansible_runner.clone();
+        let build_handle = std::thread::spawn(move || {
+            ansible_runner.get_inventory(AnsibleInventoryType::Build, false)
+        });
+        let ansible_runner = self.ansible_runner.clone();
+        let full_cone_nat_gateway_handle = std::thread::spawn(move || {
+            ansible_runner.get_inventory(AnsibleInventoryType::FullConeNatGateway, false)
+        });
+        let ansible_runner = self.ansible_runner.clone();
+        let full_cone_private_node_handle = std::thread::spawn(move || {
+            ansible_runner.get_inventory(AnsibleInventoryType::FullConePrivateNodes, false)
+        });
+        let ansible_runner = self.ansible_runner.clone();
+        let symmetric_nat_gateway_handle = std::thread::spawn(move || {
+            ansible_runner.get_inventory(AnsibleInventoryType::SymmetricNatGateway, false)
+        });
+        let ansible_runner = self.ansible_runner.clone();
+        let symmetric_private_node_handle = std::thread::spawn(move || {
+            ansible_runner.get_inventory(AnsibleInventoryType::SymmetricPrivateNodes, false)
+        });
+        let ansible_runner = self.ansible_runner.clone();
+        let generic_node_handle = std::thread::spawn(move || {
+            ansible_runner.get_inventory(AnsibleInventoryType::Nodes, false)
+        });
+        let ansible_runner = self.ansible_runner.clone();
+        let peer_cache_node_handle = std::thread::spawn(move || {
+            ansible_runner.get_inventory(AnsibleInventoryType::PeerCacheNodes, false)
+        });
+        let ansible_runner = self.ansible_runner.clone();
+        let client_handle = std::thread::spawn(move || {
+            ansible_runner.get_inventory(AnsibleInventoryType::Clients, true)
+        });
 
+        let genesis_vm = genesis_handle.join().expect("Thread panicked")?;
         let mut misc_vms = Vec::new();
-        let build_vm = self
-            .ansible_runner
-            .get_inventory(AnsibleInventoryType::Build, false)?;
-        misc_vms.extend(build_vm);
+        misc_vms.extend(build_handle.join().expect("Thread panicked")?);
+        let full_cone_nat_gateway_vms = full_cone_nat_gateway_handle
+            .join()
+            .expect("Thread panicked")?;
+        let full_cone_private_node_vms = full_cone_private_node_handle
+            .join()
+            .expect("Thread panicked")?;
+        let symmetric_nat_gateway_vms = symmetric_nat_gateway_handle
+            .join()
+            .expect("Thread panicked")?;
+        let symmetric_private_node_vms = symmetric_private_node_handle
+            .join()
+            .expect("Thread panicked")?;
+        let generic_node_vms = generic_node_handle.join().expect("Thread panicked")?;
+        let peer_cache_node_vms = peer_cache_node_handle.join().expect("Thread panicked")?;
+        let client_vms = if !client_handle.join().expect("Thread panicked")?.is_empty()
+            && environment_details.deployment_type != DeploymentType::Bootstrap
+        {
+            let client_and_sks = self.ansible_provisioner.get_client_secret_keys()?;
+            client_and_sks
+                .iter()
+                .map(|(vm, sks)| ClientVirtualMachine {
+                    vm: vm.clone(),
+                    wallet_public_key: sks
+                        .iter()
+                        .enumerate()
+                        .map(|(user, sk)| (format!("safe{}", user + 1), sk.address().encode_hex()))
+                        .collect(),
+                })
+                .collect()
+        } else {
+            Vec::new()
+        };
 
-        let full_cone_nat_gateway_vms = self
-            .ansible_runner
-            .get_inventory(AnsibleInventoryType::FullConeNatGateway, false)?;
-        let full_cone_private_node_vms = self
-            .ansible_runner
-            .get_inventory(AnsibleInventoryType::FullConePrivateNodes, false)?;
         debug!("full_cone_private_node_vms: {full_cone_private_node_vms:?}");
         debug!("full_cone_nat_gateway_vms: {full_cone_nat_gateway_vms:?}");
-
-        let symmetric_nat_gateway_vms = self
-            .ansible_runner
-            .get_inventory(AnsibleInventoryType::SymmetricNatGateway, false)?;
-        let symmetric_private_node_vms = self
-            .ansible_runner
-            .get_inventory(AnsibleInventoryType::SymmetricPrivateNodes, false)?;
         debug!("symmetric_private_node_vms: {symmetric_private_node_vms:?}");
         debug!("symmetric_nat_gateway_vms: {symmetric_nat_gateway_vms:?}");
-
-        let generic_node_vms = self
-            .ansible_runner
-            .get_inventory(AnsibleInventoryType::Nodes, false)?;
 
         // Create static inventory for private nodes. Will be used during ansible-playbook run.
         generate_full_cone_private_node_static_environment_inventory(
@@ -231,59 +277,56 @@ impl DeploymentInventoryService {
             )?;
         }
 
-        let peer_cache_node_vms = self
-            .ansible_runner
-            .get_inventory(AnsibleInventoryType::PeerCacheNodes, false)?;
-
-        let client_inventories = self
-            .ansible_runner
-            .get_inventory(AnsibleInventoryType::Clients, true)?;
-        let client_vms = if !client_inventories.is_empty()
-            && environment_details.deployment_type != DeploymentType::Bootstrap
-        {
-            let client_and_sks = self.ansible_provisioner.get_client_secret_keys()?;
-            client_and_sks
-                .iter()
-                .map(|(vm, sks)| ClientVirtualMachine {
-                    vm: vm.clone(),
-                    wallet_public_key: sks
-                        .iter()
-                        .enumerate()
-                        .map(|(user, sk)| (format!("safe{}", user + 1), sk.address().encode_hex()))
-                        .collect(),
-                })
-                .collect()
-        } else {
-            Vec::new()
-        };
-
         println!("Retrieving node registries from all VMs...");
-        let mut failed_node_registry_vms = Vec::new();
+        let ansible_provisioner = self.ansible_provisioner.clone();
+        let peer_cache_node_registries_handle = std::thread::spawn(move || {
+            ansible_provisioner.get_node_registries(&AnsibleInventoryType::PeerCacheNodes)
+        });
+        let ansible_provisioner = self.ansible_provisioner.clone();
+        let generic_node_registries_handle = std::thread::spawn(move || {
+            ansible_provisioner.get_node_registries(&AnsibleInventoryType::Nodes)
+        });
+        let ansible_provisioner = self.ansible_provisioner.clone();
+        let symmetric_private_node_registries_handle = std::thread::spawn(move || {
+            ansible_provisioner.get_node_registries(&AnsibleInventoryType::SymmetricPrivateNodes)
+        });
+        let ansible_provisioner = self.ansible_provisioner.clone();
+        let full_cone_private_node_registries_handle = std::thread::spawn(move || {
+            ansible_provisioner.get_node_registries(&AnsibleInventoryType::FullConePrivateNodes)
+        });
+        let ansible_provisioner = self.ansible_provisioner.clone();
+        let genesis_node_registry_handle = std::thread::spawn(move || {
+            ansible_provisioner.get_node_registries(&AnsibleInventoryType::Genesis)
+        });
 
-        let peer_cache_node_registries = self
-            .ansible_provisioner
-            .get_node_registries(&AnsibleInventoryType::PeerCacheNodes)?;
+        let peer_cache_node_registries = peer_cache_node_registries_handle
+            .join()
+            .expect("Thread panicked")?;
+        let generic_node_registries = generic_node_registries_handle
+            .join()
+            .expect("Thread panicked")?;
+        let symmetric_private_node_registries = symmetric_private_node_registries_handle
+            .join()
+            .expect("Thread panicked")?;
+        let full_cone_private_node_registries = full_cone_private_node_registries_handle
+            .join()
+            .expect("Thread panicked")?;
+        let genesis_node_registry = genesis_node_registry_handle
+            .join()
+            .expect("Thread panicked")?;
+
         let peer_cache_node_vms =
             NodeVirtualMachine::from_list(&peer_cache_node_vms, &peer_cache_node_registries);
 
-        let generic_node_registries = self
-            .ansible_provisioner
-            .get_node_registries(&AnsibleInventoryType::Nodes)?;
         let generic_node_vms =
             NodeVirtualMachine::from_list(&generic_node_vms, &generic_node_registries);
 
-        let symmetric_private_node_registries = self
-            .ansible_provisioner
-            .get_node_registries(&AnsibleInventoryType::SymmetricPrivateNodes)?;
         let symmetric_private_node_vms = NodeVirtualMachine::from_list(
             &symmetric_private_node_vms,
             &symmetric_private_node_registries,
         );
         debug!("symmetric_private_node_vms after conversion: {symmetric_private_node_vms:?}");
 
-        let full_cone_private_node_registries = self
-            .ansible_provisioner
-            .get_node_registries(&AnsibleInventoryType::FullConePrivateNodes)?;
         debug!("full_cone_private_node_vms: {full_cone_private_node_vms:?}");
         let full_cone_private_node_gateway_vm_map =
             PrivateNodeProvisionInventory::match_private_node_vm_and_gateway_vm(
@@ -297,9 +340,6 @@ impl DeploymentInventoryService {
         );
         debug!("full_cone_private_node_vms after conversion: {full_cone_private_node_vms:?}");
 
-        let genesis_node_registry = self
-            .ansible_provisioner
-            .get_node_registries(&AnsibleInventoryType::Genesis)?;
         let genesis_vm = NodeVirtualMachine::from_list(&genesis_vm, &genesis_node_registry);
         let genesis_vm = if !genesis_vm.is_empty() {
             Some(genesis_vm[0].clone())
@@ -307,6 +347,7 @@ impl DeploymentInventoryService {
             None
         };
 
+        let mut failed_node_registry_vms = Vec::new();
         failed_node_registry_vms.extend(peer_cache_node_registries.failed_vms);
         failed_node_registry_vms.extend(generic_node_registries.failed_vms);
         failed_node_registry_vms.extend(full_cone_private_node_registries.failed_vms);
