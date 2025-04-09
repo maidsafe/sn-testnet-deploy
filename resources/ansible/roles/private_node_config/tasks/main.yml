@@ -17,8 +17,9 @@
 - name: set nat_gateway_is_configured to true if nat gateway is configured
   set_fact:
     nat_gateway_is_configured: true
-  when: ip_route_output.stdout.find(nat_gateway_private_ip_eth1) != -1
-
+  when: >
+    ip_route_output.stdout is search('via {{ nat_gateway_private_ip_eth1 }} dev')
+  
 - name: obtain do gateway ip
   command: curl -s http://169.254.169.254/metadata/v1/interfaces/public/0/ipv4/gateway
   register: do_gateway_ip
