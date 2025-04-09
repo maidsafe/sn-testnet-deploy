@@ -1,11 +1,10 @@
 ---
 - name: configure downloaders
   hosts: all
-  become: False
+  become: True
   ignore_unreachable: yes
   roles:
     - role: downloaders
-      become: True
 
   tasks:
     # Something is wrong with the journal service on Ubuntu that causes no

@@ -17,12 +17,17 @@ Environment="EVM_NETWORK=arbitrum-one"
 Environment="{{ client_env_variables }}"
 {% endif %}
 User=ant{{ count }}
-{% if testnet_name.startswith('PROD-') %}
+{% if peer is not defined and network_contacts_url is not defined and network_id is not defined %}
 ExecStart=/home/ant{{ count }}/ant_random_uploader.sh
 {% else %}
-ExecStart=/home/ant{{ count }}/ant_random_uploader.sh {{ genesis_multiaddr }} {{network_contacts_url}}{% if network_id is defined %} {{network_id}}{% endif %}
+ExecStart=/home/ant{{ count }}/ant_random_uploader.sh \
+    {% if peer is defined %}--peer "{{ peer }}" \{% endif %}
 
+    {% if network_contacts_url is defined %}--network-contacts-url "{{network_contacts_url}}" \{% endif %}
+
+    {% if network_id is defined %}--network-id "{{network_id}}" {% endif %}
 {% endif %}
+
 Restart=always
 WorkingDirectory=/home/ant{{ count }}
 

@@ -1,4 +1,11 @@
 #!/usr/bin/env bash
+
+# Usage: ./script.sh [-p PEER] [-u URL] [-n ID]
+#
+#   -p, --peer: Optional contact peer
+#   -u, --network-contacts-url: Optional network contacts URL
+#   -n, --network-id: Optional network ID (also enables testnet mode)
+
 LOG_OUTPUT_DEST="{{ log_output_dest }}"
 UPLOAD_METRIC_DIR="/mnt/ant-storage/logs/upload_files/random_uploader/${USER}"
 
@@ -24,33 +31,77 @@ if [[ -n "${EVM_NETWORK}" ]] && ! grep -q "export EVM_NETWORK=" ~/.profile; then
   echo "export EVM_NETWORK=${EVM_NETWORK}" >> ~/.profile
 fi
 
+CONTACT_PEER=""
+NETWORK_CONTACTS_URL=""
+NETWORK_ID=""
+
+usage() {
+  echo "Usage: $0 [-p PEER] [-u URL] [-n ID]"
+  echo "  -p, --peer                PEER: Optional contact peer"
+  echo "  -u, --network-contacts-url URL: Optional network contacts URL"
+  echo "  -n, --network-id          ID: Optional network ID (also enables testnet mode)"
+  exit 1
+}
+
+TEMP=$(getopt -o p:u:n: --long peer:,network-contacts-url:,network-id: -n 'ant_random_uploader.sh' -- "$@")
+
+if [[ $? != 0 ]]; then
+  echo "Failed to parse arguments" >&2
+  usage
+fi
+
+# The quotes around "$TEMP" are necessary
+eval set -- "$TEMP"
+
+while true; do
+  case "$1" in
+    -p|--peer)
+      CONTACT_PEER="$2"
+      shift 2
+      ;;
+    -u|--network-contacts-url)
+      NETWORK_CONTACTS_URL="$2"
+      shift 2
+      ;;
+    -n|--network-id)
+      NETWORK_ID="$2"
+      shift 2
+      ;;
+    --)
+      shift
+      break
+      ;;
+    *)
+      echo "Unknown option: $1"
+      usage
+      ;;
+  esac
+done
 
 CONTACT_PEER_ARG=""
 NETWORK_CONTACTS_URL_ARG=""
 NETWORK_ID_ARG=""
 TESTNET_ARG=""
 
-if [ -n "${1:-}" ]; then
-  echo "Setting contact peer arg to ${1:-}"
-  CONTACT_PEER_ARG="--peer ${1:-}"
+if [[ -n "$CONTACT_PEER" ]]; then
+  echo "Setting contact peer arg to $CONTACT_PEER"
+  CONTACT_PEER_ARG="--peer $CONTACT_PEER"
 fi
-if [ -n "${2:-}" ]; then
-  echo "Setting network contacts URL arg to ${2:-}"
-  NETWORK_CONTACTS_URL_ARG="--network-contacts-url ${2:-}"
+if [[ -n "$NETWORK_CONTACTS_URL" ]]; then
+  echo "Setting network contacts URL arg to $NETWORK_CONTACTS_URL"
+  NETWORK_CONTACTS_URL_ARG="--network-contacts-url $NETWORK_CONTACTS_URL"
 fi
-if [ -n "${3:-}" ]; then
-  echo "Setting network ID arg to ${3:-}"
-  NETWORK_ID_ARG="--network-id ${3:-}"
+if [[ -n "$NETWORK_ID" ]]; then
+  echo "Setting network ID arg to $NETWORK_ID"
+  NETWORK_ID_ARG="--network-id $NETWORK_ID"
   echo "Setting --testnet arg"
   TESTNET_ARG="--testnet"
 fi
-
 
 if ! command -v ant &> /dev/null; then
   echo "Error: 'ant' not found in PATH."
   exit 1
 fi
-
 
 get_error_enum() {
   local exit_code=$1
@@ -185,7 +236,7 @@ generate_random_data_file_and_upload() {
   echo "Elapsed time: $elapsed seconds"
   error_enum=$(get_error_enum $exit_code)
 
-  if [ $exit_code -eq 0 ]; then
+  if [[ $exit_code -eq 0 ]]; then
     echo "Successfully uploaded $tmpfile using ANT CLI"
     success_file="$UPLOAD_METRIC_DIR/metrics_success.csv"
 
@@ -224,7 +275,7 @@ while true; do
   upload_count=$((upload_count + 1))
   
   {% if max_uploads is defined %}
-  if [ $upload_count -ge {{ max_uploads }} ]; then
+  if [[ $upload_count -ge {{ max_uploads }} ]]; then
     # Sleeping indefinitely allows the service restart policy to be retained
     # such that the service would restart on errors.
     echo "Reached maximum upload count of {{ max_uploads }}, pausing uploads."
