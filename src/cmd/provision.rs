@@ -86,7 +86,7 @@ async fn init_provision(
 }
 
 async fn handle_provision_nodes(name: String, node_type: NodeType) -> Result<()> {
-    let (deploy_options, mut provision_options, provisioner, ssh_client) =
+    let (deploy_options, provision_options, provisioner, ssh_client) =
         init_provision(&name).await?;
 
     let (genesis_multiaddr, genesis_ip) =
@@ -105,7 +105,7 @@ async fn handle_provision_nodes(name: String, node_type: NodeType) -> Result<()>
     match node_type {
         NodeType::FullConePrivateNode => {
             if private_node_inventory.should_provision_full_cone_private_nodes() {
-                provisioner.provision_full_cone(
+                provisioner.provision_full_cone_private_node_and_gateways(
                     &provision_options,
                     Some(genesis_multiaddr),
                     Some(genesis_network_contacts),
@@ -118,17 +118,10 @@ async fn handle_provision_nodes(name: String, node_type: NodeType) -> Result<()>
         }
         NodeType::SymmetricPrivateNode => {
             if private_node_inventory.should_provision_symmetric_private_nodes() {
-                provisioner.print_ansible_run_banner("Provision Symmetric NAT Gateway");
                 provisioner
-                    .provision_symmetric_nat_gateway(&provision_options, &private_node_inventory)
-                    .map_err(|err| {
-                        println!("Failed to provision Symmetric NAT gateway {err:?}");
-                        err
-                    })?;
-
-                provisioner.print_ansible_run_banner("Provision Symmetric Private Nodes");
-                provisioner.provision_symmetric_private_nodes(
-                    &mut provision_options,
+                    .print_ansible_run_banner("Provision Symmetric Private Nodes and Gateway");
+                provisioner.provision_symmetric_private_nodes_and_gateways(
+                    &provision_options,
                     Some(genesis_multiaddr),
                     Some(genesis_network_contacts),
                     &private_node_inventory,

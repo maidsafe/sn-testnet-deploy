@@ -240,45 +240,12 @@ impl TestnetDeployer {
     }
 
     pub async fn deploy(&self, options: &DeployOptions) -> Result<()> {
-        let (mut provision_options, (genesis_multiaddr, genesis_network_contacts)) =
+        let (provision_options, (genesis_multiaddr, genesis_network_contacts)) =
             self.deploy_to_genesis(options).await?;
 
         println!("Obtained multiaddr for genesis node: {genesis_multiaddr}, network contact: {genesis_network_contacts}");
 
-        let mut node_provision_failed = false;
-        self.ansible_provisioner
-            .print_ansible_run_banner("Provision Peer Cache Nodes");
-        match self.ansible_provisioner.provision_nodes(
-            &provision_options,
-            Some(genesis_multiaddr.clone()),
-            Some(genesis_network_contacts.clone()),
-            NodeType::PeerCache,
-        ) {
-            Ok(()) => {
-                println!("Provisioned Peer Cache nodes");
-            }
-            Err(err) => {
-                error!("Failed to provision Peer Cache nodes: {err}");
-                node_provision_failed = true;
-            }
-        }
-
-        self.ansible_provisioner
-            .print_ansible_run_banner("Provision Normal Nodes");
-        match self.ansible_provisioner.provision_nodes(
-            &provision_options,
-            Some(genesis_multiaddr.clone()),
-            Some(genesis_network_contacts.clone()),
-            NodeType::Generic,
-        ) {
-            Ok(()) => {
-                println!("Provisioned normal nodes");
-            }
-            Err(err) => {
-                error!("Failed to provision normal nodes: {err}");
-                node_provision_failed = true;
-            }
-        }
+        let ansible_provisioner = self.ansible_provisioner.clone();
 
         let private_node_inventory = PrivateNodeProvisionInventory::new(
             &self.ansible_provisioner,
@@ -286,89 +253,190 @@ impl TestnetDeployer {
             options.symmetric_private_node_vm_count,
         )?;
 
-        if private_node_inventory.should_provision_full_cone_private_nodes() {
-            match self.ansible_provisioner.provision_full_cone(
-                &provision_options,
-                Some(genesis_multiaddr.clone()),
-                Some(genesis_network_contacts.clone()),
-                private_node_inventory.clone(),
-                None,
-            ) {
-                Ok(()) => {
-                    println!("Provisioned Full Cone nodes and Gateway");
-                }
-                Err(err) => {
-                    error!("Failed to provision Full Cone nodes and Gateway: {err}");
-                    node_provision_failed = true;
-                }
-            }
-        }
-
-        if private_node_inventory.should_provision_symmetric_private_nodes() {
-            self.ansible_provisioner
-                .print_ansible_run_banner("Provision Symmetric NAT Gateway");
-            self.ansible_provisioner
-                .provision_symmetric_nat_gateway(&provision_options, &private_node_inventory)
-                .map_err(|err| {
-                    println!("Failed to provision Symmetric NAT gateway {err:?}");
-                    err
-                })?;
-
-            self.ansible_provisioner
-                .print_ansible_run_banner("Provision Symmetric Private Nodes");
-            match self.ansible_provisioner.provision_symmetric_private_nodes(
-                &mut provision_options,
-                Some(genesis_multiaddr.clone()),
-                Some(genesis_network_contacts.clone()),
-                &private_node_inventory,
-            ) {
-                Ok(()) => {
-                    println!("Provisioned Symmetric private nodes");
-                }
-                Err(err) => {
-                    error!("Failed to provision Symmetric Private nodes: {err}");
-                    node_provision_failed = true;
-                }
-            }
-        }
-
-        if options.current_inventory.is_empty() {
-            self.ansible_provisioner
-                .print_ansible_run_banner("Provision Clients");
-            self.ansible_provisioner
-                .provision_clients(
+        let client_result = std::thread::scope(|scope| {
+            let peer_cache_node_handle = scope.spawn(|| {
+                ansible_provisioner.print_ansible_run_banner("Provision Peer Cache Nodes");
+                let mut failed = false;
+                match ansible_provisioner.provision_nodes(
                     &provision_options,
                     Some(genesis_multiaddr.clone()),
                     Some(genesis_network_contacts.clone()),
-                )
-                .await
-                .map_err(|err| {
-                    println!("Failed to provision Clients {err:?}");
-                    err
-                })?;
-            self.ansible_provisioner
-                .print_ansible_run_banner("Provision Downloaders");
-            self.ansible_provisioner
-                .provision_downloaders(
+                    NodeType::PeerCache,
+                ) {
+                    Ok(()) => {
+                        println!("Provisioned Peer Cache nodes");
+                    }
+                    Err(err) => {
+                        failed = true;
+                        error!("Failed to provision Peer Cache nodes: {err}");
+                    }
+                }
+                failed
+            });
+            let generic_node_handle = scope.spawn(|| {
+                ansible_provisioner.print_ansible_run_banner("Provision Generic Nodes");
+                let mut failed = false;
+                match ansible_provisioner.provision_nodes(
                     &provision_options,
                     Some(genesis_multiaddr.clone()),
                     Some(genesis_network_contacts.clone()),
-                )
-                .await
-                .map_err(|err| {
-                    println!("Failed to provision downloaders {err:?}");
-                    err
-                })?;
-        }
+                    NodeType::Generic,
+                ) {
+                    Ok(()) => {
+                        println!("Provisioned Generic nodes");
+                    }
+                    Err(err) => {
+                        error!("Failed to provision Generic nodes: {err}");
+                        failed = true;
+                    }
+                }
+                failed
+            });
 
-        if node_provision_failed {
-            println!();
-            println!("{}", "WARNING!".yellow());
-            println!("Some nodes failed to provision without error.");
-            println!("This usually means a small number of nodes failed to start on a few VMs.");
-            println!("However, most of the time the deployment will still be usable.");
-            println!("See the output from Ansible to determine which VMs had failures.");
-        }
+            let full_cone_private_node_handle = if private_node_inventory
+                .should_provision_full_cone_private_nodes()
+            {
+                let full_cone_private_node_handle = scope.spawn(|| {
+                    ansible_provisioner
+                        .print_ansible_run_banner("Provision Full Cone Private Nodes and Gateway");
+                    let mut failed = false;
+                    match ansible_provisioner.provision_full_cone_private_node_and_gateways(
+                        &provision_options,
+                        Some(genesis_multiaddr.clone()),
+                        Some(genesis_network_contacts.clone()),
+                        private_node_inventory.clone(),
+                        None,
+                    ) {
+                        Ok(()) => {
+                            println!("Provisioned Full Cone Private nodes and Gateway");
+                        }
+                        Err(err) => {
+                            error!(
+                                "Failed to provision Full Cone Private nodes and Gateway: {err}"
+                            );
+                            failed = true;
+                        }
+                    }
+                    failed
+                });
+                Some(full_cone_private_node_handle)
+            } else {
+                None
+            };
+
+            let symmetric_private_node_handle = if private_node_inventory
+                .should_provision_symmetric_private_nodes()
+            {
+                let symmetric_private_node_handle = scope.spawn(|| {
+                    ansible_provisioner
+                        .print_ansible_run_banner("Provision Symmetric Private Nodes and Gateway");
+                    let mut failed = false;
+
+                    match ansible_provisioner.provision_symmetric_private_nodes_and_gateways(
+                        &provision_options,
+                        Some(genesis_multiaddr.clone()),
+                        Some(genesis_network_contacts.clone()),
+                        &private_node_inventory,
+                    ) {
+                        Ok(()) => {
+                            println!("Provisioned Symmetric private nodes and Gateway");
+                        }
+                        Err(err) => {
+                            error!(
+                                "Failed to provision Symmetric Private nodes and Gateway: {err}"
+                            );
+                            failed = true;
+                        }
+                    }
+                    failed
+                });
+                Some(symmetric_private_node_handle)
+            } else {
+                None
+            };
+
+            let client_handle = scope.spawn(|| {
+                // Create a runtime within this thread
+                let rt = tokio::runtime::Builder::new_current_thread()
+                    .enable_all()
+                    .build()
+                    .expect("Failed to build runtime");
+
+                // Use the runtime to run the async client provisioning
+                let result: Result<(), crate::error::Error> = rt.block_on(async {
+                    if options.current_inventory.is_empty() {
+                        ansible_provisioner.print_ansible_run_banner("Provision Clients");
+                        self.ansible_provisioner
+                            .provision_clients(
+                                &provision_options,
+                                Some(genesis_multiaddr.clone()),
+                                Some(genesis_network_contacts.clone()),
+                            )
+                            .await
+                            .map_err(|err| {
+                                println!("Failed to provision Clients {err:?}");
+                                err
+                            })?;
+                        ansible_provisioner.print_ansible_run_banner("Provision Downloaders");
+                        self.ansible_provisioner
+                            .provision_downloaders(
+                                &provision_options,
+                                Some(genesis_multiaddr.clone()),
+                                Some(genesis_network_contacts.clone()),
+                            )
+                            .await
+                            .map_err(|err| {
+                                println!("Failed to provision downloaders {err:?}");
+                                err
+                            })?;
+                    }
+
+                    Ok(())
+                });
+
+                result
+            });
+
+            let mut node_provision_failed = false;
+            node_provision_failed = node_provision_failed
+                || peer_cache_node_handle
+                    .join()
+                    .expect("Failed to join peer cache node thread");
+
+            node_provision_failed = node_provision_failed
+                || generic_node_handle
+                    .join()
+                    .expect("Failed to join generic node thread");
+            if let Some(handle) = full_cone_private_node_handle {
+                node_provision_failed = node_provision_failed
+                    || handle
+                        .join()
+                        .expect("Failed to join full cone private node thread");
+            }
+
+            if let Some(handle) = symmetric_private_node_handle {
+                node_provision_failed = node_provision_failed
+                    || handle
+                        .join()
+                        .expect("Failed to join symmetric private node thread");
+            }
+
+            let client_result = client_handle.join().expect("Failed to join client thread");
+
+            if node_provision_failed {
+                println!();
+                println!("{}", "WARNING!".yellow());
+                println!("Some nodes failed to provision without error.");
+                println!(
+                    "This usually means a small number of nodes failed to start on a few VMs."
+                );
+                println!("However, most of the time the deployment will still be usable.");
+                println!("See the output from Ansible to determine which VMs had failures.");
+            }
+            client_result
+        });
+
+        client_result?;
 
         Ok(())
     }

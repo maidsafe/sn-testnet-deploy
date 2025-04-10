@@ -339,13 +339,15 @@ impl TestnetDeployer {
                 Some(full_cone_nat_gateway_new_vms)
             };
 
-            match self.ansible_provisioner.provision_full_cone(
-                &provision_options,
-                Some(initial_multiaddr.clone()),
-                Some(initial_network_contacts_url.clone()),
-                private_node_inventory.clone(),
-                full_cone_nat_gateway_new_vms,
-            ) {
+            match self
+                .ansible_provisioner
+                .provision_full_cone_private_node_and_gateways(
+                    &provision_options,
+                    Some(initial_multiaddr.clone()),
+                    Some(initial_network_contacts_url.clone()),
+                    private_node_inventory.clone(),
+                    full_cone_nat_gateway_new_vms,
+                ) {
                 Ok(()) => {
                     println!("Provisioned Full Cone nodes and Gateway");
                 }
@@ -361,32 +363,26 @@ impl TestnetDeployer {
                 AnsibleInventoryType::SymmetricNatGateway,
                 &options.current_inventory,
             )?;
-            self.ansible_provisioner
-                .print_ansible_run_banner("Provision Symmetric NAT Gateway");
-            self.ansible_provisioner
-                .provision_symmetric_nat_gateway(&provision_options, &private_node_inventory)
-                .map_err(|err| {
-                    println!("Failed to provision symmetric NAT gateway {err:?}");
-                    err
-                })?;
 
             self.wait_for_ssh_availability_on_new_machines(
                 AnsibleInventoryType::SymmetricPrivateNodes,
                 &options.current_inventory,
             )?;
             self.ansible_provisioner
-                .print_ansible_run_banner("Provision Symmetric Private Nodes");
-            match self.ansible_provisioner.provision_symmetric_private_nodes(
-                &mut provision_options,
-                Some(initial_multiaddr.clone()),
-                Some(initial_network_contacts_url.clone()),
-                &private_node_inventory,
-            ) {
+                .print_ansible_run_banner("Provision Symmetric Private Nodes and Gateway");
+            match self
+                .ansible_provisioner
+                .provision_symmetric_private_nodes_and_gateways(
+                    &mut provision_options,
+                    Some(initial_multiaddr.clone()),
+                    Some(initial_network_contacts_url.clone()),
+                    &private_node_inventory,
+                ) {
                 Ok(()) => {
-                    println!("Provisioned symmetric private nodes");
+                    println!("Provisioned symmetric private nodes and Gateway");
                 }
                 Err(err) => {
-                    log::error!("Failed to provision symmetric private nodes: {err}");
+                    log::error!("Failed to provision symmetric private nodes and gateway: {err}");
                     node_provision_failed = true;
                 }
             }

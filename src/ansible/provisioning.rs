@@ -583,7 +583,7 @@ impl AnsibleProvisioner {
         Ok(())
     }
 
-    pub fn provision_full_cone(
+    pub fn provision_full_cone_private_node_and_gateways(
         &self,
         options: &ProvisionOptions,
         initial_contact_peer: Option<String>,
@@ -793,7 +793,8 @@ impl AnsibleProvisioner {
         print_duration(start.elapsed());
         Ok(())
     }
-    pub fn provision_symmetric_nat_gateway(
+
+    fn provision_symmetric_nat_gateway(
         &self,
         options: &ProvisionOptions,
         private_node_inventory: &PrivateNodeProvisionInventory,
@@ -925,13 +926,19 @@ impl AnsibleProvisioner {
         Ok(())
     }
 
-    pub fn provision_symmetric_private_nodes(
+    pub fn provision_symmetric_private_nodes_and_gateways(
         &self,
-        options: &mut ProvisionOptions,
+        options: &ProvisionOptions,
         initial_contact_peer: Option<String>,
         initial_network_contacts_url: Option<String>,
         private_node_inventory: &PrivateNodeProvisionInventory,
     ) -> Result<()> {
+        self.provision_symmetric_nat_gateway(options, private_node_inventory)
+            .map_err(|err| {
+                println!("Failed to provision Symmetric NAT gateway {err:?}");
+                err
+            })?;
+
         let start = Instant::now();
         self.print_ansible_run_banner("Provision Symmetric Private Node Config");
 

@@ -115,7 +115,7 @@ impl TestnetDeployer {
             err
         })?;
 
-        let mut provision_options = ProvisionOptions::from(options.clone());
+        let provision_options = ProvisionOptions::from(options.clone());
         if build_custom_binaries {
             self.ansible_provisioner
                 .print_ansible_run_banner("Build Custom Binaries");
@@ -153,13 +153,17 @@ impl TestnetDeployer {
         )?;
 
         if private_node_inventory.should_provision_full_cone_private_nodes() {
-            match self.ansible_provisioner.provision_full_cone(
-                &provision_options,
-                options.peer.clone(),
-                options.network_contacts_url.clone(),
-                private_node_inventory.clone(),
-                None,
-            ) {
+            self.ansible_provisioner
+                .print_ansible_run_banner("Provision Full Cone Private Nodes and Gateway");
+            match self
+                .ansible_provisioner
+                .provision_full_cone_private_node_and_gateways(
+                    &provision_options,
+                    options.peer.clone(),
+                    options.network_contacts_url.clone(),
+                    private_node_inventory.clone(),
+                    None,
+                ) {
                 Ok(()) => {
                     println!("Provisioned Full Cone nodes and Gateway");
                 }
@@ -172,27 +176,20 @@ impl TestnetDeployer {
 
         if private_node_inventory.should_provision_symmetric_private_nodes() {
             self.ansible_provisioner
-                .print_ansible_run_banner("Provision Symmetric NAT Gateway");
-            self.ansible_provisioner
-                .provision_symmetric_nat_gateway(&provision_options, &private_node_inventory)
-                .map_err(|err| {
-                    println!("Failed to provision Symmetric NAT gateway {err:?}");
-                    err
-                })?;
-
-            self.ansible_provisioner
-                .print_ansible_run_banner("Provision Symmetric Private Nodes");
-            match self.ansible_provisioner.provision_symmetric_private_nodes(
-                &mut provision_options,
-                options.peer.clone(),
-                options.network_contacts_url.clone(),
-                &private_node_inventory,
-            ) {
+                .print_ansible_run_banner("Provision Symmetric Private Nodes and Gateway");
+            match self
+                .ansible_provisioner
+                .provision_symmetric_private_nodes_and_gateways(
+                    &provision_options,
+                    options.peer.clone(),
+                    options.network_contacts_url.clone(),
+                    &private_node_inventory,
+                ) {
                 Ok(()) => {
-                    println!("Provisioned Symmetric private nodes");
+                    println!("Provisioned Symmetric private nodes and Gateway");
                 }
                 Err(err) => {
-                    error!("Failed to provision Symmetric Private nodes: {err}");
+                    error!("Failed to provision Symmetric Private nodes and Gateways: {err}");
                     failed_to_provision = true;
                 }
             }
