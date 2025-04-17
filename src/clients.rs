@@ -57,6 +57,7 @@ pub struct ClientsDeployOptions {
     pub output_inventory_dir_path: PathBuf,
     pub peer: Option<String>,
     pub uploaders_count: u16,
+    pub upload_size: Option<u16>,
     pub wallet_secret_keys: Option<Vec<String>>,
 }
 

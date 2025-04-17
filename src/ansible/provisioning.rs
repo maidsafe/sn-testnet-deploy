@@ -83,6 +83,7 @@ pub struct ProvisionOptions {
     pub rewards_address: Option<String>,
     pub symmetric_private_node_count: u16,
     pub token_amount: Option<U256>,
+    pub upload_size: Option<u16>,
     pub uploaders_count: Option<u16>,
     pub wallet_secret_keys: Option<Vec<String>>,
 }
@@ -276,6 +277,7 @@ impl From<BootstrapOptions> for ProvisionOptions {
             rewards_address: Some(bootstrap_options.rewards_address),
             symmetric_private_node_count: bootstrap_options.symmetric_private_node_count,
             token_amount: None,
+            upload_size: None,
             uploaders_count: None,
             wallet_secret_keys: None,
         }
@@ -319,6 +321,7 @@ impl From<DeployOptions> for ProvisionOptions {
             rewards_address: Some(deploy_options.rewards_address),
             symmetric_private_node_count: deploy_options.symmetric_private_node_count,
             token_amount: deploy_options.initial_tokens,
+            upload_size: None,
             uploaders_count: Some(deploy_options.uploaders_count),
             wallet_secret_keys: None,
         }
@@ -362,6 +365,7 @@ impl From<ClientsDeployOptions> for ProvisionOptions {
             rewards_address: None,
             symmetric_private_node_count: 0,
             token_amount: client_options.initial_tokens,
+            upload_size: client_options.upload_size,
             uploaders_count: Some(client_options.uploaders_count),
             wallet_secret_keys: client_options.wallet_secret_keys,
         }

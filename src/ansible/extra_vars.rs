@@ -380,6 +380,10 @@ pub fn build_node_extra_vars_doc(
         extra_vars.add_variable("evm_rpc_url", evm_rpc_url);
     }
 
+    extra_vars.add_boolean_variable("enable_performance_verifier", options.enable_performance_verifier);
+    
+    extra_vars.add_variable("upload_size", &options.upload_size.unwrap_or(100).to_string());
+
     Ok(extra_vars.build())
 }
 
@@ -550,6 +554,8 @@ pub fn build_clients_extra_vars_doc(
     if let Some(max_uploads) = options.max_uploads {
         extra_vars.add_variable("max_uploads", &max_uploads.to_string());
     }
+
+    extra_vars.add_variable("upload_size", &options.upload_size.unwrap_or(100).to_string());
 
     Ok(extra_vars.build())
 }

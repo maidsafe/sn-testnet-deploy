@@ -204,7 +204,7 @@ get_error_enum() {
 
 generate_random_data_file_and_upload() {
   tmpfile=$(mktemp)
-  dd if=/dev/urandom of="$tmpfile" bs=100M count=1 iflag=fullblock &> /dev/null
+  dd if=/dev/urandom of="$tmpfile" bs={{ upload_size|default(100) }}M count=1 iflag=fullblock &> /dev/null
 
   file_size_kb=$(du -k "$tmpfile" | cut -f1)
   file_hash=$(sha256sum "$tmpfile" | awk '{ print $1 }')
