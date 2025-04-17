@@ -184,25 +184,26 @@ impl TestnetDeployer {
         }
 
         let mut provision_options = ProvisionOptions {
+            ant_version: options.ant_version.clone(),
             binary_option: options.current_inventory.binary_option.clone(),
             chunk_size: None,
             client_env_variables: None,
             enable_download_verifier: options.enable_download_verifier,
-            enable_random_verifier: options.enable_random_verifier,
             enable_performance_verifier: options.enable_performance_verifier,
-            enable_uploaders: true,
+            enable_random_verifier: options.enable_random_verifier,
             enable_telegraf: true,
-            evm_network: options
-                .current_inventory
-                .environment_details
-                .evm_details
-                .network
-                .clone(),
+            enable_uploaders: true,
             evm_data_payments_address: options
                 .current_inventory
                 .environment_details
                 .evm_details
                 .data_payments_address
+                .clone(),
+            evm_network: options
+                .current_inventory
+                .environment_details
+                .evm_details
+                .network
                 .clone(),
             evm_payment_token_address: options
                 .current_inventory
@@ -221,14 +222,16 @@ impl TestnetDeployer {
             file_address: None,
             full_cone_private_node_count: desired_full_cone_private_node_count,
             funding_wallet_secret_key: options.funding_wallet_secret_key.clone(),
+            gas_amount: options.gas_amount,
             interval: Some(options.interval),
             log_format: None,
+            max_archived_log_files: options.max_archived_log_files,
+            max_log_files: options.max_log_files,
+            max_uploads: None,
             name: options.current_inventory.name.clone(),
             network_id: options.current_inventory.environment_details.network_id,
             node_count: desired_node_count,
             node_env_variables: None,
-            max_archived_log_files: options.max_archived_log_files,
-            max_log_files: options.max_log_files,
             output_inventory_dir_path: self
                 .working_directory_path
                 .join("ansible")
@@ -241,12 +244,10 @@ impl TestnetDeployer {
                 .rewards_address
                 .clone(),
             symmetric_private_node_count: desired_symmetric_private_node_count,
-            ant_version: options.ant_version.clone(),
-            uploaders_count: options.desired_uploaders_count,
-            gas_amount: options.gas_amount,
             token_amount: None,
+            upload_size: None,
+            uploaders_count: options.desired_uploaders_count,
             wallet_secret_keys: None,
-            max_uploads: None,
         };
         let mut node_provision_failed = false;
 
@@ -569,6 +570,7 @@ impl TestnetDeployer {
             symmetric_private_node_count: 0,
             token_amount: options.token_amount,
             uploaders_count: options.desired_uploaders_count,
+            upload_size: None,
             wallet_secret_keys: None,
         };
 
