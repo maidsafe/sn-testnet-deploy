@@ -42,6 +42,7 @@ pub struct UpscaleOptions {
     pub infra_only: bool,
     pub max_archived_log_files: u16,
     pub max_log_files: u16,
+    pub node_env_variables: Option<Vec<(String, String)>>,
     pub plan: bool,
     pub public_rpc: bool,
     pub provision_only: bool,
@@ -231,7 +232,7 @@ impl TestnetDeployer {
             name: options.current_inventory.name.clone(),
             network_id: options.current_inventory.environment_details.network_id,
             node_count: desired_node_count,
-            node_env_variables: None,
+            node_env_variables: options.node_env_variables.clone(),
             output_inventory_dir_path: self
                 .working_directory_path
                 .join("ansible")

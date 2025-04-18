@@ -1086,6 +1086,14 @@ pub enum Commands {
         /// exclusive with the version arguments.
         #[arg(long, verbatim_doc_comment)]
         repo_owner: Option<String>,
+        /// Provide environment variables for the antnode service.
+        ///
+        /// This is useful to set the antnode's log levels. Each variable should be comma
+        /// separated without any space.
+        ///
+        /// Example: --node-env ANT_LOG=all,RUST_LOG=libp2p=debug
+        #[clap(name = "node-env", long, use_value_delimiter = true, value_parser = parse_environment_variables, verbatim_doc_comment)]
+        node_env_variables: Option<Vec<(String, String)>>,
     },
 }
 
