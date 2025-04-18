@@ -380,9 +380,15 @@ pub fn build_node_extra_vars_doc(
         extra_vars.add_variable("evm_rpc_url", evm_rpc_url);
     }
 
-    extra_vars.add_boolean_variable("enable_performance_verifier", options.enable_performance_verifier);
-    
-    extra_vars.add_variable("upload_size", &options.upload_size.unwrap_or(100).to_string());
+    extra_vars.add_boolean_variable(
+        "enable_performance_verifier",
+        options.enable_performance_verifier,
+    );
+
+    extra_vars.add_variable(
+        "upload_size",
+        &options.upload_size.unwrap_or(100).to_string(),
+    );
 
     Ok(extra_vars.build())
 }
@@ -463,7 +469,10 @@ pub fn build_downloaders_extra_vars_doc(
 
     extra_vars.add_boolean_variable("enable_download_verifier", options.enable_download_verifier);
     extra_vars.add_boolean_variable("enable_random_verifier", options.enable_random_verifier);
-    extra_vars.add_boolean_variable("enable_performance_verifier", options.enable_performance_verifier);
+    extra_vars.add_boolean_variable(
+        "enable_performance_verifier",
+        options.enable_performance_verifier,
+    );
 
     if let Some(file_address) = &options.file_address {
         extra_vars.add_variable("file_address", file_address);
@@ -555,7 +564,10 @@ pub fn build_clients_extra_vars_doc(
         extra_vars.add_variable("max_uploads", &max_uploads.to_string());
     }
 
-    extra_vars.add_variable("upload_size", &options.upload_size.unwrap_or(100).to_string());
+    extra_vars.add_variable(
+        "upload_size",
+        &options.upload_size.unwrap_or(100).to_string(),
+    );
 
     Ok(extra_vars.build())
 }
