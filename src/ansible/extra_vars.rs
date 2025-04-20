@@ -390,6 +390,10 @@ pub fn build_node_extra_vars_doc(
         &options.upload_size.unwrap_or(100).to_string(),
     );
 
+    if let Some(branch) = &options.network_dashboard_branch {
+        extra_vars.add_variable("network_dashboard_branch", branch);
+    }
+
     Ok(extra_vars.build())
 }
 
