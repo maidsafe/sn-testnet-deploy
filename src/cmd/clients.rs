@@ -691,6 +691,7 @@ pub async fn handle_clients_command(cmd: ClientsCommands) -> Result<()> {
                     max_log_files: 1,
                     infra_only,
                     interval: Duration::from_millis(2000),
+                    network_dashboard_branch: None,
                     node_env_variables: None,
                     plan,
                     provision_only,

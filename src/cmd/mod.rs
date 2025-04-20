@@ -473,6 +473,11 @@ pub enum Commands {
         /// If not used, the contacts file will have the same name as the environment.
         #[arg(long)]
         network_contacts_file_name: Option<String>,
+        /// Specify the branch of the network dashboard to use.
+        ///
+        /// Used for testing different configurations for Telegraf.
+        #[clap(long, verbatim_doc_comment)]
+        network_dashboard_branch: Option<String>,
         /// Provide environment variables for the antnode service.
         ///
         /// This is useful to set the antnode's log levels. Each variable should be comma
@@ -926,19 +931,16 @@ pub enum Commands {
     },
     /// Upscale VMs and node services for an existing network.
     Upscale {
-        /// Set to run Ansible with more verbose output.
-        #[arg(long)]
-        ansible_verbose: bool,
-        /// Supply a version number for the antctl binary.
-        ///
-        /// There should be no 'v' prefix.
-        #[arg(long, verbatim_doc_comment)]
-        antctl_version: Option<String>,
         /// Supply a version number for the antnode binary.
         ///
         /// There should be no 'v' prefix.
         #[arg(long, verbatim_doc_comment)]
         antnode_version: Option<String>,
+        /// Supply a version number for the antctl binary.
+        ///
+        /// There should be no 'v' prefix.
+        #[arg(long, verbatim_doc_comment)]
+        antctl_version: Option<String>,
         /// Supply a version number for the safe binary to be used for new Client VMs.
         ///
         /// There should be no 'v' prefix.
@@ -946,6 +948,9 @@ pub enum Commands {
         /// This argument is required when the Client VM count is supplied.
         #[arg(long, verbatim_doc_comment)]
         ant_version: Option<String>,
+        /// Set to run Ansible with more verbose output.
+        #[arg(long)]
+        ansible_verbose: bool,
         /// The name of a branch from which custom binaries were built.
         ///
         /// This only applies if the original deployment also used a custom branch. The upscale will
@@ -1060,6 +1065,19 @@ pub enum Commands {
         /// The name of the existing network to upscale.
         #[arg(short = 'n', long, verbatim_doc_comment)]
         name: String,
+        /// Specify the branch of the network dashboard to use.
+        ///
+        /// Used for testing different configurations for Telegraf.
+        #[clap(long, verbatim_doc_comment)]
+        network_dashboard_branch: Option<String>,
+        /// Provide environment variables for the antnode service.
+        ///
+        /// This is useful to set the antnode's log levels. Each variable should be comma
+        /// separated without any space.
+        ///
+        /// Example: --node-env ANT_LOG=all,RUST_LOG=libp2p=debug
+        #[clap(name = "node-env", long, use_value_delimiter = true, value_parser = parse_environment_variables, verbatim_doc_comment)]
+        node_env_variables: Option<Vec<(String, String)>>,
         /// Set to only run the Terraform plan rather than applying the changes.
         ///
         /// Can be useful to preview the upscale to make sure everything is ok and that no other
@@ -1086,14 +1104,6 @@ pub enum Commands {
         /// exclusive with the version arguments.
         #[arg(long, verbatim_doc_comment)]
         repo_owner: Option<String>,
-        /// Provide environment variables for the antnode service.
-        ///
-        /// This is useful to set the antnode's log levels. Each variable should be comma
-        /// separated without any space.
-        ///
-        /// Example: --node-env ANT_LOG=all,RUST_LOG=libp2p=debug
-        #[clap(name = "node-env", long, use_value_delimiter = true, value_parser = parse_environment_variables, verbatim_doc_comment)]
-        node_env_variables: Option<Vec<(String, String)>>,
     },
 }
 
