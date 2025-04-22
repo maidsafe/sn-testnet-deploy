@@ -606,7 +606,6 @@ impl AnsibleProvisioner {
                 None,
                 1,
                 options.evm_network.clone(),
-                false,
             )?),
         )?;
 
@@ -884,15 +883,11 @@ impl AnsibleProvisioner {
         node_type: NodeType,
     ) -> Result<()> {
         let start = Instant::now();
-        let mut relay = false;
         let (inventory_type, node_count) = match &node_type {
-            NodeType::FullConePrivateNode => {
-                relay = true;
-                (
-                    node_type.to_ansible_inventory_type(),
-                    options.full_cone_private_node_count,
-                )
-            }
+            NodeType::FullConePrivateNode => (
+                node_type.to_ansible_inventory_type(),
+                options.full_cone_private_node_count,
+            ),
             // use provision_genesis_node fn
             NodeType::Generic => (node_type.to_ansible_inventory_type(), options.node_count),
             NodeType::Genesis => return Err(Error::InvalidNodeType(node_type)),
@@ -900,13 +895,10 @@ impl AnsibleProvisioner {
                 node_type.to_ansible_inventory_type(),
                 options.peer_cache_node_count,
             ),
-            NodeType::SymmetricPrivateNode => {
-                relay = true;
-                (
-                    node_type.to_ansible_inventory_type(),
-                    options.symmetric_private_node_count,
-                )
-            }
+            NodeType::SymmetricPrivateNode => (
+                node_type.to_ansible_inventory_type(),
+                options.symmetric_private_node_count,
+            ),
         };
 
         // For a new deployment, it's quite probable that SSH is available, because this part occurs
@@ -949,7 +941,6 @@ impl AnsibleProvisioner {
                 initial_network_contacts_url,
                 node_count,
                 options.evm_network.clone(),
-                relay,
             )?),
         )?;
 
