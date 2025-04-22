@@ -5,22 +5,30 @@
     state: started
     enabled: yes
 
-- name: find the json file in the bootstrap cache directory
+- name: find the version0 json file
   find:
     paths: "{{ bootstrap_cache_dir }}"
     patterns: "*.json"
-  register: json_files
+    recurse: no
+  register: version0_file
 
-- name: fail if no json file is found
-  fail:
-    msg: "No json file found in the bootstrap directory."
-  when: json_files.matched == 0
+- name: find the version1 json file
+  find:
+    paths: "{{ bootstrap_cache_dir }}/version_1"
+    patterns: "*.json"
+    recurse: no
+  register: version1_file
+
+- name: create a map of versions to their respective json files
+  set_fact:
+    version_files:
+      version0: "{{ version0_file.files[0].path }}"
+      version1: "{{ version1_file.files[0].path }}"
 
 - name: ensure nginx is serving the json file using a template
   template:
     src: nginx.conf.j2
     dest: /etc/nginx/sites-available/default
-  when: json_files.matched > 0
 
 - name: ensure nginx status site file is set
   template:
@@ -32,10 +40,8 @@
     src: /etc/nginx/sites-available/nginx_status
     dest: /etc/nginx/sites-enabled/nginx_status
     state: link
-  when: json_files.matched > 0
 
 - name: reload nginx to apply changes
   service:
     name: nginx
     state: reloaded
-  when: json_files.matched > 0
