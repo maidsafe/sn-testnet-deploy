@@ -56,9 +56,6 @@ for ((i=0; i<node_count; i++)); do
     --max-archived-log-files ${max_archived_log_files} \
     --max-log-files ${max_log_files} \
     --rewards-address ${rewards_address} \
-{% if environment_name is defined and not environment_name.startswith('PROD') %}
-    --testnet \
-{% endif %}
 {% if evm_network_type == 'evm-custom' %}
     {{ evm_network_type }} \
 {% else %}

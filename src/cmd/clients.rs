@@ -160,12 +160,17 @@ pub enum ClientsCommands {
         /// The name of the environment
         #[arg(short = 'n', long)]
         name: String,
-        /// Specify the network ID to use for the node services. This is used to partition the network and will not allow
-        /// nodes with different network IDs to join.
+        /// Specify the network ID for the ant binary.
         ///
-        /// By default, the network ID is set to 1, which represents the mainnet.
+        /// This is used to ensure the client connects to the correct network.
+        ///
+        /// For a production deployment, use 1.
+        ///
+        /// For an alpha deployment, use 2.
+        ///
+        /// For a testnet deployment, use anything between 3 and 255.
         #[clap(long, verbatim_doc_comment)]
-        network_id: Option<u8>,
+        network_id: u8,
         /// The networks contacts URL from an existing network.
         #[arg(long)]
         network_contacts_url: Option<String>,
@@ -505,7 +510,7 @@ pub async fn handle_clients_command(cmd: ClientsCommands) -> Result<()> {
                 max_log_files: 1,
                 max_uploads,
                 name: name.clone(),
-                network_id,
+                network_id: Some(network_id),
                 network_contacts_url,
                 output_inventory_dir_path: client_deployer.working_directory_path.join("inventory"),
                 peer,

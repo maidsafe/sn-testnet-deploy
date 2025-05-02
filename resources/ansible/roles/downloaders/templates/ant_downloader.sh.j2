@@ -137,7 +137,6 @@ mkdir -p "${DOWNLOAD_METRICS_DIR}"
 CONTACT_PEER_ARG=""
 NETWORK_CONTACTS_URL_ARG=""
 NETWORK_ID_ARG=""
-TESTNET_ARG=""
 
 if [[ -n "$CONTACT_PEER" ]]; then
   echo "Setting contact peer arg to $CONTACT_PEER"
@@ -150,8 +149,6 @@ fi
 if [[ -n "$NETWORK_ID" ]]; then
   echo "Setting network ID arg to $NETWORK_ID"
   NETWORK_ID_ARG="--network-id $NETWORK_ID"
-  echo "Setting --testnet arg"
-  TESTNET_ARG="--testnet"
 fi
 
 if ! command -v ant &> /dev/null; then
@@ -279,7 +276,7 @@ download_file() {
     fi
     
     start_time=$(date +%s%N)
-    stdout=$(ant $CONTACT_PEER_ARG $NETWORK_CONTACTS_URL_ARG $TESTNET_ARG $NETWORK_ID_ARG file download "$file_ref" "$download_path" $QUORUM_ARG 2>&1)
+    stdout=$(ant $CONTACT_PEER_ARG $NETWORK_CONTACTS_URL_ARG $NETWORK_ID_ARG file download "$file_ref" "$download_path" $QUORUM_ARG 2>&1)
     exit_code=$?
     end_time=$(date +%s%N)
     echo "$stdout"

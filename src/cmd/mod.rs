@@ -461,13 +461,17 @@ pub enum Commands {
         /// The name of the environment
         #[arg(short = 'n', long)]
         name: String,
-        /// Specify the network ID to use for the node services.
+        /// Specify the network ID for the node services.
         ///
         /// This is used to isolate the network and prevent nodes from other networks joining.
         ///
-        /// The default value is 1, which represents the mainnet.
-        #[clap(long, verbatim_doc_comment)]
-        network_id: Option<u8>,
+        /// For a production deployment, use 1.
+        ///
+        /// For an alpha deployment, use 2.
+        ///
+        /// For a testnet deployment, use anything between 3 and 255.
+        #[clap(long, verbatim_doc_comment, required = true)]
+        network_id: u8,
         /// Provide a name for the network contacts file to be uploaded to S3.
         ///
         /// If not used, the contacts file will have the same name as the environment.
