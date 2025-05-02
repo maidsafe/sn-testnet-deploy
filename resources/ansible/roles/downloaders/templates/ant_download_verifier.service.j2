@@ -13,15 +13,13 @@ Environment="EVM_NETWORK=arbitrum-sepolia"
 Environment="EVM_NETWORK=arbitrum-one"
 {% endif %}
 User=ant1
-{% if peer is not defined and network_contacts_url is not defined and network_id is not defined %}
+{% if network_id == "1" %}
 ExecStart=/home/ant1/ant_downloader.sh --mode verifier
 {% else %}
 ExecStart=/home/ant1/ant_downloader.sh \
     --mode verifier \
     {% if peer is defined %}--peer "{{ peer }}" \{% endif %}
-
     {% if network_contacts_url is defined %}--network-contacts-url "{{network_contacts_url}}" \{% endif %}
-
     {% if network_id is defined %}--network-id "{{network_id}}" {% endif %}
 {% endif %}
 

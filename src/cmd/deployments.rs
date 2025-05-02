@@ -226,7 +226,7 @@ pub async fn handle_deploy(
     max_archived_log_files: u16,
     max_log_files: u16,
     name: String,
-    network_id: Option<u8>,
+    network_id: u8,
     network_contacts_file_name: Option<String>,
     network_dashboard_branch: Option<String>,
     node_count: Option<u16>,

@@ -81,7 +81,6 @@ done
 CONTACT_PEER_ARG=""
 NETWORK_CONTACTS_URL_ARG=""
 NETWORK_ID_ARG=""
-TESTNET_ARG=""
 
 if [[ -n "$CONTACT_PEER" ]]; then
   echo "Setting contact peer arg to $CONTACT_PEER"
@@ -94,8 +93,6 @@ fi
 if [[ -n "$NETWORK_ID" ]]; then
   echo "Setting network ID arg to $NETWORK_ID"
   NETWORK_ID_ARG="--network-id $NETWORK_ID"
-  echo "Setting --testnet arg"
-  TESTNET_ARG="--testnet"
 fi
 
 if ! command -v ant &> /dev/null; then
@@ -221,7 +218,6 @@ generate_random_data_file_and_upload() {
   stdout=$(ant \
     $CONTACT_PEER_ARG \
     $NETWORK_CONTACTS_URL_ARG \
-    $TESTNET_ARG \
     $NETWORK_ID_ARG \
     $LOG_OUTPUT_ARG \
     file upload "$tmpfile" 2>&1)

@@ -315,7 +315,7 @@ impl From<DeployOptions> for ProvisionOptions {
             max_log_files: deploy_options.max_log_files,
             max_uploads: None,
             name: deploy_options.name,
-            network_id: deploy_options.network_id,
+            network_id: Some(deploy_options.network_id),
             network_dashboard_branch: deploy_options.network_dashboard_branch,
             node_count: deploy_options.node_count,
             output_inventory_dir_path: deploy_options.output_inventory_dir_path,
