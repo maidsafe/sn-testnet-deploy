@@ -606,8 +606,8 @@ impl AnsibleProvisioner {
                 &self.cloud_provider.to_string(),
                 options,
                 NodeType::Genesis,
-                None,
-                None,
+                vec![],
+                vec![],
                 1,
                 options.evm_network.clone(),
                 false,
@@ -622,8 +622,8 @@ impl AnsibleProvisioner {
     pub fn provision_full_cone(
         &self,
         options: &ProvisionOptions,
-        initial_contact_peer: Option<String>,
-        initial_network_contacts_url: Option<String>,
+        initial_contact_peers: Vec<String>,
+        initial_network_contacts_urls: Vec<String>,
         private_node_inventory: PrivateNodeProvisionInventory,
         new_full_cone_nat_gateway_new_vms_for_upscale: Option<Vec<VirtualMachine>>,
     ) -> Result<()> {
@@ -818,8 +818,8 @@ impl AnsibleProvisioner {
 
         self.provision_nodes(
             options,
-            initial_contact_peer,
-            initial_network_contacts_url,
+            initial_contact_peers,
+            initial_network_contacts_urls,
             NodeType::FullConePrivateNode,
         )?;
 
@@ -877,8 +877,8 @@ impl AnsibleProvisioner {
     pub fn provision_nodes(
         &self,
         options: &ProvisionOptions,
-        initial_contact_peer: Option<String>,
-        initial_network_contacts_url: Option<String>,
+        initial_contact_peers: Vec<String>,
+        initial_network_contacts_urls: Vec<String>,
         node_type: NodeType,
     ) -> Result<()> {
         let start = Instant::now();
@@ -940,8 +940,8 @@ impl AnsibleProvisioner {
                 &self.cloud_provider.to_string(),
                 options,
                 node_type.clone(),
-                initial_contact_peer,
-                initial_network_contacts_url,
+                initial_contact_peers,
+                initial_network_contacts_urls,
                 node_count,
                 options.evm_network.clone(),
                 write_older_cache_files,
@@ -955,8 +955,8 @@ impl AnsibleProvisioner {
     pub fn provision_symmetric_private_nodes(
         &self,
         options: &mut ProvisionOptions,
-        initial_contact_peer: Option<String>,
-        initial_network_contacts_url: Option<String>,
+        initial_contact_peers: Vec<String>,
+        initial_network_contacts_urls: Vec<String>,
         private_node_inventory: &PrivateNodeProvisionInventory,
     ) -> Result<()> {
         let start = Instant::now();
@@ -1017,8 +1017,8 @@ impl AnsibleProvisioner {
 
         self.provision_nodes(
             options,
-            initial_contact_peer,
-            initial_network_contacts_url,
+            initial_contact_peers,
+            initial_network_contacts_urls,
             NodeType::SymmetricPrivateNode,
         )?;
 
@@ -1028,8 +1028,8 @@ impl AnsibleProvisioner {
     pub async fn provision_downloaders(
         &self,
         options: &ProvisionOptions,
-        genesis_multiaddr: Option<String>,
-        genesis_network_contacts_url: Option<String>,
+        genesis_multiaddrs: Vec<String>,
+        genesis_network_contacts_urls: Vec<String>,
     ) -> Result<()> {
         let start = Instant::now();
 
@@ -1042,8 +1042,8 @@ impl AnsibleProvisioner {
             Some(extra_vars::build_downloaders_extra_vars_doc(
                 &self.cloud_provider.to_string(),
                 options,
-                genesis_multiaddr,
-                genesis_network_contacts_url,
+                genesis_multiaddrs,
+                genesis_network_contacts_urls,
             )?),
         )?;
         print_duration(start.elapsed());
@@ -1053,8 +1053,8 @@ impl AnsibleProvisioner {
     pub async fn provision_clients(
         &self,
         options: &ProvisionOptions,
-        genesis_multiaddr: Option<String>,
-        genesis_network_contacts_url: Option<String>,
+        genesis_multiaddrs: Vec<String>,
+        genesis_network_contacts_urls: Vec<String>,
     ) -> Result<()> {
         let start = Instant::now();
 
@@ -1080,8 +1080,8 @@ impl AnsibleProvisioner {
             Some(extra_vars::build_clients_extra_vars_doc(
                 &self.cloud_provider.to_string(),
                 options,
-                genesis_multiaddr,
-                genesis_network_contacts_url,
+                genesis_multiaddrs,
+                genesis_network_contacts_urls,
                 &sk_map,
             )?),
         )?;
