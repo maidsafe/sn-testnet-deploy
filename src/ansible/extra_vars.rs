@@ -62,6 +62,12 @@ impl ExtraVarsDocBuilder {
         self
     }
 
+    pub fn add_list_variable_as_csv(&mut self, name: &str, values: Vec<String>) -> &mut Self {
+        let joined_values = values.join(",");
+        self.add_variable(name, &joined_values);
+        self
+    }
+
     /// Add a serde value to the extra vars map. This is useful if you have a complex type.
     pub fn add_serde_value(&mut self, name: &str, value: Value) {
         self.map.insert(name.to_owned(), value);
@@ -295,8 +301,8 @@ pub fn build_node_extra_vars_doc(
     cloud_provider: &str,
     options: &ProvisionOptions,
     node_type: NodeType,
-    genesis_multiaddr: Option<String>,
-    network_contacts_url: Option<String>,
+    genesis_multiaddrs: Vec<String>,
+    network_contacts_urls: Vec<String>,
     node_instance_count: u16,
     evm_network: EvmNetwork,
     write_older_cache_files: bool,
@@ -305,11 +311,11 @@ pub fn build_node_extra_vars_doc(
     extra_vars.add_variable("provider", cloud_provider);
     extra_vars.add_variable("testnet_name", &options.name);
     extra_vars.add_variable("node_type", node_type.telegraf_role());
-    if let Some(genesis_multiaddr) = genesis_multiaddr {
-        extra_vars.add_variable("genesis_multiaddr", &genesis_multiaddr);
+    if !genesis_multiaddrs.is_empty() {
+        extra_vars.add_list_variable_as_csv("genesis_multiaddr", genesis_multiaddrs);
     }
-    if let Some(network_contacts_url) = network_contacts_url {
-        extra_vars.add_variable("network_contacts_url", &network_contacts_url);
+    if !network_contacts_urls.is_empty() {
+        extra_vars.add_list_variable_as_csv("network_contacts_url", network_contacts_urls);
     }
 
     extra_vars.add_variable("node_instance_count", &node_instance_count.to_string());
@@ -470,17 +476,17 @@ pub fn build_symmetric_private_node_config_extra_vars_doc(
 pub fn build_downloaders_extra_vars_doc(
     cloud_provider: &str,
     options: &ProvisionOptions,
-    peer: Option<String>,
-    network_contacts_url: Option<String>,
+    peers: Vec<String>,
+    network_contacts_urls: Vec<String>,
 ) -> Result<String> {
     let mut extra_vars: ExtraVarsDocBuilder = ExtraVarsDocBuilder::default();
     extra_vars.add_variable("provider", cloud_provider);
     extra_vars.add_variable("testnet_name", &options.name);
-    if let Some(peer) = peer {
-        extra_vars.add_variable("peer", &peer);
+    if !peers.is_empty() {
+        extra_vars.add_list_variable_as_csv("peer", peers);
     }
-    if let Some(network_contacts_url) = network_contacts_url {
-        extra_vars.add_variable("network_contacts_url", &network_contacts_url);
+    if !network_contacts_urls.is_empty() {
+        extra_vars.add_list_variable_as_csv("network_contacts_url", network_contacts_urls);
     }
 
     extra_vars.add_ant_url_or_version(
@@ -554,18 +560,18 @@ pub fn build_downloaders_extra_vars_doc(
 pub fn build_clients_extra_vars_doc(
     cloud_provider: &str,
     options: &ProvisionOptions,
-    peer: Option<String>,
-    network_contacts_url: Option<String>,
+    peers: Vec<String>,
+    network_contacts_urls: Vec<String>,
     sk_map: &HashMap<VirtualMachine, Vec<PrivateKeySigner>>,
 ) -> Result<String> {
     let mut extra_vars = ExtraVarsDocBuilder::default();
     extra_vars.add_variable("provider", cloud_provider);
     extra_vars.add_variable("testnet_name", &options.name);
-    if let Some(peer) = peer {
-        extra_vars.add_variable("peer", &peer);
+    if !peers.is_empty() {
+        extra_vars.add_list_variable_as_csv("peer", peers);
     }
-    if let Some(network_contacts_url) = network_contacts_url {
-        extra_vars.add_variable("network_contacts_url", &network_contacts_url);
+    if !network_contacts_urls.is_empty() {
+        extra_vars.add_list_variable_as_csv("network_contacts_url", network_contacts_urls);
     }
 
     extra_vars.add_ant_url_or_version(

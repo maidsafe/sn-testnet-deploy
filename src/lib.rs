@@ -44,13 +44,13 @@ use flate2::read::GzDecoder;
 use indicatif::{ProgressBar, ProgressStyle};
 use infra::{build_terraform_args, InfraRunOptions};
 use log::{debug, trace};
+use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
 use semver::Version;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 use std::{
     fs::File,
     io::{BufRead, BufReader, BufWriter, Write},
-    net::IpAddr,
     path::{Path, PathBuf},
     process::{Command, Stdio},
     str::FromStr,
@@ -1081,20 +1081,22 @@ impl TestnetDeployer {
 // Shared Helpers
 //
 
+/// Returns the list of genesis node multiaddresses and the machines
 pub fn get_genesis_multiaddr(
     ansible_runner: &AnsibleRunner,
     ssh_client: &SshClient,
-) -> Result<Option<(String, IpAddr)>> {
+) -> Result<Option<(Vec<String>, Vec<VirtualMachine>)>> {
     let genesis_inventory = ansible_runner.get_inventory(AnsibleInventoryType::Genesis, true)?;
     if genesis_inventory.is_empty() {
         return Ok(None);
     }
-    let genesis_ip = genesis_inventory[0].public_ip_addr;
 
-    // It's possible for the genesis host to be altered from its original state where a node was
+    let addrs = genesis_inventory.par_iter().map(|vm| {
+        let genesis_ip = vm.public_ip_addr;
+         // It's possible for the genesis host to be altered from its original state where a node was
     // started with the `--first` flag.
     // First attempt: try to find node with first=true
-    let multiaddr = ssh_client
+        let multiaddr = ssh_client
         .run_command(
             &genesis_ip,
             "root",
@@ -1108,8 +1110,8 @@ pub fn get_genesis_multiaddr(
         });
 
     // Second attempt: if first attempt failed, see if any node is available.
-    let multiaddr = match multiaddr {
-        Some(addr) => addr,
+   match multiaddr {
+        Some(addr) => Ok(addr),
         None => ssh_client
             .run_command(
                 &genesis_ip,
@@ -1119,10 +1121,10 @@ pub fn get_genesis_multiaddr(
             )?
             .first()
             .cloned()
-            .ok_or_else(|| Error::GenesisListenAddress)?,
-    };
+            .ok_or_else(|| Error::GenesisListenAddress)
+    }}).collect::<Result<Vec<_>>>()?;
 
-    Ok(Some((multiaddr, genesis_ip)))
+    Ok(Some((addrs, genesis_inventory)))
 }
 
 pub fn get_anvil_node_data(
@@ -1181,22 +1183,24 @@ pub fn get_anvil_node_data(
 pub fn get_multiaddr(
     ansible_runner: &AnsibleRunner,
     ssh_client: &SshClient,
-) -> Result<(String, IpAddr)> {
+) -> Result<(Vec<String>, Vec<VirtualMachine>)> {
     let node_inventory = ansible_runner.get_inventory(AnsibleInventoryType::Nodes, true)?;
     // For upscaling a bootstrap deployment, we'd need to select one of the nodes that's already
     // provisioned. So just try the first one.
-    let node_ip = node_inventory
-        .iter()
+    let node_vm = node_inventory
+        .into_iter()
         .find(|vm| vm.name.ends_with("-node-1"))
-        .ok_or_else(|| Error::NodeAddressNotFound)?
-        .public_ip_addr;
+        .ok_or_else(|| Error::NodeAddressNotFound)?;
 
-    debug!("Getting multiaddr from node {node_ip}");
+    debug!(
+        "Getting multiaddr from node-1 with ip: {}",
+        node_vm.public_ip_addr
+    );
 
     let multiaddr =
         ssh_client
         .run_command(
-            &node_ip,
+            &node_vm.public_ip_addr,
             "root",
             // fetch the first multiaddr which does not contain the localhost addr.
             "jq -r '.nodes[] | .listen_addr[] | select(contains(\"127.0.0.1\") | not)' /var/antctl/node_registry.json | head -n 1",
@@ -1207,7 +1211,7 @@ pub fn get_multiaddr(
 
     // The node_ip is obviously inside the multiaddr, but it's just being returned as a
     // separate item for convenience.
-    Ok((multiaddr, node_ip))
+    Ok((vec![multiaddr], vec![node_vm]))
 }
 
 pub async fn get_and_extract_archive_from_s3(
@@ -1509,6 +1513,8 @@ pub fn calculate_size_per_attached_volume(node_count: u16) -> u16 {
     (total_volume_required as f64 / 7.0).ceil() as u16
 }
 
-pub fn get_bootstrap_cache_url(ip_addr: &IpAddr) -> String {
-    format!("http://{ip_addr}/bootstrap_cache.json")
+pub fn get_bootstrap_cache_url(vms: &[VirtualMachine]) -> Vec<String> {
+    vms.iter()
+        .map(|vm| format!("http://{}/bootstrap_cache.json", vm.public_ip_addr))
+        .collect()
 }
