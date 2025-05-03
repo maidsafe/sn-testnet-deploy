@@ -20,8 +20,8 @@ if [ "{{ evm_network_type }}" = "evm-custom" ]; then
   data_payments_address=$(cat ${NODE_REGISTRY} | ${JQ} -r '.nodes[0].evm_network.Custom.data_payments_address')
 fi
 
-network_contacts_url=$(cat ${NODE_REGISTRY} | ${JQ} -r '.nodes[0].peers_args.network_contacts_url[0]')
-peer_multiaddr=$(cat ${NODE_REGISTRY} | ${JQ} -r '.nodes[0].peers_args.addrs[0]')
+network_contacts_url=$(cat ${NODE_REGISTRY} | ${JQ} -r '.nodes[0].initial_peers_config.network_contacts_url[0]')
+peer_multiaddr=$(cat ${NODE_REGISTRY} | ${JQ} -r '.nodes[0].initial_peers_config.addrs[0]')
 rewards_address=$(cat ${NODE_REGISTRY} | ${JQ} -r '.nodes[0].rewards_address')
 network_id=$(cat ${NODE_REGISTRY} | ${JQ} -r '.nodes[0].network_id')
 max_archived_log_files=$(cat ${NODE_REGISTRY} | ${JQ} -r '.nodes[0].max_archived_log_files')

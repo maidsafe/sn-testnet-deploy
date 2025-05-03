@@ -20,7 +20,7 @@
 
 - name: calculate current non-genesis node count
   set_fact:
-    current_node_count: "{{ (node_status.stdout | from_json).nodes | selectattr('peers_args.first', 'equalto', false) | list | length }}"
+    current_node_count: "{{ (node_status.stdout | from_json).nodes | selectattr('initial_peers_config.first', 'equalto', false) | list | length }}"
   when: node_status.stdout != ""
 
 - name: calculate number of nodes to add
