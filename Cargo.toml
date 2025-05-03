@@ -13,9 +13,9 @@ path="src/main.rs"
 name="testnet-deploy"
 
 [dependencies]
-alloy = { version = "0.7.3", default-features = false, features = ["signers"] }
+alloy = { version = "0.15.6", default-features = false, features = ["signers"] }
 ant-releases = "0.4.0"
-ant-service-management = "0.4.12"
+ant-service-management = { git = "https://github.com/maidsafe/autonomi", branch = "main" }
 async-recursion = "1.0.4"
 aws-config = "0.56.0"
 aws-sdk-s3 = "0.29.0"
@@ -26,7 +26,8 @@ colored = "2.0.4"
 dirs-next = "2.0.0"
 dotenv = "0.15.0"
 env_logger = "0.10.0"
-evmlib = "~0.1.2"
+# evmlib = "0.3.0"
+evmlib = { git = "https://github.com/maidsafe/autonomi", branch = "main" }
 flate2 = "1.0"
 futures = "~0.3.13"
 fs_extra = "1.2.0"

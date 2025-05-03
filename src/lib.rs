@@ -1040,7 +1040,7 @@ pub fn get_genesis_multiaddr(
         .run_command(
             &genesis_ip,
             "root",
-            "jq -r '.nodes[] | select(.peers_args.first == true) | .listen_addr[] | select(contains(\"127.0.0.1\") | not) | select(contains(\"quic-v1\"))' /var/antctl/node_registry.json | head -n 1",
+            "jq -r '.nodes[] | select(.initial_peers_config.first == true) | .listen_addr[] | select(contains(\"127.0.0.1\") | not) | select(contains(\"quic-v1\"))' /var/antctl/node_registry.json | head -n 1",
             false,
         )
         .map(|output| output.first().cloned())
