@@ -25,7 +25,7 @@ use crate::{
 use alloy::hex::ToHexExt;
 use ant_service_management::{NodeRegistry, ServiceStatus};
 use color_eyre::{eyre::eyre, Result};
-use log::debug;
+use log::{debug, error};
 use rand::seq::{IteratorRandom, SliceRandom};
 use semver::Version;
 use serde::{Deserialize, Serialize};
@@ -210,7 +210,7 @@ impl DeploymentInventoryService {
             ansible_runner.get_inventory(AnsibleInventoryType::Clients, true)
         });
 
-        let genesis_vm = genesis_handle.join().expect("Thread panicked")?;
+        let genesis_vms = genesis_handle.join().expect("Thread panicked")?;
         let mut misc_vms = Vec::new();
         misc_vms.extend(build_handle.join().expect("Thread panicked")?);
         let full_cone_nat_gateway_vms = full_cone_nat_gateway_handle
@@ -359,12 +359,7 @@ impl DeploymentInventoryService {
             NodeVirtualMachine::from_list(&upnp_private_node_vms, &upnp_private_node_registries);
         debug!("upnp_private_node_vms after conversion: {upnp_private_node_vms:?}");
 
-        let genesis_vm = NodeVirtualMachine::from_list(&genesis_vm, &genesis_node_registry);
-        let genesis_vm = if !genesis_vm.is_empty() {
-            Some(genesis_vm[0].clone())
-        } else {
-            None
-        };
+        let genesis_vms = NodeVirtualMachine::from_list(&genesis_vms, &genesis_node_registry);
 
         let mut failed_node_registry_vms = Vec::new();
         failed_node_registry_vms.extend(peer_cache_node_registries.failed_vms);
@@ -383,8 +378,8 @@ impl DeploymentInventoryService {
                     random_vm = generic_node_vms.first().cloned();
                 } else if !peer_cache_node_vms.is_empty() {
                     random_vm = peer_cache_node_vms.first().cloned();
-                } else if genesis_vm.is_some() {
-                    random_vm = genesis_vm.clone()
+                } else if !genesis_vms.is_empty() {
+                    random_vm = genesis_vms.first().cloned()
                 };
 
                 let Some(random_vm) = random_vm else {
@@ -430,26 +425,33 @@ impl DeploymentInventoryService {
             }
         };
 
-        let (genesis_multiaddr, genesis_ip) =
-            if environment_details.deployment_type == DeploymentType::New {
-                match get_genesis_multiaddr(&self.ansible_runner, &self.ssh_client) {
-                    Ok(Some((multiaddr, ip))) => (Some(multiaddr), Some(ip)),
-                    Ok(None) => (None, None),
-                    Err(_) => (None, None),
+        let genesis_multiaddrs = if environment_details.deployment_type == DeploymentType::New {
+            match get_genesis_multiaddr(&self.ansible_runner, &self.ssh_client) {
+                Ok(Some((genesis_multiaddr, _))) => genesis_multiaddr,
+                Ok(None) => {
+                    error!("Genesis inventory is empty, cannot retrieve genesis multiaddr");
+                    vec![]
                 }
-            } else {
-                (None, None)
-            };
+                Err(_) => {
+                    error!("Failed to retrieve genesis multiaddr");
+                    vec![]
+                }
+            }
+        } else {
+            vec![]
+        };
         let inventory = DeploymentInventory {
             binary_option,
             client_vms,
             environment_details,
             failed_node_registry_vms,
-            faucet_address: genesis_ip.map(|ip| format!("{ip}:8000")),
+            faucet_address: genesis_vms
+                .first()
+                .map(|vm| format!("{}:8000", vm.vm.public_ip_addr)),
             full_cone_nat_gateway_vms,
             full_cone_private_node_vms,
-            genesis_multiaddr,
-            genesis_vm,
+            genesis_multiaddrs,
+            genesis_vms,
             name: name.to_string(),
             misc_vms,
             node_vms: generic_node_vms,
@@ -923,8 +925,8 @@ pub struct DeploymentInventory {
     pub faucet_address: Option<String>,
     pub full_cone_nat_gateway_vms: Vec<VirtualMachine>,
     pub full_cone_private_node_vms: Vec<NodeVirtualMachine>,
-    pub genesis_vm: Option<NodeVirtualMachine>,
-    pub genesis_multiaddr: Option<String>,
+    pub genesis_vms: Vec<NodeVirtualMachine>,
+    pub genesis_multiaddrs: Vec<String>,
     pub misc_vms: Vec<VirtualMachine>,
     pub name: String,
     pub node_vms: Vec<NodeVirtualMachine>,
@@ -945,8 +947,8 @@ impl DeploymentInventory {
             binary_option,
             client_vms: Default::default(),
             environment_details: EnvironmentDetails::default(),
-            genesis_vm: Default::default(),
-            genesis_multiaddr: Default::default(),
+            genesis_vms: Default::default(),
+            genesis_multiaddrs: Default::default(),
             failed_node_registry_vms: Default::default(),
             faucet_address: Default::default(),
             full_cone_nat_gateway_vms: Default::default(),
@@ -974,7 +976,7 @@ impl DeploymentInventory {
     }
 
     pub fn is_empty(&self) -> bool {
-        self.genesis_vm.is_none()
+        self.genesis_vms.is_empty()
             && self.node_vms.is_empty()
             && self.peer_cache_node_vms.is_empty()
             && self.full_cone_private_node_vms.is_empty()
@@ -991,7 +993,7 @@ impl DeploymentInventory {
                 .iter()
                 .map(|node_vm| node_vm.vm.clone()),
         );
-        list.extend(self.genesis_vm.iter().map(|node_vm| node_vm.vm.clone()));
+        list.extend(self.genesis_vms.iter().map(|node_vm| node_vm.vm.clone()));
         list.extend(self.node_vms.iter().map(|node_vm| node_vm.vm.clone()));
         list.extend(self.misc_vms.clone());
         list.extend(
@@ -1016,7 +1018,7 @@ impl DeploymentInventory {
     pub fn node_vm_list(&self) -> Vec<NodeVirtualMachine> {
         let mut list = Vec::new();
         list.extend(self.peer_cache_node_vms.iter().cloned());
-        list.extend(self.genesis_vm.iter().cloned());
+        list.extend(self.genesis_vms.iter().cloned());
         list.extend(self.node_vms.iter().cloned());
         list.extend(self.full_cone_private_node_vms.iter().cloned());
         list.extend(self.symmetric_private_node_vms.iter().cloned());
@@ -1033,7 +1035,7 @@ impl DeploymentInventory {
                 .flat_map(|node_vm| node_vm.get_quic_addresses()),
         );
         list.extend(
-            self.genesis_vm
+            self.genesis_vms
                 .iter()
                 .flat_map(|node_vm| node_vm.get_quic_addresses()),
         );
@@ -1092,7 +1094,7 @@ impl DeploymentInventory {
     }
 
     pub fn genesis_node_count(&self) -> usize {
-        if let Some(genesis_vm) = &self.genesis_vm {
+        if let Some(genesis_vm) = self.genesis_vms.first() {
             genesis_vm.node_count
         } else {
             0
@@ -1198,7 +1200,7 @@ impl DeploymentInventory {
         println!("========");
         println!("Node VMs");
         println!("========");
-        if let Some(genesis_vm) = &self.genesis_vm {
+        for genesis_vm in self.genesis_vms.iter() {
             println!("{}: {}", genesis_vm.vm.name, genesis_vm.vm.public_ip_addr);
         }
         for node_vm in self.node_vms.iter() {
@@ -1400,12 +1402,15 @@ impl DeploymentInventory {
         }
         println!();
 
-        println!(
-            "Genesis: {}",
-            self.genesis_multiaddr
-                .as_ref()
-                .map_or("N/A", |genesis| genesis)
-        );
+        if self.genesis_multiaddrs.is_empty() {
+            println!("Genesis: N/A");
+        } else {
+            println!("Genesis:");
+            for genesis in self.genesis_multiaddrs.iter() {
+                println!("  {genesis}");
+            }
+        }
+
         let inventory_file_path =
             get_data_directory()?.join(format!("{}-inventory.json", self.name));
         println!(
@@ -1478,8 +1483,10 @@ impl DeploymentInventory {
         println!("=====================");
 
         for node_vm in &self.peer_cache_node_vms {
-            let webserver = get_bootstrap_cache_url(&node_vm.vm.public_ip_addr);
-            println!("{}: {webserver}", node_vm.vm.name);
+            let webservers = get_bootstrap_cache_url(std::slice::from_ref(&node_vm.vm));
+            for webserver in webservers {
+                println!("{}: {webserver}", node_vm.vm.name);
+            }
         }
     }
 }

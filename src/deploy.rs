@@ -81,7 +81,7 @@ impl TestnetDeployer {
     pub async fn deploy_to_genesis(
         &self,
         options: &DeployOptions,
-    ) -> Result<(ProvisionOptions, (String, String))> {
+    ) -> Result<(ProvisionOptions, (Vec<String>, Vec<String>))> {
         let build_custom_binaries = options.binary_option.should_provision_build_machine();
 
         self.create_or_update_infra(&InfraRunOptions {
@@ -100,7 +100,7 @@ impl TestnetDeployer {
             full_cone_vm_size: options.full_cone_vm_size.clone(),
             full_cone_private_node_vm_count: options.full_cone_private_node_vm_count,
             full_cone_private_node_volume_size: options.full_cone_private_node_volume_size,
-            genesis_vm_count: Some(1),
+            genesis_vm_count: Some(5),
             genesis_node_volume_size: options.genesis_node_volume_size,
             name: options.name.clone(),
             nat_gateway_image_id: None,
@@ -225,36 +225,36 @@ impl TestnetDeployer {
         }
 
         self.ansible_provisioner
-            .print_ansible_run_banner("Provision Genesis Node");
+            .print_ansible_run_banner("Provision Genesis Nodes");
         self.ansible_provisioner
             .provision_genesis_node(&provision_options)
             .map_err(|err| {
-                println!("Failed to provision genesis node {err:?}");
+                println!("Failed to provision genesis nodes {err:?}");
                 err
             })?;
 
-        let (genesis_multiaddr, genesis_ip) =
+        let (genesis_multiaddrs, genesis_vms) =
             get_genesis_multiaddr(&self.ansible_provisioner.ansible_runner, &self.ssh_client)?
                 .ok_or_else(|| Error::GenesisListenAddress)?;
         Ok((
             provision_options,
-            (genesis_multiaddr, get_bootstrap_cache_url(&genesis_ip)),
+            (genesis_multiaddrs, get_bootstrap_cache_url(&genesis_vms)),
         ))
     }
 
     pub async fn deploy(&self, options: &DeployOptions) -> Result<()> {
-        let (mut provision_options, (genesis_multiaddr, genesis_network_contacts)) =
+        let (mut provision_options, (genesis_multiaddrs, genesis_network_contacts)) =
             self.deploy_to_genesis(options).await?;
 
-        println!("Obtained multiaddr for genesis node: {genesis_multiaddr}, network contact: {genesis_network_contacts}");
+        println!("Obtained multiaddr for genesis node: {genesis_multiaddrs:?}, network contact: {genesis_network_contacts:?}");
 
         let mut node_provision_failed = false;
         self.ansible_provisioner
             .print_ansible_run_banner("Provision Peer Cache Nodes");
         match self.ansible_provisioner.provision_nodes(
             &provision_options,
-            Some(genesis_multiaddr.clone()),
-            Some(genesis_network_contacts.clone()),
+            genesis_multiaddrs.clone(),
+            genesis_network_contacts.clone(),
             NodeType::PeerCache,
         ) {
             Ok(()) => {
@@ -270,8 +270,8 @@ impl TestnetDeployer {
             .print_ansible_run_banner("Provision Public Nodes");
         match self.ansible_provisioner.provision_nodes(
             &provision_options,
-            Some(genesis_multiaddr.clone()),
-            Some(genesis_network_contacts.clone()),
+            genesis_multiaddrs.clone(),
+            genesis_network_contacts.clone(),
             NodeType::Generic,
         ) {
             Ok(()) => {
@@ -287,8 +287,8 @@ impl TestnetDeployer {
             .print_ansible_run_banner("Provision UPnP Nodes");
         match self.ansible_provisioner.provision_nodes(
             &provision_options,
-            Some(genesis_multiaddr.clone()),
-            Some(genesis_network_contacts.clone()),
+            genesis_multiaddrs.clone(),
+            genesis_network_contacts.clone(),
             NodeType::Upnp,
         ) {
             Ok(()) => {
@@ -309,8 +309,8 @@ impl TestnetDeployer {
         if private_node_inventory.should_provision_full_cone_private_nodes() {
             match self.ansible_provisioner.provision_full_cone(
                 &provision_options,
-                Some(genesis_multiaddr.clone()),
-                Some(genesis_network_contacts.clone()),
+                genesis_multiaddrs.clone(),
+                genesis_network_contacts.clone(),
                 private_node_inventory.clone(),
                 None,
             ) {
@@ -338,8 +338,8 @@ impl TestnetDeployer {
                 .print_ansible_run_banner("Provision Symmetric Private Nodes");
             match self.ansible_provisioner.provision_symmetric_private_nodes(
                 &mut provision_options,
-                Some(genesis_multiaddr.clone()),
-                Some(genesis_network_contacts.clone()),
+                genesis_multiaddrs.clone(),
+                genesis_network_contacts.clone(),
                 &private_node_inventory,
             ) {
                 Ok(()) => {
@@ -357,8 +357,8 @@ impl TestnetDeployer {
         self.ansible_provisioner
             .provision_uploaders(
                 &provision_options,
-                Some(genesis_multiaddr.clone()),
-                Some(genesis_network_contacts.clone()),
+                genesis_multiaddrs.clone(),
+                genesis_network_contacts.clone(),
             )
             .await
             .map_err(|err| {
@@ -370,8 +370,8 @@ impl TestnetDeployer {
         self.ansible_provisioner
             .provision_downloaders(
                 &provision_options,
-                Some(genesis_multiaddr.clone()),
-                Some(genesis_network_contacts.clone()),
+                genesis_multiaddrs.clone(),
+                genesis_network_contacts.clone(),
             )
             .await
             .map_err(|err| {

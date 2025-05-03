@@ -118,10 +118,10 @@ async fn handle_provision_nodes(
 
     provision_options.disable_nodes = disable_nodes;
 
-    let (genesis_multiaddr, genesis_ip) =
+    let (initial_contact_peers, genesis_ip) =
         get_genesis_multiaddr(&provisioner.ansible_runner, &ssh_client)?
             .ok_or_else(|| Error::GenesisListenAddress)?;
-    let genesis_network_contacts = get_bootstrap_cache_url(&genesis_ip);
+    let initial_network_contacts_urls = get_bootstrap_cache_url(&genesis_ip);
 
     let private_node_inventory = PrivateNodeProvisionInventory::new(
         &provisioner,
@@ -134,8 +134,8 @@ async fn handle_provision_nodes(
             if private_node_inventory.should_provision_full_cone_private_nodes() {
                 provisioner.provision_full_cone(
                     &provision_options,
-                    Some(genesis_multiaddr),
-                    Some(genesis_network_contacts),
+                    initial_contact_peers.clone(),
+                    initial_network_contacts_urls.clone(),
                     private_node_inventory,
                     None,
                 )?;
@@ -156,8 +156,8 @@ async fn handle_provision_nodes(
                 provisioner.print_ansible_run_banner("Provision Symmetric Private Nodes");
                 provisioner.provision_symmetric_private_nodes(
                     &mut provision_options,
-                    Some(genesis_multiaddr),
-                    Some(genesis_network_contacts),
+                    initial_contact_peers.clone(),
+                    initial_network_contacts_urls.clone(),
                     &private_node_inventory,
                 )?;
             } else {
@@ -168,8 +168,8 @@ async fn handle_provision_nodes(
             provisioner.print_ansible_run_banner(&format!("Provision {node_type} Nodes"));
             provisioner.provision_nodes(
                 &provision_options,
-                Some(genesis_multiaddr),
-                Some(genesis_network_contacts),
+                initial_contact_peers.clone(),
+                initial_network_contacts_urls.clone(),
                 node_type,
             )?;
         }
@@ -206,17 +206,17 @@ pub async fn handle_provision_upnp_nodes(name: String, disable_nodes: bool) -> R
 
 pub async fn handle_provision_clients(name: String) -> Result<()> {
     let (_, provision_options, provisioner, ssh_client) = init_provision(&name).await?;
-    let (genesis_multiaddr, genesis_ip) =
+    let (initial_contact_peers, genesis_ip) =
         get_genesis_multiaddr(&provisioner.ansible_runner, &ssh_client)?
             .ok_or_else(|| Error::GenesisListenAddress)?;
-    let genesis_network_contacts = get_bootstrap_cache_url(&genesis_ip);
+    let initial_network_contacts_urls = get_bootstrap_cache_url(&genesis_ip);
 
     provisioner.print_ansible_run_banner("Provision Clients");
     provisioner
         .provision_uploaders(
             &provision_options,
-            Some(genesis_multiaddr.clone()),
-            Some(genesis_network_contacts.clone()),
+            initial_contact_peers.clone(),
+            initial_network_contacts_urls.clone(),
         )
         .await
         .map_err(|err| {
@@ -228,8 +228,8 @@ pub async fn handle_provision_clients(name: String) -> Result<()> {
     provisioner
         .provision_downloaders(
             &provision_options,
-            Some(genesis_multiaddr.clone()),
-            Some(genesis_network_contacts.clone()),
+            initial_contact_peers.clone(),
+            initial_network_contacts_urls.clone(),
         )
         .await
         .map_err(|err| {

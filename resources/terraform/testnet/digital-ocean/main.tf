@@ -39,7 +39,7 @@ resource "digitalocean_droplet" "build" {
 resource "digitalocean_droplet" "genesis_bootstrap" {
   count    = var.genesis_vm_count
   image    = var.peer_cache_droplet_image_id
-  name     = "${terraform.workspace}-genesis-bootstrap"
+  name     = "${terraform.workspace}-genesis-bootstrap-${count.index + 1}"
   region   = var.region
   size     = var.peer_cache_droplet_size
   ssh_keys = var.droplet_ssh_keys

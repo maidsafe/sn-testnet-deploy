@@ -73,8 +73,8 @@ variable "region" {
 }
 
 variable "genesis_vm_count" {
-  default     = 1
-  description = "Set to 1 or 0 to control whether there is a genesis node"
+  default     = 5
+  description = "The number of genesis droplets to launch"
 }
 
 variable "peer_cache_node_vm_count" {
