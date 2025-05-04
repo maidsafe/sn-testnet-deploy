@@ -55,14 +55,6 @@
   when: use_port_range
 
 #
-# Obtain private IP if relay is set
-#
-- name: get private ip of eth1
-  shell: ip -4 addr show dev eth1 | grep inet | awk '{print $2}' | cut -d/ -f1
-  register: private_ip_eth1
-  when: private_ip | bool
-
-#
 # Add the nodes
 #
 - name: add node services
@@ -74,7 +66,6 @@
       - "{{ binary_dir }}/antctl"
       - -v
       - add
-      - --no-upnp
       - --data-dir-path=/mnt/antnode-storage/data
       - --log-dir-path=/mnt/antnode-storage/log
       - "--count={{ nodes_to_add }}"
@@ -85,8 +76,6 @@
       - "--rewards-address={{ rewards_address }}"
       - "--max-archived-log-files={{ max_archived_log_files }}"
       - "--max-log-files={{ max_log_files }}"
-      - "{{ ('--node-ip=' + private_ip_eth1.stdout) if private_ip | bool else omit }}"
-      - "{{ '--relay' if relay | bool else omit }}"
       - --reachability-check
       - "{{ ('--rpc-port=' + rpc_port) if not use_port_range else omit }}"
       - "{{ ('--rpc-port=' + rpc_start_port + '-' + rpc_end_port) if use_port_range else omit }}"

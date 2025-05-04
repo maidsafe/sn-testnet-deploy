@@ -336,19 +336,6 @@ pub fn build_node_extra_vars_doc(
         extra_vars.add_variable("public_rpc", "true");
     }
 
-    match node_type {
-        NodeType::FullConePrivateNode => {
-            // Full cone private nodes do not need relay as it is a straight port forward.
-            extra_vars.add_variable("private_ip", "true");
-        }
-        NodeType::SymmetricPrivateNode => {
-            // Symmetric private nodes need relay and private ip.
-            extra_vars.add_variable("private_ip", "true");
-            extra_vars.add_variable("relay", "true");
-        }
-        _ => {}
-    }
-
     if let Some(network_id) = options.network_id {
         extra_vars.add_variable("network_id", &network_id.to_string());
     }
