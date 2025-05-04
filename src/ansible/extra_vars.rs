@@ -338,17 +338,6 @@ pub fn build_node_extra_vars_doc(
     }
 
     match node_type {
-        NodeType::FullConePrivateNode => {
-            // Full cone private nodes do not need relay as it is a straight port forward.
-            extra_vars.add_variable("private_ip", "true");
-            extra_vars.add_boolean_variable("enable_upnp", false);
-        }
-        NodeType::SymmetricPrivateNode => {
-            // Symmetric private nodes need relay and private ip.
-            extra_vars.add_variable("private_ip", "true");
-            extra_vars.add_variable("relay", "true");
-            extra_vars.add_boolean_variable("enable_upnp", false);
-        }
         NodeType::Upnp => {
             extra_vars.add_boolean_variable("enable_upnp", true);
         }
