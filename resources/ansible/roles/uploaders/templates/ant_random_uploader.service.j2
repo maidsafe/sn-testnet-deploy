@@ -22,9 +22,7 @@ ExecStart=/home/ant{{ count }}/ant_random_uploader.sh
 {% else %}
 ExecStart=/home/ant{{ count }}/ant_random_uploader.sh \
     --network-id "{{network_id}}" \
-
     {% if peer is defined %}--peer "{{ peer }}" \{% endif %}
-
     {% if network_contacts_url is defined %}--network-contacts-url "{{network_contacts_url}}"{% endif %}
 {% endif %}
 
