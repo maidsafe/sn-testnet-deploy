@@ -15,28 +15,13 @@ Environment="EVM_NETWORK=arbitrum-one"
 User=ant1
 
 {% if file_address is defined and network_id == "1" %}
-ExecStart=/home/ant1/ant_downloader.sh \
-    --mode performance \
-    --file-address {{ file_address }} \
-    --expected-hash {{ expected_hash }} \
-    --expected-size {{ expected_size }}
+ExecStart=/home/ant1/ant_downloader.sh --mode performance --file-address {{ file_address }} --expected-hash {{ expected_hash }} --expected-size {{ expected_size }}
 {% elif file_address is defined %}
-ExecStart=/home/ant1/ant_downloader.sh \
-    --mode performance \
-    {% if peer is defined %}--peer "{{ peer }}" \{% endif %}
-    {% if network_contacts_url is defined %}--network-contacts-url "{{network_contacts_url}}" \{% endif %}
-    {% if network_id is defined %}--network-id "{{network_id}}" \{% endif %}
-    --file-address "{{ file_address }}" \
-    --expected-hash "{{ expected_hash }}" \
-    --expected-size "{{ expected_size }}"
+ExecStart=/home/ant1/ant_downloader.sh --mode performance {% if peer is defined %}--peer "{{ peer }}" {% endif %} {% if network_contacts_url is defined %}--network-contacts-url "{{network_contacts_url}}" {% endif %} {% if network_id is defined %}--network-id "{{network_id}}" {% endif %} --file-address "{{ file_address }}" --expected-hash "{{ expected_hash }}" --expected-size "{{ expected_size }}"
 {% elif network_id == "1" %}
 ExecStart=/home/ant1/ant_downloader.sh --mode performance
 {% else %}
-ExecStart=/home/ant1/ant_downloader.sh \
-    --mode performance \
-    {% if peer is defined %}--peer "{{ peer }}" \{% endif %}
-    {% if network_contacts_url is defined %}--network-contacts-url "{{network_contacts_url}}" \{% endif %}
-    {% if network_id is defined %}--network-id "{{network_id}}" \{% endif %}
+ExecStart=/home/ant1/ant_downloader.sh --mode performance {% if peer is defined %}--peer "{{ peer }}" {% endif %} {% if network_contacts_url is defined %}--network-contacts-url "{{network_contacts_url}}" {% endif %} {% if network_id is defined %}--network-id "{{network_id}}" {% endif %}
 {% endif %}
 Restart=always
 WorkingDirectory=/home/ant1

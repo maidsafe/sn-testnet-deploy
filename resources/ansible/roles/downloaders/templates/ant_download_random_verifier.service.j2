@@ -16,11 +16,7 @@ User=ant1
 {% if network_id == "1" %}
 ExecStart=/home/ant1/ant_downloader.sh --mode random
 {% else %}
-ExecStart=/home/ant1/ant_downloader.sh \
-    --mode random \
-    --network-id "{{network_id}}" \
-    {% if peer is defined %}--peer "{{ peer }}" \{% endif %}
-    {% if network_contacts_url is defined %}--network-contacts-url "{{network_contacts_url}}"{% endif %}
+ExecStart=/home/ant1/ant_downloader.sh --mode random --network-id "{{network_id}}" {% if peer is defined %}--peer "{{ peer }}" {% endif %} {% if network_contacts_url is defined %}--network-contacts-url "{{network_contacts_url}}"{% endif %}
 {% endif %}
 
 Restart=always
