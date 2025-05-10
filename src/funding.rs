@@ -428,12 +428,12 @@ impl AnsibleProvisioner {
                 let network = Network::ArbitrumOne;
                 Wallet::new(network.clone(), EthereumWallet::new(funding_wallet_sk))
             }
-            EvmNetwork::ArbitrumSepolia => {
+            EvmNetwork::ArbitrumSepoliaTest => {
                 let funding_wallet_sk = funding_wallet_sk.ok_or_else(|| {
                     error!("Funding wallet secret key not provided");
                     Error::SecretKeyNotFound
                 })?;
-                let network = Network::ArbitrumSepolia;
+                let network = Network::ArbitrumSepoliaTest;
                 Wallet::new(network.clone(), EthereumWallet::new(funding_wallet_sk))
             }
         };
@@ -524,7 +524,7 @@ pub async fn drain_funds(
                 .unwrap(),
         )),
         EvmNetwork::ArbitrumOne => Some(Network::ArbitrumOne),
-        EvmNetwork::ArbitrumSepolia => Some(Network::ArbitrumSepolia),
+        EvmNetwork::ArbitrumSepoliaTest => Some(Network::ArbitrumSepoliaTest),
     };
 
     if let (Some(network), Some(address)) =

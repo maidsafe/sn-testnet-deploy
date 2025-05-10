@@ -165,7 +165,7 @@ pub enum EvmNetwork {
     #[default]
     Anvil,
     ArbitrumOne,
-    ArbitrumSepolia,
+    ArbitrumSepoliaTest,
     Custom,
 }
 
@@ -174,7 +174,7 @@ impl std::fmt::Display for EvmNetwork {
         match self {
             EvmNetwork::Anvil => write!(f, "evm-custom"),
             EvmNetwork::ArbitrumOne => write!(f, "evm-arbitrum-one"),
-            EvmNetwork::ArbitrumSepolia => write!(f, "evm-arbitrum-sepolia"),
+            EvmNetwork::ArbitrumSepoliaTest => write!(f, "evm-arbitrum-sepolia-test"),
             EvmNetwork::Custom => write!(f, "evm-custom"),
         }
     }
@@ -187,7 +187,7 @@ impl std::str::FromStr for EvmNetwork {
         match s.to_lowercase().as_str() {
             "anvil" => Ok(EvmNetwork::Anvil),
             "arbitrum-one" => Ok(EvmNetwork::ArbitrumOne),
-            "arbitrum-sepolia" => Ok(EvmNetwork::ArbitrumSepolia),
+            "arbitrum-sepolia-test" => Ok(EvmNetwork::ArbitrumSepoliaTest),
             "custom" => Ok(EvmNetwork::Custom),
             _ => Err(format!("Invalid EVM network type: {}", s)),
         }
