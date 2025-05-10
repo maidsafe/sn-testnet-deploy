@@ -91,7 +91,7 @@ impl TestnetDeployer {
             evm_node_count: match options.evm_network {
                 EvmNetwork::Anvil => Some(1),
                 EvmNetwork::ArbitrumOne => Some(0),
-                EvmNetwork::ArbitrumSepolia => Some(0),
+                EvmNetwork::ArbitrumSepoliaTest => Some(0),
                 EvmNetwork::Custom => Some(0),
             },
             evm_node_vm_size: options.evm_node_vm_size.clone(),

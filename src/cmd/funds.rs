@@ -131,7 +131,7 @@ pub async fn handle_funds_command(cmd: FundsCommand) -> Result<()> {
                     ));
                 }
                 EvmNetwork::ArbitrumOne => Network::ArbitrumOne,
-                EvmNetwork::ArbitrumSepolia => Network::ArbitrumSepolia,
+                EvmNetwork::ArbitrumSepoliaTest => Network::ArbitrumSepoliaTest,
                 EvmNetwork::Custom => {
                     if let (
                         Some(emv_data_payments_address),

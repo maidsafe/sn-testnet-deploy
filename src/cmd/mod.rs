@@ -1343,7 +1343,7 @@ pub fn parse_evm_network(s: &str) -> Result<EvmNetwork, String> {
     match s.to_lowercase().as_str() {
         "anvil" => Ok(EvmNetwork::Anvil),
         "arbitrum-one" => Ok(EvmNetwork::ArbitrumOne),
-        "arbitrum-sepolia" => Ok(EvmNetwork::ArbitrumSepolia),
+        "arbitrum-sepolia-test" => Ok(EvmNetwork::ArbitrumSepoliaTest),
         "custom" => Ok(EvmNetwork::Custom),
         _ => Err(format!("Invalid EVM network type: {}", s)),
     }
