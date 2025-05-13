@@ -72,7 +72,7 @@
   vars:
     command_args:
       - "{{ binary_dir }}/antctl"
-      - -v
+      - --trace
       - add
       - "{{ '--no-upnp' if not (enable_upnp | default(false)) else omit }}"
       - --data-dir-path=/mnt/antnode-storage/data
@@ -103,7 +103,7 @@
 
 - name: start the node services
   become: True
-  command: antctl -v start --interval {{ interval}}
+  command: antctl --trace start --interval {{ interval}}
   register: start_services_result
   failed_when: false
 
