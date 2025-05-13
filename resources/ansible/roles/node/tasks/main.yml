@@ -64,7 +64,7 @@
   vars:
     command_args:
       - "{{ binary_dir }}/antctl"
-      - -v
+      - --trace
       - add
       - --data-dir-path=/mnt/antnode-storage/data
       - --log-dir-path=/mnt/antnode-storage/log
@@ -92,7 +92,7 @@
 
 - name: start the node services
   become: True
-  command: antctl -v start --interval {{ interval}}
+  command: antctl --trace start --interval {{ interval}}
   register: start_services_result
   failed_when: false
 
