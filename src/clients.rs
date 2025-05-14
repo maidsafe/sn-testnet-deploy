@@ -378,8 +378,8 @@ impl ClientsDeployer {
         self.ansible_provisioner
             .provision_clients(
                 &provision_options,
-                options.peer.clone(),
-                options.network_contacts_url.clone(),
+                options.peer.iter().cloned().collect(),
+                options.network_contacts_url.iter().cloned().collect(),
             )
             .await
             .map_err(|err| {
@@ -392,8 +392,8 @@ impl ClientsDeployer {
         self.ansible_provisioner
             .provision_downloaders(
                 &provision_options,
-                options.peer.clone(),
-                options.network_contacts_url.clone(),
+                options.peer.iter().cloned().collect(),
+                options.network_contacts_url.iter().cloned().collect(),
             )
             .await
             .map_err(|err| {
