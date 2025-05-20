@@ -108,14 +108,7 @@ impl AnsibleProvisioner {
             }
         }
 
-        let funding_wallet_sk = if let Some(sk) = &options.funding_wallet_secret_key {
-            Some(sk.parse().map_err(|_| Error::FailedToParseKey)?)
-        } else {
-            None
-        };
-
-        self.deposit_funds(funding_wallet_sk, &ant_secret_keys, options)
-            .await?;
+        self.deposit_funds(&ant_secret_keys, options).await?;
 
         Ok(ant_secret_keys)
     }
@@ -378,7 +371,6 @@ impl AnsibleProvisioner {
 
     async fn deposit_funds(
         &self,
-        funding_wallet_sk: Option<PrivateKeySigner>,
         all_secret_keys: &HashMap<VirtualMachine, Vec<PrivateKeySigner>>,
         options: &FundingOptions,
     ) -> Result<()> {
@@ -386,6 +378,14 @@ impl AnsibleProvisioner {
             error!("No ANT secret keys found");
             return Err(Error::SecretKeyNotFound);
         }
+
+        let funding_wallet_sk: PrivateKeySigner =
+            if let Some(sk) = &options.funding_wallet_secret_key {
+                sk.parse().map_err(|_| Error::FailedToParseKey)?
+            } else {
+                warn!("Funding wallet secret key not provided. Skipping funding.");
+                return Ok(());
+            };
 
         let _sk_count = all_secret_keys.values().map(|v| v.len()).sum::<usize>();
 
@@ -410,29 +410,13 @@ impl AnsibleProvisioner {
                     return Err(Error::EvmTestnetDataNotFound);
                 };
 
-                let Some(deployer_wallet_sk) = &options.funding_wallet_secret_key else {
-                    error!("Deployer wallet secret key not provided");
-                    return Err(Error::SecretKeyNotFound);
-                };
-                let deployer_wallet_sk: PrivateKeySigner = deployer_wallet_sk
-                    .parse()
-                    .map_err(|_| Error::FailedToParseKey)?;
-
-                Wallet::new(network.clone(), EthereumWallet::new(deployer_wallet_sk))
+                Wallet::new(network.clone(), EthereumWallet::new(funding_wallet_sk))
             }
             EvmNetwork::ArbitrumOne => {
-                let funding_wallet_sk = funding_wallet_sk.ok_or_else(|| {
-                    error!("Funding wallet secret key not provided");
-                    Error::SecretKeyNotFound
-                })?;
                 let network = Network::ArbitrumOne;
                 Wallet::new(network.clone(), EthereumWallet::new(funding_wallet_sk))
             }
             EvmNetwork::ArbitrumSepoliaTest => {
-                let funding_wallet_sk = funding_wallet_sk.ok_or_else(|| {
-                    error!("Funding wallet secret key not provided");
-                    Error::SecretKeyNotFound
-                })?;
                 let network = Network::ArbitrumSepoliaTest;
                 Wallet::new(network.clone(), EthereumWallet::new(funding_wallet_sk))
             }
