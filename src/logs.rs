@@ -249,25 +249,24 @@ impl TestnetDeployer {
             .ok_or(Error::RoutedVmNotFound(private_vm.public_ip_addr))?;
 
         rsync_args.extend(vec![
-                "-e".to_string(),
-                format!(
-                    "ssh -i {} -q -o StrictHostKeyChecking=no -o BatchMode=yes -o ConnectTimeout=30 -o ProxyCommand='ssh root@{gateway_ip} -W %h:%p -i {}'",
-                    self.ssh_client
-                        .get_private_key_path()
-                        .to_string_lossy()
-                        .as_ref(),
-                    self.ssh_client
-                        .get_private_key_path()
-                        .to_string_lossy()
-                        .as_ref(),
-                ),
-                format!("root@{}:{NODE_LOG_DIR}", private_vm.private_ip_addr),
-                vm_path.to_string_lossy().to_string(),
-            ]);
+            "-e".to_string(),
+            format!(
+                "ssh -i {} -q -o StrictHostKeyChecking=no -o BatchMode=yes -o ConnectTimeout=30 -o ProxyCommand='ssh -o StrictHostKeyChecking=no -o BatchMode=yes root@{gateway_ip} -W %h:%p -i {}'",
+                self.ssh_client
+                    .get_private_key_path()
+                    .to_string_lossy()
+                    .as_ref(),
+                self.ssh_client
+                    .get_private_key_path()
+                    .to_string_lossy()
+                    .as_ref(),
+            ),
+            format!("root@{}:{NODE_LOG_DIR}", private_vm.private_ip_addr),
+            vm_path.to_string_lossy().to_string(),
+        ]);
 
         Ok(rsync_args)
     }
-
     fn run_rsync(vm: &VirtualMachine, rsync_args: &[String]) -> Result<()> {
         debug!(
             "Rsync logs to our machine for {:?} : {}",
