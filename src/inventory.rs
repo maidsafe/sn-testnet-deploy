@@ -930,7 +930,7 @@ impl DeploymentInventory {
     }
 
     pub fn is_empty(&self) -> bool {
-        self.peer_cache_node_vms.is_empty() && self.node_vms.is_empty()
+        self.genesis_vm.is_none()
     }
 
     pub fn vm_list(&self) -> Vec<VirtualMachine> {
