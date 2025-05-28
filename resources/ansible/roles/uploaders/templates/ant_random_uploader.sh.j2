@@ -285,5 +285,5 @@ while true; do
   fi
   {% endif %}
   
-  sleep 10
+  sleep {{ upload_interval|default(10) }}
 done

@@ -581,6 +581,11 @@ pub fn build_clients_extra_vars_doc(
         &options.upload_size.unwrap_or(100).to_string(),
     );
 
+    extra_vars.add_variable(
+        "upload_interval",
+        &options.upload_interval.unwrap_or(10).to_string(),
+    );
+
     Ok(extra_vars.build())
 }
 

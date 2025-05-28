@@ -250,6 +250,7 @@ impl TestnetDeployer {
             token_amount: None,
             upload_size: None,
             uploaders_count: options.desired_uploaders_count,
+            upload_interval: None,
             wallet_secret_keys: None,
         };
         let mut node_provision_failed = false;
@@ -575,6 +576,7 @@ impl TestnetDeployer {
             token_amount: options.token_amount,
             uploaders_count: options.desired_uploaders_count,
             upload_size: None,
+            upload_interval: None,
             wallet_secret_keys: None,
         };
 
