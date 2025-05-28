@@ -249,6 +249,7 @@ pub async fn handle_deploy(
     rewards_address: String,
     to_genesis: bool,
     uploaders_count: u16,
+    upload_interval: u16,
 ) -> Result<()> {
     if evm_network_type == EvmNetwork::Custom {
         if evm_data_payments_address.is_none() {
@@ -390,6 +391,7 @@ pub async fn handle_deploy(
             ))
         }),
         uploaders_count,
+        upload_interval,
         region,
     };
 

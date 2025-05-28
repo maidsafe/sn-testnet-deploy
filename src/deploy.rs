@@ -69,6 +69,7 @@ pub struct DeployOptions {
     pub region: String,
     pub rewards_address: String,
     pub uploaders_count: u16,
+    pub upload_interval: u16,
 }
 
 impl TestnetDeployer {

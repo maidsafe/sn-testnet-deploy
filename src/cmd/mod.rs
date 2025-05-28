@@ -123,7 +123,6 @@ pub enum Commands {
         /// multiplied by this number.
         ///
         /// If the argument is not used, the value will be determined by the 'environment-type'
-        /// argument.
         #[clap(long, verbatim_doc_comment)]
         full_cone_private_node_count: Option<u16>,
         /// The number of VMs to use for hosting nodes behind a full-cone NAT gateway.
@@ -600,6 +599,11 @@ pub enum Commands {
         /// The desired number of uploaders per VM.
         #[clap(long, default_value_t = 1)]
         uploaders_count: u16,
+        /// The interval between uploads in seconds.
+        ///
+        /// This controls how long the random uploader waits between uploads.
+        #[clap(long, default_value_t = 10)]
+        upload_interval: u16,
     },
     ExtendVolumeSize {
         /// Set to run Ansible with more verbose output.

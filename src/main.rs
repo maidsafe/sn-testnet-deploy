@@ -184,6 +184,7 @@ async fn main() -> Result<()> {
             rewards_address,
             to_genesis,
             uploaders_count,
+            upload_interval,
         } => {
             cmd::deployments::handle_deploy(
                 ansible_verbose,
@@ -243,6 +244,7 @@ async fn main() -> Result<()> {
                 rewards_address,
                 to_genesis,
                 uploaders_count,
+                upload_interval,
             )
             .await?;
             Ok(())

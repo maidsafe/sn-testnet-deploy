@@ -58,6 +58,7 @@ pub struct ClientsDeployOptions {
     pub peer: Option<String>,
     pub uploaders_count: u16,
     pub upload_size: Option<u16>,
+    pub upload_interval: u16,
     pub wallet_secret_keys: Option<Vec<String>>,
 }
 
