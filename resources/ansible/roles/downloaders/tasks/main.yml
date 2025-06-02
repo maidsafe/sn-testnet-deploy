@@ -45,6 +45,15 @@
   become: true
   when: enable_performance_verifier | bool
 
+- name: ensure the ant users can write to the log output destination
+  ansible.builtin.file:
+    path: "{{ log_output_dest }}"
+    state: directory
+    mode: '0775'
+    owner: root
+    group: ant
+  become: true
+
 - name: Check if systemd ant_download_random_verifier service file exists
   ansible.builtin.stat:
     path: "/etc/systemd/system/ant_download_random_verifier.service"

@@ -11,6 +11,7 @@
 #   -h, --expected-hash: Required if file-address is provided - expected SHA256 hash of the file
 #   -s, --expected-size: Required if file-address is provided - expected size of the file in KB
 
+LOG_OUTPUT_DEST="{{ log_output_dest }}"
 MODE=""
 CONTACT_PEER=""
 NETWORK_CONTACTS_URL=""
@@ -274,9 +275,13 @@ download_file() {
     if [[ "$MODE" == "verifier" ]]; then
       QUORUM_ARG="--quorum majority"
     fi
+
+    timestamp=$(date +"%Y%m%d_%H%M%S")
+    log_file_path="${LOG_OUTPUT_DEST}/${timestamp}"
+    LOG_OUTPUT_ARG="--log-output-dest $log_file_path"
     
     start_time=$(date +%s%N)
-    stdout=$(ant $CONTACT_PEER_ARG $NETWORK_CONTACTS_URL_ARG $NETWORK_ID_ARG file download "$file_ref" "$download_path" $QUORUM_ARG 2>&1)
+    stdout=$(ant $CONTACT_PEER_ARG $NETWORK_CONTACTS_URL_ARG $NETWORK_ID_ARG $LOG_OUTPUT_ARG file download "$file_ref" "$download_path" $QUORUM_ARG 2>&1)
     exit_code=$?
     end_time=$(date +%s%N)
     echo "$stdout"
