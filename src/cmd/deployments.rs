@@ -49,6 +49,7 @@ pub async fn handle_bootstrap(
     region: String,
     repo_owner: Option<String>,
     rewards_address: String,
+    skip_binary_build: bool,
     symmetric_private_node_count: Option<u16>,
     symmetric_private_node_vm_count: Option<u16>,
     symmetric_private_node_volume_size: Option<u16>,
@@ -90,6 +91,7 @@ pub async fn handle_bootstrap(
         antnode_version,
         antctl_version,
         antnode_features,
+        skip_binary_build,
     )
     .await?;
 
@@ -238,6 +240,7 @@ pub async fn handle_deploy(
     peer_cache_node_vm_count: Option<u16>,
     peer_cache_node_vm_size: Option<String>,
     peer_cache_node_volume_size: Option<u16>,
+    skip_binary_build: bool,
     symmetric_nat_gateway_vm_size: Option<String>,
     symmetric_private_node_count: Option<u16>,
     symmetric_private_node_vm_count: Option<u16>,
@@ -280,6 +283,7 @@ pub async fn handle_deploy(
         antnode_version,
         antctl_version,
         antnode_features,
+        skip_binary_build,
     )
     .await?;
 
@@ -298,7 +302,6 @@ pub async fn handle_deploy(
     let inventory = inventory_service
         .generate_or_retrieve_inventory(&name, true, Some(binary_option.clone()))
         .await?;
-    // let inventory = DeploymentInventory::empty(&name, binary_option.clone());
 
     match testnet_deployer.init().await {
         Ok(_) => {}
@@ -467,6 +470,7 @@ pub async fn handle_upscale(
     provider: CloudProvider,
     public_rpc: bool,
     repo_owner: Option<String>,
+    skip_binary_build: bool,
 ) -> Result<()> {
     if branch.is_some() && repo_owner.is_none() {
         return Err(eyre!(
@@ -515,6 +519,7 @@ pub async fn handle_upscale(
             antnode_features: None,
             branch: branch.unwrap(),
             repo_owner: repo_owner.unwrap(),
+            skip_binary_build,
         };
     } else if antnode_version.is_some() || antctl_version.is_some() {
         match &inventory.binary_option {
