@@ -23,6 +23,7 @@ ExecStart=/home/ant1/ant_downloader.sh --mode performance
 {% else %}
 ExecStart=/home/ant1/ant_downloader.sh --mode performance {% if peer is defined %}--peer "{{ peer }}" {% endif %} {% if network_contacts_url is defined %}--network-contacts-url "{{network_contacts_url}}" {% endif %} {% if network_id is defined %}--network-id "{{network_id}}" {% endif %}
 {% endif %}
+
 Restart=always
 WorkingDirectory=/home/ant1
 

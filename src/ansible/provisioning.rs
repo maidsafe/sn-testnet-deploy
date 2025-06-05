@@ -400,7 +400,7 @@ impl AnsibleProvisioner {
         }
     }
 
-    pub fn build_safe_network_binaries(
+    pub fn build_autonomi_binaries(
         &self,
         options: &ProvisionOptions,
         binaries_to_build: Option<Vec<String>>,
