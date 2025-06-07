@@ -930,6 +930,9 @@ impl DeploymentInventory {
     }
 
     pub fn is_empty(&self) -> bool {
+        if self.environment_details.deployment_type == DeploymentType::Bootstrap {
+            return self.node_vms.is_empty();
+        }
         self.genesis_vm.is_none()
     }
 
