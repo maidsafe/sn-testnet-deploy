@@ -69,6 +69,7 @@ async fn main() -> Result<()> {
             region,
             repo_owner,
             rewards_address,
+            skip_binary_build,
             symmetric_private_node_count,
             symmetric_private_node_vm_count,
             symmetric_private_node_volume_size,
@@ -106,6 +107,7 @@ async fn main() -> Result<()> {
                 region,
                 repo_owner,
                 rewards_address,
+                skip_binary_build,
                 symmetric_private_node_count,
                 symmetric_private_node_vm_count,
                 symmetric_private_node_volume_size,
@@ -173,6 +175,7 @@ async fn main() -> Result<()> {
             peer_cache_node_vm_count,
             peer_cache_node_vm_size,
             peer_cache_node_volume_size,
+            skip_binary_build,
             symmetric_nat_gateway_vm_size,
             symmetric_private_node_count,
             symmetric_private_node_vm_count,
@@ -233,6 +236,7 @@ async fn main() -> Result<()> {
                 peer_cache_node_vm_count,
                 peer_cache_node_vm_size,
                 peer_cache_node_volume_size,
+                skip_binary_build,
                 symmetric_nat_gateway_vm_size,
                 symmetric_private_node_count,
                 symmetric_private_node_vm_count,
@@ -502,6 +506,7 @@ async fn main() -> Result<()> {
             provider,
             public_rpc,
             repo_owner,
+            skip_binary_build,
         } => {
             cmd::deployments::handle_upscale(
                 ansible_verbose,
@@ -534,6 +539,7 @@ async fn main() -> Result<()> {
                 provider,
                 public_rpc,
                 repo_owner,
+                skip_binary_build,
             )
             .await?;
             Ok(())

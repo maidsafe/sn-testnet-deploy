@@ -87,6 +87,7 @@ impl ExtraVarsDocBuilder {
                 repo_owner,
                 branch,
                 antnode_features,
+                skip_binary_build: _,
             } => {
                 self.add_variable("custom_bin", "true");
                 self.add_variable("testnet_name", deployment_name);

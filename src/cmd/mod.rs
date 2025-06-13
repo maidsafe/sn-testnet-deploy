@@ -230,6 +230,12 @@ pub enum Commands {
         /// The rewards address for each of the antnode services.
         #[arg(long, required = true)]
         rewards_address: String,
+        /// Skip building the autonomi binaries if they were built during a previous run of the deployer using the same
+        /// --branch, --repo-owner and --name arguments.
+        ///
+        /// This is useful to re-run any failed deployments without rebuilding the binaries.
+        #[arg(long, default_value_t = false)]
+        skip_binary_build: bool,
         /// The number of antnode services to run behind a symmetric NAT gateway on each VM.
         ///
         /// If the argument is not used, the value will be determined by the 'environment-type'
@@ -566,6 +572,12 @@ pub enum Commands {
         /// The rewards address for each of the antnode services.
         #[arg(long, required = true)]
         rewards_address: String,
+        /// Skip building the autonomi binaries if they were built during a previous run of the deployer using the same
+        /// --branch, --repo-owner and --name arguments.
+        ///
+        /// This is useful to re-run any failed deployments without rebuilding the binaries.
+        #[arg(long, default_value_t = false)]
+        skip_binary_build: bool,
         /// Override the size of the symmetric NAT gateway VM.
         #[clap(long)]
         symmetric_nat_gateway_vm_size: Option<String>,
@@ -1112,6 +1124,12 @@ pub enum Commands {
         /// exclusive with the version arguments.
         #[arg(long, verbatim_doc_comment)]
         repo_owner: Option<String>,
+        /// Skip building the autonomi binaries if they were built during a previous run of the deployer using the same
+        /// --branch, --repo-owner and --name arguments.
+        ///
+        /// This is useful to re-run any failed deployments without rebuilding the binaries.
+        #[arg(long, default_value_t = false)]
+        skip_binary_build: bool,
     },
 }
 
@@ -1202,6 +1220,7 @@ async fn get_binary_option(
     antnode_version: Option<String>,
     antctl_version: Option<String>,
     antnode_features: Option<Vec<String>>,
+    skip_binary_build: bool,
 ) -> Result<BinaryOption> {
     let mut use_versions = true;
 
@@ -1262,6 +1281,7 @@ async fn get_binary_option(
             repo_owner,
             branch,
             antnode_features: antnode_features.map(|list| list.join(",")),
+            skip_binary_build,
         }
     };
 

@@ -310,6 +310,9 @@ pub enum BinaryOption {
         antnode_features: Option<String>,
         branch: String,
         repo_owner: String,
+        /// Skip building the binaries, if they were already built during the previous run using the same
+        /// branch, repo owner and testnet name.
+        skip_binary_build: bool,
     },
     /// Pre-built, versioned binaries will be fetched from S3.
     Versioned {
@@ -320,12 +323,22 @@ pub enum BinaryOption {
 }
 
 impl BinaryOption {
+    pub fn should_provision_build_machine(&self) -> bool {
+        match self {
+            BinaryOption::BuildFromSource {
+                skip_binary_build, ..
+            } => !skip_binary_build,
+            BinaryOption::Versioned { .. } => false,
+        }
+    }
+
     pub fn print(&self) {
         match self {
             BinaryOption::BuildFromSource {
                 antnode_features,
                 branch,
                 repo_owner,
+                skip_binary_build: _,
             } => {
                 println!("Source configuration:");
                 println!("  Repository owner: {}", repo_owner);

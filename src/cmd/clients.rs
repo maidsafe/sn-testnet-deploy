@@ -200,6 +200,12 @@ pub enum ClientsCommands {
         /// arguments. You can only supply version numbers or a custom branch, not both.
         #[arg(long, verbatim_doc_comment)]
         repo_owner: Option<String>,
+        /// Skip building the autonomi binaries if they were built during a previous run of the deployer using the same
+        /// --branch, --repo-owner and --name arguments.
+        ///
+        /// This is useful to re-run any failed deployments without rebuilding the binaries.
+        #[arg(long, default_value_t = false)]
+        skip_binary_build: bool,
         /// The desired number of uploaders per client VM.
         #[clap(long, default_value_t = 1)]
         uploaders_count: u16,
@@ -408,6 +414,7 @@ pub async fn handle_clients_command(cmd: ClientsCommands) -> Result<()> {
             expected_size,
             upload_size,
             upload_interval,
+            skip_binary_build,
         } => {
             if (branch.is_some() && repo_owner.is_none())
                 || (branch.is_none() && repo_owner.is_some())
@@ -461,8 +468,16 @@ pub async fn handle_clients_command(cmd: ClientsCommands) -> Result<()> {
                 ));
             }
 
-            let binary_option =
-                get_binary_option(branch, repo_owner, ant_version, None, None, None).await?;
+            let binary_option = get_binary_option(
+                branch,
+                repo_owner,
+                ant_version,
+                None,
+                None,
+                None,
+                skip_binary_build,
+            )
+            .await?;
 
             let mut builder = ClientsDeployBuilder::new();
             builder

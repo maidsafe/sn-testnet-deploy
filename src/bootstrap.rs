@@ -50,12 +50,7 @@ pub struct BootstrapOptions {
 
 impl TestnetDeployer {
     pub async fn bootstrap(&self, options: &BootstrapOptions) -> Result<()> {
-        let build_custom_binaries = {
-            match &options.binary_option {
-                BinaryOption::BuildFromSource { .. } => true,
-                BinaryOption::Versioned { .. } => false,
-            }
-        };
+        let build_custom_binaries = options.binary_option.should_provision_build_machine();
 
         write_environment_details(
             &self.s3_repository,
@@ -120,7 +115,7 @@ impl TestnetDeployer {
             self.ansible_provisioner
                 .print_ansible_run_banner("Build Custom Binaries");
             self.ansible_provisioner
-                .build_safe_network_binaries(&provision_options, None)
+                .build_autonomi_binaries(&provision_options, None)
                 .map_err(|err| {
                     println!("Failed to build safe network binaries {err:?}");
                     err

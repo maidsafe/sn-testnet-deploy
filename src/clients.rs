@@ -319,12 +319,7 @@ impl ClientsDeployer {
             self.environment_name
         );
 
-        let build_custom_binaries = {
-            match &options.binary_option {
-                BinaryOption::BuildFromSource { .. } => true,
-                BinaryOption::Versioned { .. } => false,
-            }
-        };
+        let build_custom_binaries = options.binary_option.should_provision_build_machine();
 
         let start = Instant::now();
         println!("Initializing infrastructure...");
@@ -367,7 +362,7 @@ impl ClientsDeployer {
             self.ansible_provisioner
                 .print_ansible_run_banner("Build Custom Binaries");
             self.ansible_provisioner
-                .build_safe_network_binaries(&provision_options, Some(vec!["ant".to_string()]))
+                .build_autonomi_binaries(&provision_options, Some(vec!["ant".to_string()]))
                 .map_err(|err| {
                     println!("Failed to build safe network binaries {err:?}");
                     err
