@@ -306,14 +306,16 @@ download_file() {
         actual_file_size_kb=$(du -k "$first_file" | cut -f1)
         
         if [[ "$actual_hash" != "$expected_hash" ]]; then
-          echo "Hash mismatch! Expected: $expected_hash, Got: $actual_hash"
+          echo "❌ HASH MISMATCH!"
+          echo "Expected hash: $expected_hash"
+          echo "Actual hash:   $actual_hash"
           exit_code=1
           error_enum=HASH_MISMATCH
         else
-          echo "Hash verification successful"
+          echo "✅ Hash verification successful"
         fi
       else
-        echo "No files found in $download_path"
+        echo "❌ NO FILES FOUND in $download_path"
         exit_code=1
         error_enum=NO_FILES_FOUND
       fi
@@ -322,7 +324,7 @@ download_file() {
     rm -rf "$download_path"
 
     if [[ $exit_code -eq 0 ]]; then
-      echo "Successfully downloaded $file_ref"
+      echo "✅ Successfully downloaded $file_ref"
       success_file="$DOWNLOAD_METRICS_DIR/metrics_success.csv"
 
       if [[ ! -f "$success_file" ]]; then
@@ -330,7 +332,9 @@ download_file() {
       fi
       echo "$start_time,$end_time,$file_ref,$elapsed,0,0,0,$error_enum,$SERVICE_TYPE,$USER,1,$expected_file_size,$actual_file_size_kb,$actual_hash,$expected_hash,$package_version,$build_date" >> "$success_file"
     else
-      echo "Failed to download $file_ref"
+      echo "❌ FAILED TO DOWNLOAD $file_ref"
+      echo "Error type: $error_enum"
+      echo "Please check the logs above for more details."
       failure_file="$DOWNLOAD_METRICS_DIR/metrics_failure.csv"
 
       if [[ ! -f "$failure_file" ]]; then
@@ -367,6 +371,11 @@ fi
 
 while true; do
   if [[ -f "$SUCCESSFUL_UPLOAD_METRIC_FILE" && -s "$SUCCESSFUL_UPLOAD_METRIC_FILE" ]]; then
+    echo "================================"
+    echo "Downloading file..."
+    echo "================================"
+    echo "$(date +"%A, %B %d, %Y %H:%M:%S")"
+    
     case "$MODE" in
       performance)
         # downloads the same file repeatedly - second line of the file
