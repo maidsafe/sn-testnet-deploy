@@ -261,9 +261,12 @@ generate_random_data_file_and_upload() {
   fi
 
   rm "$tmpfile"
+  
+  return $exit_code
 }
 
 upload_count=0
+successful_upload_count=0
 while true; do
   echo "================================"
   echo "Generating and uploading file..."
@@ -273,14 +276,20 @@ while true; do
   
   upload_count=$((upload_count + 1))
   
+  if [[ $? -eq 0 ]]; then
+    successful_upload_count=$((successful_upload_count + 1))
+    echo "$successful_upload_count successful uploads so far"
+  fi
+  
   {% if max_uploads is defined %}
-  if [[ $upload_count -ge {{ max_uploads }} ]]; then
+  if [[ $successful_upload_count -ge {{ max_uploads }} ]]; then
     # Sleeping indefinitely allows the service restart policy to be retained
     # such that the service would restart on errors.
-    echo "Reached maximum upload count of {{ max_uploads }}, pausing uploads."
+    echo "We now have $successful_upload_count successful uploads"
+    echo "The service will remain running but we won't attempt any more uploads"
     while true; do
       sleep 3600
-      echo "Maximum uploads ({{ max_uploads }}) reached. Service remains active but not uploading."
+      echo "Service remains active but not uploading"
     done
   fi
   {% endif %}
