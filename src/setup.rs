@@ -86,27 +86,17 @@ pub fn setup_dotenv_file() -> Result<()> {
 
     let contents = format!(
         r#"
-ANSIBLE_VAULT_PASSWORD_PATH={}
-AWS_ACCESS_KEY_ID={}
-AWS_SECRET_ACCESS_KEY={}
-AWS_DEFAULT_REGION={}
-DO_PAT={}
-SSH_KEY_PATH={}
-SLACK_WEBHOOK_URL={}
-SN_TESTNET_DEV_SUBNET_ID={}
-SN_TESTNET_DEV_SECURITY_GROUP_ID={}
-TERRAFORM_STATE_BUCKET_NAME={}
-"#,
-        ansible_vault_password_path,
-        aws_access_key_id,
-        aws_access_secret_access_key,
-        aws_region,
-        digital_ocean_pat,
-        ssh_key_path,
-        slack_webhook_url,
-        sn_testnet_dev_subnet_id,
-        sn_testnet_dev_security_group_id,
-        terraform_state_bucket_name
+ANSIBLE_VAULT_PASSWORD_PATH={ansible_vault_password_path}
+AWS_ACCESS_KEY_ID={aws_access_key_id}
+AWS_SECRET_ACCESS_KEY={aws_access_secret_access_key}
+AWS_DEFAULT_REGION={aws_region}
+DO_PAT={digital_ocean_pat}
+SSH_KEY_PATH={ssh_key_path}
+SLACK_WEBHOOK_URL={slack_webhook_url}
+SN_TESTNET_DEV_SUBNET_ID={sn_testnet_dev_subnet_id}
+SN_TESTNET_DEV_SECURITY_GROUP_ID={sn_testnet_dev_security_group_id}
+TERRAFORM_STATE_BUCKET_NAME={terraform_state_bucket_name}
+"#
     );
 
     std::fs::write(".env", contents.trim())?;
