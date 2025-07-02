@@ -70,7 +70,7 @@ impl From<&TestnetDeployer> for DeploymentInventoryService {
                 .working_directory_path
                 .join("ansible")
                 .join("inventory")
-                .join(format!("dev_inventory_{}.yml", provider)),
+                .join(format!("dev_inventory_{provider}.yml")),
             s3_repository: item.s3_repository.clone(),
             ssh_client: item.ssh_client.clone(),
             terraform_runner: item.terraform_runner.clone(),
@@ -93,7 +93,7 @@ impl From<&ClientsDeployer> for DeploymentInventoryService {
                 .working_directory_path
                 .join("ansible")
                 .join("inventory")
-                .join(format!("dev_inventory_{}.yml", provider)),
+                .join(format!("dev_inventory_{provider}.yml")),
             s3_repository: item.s3_repository.clone(),
             ssh_client: item.ssh_client.clone(),
             terraform_runner: item.terraform_runner.clone(),
@@ -399,13 +399,13 @@ impl DeploymentInventoryService {
 
             println!("Retrieved binary versions from previous deployment:");
             if let Some(version) = &antnode_version {
-                println!("  antnode: {}", version);
+                println!("  antnode: {version}");
             }
             if let Some(version) = &antctl_version {
-                println!("  antctl: {}", version);
+                println!("  antctl: {version}");
             }
             if let Some(version) = &ant_version {
-                println!("  ant: {}", version);
+                println!("  ant: {version}");
             }
 
             BinaryOption::Versioned {
@@ -672,7 +672,7 @@ impl DeploymentInventoryService {
 
             println!("Retrieved binary versions from previous deployment:");
             if let Some(version) = &ant_version {
-                println!("  ant: {}", version);
+                println!("  ant: {version}");
             }
 
             BinaryOption::Versioned {
@@ -845,7 +845,7 @@ impl DeploymentNodeRegistries {
                 self.inventory_type
             );
             for vm_name in self.failed_vms.iter() {
-                println!("- {}", vm_name);
+                println!("- {vm_name}");
             }
         }
     }
@@ -866,9 +866,9 @@ impl DeploymentNodeRegistries {
         let total_width = text_width + border_chars;
         let top_bottom = "═".repeat(total_width);
 
-        println!("╔{}╗", top_bottom);
-        println!("║ {:^width$} ║", text, width = text_width);
-        println!("╚{}╝", top_bottom);
+        println!("╔{top_bottom}╗");
+        println!("║ {text:^text_width$} ║");
+        println!("╚{top_bottom}╝");
     }
 }
 
@@ -1572,7 +1572,7 @@ impl ClientsDeploymentInventory {
             println!("======================");
             println!("Funding Wallet Address");
             println!("======================");
-            println!("{}", funding_wallet_address);
+            println!("{funding_wallet_address}");
             println!();
         }
 
@@ -1580,7 +1580,7 @@ impl ClientsDeploymentInventory {
             println!("==========");
             println!("Network ID");
             println!("==========");
-            println!("{}", network_id);
+            println!("{network_id}");
             println!();
         }
 

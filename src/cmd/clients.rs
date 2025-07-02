@@ -368,13 +368,13 @@ pub async fn handle_clients_command(cmd: ClientsCommands) -> Result<()> {
             Ok(())
         }
         ClientsCommands::Clean { name, provider } => {
-            println!("Cleaning Client environment '{}'...", name);
+            println!("Cleaning Client environment '{name}'...");
             let client_deployer = ClientsDeployBuilder::default()
                 .environment_name(&name)
                 .provider(provider)
                 .build()?;
             client_deployer.clean().await?;
-            println!("Client environment '{}' cleaned", name);
+            println!("Client environment '{name}' cleaned");
             Ok(())
         }
         ClientsCommands::Deploy {
@@ -547,7 +547,7 @@ pub async fn handle_clients_command(cmd: ClientsCommands) -> Result<()> {
 
             client_deployer.deploy(options).await?;
 
-            println!("Client deployment for '{}' completed successfully", name);
+            println!("Client deployment for '{name}' completed successfully");
             Ok(())
         }
         ClientsCommands::StartDownloaders { name, provider } => {
@@ -743,7 +743,7 @@ pub async fn handle_clients_command(cmd: ClientsCommands) -> Result<()> {
                     Ok(inv) => break inv,
                     Err(e) if retries < max_retries => {
                         retries += 1;
-                        eprintln!("Failed to generate inventory on attempt {retries}: {:?}", e);
+                        eprintln!("Failed to generate inventory on attempt {retries}: {e:?}");
                         eprintln!("Will retry up to {max_retries} times...");
                     }
                     Err(_) => {

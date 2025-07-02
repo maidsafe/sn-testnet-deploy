@@ -29,7 +29,7 @@ impl S3Repository {
             .to_str()
             .ok_or_else(|| Error::FilenameNotRetrieved)?;
 
-        println!("Uploading {} to bucket {}", object_key, bucket_name);
+        println!("Uploading {object_key} to bucket {bucket_name}");
 
         let mut file = tokio::fs::File::open(file_path).await?;
         let mut contents = Vec::new();
@@ -47,7 +47,7 @@ impl S3Repository {
             Error::PutS3ObjectError(object_key.to_string(), bucket_name.to_string())
         })?;
 
-        println!("{} has been uploaded to {}", object_key, bucket_name);
+        println!("{object_key} has been uploaded to {bucket_name}");
         Ok(())
     }
 
@@ -101,7 +101,7 @@ impl S3Repository {
         let prefix = if folder_path.ends_with('/') {
             folder_path.to_string()
         } else {
-            format!("{}/", folder_path)
+            format!("{folder_path}/")
         };
         let output = client
             .list_objects_v2()
