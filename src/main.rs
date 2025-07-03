@@ -7,6 +7,7 @@ mod cmd;
 
 use crate::cmd::{
     network::{ChurnCommands, NetworkCommands},
+    nginx::NginxCommands,
     nodes,
     provision::ProvisionCommands,
     telegraf::TelegrafCommands,
@@ -652,6 +653,14 @@ async fn main() -> Result<()> {
                 name,
                 provider,
             } => cmd::telegraf::handle_upgrade_node_telegraf_config(forks, name, provider).await,
+        },
+        Commands::Nginx(nginx_cmd) => match nginx_cmd {
+            NginxCommands::UpgradeConfig {
+                custom_inventory,
+                forks,
+                name,
+                provider,
+            } => cmd::nginx::handle_upgrade_nginx_config(custom_inventory, forks, name, provider).await,
         },
     }
 }

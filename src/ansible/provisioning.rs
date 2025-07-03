@@ -1460,6 +1460,35 @@ impl AnsibleProvisioner {
         Ok(())
     }
 
+    pub fn upgrade_nginx_config(
+        &self,
+        environment_name: &str,
+        custom_inventory: Option<Vec<VirtualMachine>>,
+    ) -> Result<()> {
+        if let Some(custom_inventory) = custom_inventory {
+            println!("Running the upgrade nginx config playbook with a custom inventory");
+            generate_custom_environment_inventory(
+                &custom_inventory,
+                environment_name,
+                &self.ansible_runner.working_directory_path.join("inventory"),
+            )?;
+            self.ansible_runner.run_playbook(
+                AnsiblePlaybook::UpgradeNginx,
+                AnsibleInventoryType::Custom,
+                None,
+            )?;
+            return Ok(());
+        }
+
+        println!("Running the upgrade nginx config playbook for peer cache nodes");
+        self.ansible_runner.run_playbook(
+            AnsiblePlaybook::UpgradeNginx,
+            AnsibleInventoryType::PeerCacheNodes,
+            None,
+        )?;
+        Ok(())
+    }
+
     pub fn upgrade_geoip_telegraf(&self, name: &str) -> Result<()> {
         self.ansible_runner.run_playbook(
             AnsiblePlaybook::UpgradeGeoIpTelegrafConfig,

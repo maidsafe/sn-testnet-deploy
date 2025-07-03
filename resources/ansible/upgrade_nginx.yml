@@ -1,0 +1,6 @@
+---
+- name: upgrade the nginx configuration
+  hosts: all
+  roles:
+    - role: cache_webserver
+      become: True
