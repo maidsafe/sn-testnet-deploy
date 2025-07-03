@@ -10,6 +10,7 @@ pub mod funds;
 pub mod logs;
 pub mod misc;
 pub mod network;
+pub mod nginx;
 pub mod nodes;
 pub mod provision;
 pub mod telegraf;
@@ -17,7 +18,7 @@ pub mod upgrade;
 
 use crate::cmd::{
     clients::ClientsCommands, funds::FundsCommand, logs::LogCommands, network::NetworkCommands,
-    provision::ProvisionCommands, telegraf::TelegrafCommands,
+    nginx::NginxCommands, provision::ProvisionCommands, telegraf::TelegrafCommands,
 };
 use alloy::primitives::U256;
 use ant_releases::{AntReleaseRepoActions, ReleaseType};
@@ -694,6 +695,9 @@ pub enum Commands {
     Logs(LogCommands),
     #[clap(name = "network", subcommand)]
     Network(NetworkCommands),
+    /// Manage nginx services and configuration
+    #[clap(name = "nginx", subcommand)]
+    Nginx(NginxCommands),
     /// Send a notification to Slack with testnet inventory details
     Notify {
         /// The name of the environment.
