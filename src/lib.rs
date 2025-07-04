@@ -419,6 +419,7 @@ impl LogFormat {
 #[derive(Clone)]
 pub struct UpgradeOptions {
     pub ansible_verbose: bool,
+    pub branch: Option<String>,
     pub custom_inventory: Option<Vec<VirtualMachine>>,
     pub env_variables: Option<Vec<(String, String)>>,
     pub force: bool,
@@ -428,6 +429,7 @@ pub struct UpgradeOptions {
     pub node_type: Option<NodeType>,
     pub pre_upgrade_delay: Option<u64>,
     pub provider: CloudProvider,
+    pub repo_owner: Option<String>,
     pub version: Option<String>,
 }
 
@@ -447,6 +449,17 @@ impl UpgradeOptions {
         if let Some(pre_upgrade_delay) = &self.pre_upgrade_delay {
             extra_vars.add_variable("pre_upgrade_delay", &pre_upgrade_delay.to_string());
         }
+
+        if let (Some(repo_owner), Some(branch)) = (&self.repo_owner, &self.branch) {
+            let binary_option = BinaryOption::BuildFromSource {
+                antnode_features: None,
+                branch: branch.clone(),
+                repo_owner: repo_owner.clone(),
+                skip_binary_build: true,
+            };
+            extra_vars.add_node_url_or_version(&self.name, &binary_option);
+        }
+
         extra_vars.build()
     }
 }

@@ -13,6 +13,7 @@ use std::time::Duration;
 #[allow(clippy::too_many_arguments)]
 pub async fn handle_upgrade_command(
     ansible_verbose: bool,
+    branch: Option<String>,
     custom_inventory: Option<Vec<String>>,
     env_variables: Option<Vec<(String, String)>>,
     force: bool,
@@ -22,6 +23,7 @@ pub async fn handle_upgrade_command(
     node_type: Option<NodeType>,
     provider: CloudProvider,
     pre_upgrade_delay: Option<u64>,
+    repo_owner: Option<String>,
     version: Option<String>,
 ) -> Result<()> {
     // The upgrade intentionally uses a small value for `forks`, but this is far too slow
@@ -56,6 +58,7 @@ pub async fn handle_upgrade_command(
         .build()?;
     testnet_deployer.upgrade(UpgradeOptions {
         ansible_verbose,
+        branch,
         custom_inventory,
         env_variables,
         force,
@@ -65,6 +68,7 @@ pub async fn handle_upgrade_command(
         node_type,
         provider,
         pre_upgrade_delay,
+        repo_owner,
         version,
     })?;
 

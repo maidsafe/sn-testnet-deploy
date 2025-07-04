@@ -18,6 +18,10 @@
         {% endif %}
         {% if antnode_version is defined %}
         cmd="$cmd --version={{ antnode_version }}"
+        {% elif node_archive_url is defined %}
+        cmd="$cmd --url={{ node_archive_url }}"
+        cmd="$cmd --force"
+        echo "$cmd" >> /tmp/upgrade_cmd
         {% endif %}
         eval "$cmd"
       args:
