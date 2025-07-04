@@ -432,6 +432,7 @@ async fn main() -> Result<()> {
         }
         Commands::Upgrade {
             ansible_verbose,
+            branch,
             custom_inventory,
             force,
             forks,
@@ -441,10 +442,12 @@ async fn main() -> Result<()> {
             node_type,
             provider,
             pre_upgrade_delay,
+            repo_owner,
             version,
         } => {
             cmd::upgrade::handle_upgrade_command(
                 ansible_verbose,
+                branch,
                 custom_inventory,
                 node_env_variables,
                 force,
@@ -454,6 +457,7 @@ async fn main() -> Result<()> {
                 node_type,
                 provider,
                 pre_upgrade_delay,
+                repo_owner,
                 version,
             )
             .await?;
@@ -660,7 +664,10 @@ async fn main() -> Result<()> {
                 forks,
                 name,
                 provider,
-            } => cmd::nginx::handle_upgrade_nginx_config(custom_inventory, forks, name, provider).await,
+            } => {
+                cmd::nginx::handle_upgrade_nginx_config(custom_inventory, forks, name, provider)
+                    .await
+            }
         },
     }
 }

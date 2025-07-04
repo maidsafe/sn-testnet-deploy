@@ -863,6 +863,17 @@ pub enum Commands {
         /// Set to run Ansible with more verbose output.
         #[arg(long)]
         ansible_verbose: bool,
+        /// The branch of the Github repository to use for custom binaries.
+        ///
+        /// This specifies the pre-built binaries to download from S3 for the upgrade.
+        /// The binaries must have been previously built and uploaded.
+        ///
+        /// This argument must be used in conjunction with the --repo-owner argument.
+        ///
+        /// The --branch and --repo-owner arguments are mutually exclusive with the --version
+        /// argument. You can only supply a version number or a custom branch, not both.
+        #[arg(long, verbatim_doc_comment)]
+        branch: Option<String>,
         /// Provide a list of VM names to use as a custom inventory.
         ///
         /// This will run the upgrade against this particular subset of VMs.
@@ -911,6 +922,17 @@ pub enum Commands {
         /// Valid values are "aws" or "digital-ocean".
         #[clap(long, default_value_t = CloudProvider::DigitalOcean, value_parser = parse_provider, verbatim_doc_comment)]
         provider: CloudProvider,
+        /// The owner/org of the Github repository to use for custom binaries.
+        ///
+        /// This specifies the pre-built binaries to download from S3 for the upgrade.
+        /// The binaries must have been previously built and uploaded.
+        ///
+        /// This argument must be used in conjunction with the --branch argument.
+        ///
+        /// The --branch and --repo-owner arguments are mutually exclusive with the --version
+        /// argument. You can only supply a version number or a custom branch, not both.
+        #[arg(long, verbatim_doc_comment)]
+        repo_owner: Option<String>,
         #[arg(long)]
         /// Optionally supply a version number for the antnode binary to upgrade to.
         ///
