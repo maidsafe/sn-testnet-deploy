@@ -140,3 +140,15 @@ build-lon1-images:
 
 build-ams3-images:
   just build-all-images ams3
+
+build-lon1-rust-build-image:
+  just build-rust-build-image lon1
+
+build-ams3-rust-build-image:
+  just build-rust-build-image ams3
+
+build-lon1-evm-node-image:
+  just build-evm-node-image lon1
+
+build-ams3-evm-node-image:
+  just build-evm-node-image ams3

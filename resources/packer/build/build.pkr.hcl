@@ -35,7 +35,7 @@ variable "size" {
 
 variable "snapshot_name" {
   type = string
-  default = "safe_network-build"
+  default = "autonomi-build"
   description = "The name of the snapshot that will be created"
 }
 
