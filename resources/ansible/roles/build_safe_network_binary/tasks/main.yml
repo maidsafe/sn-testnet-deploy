@@ -3,11 +3,16 @@
   set_fact:
     aws_secret_key: "{{ lookup('file', 'files/s3_deploy_secret_access_key') }}"
 
+# The force: true parameter will discard any local modifications and reset the repository to match
+# the specified branch/version on subsequent runs.
+# This can sometimes be necessary if there is a clumsy commit that will cause the `Cargo.lock` file
+# to be modified.
 - name: clone autonomi repo
   ansible.builtin.git:
     repo: https://github.com/{{ org }}/autonomi
     version: "{{ branch }}"
     dest: "{{ ansible_env.HOME }}/autonomi"
+    force: true
 
 # only enable safenode features
 - name: "build {{ bin_name }} binary"
