@@ -97,7 +97,7 @@ impl std::str::FromStr for DeploymentType {
             "bootstrap" => Ok(DeploymentType::Bootstrap),
             "clients" => Ok(DeploymentType::Client),
             "new" => Ok(DeploymentType::New),
-            _ => Err(format!("Invalid deployment type: {}", s)),
+            _ => Err(format!("Invalid deployment type: {s}")),
         }
     }
 }
@@ -133,7 +133,7 @@ impl std::str::FromStr for NodeType {
             "genesis" => Ok(NodeType::Genesis),
             "peer-cache" => Ok(NodeType::PeerCache),
             "symmetric-private" => Ok(NodeType::SymmetricPrivateNode),
-            _ => Err(format!("Invalid node type: {}", s)),
+            _ => Err(format!("Invalid node type: {s}")),
         }
     }
 }
@@ -189,7 +189,7 @@ impl std::str::FromStr for EvmNetwork {
             "arbitrum-one" => Ok(EvmNetwork::ArbitrumOne),
             "arbitrum-sepolia-test" => Ok(EvmNetwork::ArbitrumSepoliaTest),
             "custom" => Ok(EvmNetwork::Custom),
-            _ => Err(format!("Invalid EVM network type: {}", s)),
+            _ => Err(format!("Invalid EVM network type: {s}")),
         }
     }
 }
@@ -341,10 +341,10 @@ impl BinaryOption {
                 skip_binary_build: _,
             } => {
                 println!("Source configuration:");
-                println!("  Repository owner: {}", repo_owner);
-                println!("  Branch: {}", branch);
+                println!("  Repository owner: {repo_owner}");
+                println!("  Branch: {branch}");
                 if let Some(features) = antnode_features {
-                    println!("  Antnode features: {}", features);
+                    println!("  Antnode features: {features}");
                 }
             }
             BinaryOption::Versioned {
@@ -354,13 +354,13 @@ impl BinaryOption {
             } => {
                 println!("Versioned binaries configuration:");
                 if let Some(version) = ant_version {
-                    println!("  ant version: {}", version);
+                    println!("  ant version: {version}");
                 }
                 if let Some(version) = antctl_version {
-                    println!("  antctl version: {}", version);
+                    println!("  antctl version: {version}");
                 }
                 if let Some(version) = antnode_version {
-                    println!("  antnode version: {}", version);
+                    println!("  antnode version: {version}");
                 }
             }
         }
@@ -877,11 +877,11 @@ impl TestnetDeployer {
             },
             full_cone_private_nodes
         );
-        println!("Total nodes: {}", total_nodes);
-        println!("Running nodes: {}", running_nodes);
-        println!("Stopped nodes: {}", stopped_nodes);
-        println!("Added nodes: {}", added_nodes);
-        println!("Removed nodes: {}", removed_nodes);
+        println!("Total nodes: {total_nodes}");
+        println!("Running nodes: {running_nodes}");
+        println!("Stopped nodes: {stopped_nodes}");
+        println!("Added nodes: {added_nodes}");
+        println!("Removed nodes: {removed_nodes}");
 
         Ok(())
     }
@@ -1097,7 +1097,7 @@ pub fn get_anvil_node_data(
     const RETRY_DELAY: Duration = Duration::from_secs(5);
 
     for attempt in 1..=MAX_ATTEMPTS {
-        match ssh_client.run_command(&evm_ip, "ant", &format!("cat {}", csv_file_path), false) {
+        match ssh_client.run_command(&evm_ip, "ant", &format!("cat {csv_file_path}"), false) {
             Ok(output) => {
                 if let Some(csv_contents) = output.first() {
                     let parts: Vec<&str> = csv_contents.split(',').collect();
@@ -1293,8 +1293,8 @@ pub async fn notify_slack(inventory: DeploymentInventory) -> Result<()> {
             ..
         } => {
             message.push_str("*Branch Details*\n");
-            message.push_str(&format!("Repo owner: {}\n", repo_owner));
-            message.push_str(&format!("Branch: {}\n", branch));
+            message.push_str(&format!("Repo owner: {repo_owner}\n"));
+            message.push_str(&format!("Branch: {branch}\n"));
         }
         BinaryOption::Versioned {
             ant_version: ref safe_version,
@@ -1333,7 +1333,7 @@ pub async fn notify_slack(inventory: DeploymentInventory) -> Result<()> {
     message.push_str("*Available Files*\n");
     message.push_str("```\n");
     for (addr, file_name) in inventory.uploaded_files.iter() {
-        message.push_str(&format!("{}: {}\n", addr, file_name))
+        message.push_str(&format!("{addr}: {file_name}\n"))
     }
     message.push_str("```\n");
 
@@ -1354,7 +1354,7 @@ fn print_duration(duration: Duration) {
     let total_seconds = duration.as_secs();
     let minutes = total_seconds / 60;
     let seconds = total_seconds % 60;
-    debug!("Time taken: {} minutes and {} seconds", minutes, seconds);
+    debug!("Time taken: {minutes} minutes and {seconds} seconds");
 }
 
 pub fn get_progress_bar(length: u64) -> Result<ProgressBar> {
@@ -1399,7 +1399,7 @@ pub async fn get_environment_details(
                         }
                     }
                 };
-                trace!("Content of the environment details file: {}", content);
+                trace!("Content of the environment details file: {content}");
 
                 match serde_json::from_str(&content) {
                     Ok(environment_details) => break environment_details,

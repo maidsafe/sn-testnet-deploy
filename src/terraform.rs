@@ -50,7 +50,7 @@ impl TerraformRunner {
         let mut args = vec!["apply".to_string(), "-auto-approve".to_string()];
         if let Some(filenames) = tfvars_filenames {
             for filename in filenames {
-                args.push(format!("-var-file={}", filename));
+                args.push(format!("-var-file={filename}"));
             }
         }
         for var in vars.iter() {
@@ -75,7 +75,7 @@ impl TerraformRunner {
         let mut args = vec!["plan".to_string()];
         if let Some(filenames) = tfvars_filenames {
             for filename in filenames {
-                args.push(format!("-var-file={}", filename));
+                args.push(format!("-var-file={filename}"));
             }
         }
         if let Some(vars) = vars {
@@ -102,7 +102,7 @@ impl TerraformRunner {
         let mut args = vec!["destroy".to_string(), "-auto-approve".to_string()];
         if let Some(filenames) = tfvars_filenames {
             for filename in filenames {
-                args.push(format!("-var-file={}", filename));
+                args.push(format!("-var-file={filename}"));
             }
         }
         if let Some(vars) = vars {

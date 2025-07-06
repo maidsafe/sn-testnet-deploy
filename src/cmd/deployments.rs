@@ -417,7 +417,7 @@ pub async fn handle_deploy(
             Ok(inv) => break inv,
             Err(e) if retries < max_retries => {
                 retries += 1;
-                eprintln!("Failed to generate inventory on attempt {retries}: {:?}", e);
+                eprintln!("Failed to generate inventory on attempt {retries}: {e:?}");
                 eprintln!("Will retry up to {max_retries} times...");
             }
             Err(_) => {
@@ -545,8 +545,8 @@ pub async fn handle_upscale(
                     .unwrap_or_else(|| existing_antctl_version.clone());
 
                 println!("The upscale will use the following override binary versions:");
-                println!("antnode: {}", new_antnode_version);
-                println!("antctl: {}", new_antctl_version);
+                println!("antnode: {new_antnode_version}");
+                println!("antctl: {new_antctl_version}");
 
                 inventory.binary_option = BinaryOption::Versioned {
                     ant_version: None,
@@ -612,7 +612,7 @@ pub async fn handle_upscale(
             Ok(inv) => break inv,
             Err(e) if retries < max_retries => {
                 retries += 1;
-                eprintln!("Failed to generate inventory on attempt {retries}: {:?}", e);
+                eprintln!("Failed to generate inventory on attempt {retries}: {e:?}");
                 eprintln!("Will retry up to {max_retries} times...");
             }
             Err(_) => {

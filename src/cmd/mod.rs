@@ -1142,8 +1142,8 @@ pub enum OptionsType {
 impl OptionsType {
     fn file_name(&self, environment_name: &str) -> String {
         match self {
-            Self::Deploy => format!("{}-deploy.json", environment_name),
-            Self::Provision => format!("{}-provision.json", environment_name),
+            Self::Deploy => format!("{environment_name}-deploy.json"),
+            Self::Provision => format!("{environment_name}-provision.json"),
         }
     }
 }
@@ -1268,8 +1268,7 @@ async fn get_binary_option(
         let branch = branch.unwrap();
 
         print_with_banner(&format!(
-            "Binaries will be built from {}/{}",
-            repo_owner, branch
+            "Binaries will be built from {repo_owner}/{branch}"
         ));
 
         let url = format!("https://github.com/{repo_owner}/autonomi/tree/{branch}",);
@@ -1369,7 +1368,7 @@ pub fn parse_evm_network(s: &str) -> Result<EvmNetwork, String> {
         "arbitrum-one" => Ok(EvmNetwork::ArbitrumOne),
         "arbitrum-sepolia-test" => Ok(EvmNetwork::ArbitrumSepoliaTest),
         "custom" => Ok(EvmNetwork::Custom),
-        _ => Err(format!("Invalid EVM network type: {}", s)),
+        _ => Err(format!("Invalid EVM network type: {s}")),
     }
 }
 
@@ -1385,5 +1384,5 @@ pub fn parse_provider(val: &str) -> Result<CloudProvider> {
 
 fn print_with_banner(s: &str) {
     let banner = "=".repeat(s.len());
-    println!("{}\n{}\n{}", banner, s, banner);
+    println!("{banner}\n{s}\n{banner}");
 }

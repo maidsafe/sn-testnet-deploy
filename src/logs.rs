@@ -393,7 +393,7 @@ impl TestnetDeployer {
         writeln!(file, "Command: {cmd}")?;
 
         for line in output {
-            writeln!(file, "{}", line)?;
+            writeln!(file, "{line}")?;
         }
 
         Ok(())
