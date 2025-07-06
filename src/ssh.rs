@@ -291,10 +291,7 @@ impl SshClient {
             );
             args.push(format!("{user}@{gateway}"));
         } else {
-            debug!(
-                "Running command '{}' on {}@{}...",
-                command, user, ip_address
-            );
+            debug!("Running command '{command}' on {user}@{ip_address}...");
             args.push(format!("{user}@{ip_address}"));
         }
         args.extend(command_args);

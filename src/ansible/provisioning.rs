@@ -642,10 +642,7 @@ impl AnsibleProvisioner {
             self.ssh_client
                 .wait_for_ssh_availability(&vm.public_ip_addr, &self.cloud_provider.get_ssh_user())
                 .map_err(|e| {
-                    println!(
-                        "Failed to establish SSH connection to Full Cone NAT Gateway: {}",
-                        e
-                    );
+                    println!("Failed to establish SSH connection to Full Cone NAT Gateway: {e}");
                     e
                 })?;
         }
@@ -801,7 +798,7 @@ impl AnsibleProvisioner {
         let home_dir = std::env::var("HOME").inspect_err(|err| {
             println!("Failed to get home directory with error: {err:?}",);
         })?;
-        let known_hosts_path = format!("{}/.ssh/known_hosts", home_dir);
+        let known_hosts_path = format!("{home_dir}/.ssh/known_hosts");
         debug!("Cleaning up known hosts file at {known_hosts_path} ");
         run_external_command(
             PathBuf::from("rm"),
@@ -842,10 +839,7 @@ impl AnsibleProvisioner {
             self.ssh_client
                 .wait_for_ssh_availability(&vm.public_ip_addr, &self.cloud_provider.get_ssh_user())
                 .map_err(|e| {
-                    println!(
-                        "Failed to establish SSH connection to Symmetric NAT Gateway: {}",
-                        e
-                    );
+                    println!("Failed to establish SSH connection to Symmetric NAT Gateway: {e}");
                     e
                 })?;
         }
@@ -1475,6 +1469,6 @@ impl AnsibleProvisioner {
     pub fn print_ansible_run_banner(&self, s: &str) {
         let ansible_run_msg = "Ansible Run: ";
         let line = "=".repeat(s.len() + ansible_run_msg.len());
-        println!("{}\n{}{}\n{}", line, ansible_run_msg, s, line);
+        println!("{line}\n{ansible_run_msg}{s}\n{line}");
     }
 }

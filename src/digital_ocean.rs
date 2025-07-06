@@ -47,8 +47,8 @@ impl DigitalOceanClient {
             } else if !response.status().is_success() {
                 let status_code = response.status().as_u16();
                 let response_body = response.text().await?;
-                debug!("Response status code: {}", status_code);
-                debug!("Error response body: {}", response_body);
+                debug!("Response status code: {status_code}");
+                debug!("Error response body: {response_body}");
                 return Err(Error::DigitalOceanUnexpectedResponse(
                     status_code,
                     response_body,

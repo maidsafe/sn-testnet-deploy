@@ -138,7 +138,7 @@ async fn handle_provision_nodes(name: String, node_type: NodeType) -> Result<()>
             }
         }
         _ => {
-            provisioner.print_ansible_run_banner(&format!("Provision {} Nodes", node_type));
+            provisioner.print_ansible_run_banner(&format!("Provision {node_type} Nodes"));
             provisioner.provision_nodes(
                 &provision_options,
                 Some(genesis_multiaddr),

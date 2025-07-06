@@ -115,8 +115,7 @@ impl ExtraVarsDocBuilder {
                 self.add_branch_url_variable(
                     "antnode_rpc_client_archive_url",
                     &format!(
-                        "{}/{}/{}/antnode_rpc_client-{}-x86_64-unknown-linux-musl.tar.gz",
-                        BRANCH_S3_BUCKET_URL, repo_owner, branch, deployment_name
+                        "{BRANCH_S3_BUCKET_URL}/{repo_owner}/{branch}/antnode_rpc_client-{deployment_name}-x86_64-unknown-linux-musl.tar.gz"
                     ),
                     branch,
                     repo_owner,
@@ -126,8 +125,7 @@ impl ExtraVarsDocBuilder {
                 self.add_variable(
                     "antnode_rpc_client_archive_url",
                     &format!(
-                        "{}/antnode_rpc_client-latest-x86_64-unknown-linux-musl.tar.gz",
-                        RPC_CLIENT_BUCKET_URL
+                        "{RPC_CLIENT_BUCKET_URL}/antnode_rpc_client-latest-x86_64-unknown-linux-musl.tar.gz"
                     ),
                 );
             }
@@ -142,8 +140,7 @@ impl ExtraVarsDocBuilder {
                 self.add_branch_url_variable(
                     "node_archive_url",
                     &format!(
-                        "{}/{}/{}/antnode-{}-x86_64-unknown-linux-musl.tar.gz",
-                        BRANCH_S3_BUCKET_URL, repo_owner, branch, deployment_name
+                        "{BRANCH_S3_BUCKET_URL}/{repo_owner}/{branch}/antnode-{deployment_name}-x86_64-unknown-linux-musl.tar.gz"
                     ),
                     branch,
                     repo_owner,
@@ -167,8 +164,7 @@ impl ExtraVarsDocBuilder {
                 self.add_branch_url_variable(
                     "antctl_archive_url",
                     &format!(
-                        "{}/{}/{}/antctl-{}-x86_64-unknown-linux-musl.tar.gz",
-                        BRANCH_S3_BUCKET_URL, repo_owner, branch, deployment_name
+                        "{BRANCH_S3_BUCKET_URL}/{repo_owner}/{branch}/antctl-{deployment_name}-x86_64-unknown-linux-musl.tar.gz"
                     ),
                     branch,
                     repo_owner,
@@ -197,8 +193,7 @@ impl ExtraVarsDocBuilder {
                 self.add_branch_url_variable(
                     "antctld_archive_url",
                     &format!(
-                        "{}/{}/{}/antctld-{}-x86_64-unknown-linux-musl.tar.gz",
-                        BRANCH_S3_BUCKET_URL, repo_owner, branch, deployment_name
+                        "{BRANCH_S3_BUCKET_URL}/{repo_owner}/{branch}/antctld-{deployment_name}-x86_64-unknown-linux-musl.tar.gz"
                     ),
                     branch,
                     repo_owner,
@@ -231,10 +226,7 @@ impl ExtraVarsDocBuilder {
         if let Some(version) = ant_version {
             self.add_variable(
                 "ant_archive_url",
-                &format!(
-                    "{}/ant-{}-x86_64-unknown-linux-musl.tar.gz",
-                    ANT_S3_BUCKET_URL, version
-                ),
+                &format!("{ANT_S3_BUCKET_URL}/ant-{version}-x86_64-unknown-linux-musl.tar.gz"),
             );
             return Ok(());
         }
@@ -246,8 +238,7 @@ impl ExtraVarsDocBuilder {
                 self.add_branch_url_variable(
                     "ant_archive_url",
                     &format!(
-                        "{}/{}/{}/ant-{}-x86_64-unknown-linux-musl.tar.gz",
-                        BRANCH_S3_BUCKET_URL, repo_owner, branch, deployment_name
+                        "{BRANCH_S3_BUCKET_URL}/{repo_owner}/{branch}/ant-{deployment_name}-x86_64-unknown-linux-musl.tar.gz"
                     ),
                     branch,
                     repo_owner,
@@ -259,8 +250,7 @@ impl ExtraVarsDocBuilder {
                     self.add_variable(
                         "ant_archive_url",
                         &format!(
-                            "{}/ant-{}-x86_64-unknown-linux-musl.tar.gz",
-                            ANT_S3_BUCKET_URL, version
+                            "{ANT_S3_BUCKET_URL}/ant-{version}-x86_64-unknown-linux-musl.tar.gz"
                         ),
                     );
                     Ok(())
