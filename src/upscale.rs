@@ -255,7 +255,7 @@ impl TestnetDeployer {
         };
         let mut node_provision_failed = false;
 
-        let (initial_multiaddr, initial_ip_addr) = if is_bootstrap_deploy {
+        let (initial_contact_peers, initial_cache_vms) = if is_bootstrap_deploy {
             get_multiaddr(&self.ansible_provisioner.ansible_runner, &self.ssh_client).map_err(
                 |err| {
                     println!("Failed to get node multiaddr {err:?}");
@@ -269,8 +269,8 @@ impl TestnetDeployer {
                     err
                 })?
         };
-        let initial_network_contacts_url = get_bootstrap_cache_url(&initial_ip_addr);
-        debug!("Retrieved initial peer {initial_multiaddr} and initial network contacts {initial_network_contacts_url}");
+        let initial_network_contacts_urls = get_bootstrap_cache_url(&initial_cache_vms);
+        debug!("Retrieved initial peers {initial_contact_peers:?} and initial network contacts {initial_network_contacts_urls:?}");
 
         if !is_bootstrap_deploy {
             self.wait_for_ssh_availability_on_new_machines(
@@ -281,8 +281,8 @@ impl TestnetDeployer {
                 .print_ansible_run_banner("Provision Peer Cache Nodes");
             match self.ansible_provisioner.provision_nodes(
                 &provision_options,
-                Some(initial_multiaddr.clone()),
-                Some(initial_network_contacts_url.clone()),
+                initial_contact_peers.clone(),
+                initial_network_contacts_urls.clone(),
                 NodeType::PeerCache,
             ) {
                 Ok(()) => {
@@ -303,8 +303,8 @@ impl TestnetDeployer {
             .print_ansible_run_banner("Provision Normal Nodes");
         match self.ansible_provisioner.provision_nodes(
             &provision_options,
-            Some(initial_multiaddr.clone()),
-            Some(initial_network_contacts_url.clone()),
+            initial_contact_peers.clone(),
+            initial_network_contacts_urls.clone(),
             NodeType::Generic,
         ) {
             Ok(()) => {
@@ -354,8 +354,8 @@ impl TestnetDeployer {
 
             match self.ansible_provisioner.provision_full_cone(
                 &provision_options,
-                Some(initial_multiaddr.clone()),
-                Some(initial_network_contacts_url.clone()),
+                initial_contact_peers.clone(),
+                initial_network_contacts_urls.clone(),
                 private_node_inventory.clone(),
                 full_cone_nat_gateway_new_vms,
             ) {
@@ -391,8 +391,8 @@ impl TestnetDeployer {
                 .print_ansible_run_banner("Provision Symmetric Private Nodes");
             match self.ansible_provisioner.provision_symmetric_private_nodes(
                 &mut provision_options,
-                Some(initial_multiaddr.clone()),
-                Some(initial_network_contacts_url.clone()),
+                initial_contact_peers.clone(),
+                initial_network_contacts_urls.clone(),
                 &private_node_inventory,
             ) {
                 Ok(()) => {
@@ -425,14 +425,13 @@ impl TestnetDeployer {
                 AnsibleInventoryType::Clients,
                 &options.current_inventory,
             )?;
-            let genesis_network_contacts = get_bootstrap_cache_url(&initial_ip_addr);
             self.ansible_provisioner
                 .print_ansible_run_banner("Provision Clients");
             self.ansible_provisioner
                 .provision_clients(
                     &provision_options,
-                    Some(initial_multiaddr.clone()),
-                    Some(genesis_network_contacts.clone()),
+                    initial_contact_peers.clone(),
+                    initial_network_contacts_urls.clone(),
                 )
                 .await
                 .map_err(|err| {
@@ -502,14 +501,14 @@ impl TestnetDeployer {
             return Ok(());
         }
 
-        let (initial_multiaddr, initial_ip_addr) =
+        let (initial_contact_peers, initial_network_contacts_vms) =
             get_genesis_multiaddr(&self.ansible_provisioner.ansible_runner, &self.ssh_client)
                 .map_err(|err| {
                     println!("Failed to get genesis multiaddr {err:?}");
                     err
                 })?;
-        let initial_network_contacts_url = get_bootstrap_cache_url(&initial_ip_addr);
-        debug!("Retrieved initial peer {initial_multiaddr} and initial network contacts {initial_network_contacts_url}");
+        let initial_network_contacts_urls = get_bootstrap_cache_url(&initial_network_contacts_vms);
+        debug!("Retrieved initial peers {initial_contact_peers:?} and initial network contacts {initial_network_contacts_urls:?}");
 
         let provision_options = ProvisionOptions {
             ant_version: options.ant_version.clone(),
@@ -589,8 +588,8 @@ impl TestnetDeployer {
         self.ansible_provisioner
             .provision_clients(
                 &provision_options,
-                Some(initial_multiaddr),
-                Some(initial_network_contacts_url),
+                initial_contact_peers.clone(),
+                initial_network_contacts_urls.clone(),
             )
             .await
             .map_err(|err| {
