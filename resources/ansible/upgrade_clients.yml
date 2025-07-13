@@ -59,6 +59,16 @@
       become_user: "ant{{ item | regex_replace('ant([0-9]+)', '\\1') }}"
       loop: "{{ ant_users.stdout_lines }}"
 
+    - name: copy ant_downloader.sh to remote
+      ansible.builtin.template:
+        src: ant_downloader.sh.j2
+        dest: /home/ant1/ant_downloader.sh
+        owner: ant1
+        group: ant
+        mode: '0775'
+      become: true
+      become_user: ant1
+
     - name: start all ANT uploader services
       systemd:
         name: "ant_random_uploader_{{ item | regex_replace('ant([0-9]+)', '\\1') }}"
