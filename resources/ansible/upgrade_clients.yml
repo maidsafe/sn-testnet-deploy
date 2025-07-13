@@ -61,7 +61,7 @@
 
     - name: copy ant_downloader.sh to remote
       ansible.builtin.template:
-        src: ant_downloader.sh.j2
+        src: roles/downloaders/templates/ant_downloader.sh.j2
         dest: /home/ant1/ant_downloader.sh
         owner: ant1
         group: ant
