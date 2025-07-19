@@ -28,7 +28,7 @@ variable "build_machine_size" {
 }
 
 variable "build_droplet_image_id" {
-  default = "172723670"
+  description = "The ID of the image for the build machine. Varies per region."
 }
 
 variable "ant_client_droplet_image_id" {
