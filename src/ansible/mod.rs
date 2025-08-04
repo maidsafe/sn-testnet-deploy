@@ -95,10 +95,6 @@ pub enum AnsiblePlaybook {
     ///
     /// Use in combination with `AnsibleInventoryType::Genesis`.
     Faucet,
-    /// This playbook will setup the VM to act as a Full Cone NAT gateway and will route the private node through it.
-    ///
-    /// Use in combination with `AnsibleInventoryType::FullConeNatGateway`.
-    FullConeNatGateway,
     /// This playbook will fund the uploaders using the faucet.
     FundUploaders,
     /// The genesis playbook will use the node manager to setup the genesis node, which the other
@@ -138,6 +134,10 @@ pub enum AnsiblePlaybook {
     ///
     /// Use in combination with `AnsibleInventoryType::Genesis` or `AnsibleInventoryType::Nodes`.
     StartNodes,
+    /// This playbook will setup the VM to act as a static full-cone NAT gateway and will route the private node through it.
+    ///
+    /// Use in combination with `AnsibleInventoryType::FullConeNatGateway`.
+    StaticFullConeNatGateway,
     /// Run `safenode-manager status` on the machine.
     ///
     /// Useful to determine the state of all the nodes in a deployment.
@@ -226,7 +226,6 @@ impl AnsiblePlaybook {
             AnsiblePlaybook::EvmNodes => "evm_nodes.yml".to_string(),
             AnsiblePlaybook::ExtendVolumeSize => "extend_volume_size.yml".to_string(),
             AnsiblePlaybook::Faucet => "faucet.yml".to_string(),
-            AnsiblePlaybook::FullConeNatGateway => "full_cone_nat_gateway.yml".to_string(),
             AnsiblePlaybook::FundUploaders => "fund_uploaders.yml".to_string(),
             AnsiblePlaybook::Genesis => "genesis_node.yml".to_string(),
             AnsiblePlaybook::Nodes => "nodes.yml".to_string(),
@@ -239,6 +238,9 @@ impl AnsiblePlaybook {
             AnsiblePlaybook::StartNodes => "start_nodes.yml".to_string(),
             AnsiblePlaybook::StartTelegraf => "start_telegraf.yml".to_string(),
             AnsiblePlaybook::StartUploaders => "start_uploaders.yml".to_string(),
+            AnsiblePlaybook::StaticFullConeNatGateway => {
+                "static_full_cone_nat_gateway.yml".to_string()
+            }
             AnsiblePlaybook::Status => "node_status.yml".to_string(),
             AnsiblePlaybook::StopDownloaders => "stop_downloaders.yml".to_string(),
             AnsiblePlaybook::StopFaucet => "stop_faucet.yml".to_string(),
