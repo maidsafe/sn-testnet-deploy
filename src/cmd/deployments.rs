@@ -214,7 +214,7 @@ pub async fn handle_deploy(
     evm_node_vm_size: Option<String>,
     evm_payment_token_address: Option<String>,
     evm_rpc_url: Option<String>,
-    full_cone_nat_gateway_vm_size: Option<String>,
+    full_cone_vm_size: Option<String>,
     full_cone_private_node_count: Option<u16>,
     full_cone_private_node_vm_count: Option<u16>,
     full_cone_private_node_volume_size: Option<u16>,
@@ -348,7 +348,7 @@ pub async fn handle_deploy(
         evm_node_vm_size,
         evm_payment_token_address,
         evm_rpc_url,
-        full_cone_nat_gateway_vm_size,
+        full_cone_vm_size,
         full_cone_private_node_count,
         full_cone_private_node_vm_count,
         full_cone_private_node_volume_size: full_cone_private_node_volume_size.or_else(|| {
