@@ -19,9 +19,9 @@ variable "droplet_ssh_keys" {
   ]
 }
 
-variable "full_cone_nat_gateway_droplet_size" {
-  description = "The size of the droplet for Full Cone NAT gateway VM"
-  default = "s-1vcpu-2gb"
+variable "full_cone_droplet_size" {
+  description = "The size of the droplet for Full Cone NAT gateway and private node VMs"
+  default = "s-2vcpu-4gb"
 }
 
 variable "symmetric_nat_gateway_droplet_size" {

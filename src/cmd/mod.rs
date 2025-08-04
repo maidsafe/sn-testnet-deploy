@@ -401,9 +401,9 @@ pub enum Commands {
         /// The default value from ansible.cfg is 50.
         #[clap(long)]
         forks: Option<usize>,
-        /// Override the size of the full-cone NAT gateway VM.
+        /// Override the size of the full-cone NAT gateway and private node VMs.
         #[clap(long)]
-        full_cone_nat_gateway_vm_size: Option<String>,
+        full_cone_vm_size: Option<String>,
         /// The number of antnode services to run behind a full-cone NAT gateway.
         ///
         /// The number applies to each VM, so the total number of nodes will be the number of VMs

@@ -44,7 +44,7 @@ pub struct InfraRunOptions {
     pub evm_node_vm_size: Option<String>,
     /// Set to None for new deployments, as the value will be fetched from tfvars.
     pub evm_node_image_id: Option<String>,
-    pub full_cone_nat_gateway_vm_size: Option<String>,
+    pub full_cone_vm_size: Option<String>,
     pub full_cone_private_node_vm_count: Option<u16>,
     pub full_cone_private_node_volume_size: Option<u16>,
     pub genesis_vm_count: Option<u16>,
@@ -154,7 +154,7 @@ impl InfraRunOptions {
 
         let full_cone_private_node_vm_count = resource_count(FULL_CONE_PRIVATE_NODE);
         debug!("Full cone private node count: {full_cone_private_node_vm_count}");
-        let (full_cone_private_node_volume_size, full_cone_nat_gateway_vm_size) =
+        let (full_cone_private_node_volume_size, full_cone_vm_size) =
             if full_cone_private_node_vm_count > 0 {
                 let full_cone_private_node_volume_size = get_value_for_resource(
                     &resources,
@@ -165,9 +165,9 @@ impl InfraRunOptions {
                     "Full cone private node volume size: {full_cone_private_node_volume_size:?}"
                 );
                 // gateways should exists if private nodes exist
-                let full_cone_nat_gateway_vm_size =
+                let full_cone_vm_size =
                     get_value_for_resource(&resources, FULL_CONE_NAT_GATEWAY, SIZE)?;
-                debug!("Full cone nat gateway size: {full_cone_nat_gateway_vm_size:?}");
+                debug!("Full cone nat gateway size: {full_cone_vm_size:?}");
 
                 nat_gateway_image_id =
                     get_value_for_resource(&resources, FULL_CONE_NAT_GATEWAY, IMAGE)?;
@@ -175,7 +175,7 @@ impl InfraRunOptions {
 
                 (
                     full_cone_private_node_volume_size,
-                    full_cone_nat_gateway_vm_size,
+                    full_cone_vm_size,
                 )
             } else {
                 (None, None)
@@ -240,7 +240,7 @@ impl InfraRunOptions {
             evm_node_count: Some(evm_node_count),
             evm_node_vm_size,
             evm_node_image_id,
-            full_cone_nat_gateway_vm_size,
+            full_cone_vm_size,
             full_cone_private_node_vm_count: Some(full_cone_private_node_vm_count),
             full_cone_private_node_volume_size,
             genesis_vm_count: Some(genesis_node_vm_count),
@@ -422,10 +422,10 @@ pub fn build_terraform_args(options: &InfraRunOptions) -> Result<Vec<(String, St
         ));
     }
 
-    if let Some(full_cone_gateway_vm_size) = &options.full_cone_nat_gateway_vm_size {
+    if let Some(full_cone_vm_size) = &options.full_cone_vm_size {
         args.push((
-            "full_cone_nat_gateway_droplet_size".to_string(),
-            full_cone_gateway_vm_size.clone(),
+            "full_cone_droplet_size".to_string(),
+            full_cone_vm_size.clone(),
         ));
     }
 

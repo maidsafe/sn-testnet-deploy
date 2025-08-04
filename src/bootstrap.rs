@@ -80,7 +80,7 @@ impl TestnetDeployer {
             evm_node_count: Some(0),
             evm_node_vm_size: None,
             evm_node_image_id: None,
-            full_cone_nat_gateway_vm_size: None, // We can take the value from tfvars for bootstrap deployments.
+            full_cone_vm_size: None, // We can take the value from tfvars for bootstrap deployments.
             full_cone_private_node_vm_count: options.full_cone_private_node_vm_count,
             full_cone_private_node_volume_size: options.full_cone_private_node_volume_size,
             genesis_vm_count: Some(0),
