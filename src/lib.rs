@@ -141,7 +141,7 @@ impl std::str::FromStr for NodeType {
 impl NodeType {
     pub fn telegraf_role(&self) -> &'static str {
         match self {
-            NodeType::FullConePrivateNode => "NAT_FULL_CONE_NODE",
+            NodeType::FullConePrivateNode => "NAT_STATIC_FULL_CONE_NODE",
             NodeType::Generic => "GENERIC_NODE",
             NodeType::Genesis => "GENESIS_NODE",
             NodeType::PeerCache => "PEER_CACHE_NODE",

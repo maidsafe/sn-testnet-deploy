@@ -725,7 +725,7 @@ impl AnsibleProvisioner {
             AnsibleInventoryType::FullConeNatGateway
         };
         self.ansible_runner.run_playbook(
-            AnsiblePlaybook::FullConeNatGateway,
+            AnsiblePlaybook::StaticFullConeNatGateway,
             gateway_inventory,
             Some(vars),
         )?;
@@ -789,7 +789,7 @@ impl AnsibleProvisioner {
         self.print_ansible_run_banner("Provisioning Full Cone NAT Gateway - Step 2");
         debug!("Provisioning Full Cone NAT Gateway - Step 2 with vars: {vars}");
         self.ansible_runner.run_playbook(
-            AnsiblePlaybook::FullConeNatGateway,
+            AnsiblePlaybook::StaticFullConeNatGateway,
             gateway_inventory,
             Some(vars),
         )?;

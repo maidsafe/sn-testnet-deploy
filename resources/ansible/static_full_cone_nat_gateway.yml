@@ -1,0 +1,6 @@
+---
+- name: provision static full cone nat gateway
+  hosts: all
+  become: True
+  roles:
+    - static_full_cone_nat_gateway

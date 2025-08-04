@@ -1,0 +1,164 @@
+---
+- name: Retrieve private IP of the corresponding private node vm
+  set_fact:
+    node_private_ip_eth1: "{{ node_private_ip_map[inventory_hostname] }}"
+
+- name: public IP of the gateway vm
+  set_fact:
+    gateway_public_ip: "{{ ansible_host }}"
+
+- name: define ephemeral port range
+  set_fact:
+    ephemeral_start: 1024
+    ephemeral_end: 65535
+
+- name: get VPC CIDR for private node droplet
+  shell: ip route | grep eth1 | grep kernel | awk '{print $1}' | grep -v default
+  register: vpc_cidr_output
+  delegate_to: "{{ node_private_ip_eth1 }}"
+  become: yes
+
+- name: set VPC CIDR fact
+  set_fact:
+    private_node_vpc_cidr: "{{ vpc_cidr_output.stdout }}"
+
+- name: check if static full cone NAT is already configured
+  command: iptables -t nat -L POSTROUTING -v
+  register: nat_gateway_output
+
+- name: Load ip_conntrack module
+  modprobe:
+    name: ip_conntrack
+    state: present
+
+- name: set netfilter conntrack max
+  sysctl:
+    name: net.netfilter.nf_conntrack_max
+    value: 1048576
+    state: present
+    reload: true
+
+- name: ensure netfilter conntrack max is set in sysctl.conf
+  lineinfile:
+    path: /etc/sysctl.conf
+    line: 'net.netfilter.nf_conntrack_max=1048576'
+    state: present
+
+- name: flush nat table
+  iptables:
+    table: nat
+    flush: yes
+  when: nat_gateway_output.stdout.find(node_private_ip_eth1) == -1
+
+- name: flush mangle table
+  iptables:
+    table: mangle
+    flush: yes
+  when: nat_gateway_output.stdout.find(node_private_ip_eth1) == -1
+
+- name: DNAT for WAN to backend TCP (ephemeral ports only)
+  iptables:
+    table: nat
+    chain: PREROUTING
+    in_interface: eth0
+    destination: "{{ gateway_public_ip }}"
+    protocol: tcp
+    destination_port: "{{ ephemeral_start }}:{{ ephemeral_end }}"
+    jump: DNAT
+    to_destination: "{{ node_private_ip_eth1 }}:{{ ephemeral_start }}-{{ ephemeral_end }}"
+  when: nat_gateway_output.stdout.find(node_private_ip_eth1) == -1
+
+- name: DNAT for WAN to backend UDP (ephemeral ports only)
+  iptables:
+    table: nat
+    chain: PREROUTING
+    in_interface: eth0
+    destination: "{{ gateway_public_ip }}"
+    protocol: udp
+    destination_port: "{{ ephemeral_start }}:{{ ephemeral_end }}"
+    jump: DNAT
+    to_destination: "{{ node_private_ip_eth1 }}:{{ ephemeral_start }}-{{ ephemeral_end }}"
+  when: nat_gateway_output.stdout.find(node_private_ip_eth1) == -1
+
+# The `iptables` module does not have a `set_mark` parameter.
+- name: mark DNATed inbound connections for SNAT exclusion
+  command: iptables -t mangle -A PREROUTING -i eth0 -d {{ gateway_public_ip }} -j MARK --set-mark 1
+  when: nat_gateway_output.stdout.find(node_private_ip_eth1) == -1
+
+- name: DNAT for LAN hairpin TCP (ephemeral ports only)
+  iptables:
+    table: nat
+    chain: PREROUTING
+    in_interface: eth1
+    destination: "{{ gateway_public_ip }}"
+    protocol: tcp
+    destination_port: "{{ ephemeral_start }}:{{ ephemeral_end }}"
+    jump: DNAT
+    to_destination: "{{ node_private_ip_eth1 }}:{{ ephemeral_start }}-{{ ephemeral_end }}"
+  when: nat_gateway_output.stdout.find(node_private_ip_eth1) == -1
+
+- name: DNAT for LAN hairpin UDP (ephemeral ports only)
+  iptables:
+    table: nat
+    chain: PREROUTING
+    in_interface: eth1
+    destination: "{{ gateway_public_ip }}"
+    protocol: udp
+    destination_port: "{{ ephemeral_start }}:{{ ephemeral_end }}"
+    jump: DNAT
+    to_destination: "{{ node_private_ip_eth1 }}:{{ ephemeral_start }}-{{ ephemeral_end }}"
+  when: nat_gateway_output.stdout.find(node_private_ip_eth1) == -1
+
+- name: SNAT for LAN hairpin TCP (restrict to LAN subnet, ephemeral ports only)
+  iptables:
+    table: nat
+    chain: POSTROUTING
+    source: "{{ private_node_vpc_cidr }}"
+    destination: "{{ node_private_ip_eth1 }}"
+    out_interface: eth1
+    protocol: tcp
+    source_port: "{{ ephemeral_start }}:{{ ephemeral_end }}"
+    jump: SNAT
+    to_source: "{{ gateway_public_ip }}:{{ ephemeral_start }}-{{ ephemeral_end }}"
+  when: nat_gateway_output.stdout.find(node_private_ip_eth1) == -1
+
+- name: SNAT for LAN hairpin UDP (restrict to LAN subnet, ephemeral ports only)
+  iptables:
+    table: nat
+    chain: POSTROUTING
+    source: "{{ private_node_vpc_cidr }}"
+    destination: "{{ node_private_ip_eth1 }}"
+    out_interface: eth1
+    protocol: udp
+    source_port: "{{ ephemeral_start }}:{{ ephemeral_end }}"
+    jump: SNAT
+    to_source: "{{ gateway_public_ip }}:{{ ephemeral_start }}-{{ ephemeral_end }}"
+  when: nat_gateway_output.stdout.find(node_private_ip_eth1) == -1
+
+- name: SNAT for outbound from backend to WAN TCP (exclude marked DNAT replies, ephemeral ports only)
+  command: >
+    iptables -t nat -A POSTROUTING
+    -s {{ node_private_ip_eth1 }}
+    -o eth0
+    -m mark ! --mark 1
+    -p tcp
+    --sport {{ ephemeral_start }}:{{ ephemeral_end }}
+    -j SNAT
+    --to-source {{ gateway_public_ip }}:{{ ephemeral_start }}-{{ ephemeral_end }}
+  when: nat_gateway_output.stdout.find(node_private_ip_eth1) == -1
+
+- name: SNAT for outbound from backend to WAN UDP (exclude marked DNAT replies, ephemeral ports only)
+  command: >
+    iptables -t nat -A POSTROUTING
+    -s {{ node_private_ip_eth1 }}
+    -o eth0
+    -m mark ! --mark 1
+    -p udp
+    --sport {{ ephemeral_start }}:{{ ephemeral_end }}
+    -j SNAT
+    --to-source {{ gateway_public_ip }}:{{ ephemeral_start }}-{{ ephemeral_end }}
+  when: nat_gateway_output.stdout.find(node_private_ip_eth1) == -1
+
+- name: persist iptables rules to disk
+  command: service netfilter-persistent save
+  when: nat_gateway_output.stdout.find(node_private_ip_eth1) == -1
