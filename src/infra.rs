@@ -173,10 +173,7 @@ impl InfraRunOptions {
                     get_value_for_resource(&resources, FULL_CONE_NAT_GATEWAY, IMAGE)?;
                 debug!("Nat gateway image: {nat_gateway_image_id:?}");
 
-                (
-                    full_cone_private_node_volume_size,
-                    full_cone_vm_size,
-                )
+                (full_cone_private_node_volume_size, full_cone_vm_size)
             } else {
                 (None, None)
             };
