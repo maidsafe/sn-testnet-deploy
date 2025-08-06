@@ -476,6 +476,7 @@ pub fn build_downloaders_extra_vars_doc(
     }
 
     extra_vars.add_boolean_variable("enable_download_verifier", options.enable_download_verifier);
+    extra_vars.add_boolean_variable("enable_delayed_verifier", options.enable_delayed_verifier);
     extra_vars.add_boolean_variable("enable_random_verifier", options.enable_random_verifier);
     extra_vars.add_boolean_variable(
         "enable_performance_verifier",

@@ -32,7 +32,7 @@
     group: ant
     recurse: yes
   become: true
-  when: enable_download_verifier | bool
+  when: enable_delayed_verifier | bool
 
 - name: ensure the ant users can write to the performance_verifier metrics directory
   ansible.builtin.file:
@@ -87,7 +87,7 @@
     group: ant
     mode: '0644'
   become: true
-  when: not ant_download_verifier_stat.stat.exists and enable_download_verifier | bool
+  when: not ant_download_verifier_stat.stat.exists and enable_delayed_verifier | bool
 
 - name: create ant_performance_verifier systemd service file
   ansible.builtin.template:
@@ -113,7 +113,7 @@
     state: started
     enabled: yes
   become: true
-  when: enable_download_verifier | bool
+  when: enable_delayed_verifier | bool
 
 - name: start and enable ant_performance_verifier services
   ansible.builtin.systemd:

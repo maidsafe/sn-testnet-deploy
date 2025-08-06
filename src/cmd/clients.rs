@@ -709,7 +709,7 @@ pub async fn handle_clients_command(cmd: ClientsCommands) -> Result<()> {
                     desired_symmetric_private_node_count: None,
                     desired_symmetric_private_node_vm_count: None,
                     desired_uploaders_count,
-                    enable_download_verifier: !disable_download_verifier,
+                    enable_delayed_verifier: !disable_download_verifier,
                     enable_random_verifier: !disable_random_verifier,
                     enable_performance_verifier: !disable_performance_verifier,
                     funding_wallet_secret_key,
