@@ -1,0 +1,6 @@
+ant_archive_filename: ant-latest-x86_64-unknown-linux-musl.tar.gz
+binary_dir: /usr/local/bin
+delayed_verifier_chunk_download_batch_size: 16
+log_output_dest: /mnt/client-logs/log/downloads
+random_verifier_chunk_download_batch_size: 16
+performance_verifier_chunk_download_batch_size: 16
