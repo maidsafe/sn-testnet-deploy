@@ -1,0 +1,28 @@
+[Unit]
+Description=Ant Performance Verifier
+After=network.target
+
+[Service]
+{% if evm_network_type == "evm-custom" %}
+Environment="RPC_URL={{ evm_rpc_url }}"
+Environment="PAYMENT_TOKEN_ADDRESS={{ evm_payment_token_address }}"
+Environment="DATA_PAYMENTS_ADDRESS={{ evm_data_payments_address }}"
+{% elif evm_network_type == "evm-arbitrum-sepolia" %}
+Environment="EVM_NETWORK=arbitrum-sepolia"
+{% elif evm_network_type == "evm-arbitrum-one" %}
+Environment="EVM_NETWORK=arbitrum-one"
+{% endif %}
+Environment="CHUNK_DOWNLOAD_BATCH_SIZE={{ performance_verifier_chunk_download_batch_size }}"
+User=ant1
+
+{% if network_id == "1" %}
+ExecStart=/home/ant1/ant_static_downloader.sh --mode performance --csv-path /home/ant1/prod.csv
+{% else %}
+ExecStart=/home/ant1/ant_static_downloader.sh --mode performance --csv-path /home/ant1/prod.csv {% if peer is defined %}--peer "{{ peer }}" {% endif %} {% if network_contacts_url is defined %}--network-contacts-url "{{network_contacts_url}}" {% endif %} {% if network_id is defined %}--network-id "{{network_id}}" {% endif %}
+{% endif %}
+
+Restart=always
+WorkingDirectory=/home/ant1
+
+[Install]
+WantedBy=multi-user.target

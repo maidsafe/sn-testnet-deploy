@@ -1,0 +1,172 @@
+---
+- name: check if ant binary exists
+  ansible.builtin.stat:
+    path: "{{ binary_dir }}/ant"
+  register: ant_binary
+
+- name: download the ant binary
+  ansible.builtin.get_url:
+    url: "{{ ant_archive_url }}"
+    dest: "/tmp/{{ ant_archive_filename }}"
+  when: not ant_binary.stat.exists
+
+- name: extract the ant binary to binary directory
+  ansible.builtin.unarchive:
+    src: "/tmp/{{ ant_archive_filename }}"
+    dest: "{{ binary_dir }}"
+    remote_src: true
+  become: true
+  when: not ant_binary.stat.exists
+
+- name: create ant group
+  ansible.builtin.group:
+    name: ant
+    state: present
+  become: true
+
+- name: create ant1 user
+  ansible.builtin.user:
+    name: ant1
+    shell: /bin/bash
+    group: ant
+    state: present
+  become: true
+
+- name: copy ant_static_downloader.sh to remote
+  ansible.builtin.template:
+    src: ant_static_downloader.sh.j2
+    dest: /home/ant1/ant_static_downloader.sh
+    owner: ant1
+    group: ant
+    mode: '0775'
+  become: true
+  become_user: ant1
+
+- name: ensure the ant users can write to the random_verifier metrics directory
+  ansible.builtin.file:
+    path: "/mnt/ant-storage/logs/download_files/random_verifier/ant1/"
+    state: directory
+    mode: '0775'
+    owner: ant1
+    group: ant
+    recurse: yes
+  become: true
+  when: enable_random_verifier | bool
+
+- name: ensure the ant users can write to the download_verifier metrics directory
+  ansible.builtin.file:
+    path: "/mnt/ant-storage/logs/download_files/download_verifier/ant1/"
+    state: directory
+    mode: '0775'
+    owner: ant1
+    group: ant
+    recurse: yes
+  become: true
+  when: enable_delayed_verifier | bool
+
+- name: ensure the ant users can write to the performance_verifier metrics directory
+  ansible.builtin.file:
+    path: "/mnt/ant-storage/logs/download_files/performance_verifier/ant1/"
+    state: directory
+    mode: '0775'
+    owner: ant1
+    group: ant
+    recurse: yes
+  become: true
+  when: enable_performance_verifier | bool
+
+- name: ensure the ant users can write to the download directory
+  ansible.builtin.file:
+    path: "/mnt/ant-storage/downloaded_files"
+    state: directory
+    mode: '0775'
+    owner: ant1
+    group: ant
+  become: true
+
+- name: ensure the ant users can write to the log output destination
+  ansible.builtin.file:
+    path: "{{ log_output_dest }}"
+    state: directory
+    mode: '0775'
+    owner: root
+    group: ant
+  become: true
+
+- name: copy prod.csv file to remote server
+  ansible.builtin.copy:
+    src: prod.csv
+    dest: /home/ant1/prod.csv
+    owner: ant1
+    group: ant
+    mode: '0644'
+  become: true
+
+- name: Check if systemd ant_random_verifier service file exists
+  ansible.builtin.stat:
+    path: "/etc/systemd/system/ant_random_verifier.service"
+  register: ant_random_verifier_stat
+
+- name: Check if systemd ant_delayed_verifier service file exists
+  ansible.builtin.stat:
+    path: "/etc/systemd/system/ant_delayed_verifier.service"
+  register: ant_delayed_verifier_stat
+
+- name: Check if systemd ant_performance_verifier service file exists
+  ansible.builtin.stat:
+    path: "/etc/systemd/system/ant_performance_verifier.service"
+  register: ant_performance_verifier_stat
+
+- name: create ant_random_verifier systemd service file
+  ansible.builtin.template:
+    src: ant_random_verifier.service.j2
+    dest: "/etc/systemd/system/ant_random_verifier.service"
+    owner: ant1
+    group: ant
+    mode: '0644'
+  become: true
+  when: not ant_random_verifier_stat.stat.exists and enable_random_verifier | bool
+
+- name: create ant_download_verifier systemd service file
+  ansible.builtin.template:
+    src: ant_delayed_verifier.service.j2
+    dest: "/etc/systemd/system/ant_delayed_verifier.service"
+    owner: ant1
+    group: ant
+    mode: '0644'
+  become: true
+  when: not ant_delayed_verifier_stat.stat.exists and enable_delayed_verifier | bool
+
+- name: create ant_performance_verifier systemd service file
+  ansible.builtin.template:
+    src: ant_performance_verifier.service.j2
+    dest: "/etc/systemd/system/ant_performance_verifier.service"
+    owner: ant1
+    group: ant
+    mode: '0644'
+  become: true
+  when: not ant_performance_verifier_stat.stat.exists and enable_performance_verifier | bool
+
+- name: start and enable ant_random_verifier services
+  ansible.builtin.systemd:
+    name: ant_random_verifier
+    state: started
+    enabled: yes
+  become: true
+  when: enable_random_verifier | bool
+
+- name: start and enable ant_delayed_verifier services
+  ansible.builtin.systemd:
+    name: ant_delayed_verifier
+    state: started
+    enabled: yes
+  become: true
+  when: enable_delayed_verifier | bool
+
+- name: start and enable ant_performance_verifier services
+  ansible.builtin.systemd:
+    name: ant_performance_verifier
+    state: started
+    enabled: yes
+  become: true
+  when: enable_performance_verifier | bool
