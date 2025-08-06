@@ -26,7 +26,7 @@ pub struct DeployOptions {
     pub client_vm_count: Option<u16>,
     pub client_vm_size: Option<String>,
     pub current_inventory: DeploymentInventory,
-    pub enable_download_verifier: bool,
+    pub enable_delayed_verifier: bool,
     pub enable_performance_verifier: bool,
     pub enable_random_verifier: bool,
     pub enable_telegraf: bool,
