@@ -1050,6 +1050,31 @@ impl AnsibleProvisioner {
         Ok(())
     }
 
+    pub async fn provision_static_downloaders(
+        &self,
+        options: &ProvisionOptions,
+        genesis_multiaddr: Option<String>,
+        genesis_network_contacts_url: Option<String>,
+    ) -> Result<()> {
+        let start = Instant::now();
+
+        println!("Running ansible against client machine to start the static downloaders.");
+        debug!("Running ansible against client machine to start the static downloaders.");
+
+        self.ansible_runner.run_playbook(
+            AnsiblePlaybook::StaticDownloaders,
+            AnsibleInventoryType::Clients,
+            Some(extra_vars::build_downloaders_extra_vars_doc(
+                &self.cloud_provider.to_string(),
+                options,
+                genesis_multiaddr,
+                genesis_network_contacts_url,
+            )?),
+        )?;
+        print_duration(start.elapsed());
+        Ok(())
+    }
+
     pub async fn provision_clients(
         &self,
         options: &ProvisionOptions,
