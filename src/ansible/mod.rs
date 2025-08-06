@@ -146,6 +146,10 @@ pub enum AnsiblePlaybook {
     ///
     /// Use in combination with `AnsibleInventoryType::Clients`.
     StartDownloaders,
+    /// The static downloaders playbook will setup static downloader scripts on the Client VMs.
+    ///
+    /// Use in combination with `AnsibleInventoryType::Clients`.
+    StaticDownloaders,
     /// This playbook will start the faucet for the environment.
     StartFaucet,
     /// This playbook will start the Telegraf service on each machine.
@@ -234,6 +238,7 @@ impl AnsiblePlaybook {
             AnsiblePlaybook::RpcClient => "safenode_rpc_client.yml".to_string(),
             AnsiblePlaybook::ResetToNNodes => "reset_to_n_nodes.yml".to_string(),
             AnsiblePlaybook::StartDownloaders => "start_downloaders.yml".to_string(),
+            AnsiblePlaybook::StaticDownloaders => "static_downloaders.yml".to_string(),
             AnsiblePlaybook::StartFaucet => "start_faucet.yml".to_string(),
             AnsiblePlaybook::StartNodes => "start_nodes.yml".to_string(),
             AnsiblePlaybook::StartTelegraf => "start_telegraf.yml".to_string(),

@@ -401,6 +401,83 @@ impl ClientsDeployer {
         Ok(())
     }
 
+    pub async fn deploy_static_downloaders(&self, options: ClientsDeployOptions) -> Result<()> {
+        println!(
+            "Deploying static downloaders for environment: {}",
+            self.environment_name
+        );
+
+        let build_custom_binaries = options.binary_option.should_provision_build_machine();
+
+        let start = Instant::now();
+        println!("Initializing infrastructure...");
+
+        let infra_options = ClientsInfraRunOptions {
+            client_image_id: None,
+            client_vm_count: options.client_vm_count,
+            client_vm_size: options.client_vm_size.clone(),
+            enable_build_vm: build_custom_binaries,
+            name: options.name.clone(),
+            tfvars_filenames: options.current_inventory.get_tfvars_filenames(),
+        };
+
+        self.create_or_update_infra(&infra_options)?;
+
+        write_environment_details(
+            &self.s3_repository,
+            &options.name,
+            &EnvironmentDetails {
+                deployment_type: DeploymentType::Client,
+                environment_type: options.environment_type.clone(),
+                evm_details: EvmDetails {
+                    network: options.evm_details.network.clone(),
+                    data_payments_address: options.evm_details.data_payments_address.clone(),
+                    payment_token_address: options.evm_details.payment_token_address.clone(),
+                    rpc_url: options.evm_details.rpc_url.clone(),
+                },
+                funding_wallet_address: None,
+                network_id: options.network_id,
+                region: self.region.clone(),
+                rewards_address: None,
+            },
+        )
+        .await?;
+
+        println!("Provisioning static downloaders with Ansible...");
+        let provision_options = ProvisionOptions::from(options.clone());
+
+        if build_custom_binaries {
+            self.ansible_provisioner
+                .print_ansible_run_banner("Build Custom Binaries");
+            self.ansible_provisioner
+                .build_autonomi_binaries(&provision_options, Some(vec!["ant".to_string()]))
+                .map_err(|err| {
+                    println!("Failed to build safe network binaries {err:?}");
+                    err
+                })?;
+        }
+
+        self.ansible_provisioner
+            .print_ansible_run_banner("Provision Static Downloaders");
+        self.ansible_provisioner
+            .provision_static_downloaders(
+                &provision_options,
+                options.peer.clone(),
+                options.network_contacts_url.clone(),
+            )
+            .await
+            .map_err(|err| {
+                println!("Failed to provision static downloaders {err:?}");
+                err
+            })?;
+
+        println!(
+            "Static downloader deployment completed successfully in {:?}",
+            start.elapsed()
+        );
+        Ok(())
+    }
+
     async fn destroy_infra(&self, environment_details: &EnvironmentDetails) -> Result<()> {
         crate::infra::select_workspace(&self.terraform_runner, &self.environment_name)?;
 
