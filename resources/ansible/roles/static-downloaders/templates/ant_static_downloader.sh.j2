@@ -336,6 +336,10 @@ download_file() {
 current_line_index=2
 TOTAL_LINES=$(wc -l < "$CSV_PATH")
 
+SLEEP_DURATION=900  # 15 minutes
+HOURLY_SLEEP_INTERVAL=3600  # 1 hour
+last_sleep_time=$(date +%s)
+
 echo "CSV file: $CSV_PATH"
 echo "Total lines in CSV: $TOTAL_LINES"
 echo "Mode: $MODE"
@@ -375,7 +379,9 @@ while true; do
     delayed)
       if [[ $current_line_index -gt $TOTAL_LINES ]]; then
         current_line_index=2
-        echo "Reached end of CSV, cycling back to beginning"
+        echo "Completed full cycle: sleeping for $((SLEEP_DURATION / 60)) minutes..."
+        echo "Returning to the beginning of the 16 files."
+        sleep $SLEEP_DURATION
       fi
       
       current_line=$(sed -n "${current_line_index}p" "$CSV_PATH")
@@ -399,12 +405,20 @@ while true; do
       ;;
   esac
 
-  if [[ -n "$file_ref" ]]; then
-    echo "Downloading file: $file_name"
-    download_file "$file_ref" "$file_hash" "$file_size"
-    sleep "$SLEEP_INTERVAL"
-  else
-    echo "Selected line is empty. Retrying in 5 seconds..."
-    sleep 5
+  echo "Downloading file: $file_name"
+  download_file "$file_ref" "$file_hash" "$file_size"
+  
+  # Check if it's time for hourly sleep
+  if [[ "$MODE" == "performance" || "$MODE" == "random" ]]; then
+    current_time=$(date +%s)
+    time_since_last_sleep=$((current_time - last_sleep_time))
+    
+    if [[ $time_since_last_sleep -ge $HOURLY_SLEEP_INTERVAL ]]; then
+      echo "Hourly bandwidth break: sleeping for $((SLEEP_DURATION / 60)) minutes..."
+      sleep $SLEEP_DURATION
+      last_sleep_time=$(date +%s)
+    fi
   fi
+  
+  sleep "$SLEEP_INTERVAL"
 done
