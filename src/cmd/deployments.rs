@@ -513,11 +513,11 @@ pub async fn handle_upscale(
             "The funding wallet secret key is required to upscale the Clients"
         ));
     }
-    if branch.is_some() {
+    if let Some(branch) = branch {
         println!("The upscale will use the binaries built in the original deployment");
         inventory.binary_option = BinaryOption::BuildFromSource {
             antnode_features: None,
-            branch: branch.unwrap(),
+            branch,
             repo_owner: repo_owner.unwrap(),
             skip_binary_build,
         };
