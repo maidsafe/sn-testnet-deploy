@@ -512,6 +512,24 @@ pub fn build_downloaders_extra_vars_doc(
     if let Some(network_id) = options.network_id {
         extra_vars.add_variable("network_id", &network_id.to_string());
     }
+    if let Some(delayed_verifier_batch_size) = options.delayed_verifier_batch_size {
+        extra_vars.add_variable(
+            "delayed_verifier_batch_size",
+            &delayed_verifier_batch_size.to_string(),
+        );
+    }
+    if let Some(performance_verifier_batch_size) = options.performance_verifier_batch_size {
+        extra_vars.add_variable(
+            "performance_verifier_batch_size",
+            &performance_verifier_batch_size.to_string(),
+        );
+    }
+    if let Some(random_verifier_batch_size) = options.random_verifier_batch_size {
+        extra_vars.add_variable(
+            "random_verifier_batch_size",
+            &random_verifier_batch_size.to_string(),
+        );
+    }
 
     Ok(extra_vars.build())
 }

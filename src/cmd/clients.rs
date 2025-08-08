@@ -273,6 +273,9 @@ pub enum ClientsCommands {
         /// Override the size of the client VMs.
         #[clap(long)]
         client_vm_size: Option<String>,
+        /// The batch size for the delayed verifier downloader.
+        #[clap(long)]
+        delayed_verifier_batch_size: Option<u16>,
         /// Set to disable the delayed-verifier downloader on the VMs.
         #[clap(long)]
         disable_delayed_verifier: bool,
@@ -295,6 +298,12 @@ pub enum ClientsCommands {
         /// The default is 'development'.
         #[clap(long, default_value_t = EnvironmentType::Development, value_parser = parse_deployment_type, verbatim_doc_comment)]
         environment_type: EnvironmentType,
+        /// The batch size for the performance verifier downloader.
+        #[clap(long)]
+        performance_verifier_batch_size: Option<u16>,
+        /// The batch size for the random verifier downloader.
+        #[clap(long)]
+        random_verifier_batch_size: Option<u16>,
         /// The address of the data payments contract.
         #[arg(long)]
         evm_data_payments_address: Option<String>,
@@ -655,6 +664,7 @@ pub async fn handle_clients_command(cmd: ClientsCommands) -> Result<()> {
                 client_vm_count,
                 client_vm_size,
                 current_inventory: inventory,
+                delayed_verifier_batch_size: None,
                 enable_delayed_verifier: !disable_download_verifier,
                 enable_performance_verifier: !disable_performance_verifier,
                 enable_random_verifier: !disable_random_verifier,
@@ -676,6 +686,8 @@ pub async fn handle_clients_command(cmd: ClientsCommands) -> Result<()> {
                 network_id: Some(network_id),
                 output_inventory_dir_path: client_deployer.working_directory_path.join("inventory"),
                 peer,
+                performance_verifier_batch_size: None,
+                random_verifier_batch_size: None,
                 upload_interval,
                 upload_size: Some(upload_size),
                 uploaders_count,
@@ -699,6 +711,7 @@ pub async fn handle_clients_command(cmd: ClientsCommands) -> Result<()> {
             client_env_variables,
             client_vm_count,
             client_vm_size,
+            delayed_verifier_batch_size,
             disable_delayed_verifier,
             disable_performance_verifier,
             disable_random_verifier,
@@ -713,7 +726,9 @@ pub async fn handle_clients_command(cmd: ClientsCommands) -> Result<()> {
             network_id,
             network_contacts_url,
             peer,
+            performance_verifier_batch_size,
             provider,
+            random_verifier_batch_size,
             region,
             repo_owner,
             skip_binary_build,
@@ -795,6 +810,7 @@ pub async fn handle_clients_command(cmd: ClientsCommands) -> Result<()> {
                 client_vm_size: client_vm_size
                     .or_else(|| Some("s-8vcpu-32gb-640gb-intel".to_string())),
                 current_inventory: inventory,
+                delayed_verifier_batch_size,
                 enable_delayed_verifier: !disable_delayed_verifier,
                 enable_performance_verifier: !disable_performance_verifier,
                 enable_random_verifier: !disable_random_verifier,
@@ -816,6 +832,8 @@ pub async fn handle_clients_command(cmd: ClientsCommands) -> Result<()> {
                 network_id: Some(network_id),
                 output_inventory_dir_path: client_deployer.working_directory_path.join("inventory"),
                 peer,
+                performance_verifier_batch_size,
+                random_verifier_batch_size,
                 upload_interval: 10,
                 upload_size: None,
                 uploaders_count: 0,
