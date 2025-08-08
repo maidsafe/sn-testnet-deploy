@@ -190,6 +190,7 @@ impl TestnetDeployer {
             binary_option: options.current_inventory.binary_option.clone(),
             chunk_size: None,
             client_env_variables: None,
+            delayed_verifier_batch_size: None,
             enable_delayed_verifier: options.enable_delayed_verifier,
             enable_performance_verifier: options.enable_performance_verifier,
             enable_random_verifier: options.enable_random_verifier,
@@ -240,7 +241,9 @@ impl TestnetDeployer {
                 .join("ansible")
                 .join("inventory"),
             peer_cache_node_count: desired_peer_cache_node_count,
+            performance_verifier_batch_size: None,
             public_rpc: options.public_rpc,
+            random_verifier_batch_size: None,
             rewards_address: options
                 .current_inventory
                 .environment_details
@@ -516,6 +519,7 @@ impl TestnetDeployer {
             binary_option: options.current_inventory.binary_option.clone(),
             chunk_size: None,
             client_env_variables: None,
+            delayed_verifier_batch_size: None,
             enable_delayed_verifier: options.enable_delayed_verifier,
             enable_random_verifier: options.enable_random_verifier,
             enable_performance_verifier: options.enable_performance_verifier,
@@ -566,7 +570,9 @@ impl TestnetDeployer {
                 .join("ansible")
                 .join("inventory"),
             peer_cache_node_count: 0,
+            performance_verifier_batch_size: None,
             public_rpc: options.public_rpc,
+            random_verifier_batch_size: None,
             rewards_address: options
                 .current_inventory
                 .environment_details

@@ -12,7 +12,7 @@ Environment="EVM_NETWORK=arbitrum-sepolia"
 {% elif evm_network_type == "evm-arbitrum-one" %}
 Environment="EVM_NETWORK=arbitrum-one"
 {% endif %}
-Environment="CHUNK_DOWNLOAD_BATCH_SIZE={{ delayed_verifier_chunk_download_batch_size }}"
+Environment="CHUNK_DOWNLOAD_BATCH_SIZE={{ delayed_verifier_batch_size }}"
 User=ant1
 {% if network_id == "1" %}
 ExecStart=/home/ant1/ant_static_downloader.sh --mode delayed --csv-path /home/ant1/prod.csv
