@@ -273,6 +273,15 @@ pub enum ClientsCommands {
         /// Override the size of the client VMs.
         #[clap(long)]
         client_vm_size: Option<String>,
+        /// Set to disable the delayed-verifier downloader on the VMs.
+        #[clap(long)]
+        disable_delayed_verifier: bool,
+        /// Set to disable the performance-verifier downloader on the VMs.
+        #[clap(long)]
+        disable_performance_verifier: bool,
+        /// Set to disable the random-verifier downloader on the VMs.
+        #[clap(long)]
+        disable_random_verifier: bool,
         /// Set to disable Telegraf metrics collection on all nodes.
         #[clap(long)]
         disable_telegraf: bool,
@@ -690,6 +699,9 @@ pub async fn handle_clients_command(cmd: ClientsCommands) -> Result<()> {
             client_env_variables,
             client_vm_count,
             client_vm_size,
+            disable_delayed_verifier,
+            disable_performance_verifier,
+            disable_random_verifier,
             disable_telegraf,
             environment_type,
             evm_data_payments_address,
@@ -783,9 +795,9 @@ pub async fn handle_clients_command(cmd: ClientsCommands) -> Result<()> {
                 client_vm_size: client_vm_size
                     .or_else(|| Some("s-8vcpu-32gb-640gb-intel".to_string())),
                 current_inventory: inventory,
-                enable_delayed_verifier: true,
-                enable_performance_verifier: true,
-                enable_random_verifier: true,
+                enable_delayed_verifier: !disable_delayed_verifier,
+                enable_performance_verifier: !disable_performance_verifier,
+                enable_random_verifier: !disable_random_verifier,
                 enable_telegraf: !disable_telegraf,
                 enable_uploaders: false,
                 environment_type,
