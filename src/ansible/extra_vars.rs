@@ -518,6 +518,12 @@ pub fn build_downloaders_extra_vars_doc(
             &delayed_verifier_batch_size.to_string(),
         );
     }
+    if let Some(delayed_verifier_quorum_value) = &options.delayed_verifier_quorum_value {
+        extra_vars.add_variable(
+            "delayed_verifier_quorum_value",
+            delayed_verifier_quorum_value,
+        );
+    }
     if let Some(performance_verifier_batch_size) = options.performance_verifier_batch_size {
         extra_vars.add_variable(
             "performance_verifier_batch_size",

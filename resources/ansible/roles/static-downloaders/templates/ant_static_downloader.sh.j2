@@ -262,7 +262,7 @@ download_file() {
     
     quorum_arg=""
     if [[ "$MODE" == "delayed" ]]; then
-      quorum_arg="--quorum majority"
+      quorum_arg="--quorum {{ delayed_verifier_quorum_value }}"
     fi
 
     timestamp=$(date +"%Y%m%d_%H%M%S")
