@@ -5,3 +5,4 @@ delayed_verifier_quorum_value: majority
 log_output_dest: /mnt/client-logs/log/downloads
 random_verifier_batch_size: 16
 performance_verifier_batch_size: 16
+sleep_duration: 900

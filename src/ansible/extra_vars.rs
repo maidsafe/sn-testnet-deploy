@@ -536,6 +536,9 @@ pub fn build_downloaders_extra_vars_doc(
             &random_verifier_batch_size.to_string(),
         );
     }
+    if let Some(sleep_duration) = options.sleep_duration {
+        extra_vars.add_variable("sleep_duration", &sleep_duration.to_string());
+    }
 
     Ok(extra_vars.build())
 }

@@ -383,6 +383,9 @@ pub enum ClientsCommands {
         /// This is useful to re-run any failed deployments without rebuilding the binaries.
         #[arg(long, default_value_t = false)]
         skip_binary_build: bool,
+        /// Sleep duration in seconds for downloader services.
+        #[arg(long)]
+        sleep_duration: Option<u16>,
     },
     /// Enable downloaders on all client VMs in an environment.
     EnableDownloaders {
@@ -698,6 +701,7 @@ pub async fn handle_clients_command(cmd: ClientsCommands) -> Result<()> {
                 random_verifier_batch_size: None,
                 upload_interval,
                 upload_size: Some(upload_size),
+                sleep_duration: None,
                 uploaders_count,
                 wallet_secret_keys: if wallet_secret_key.is_empty() {
                     None
@@ -742,6 +746,7 @@ pub async fn handle_clients_command(cmd: ClientsCommands) -> Result<()> {
             region,
             repo_owner,
             skip_binary_build,
+            sleep_duration,
         } => {
             if (branch.is_some() && repo_owner.is_none())
                 || (branch.is_none() && repo_owner.is_some())
@@ -847,6 +852,7 @@ pub async fn handle_clients_command(cmd: ClientsCommands) -> Result<()> {
                 random_verifier_batch_size,
                 upload_interval: 10,
                 upload_size: None,
+                sleep_duration,
                 uploaders_count: 0,
                 wallet_secret_keys: None,
             };
