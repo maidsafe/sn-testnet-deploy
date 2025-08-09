@@ -302,12 +302,6 @@ pub enum ClientsCommands {
         /// The default is 'development'.
         #[clap(long, default_value_t = EnvironmentType::Development, value_parser = parse_deployment_type, verbatim_doc_comment)]
         environment_type: EnvironmentType,
-        /// The batch size for the performance verifier downloader.
-        #[clap(long)]
-        performance_verifier_batch_size: Option<u16>,
-        /// The batch size for the random verifier downloader.
-        #[clap(long)]
-        random_verifier_batch_size: Option<u16>,
         /// The address of the data payments contract.
         #[arg(long)]
         evm_data_payments_address: Option<String>,
@@ -326,6 +320,9 @@ pub enum ClientsCommands {
         /// This argument only applies if the EVM network type is 'custom'.
         #[arg(long)]
         evm_rpc_url: Option<String>,
+        /// The address of the file to download for verification.
+        #[arg(long)]
+        file_address: Option<String>,
         /// Override the maximum number of forks Ansible will use to execute tasks on target hosts.
         ///
         /// The default value from ansible.cfg is 50.
@@ -353,11 +350,17 @@ pub enum ClientsCommands {
         /// Should be in the form of a multiaddr.
         #[arg(long)]
         peer: Option<String>,
+        /// The batch size for the performance verifier downloader.
+        #[clap(long)]
+        performance_verifier_batch_size: Option<u16>,
         /// The cloud provider to deploy to.
         ///
         /// Valid values are "aws" or "digital-ocean".
         #[clap(long, default_value_t = CloudProvider::DigitalOcean, value_parser = parse_provider, verbatim_doc_comment)]
         provider: CloudProvider,
+        /// The batch size for the random verifier downloader.
+        #[clap(long)]
+        random_verifier_batch_size: Option<u16>,
         /// The region to deploy to.
         ///
         /// Defaults to "lon1" for Digital Ocean.
@@ -727,6 +730,7 @@ pub async fn handle_clients_command(cmd: ClientsCommands) -> Result<()> {
             evm_network_type,
             evm_payment_token_address,
             evm_rpc_url,
+            file_address,
             forks,
             name,
             network_id,
@@ -827,7 +831,7 @@ pub async fn handle_clients_command(cmd: ClientsCommands) -> Result<()> {
                 evm_details,
                 expected_hash: None,
                 expected_size: None,
-                file_address: None,
+                file_address,
                 funding_wallet_secret_key: None,
                 initial_gas: None,
                 initial_tokens: None,
