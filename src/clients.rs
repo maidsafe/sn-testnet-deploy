@@ -36,6 +36,7 @@ pub struct ClientsDeployOptions {
     pub client_vm_size: Option<String>,
     pub current_inventory: ClientsDeploymentInventory,
     pub delayed_verifier_batch_size: Option<u16>,
+    pub delayed_verifier_quorum_value: Option<String>,
     pub enable_delayed_verifier: bool,
     pub enable_performance_verifier: bool,
     pub enable_random_verifier: bool,

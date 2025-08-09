@@ -276,6 +276,10 @@ pub enum ClientsCommands {
         /// The batch size for the delayed verifier downloader.
         #[clap(long)]
         delayed_verifier_batch_size: Option<u16>,
+        /// The quorum value for the delayed verifier downloader.
+        /// Can be "majority", "all", or a custom number.
+        #[clap(long)]
+        delayed_verifier_quorum_value: Option<String>,
         /// Set to disable the delayed-verifier downloader on the VMs.
         #[clap(long)]
         disable_delayed_verifier: bool,
@@ -665,6 +669,7 @@ pub async fn handle_clients_command(cmd: ClientsCommands) -> Result<()> {
                 client_vm_size,
                 current_inventory: inventory,
                 delayed_verifier_batch_size: None,
+                delayed_verifier_quorum_value: None,
                 enable_delayed_verifier: !disable_download_verifier,
                 enable_performance_verifier: !disable_performance_verifier,
                 enable_random_verifier: !disable_random_verifier,
@@ -712,6 +717,7 @@ pub async fn handle_clients_command(cmd: ClientsCommands) -> Result<()> {
             client_vm_count,
             client_vm_size,
             delayed_verifier_batch_size,
+            delayed_verifier_quorum_value,
             disable_delayed_verifier,
             disable_performance_verifier,
             disable_random_verifier,
@@ -811,6 +817,7 @@ pub async fn handle_clients_command(cmd: ClientsCommands) -> Result<()> {
                     .or_else(|| Some("s-8vcpu-32gb-640gb-intel".to_string())),
                 current_inventory: inventory,
                 delayed_verifier_batch_size,
+                delayed_verifier_quorum_value,
                 enable_delayed_verifier: !disable_delayed_verifier,
                 enable_performance_verifier: !disable_performance_verifier,
                 enable_random_verifier: !disable_random_verifier,
