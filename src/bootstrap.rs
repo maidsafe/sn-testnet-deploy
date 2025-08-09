@@ -128,8 +128,8 @@ impl TestnetDeployer {
             .print_ansible_run_banner("Provision Normal Nodes");
         match self.ansible_provisioner.provision_nodes(
             &provision_options,
-            options.peer.clone(),
-            options.network_contacts_url.clone(),
+            options.peer.iter().cloned().collect(),
+            options.network_contacts_url.iter().cloned().collect(),
             NodeType::Generic,
         ) {
             Ok(()) => {
@@ -150,8 +150,8 @@ impl TestnetDeployer {
         if private_node_inventory.should_provision_full_cone_private_nodes() {
             match self.ansible_provisioner.provision_full_cone(
                 &provision_options,
-                options.peer.clone(),
-                options.network_contacts_url.clone(),
+                options.peer.iter().cloned().collect(),
+                options.network_contacts_url.iter().cloned().collect(),
                 private_node_inventory.clone(),
                 None,
             ) {
@@ -179,8 +179,8 @@ impl TestnetDeployer {
                 .print_ansible_run_banner("Provision Symmetric Private Nodes");
             match self.ansible_provisioner.provision_symmetric_private_nodes(
                 &mut provision_options,
-                options.peer.clone(),
-                options.network_contacts_url.clone(),
+                options.peer.iter().cloned().collect(),
+                options.network_contacts_url.iter().cloned().collect(),
                 &private_node_inventory,
             ) {
                 Ok(()) => {
