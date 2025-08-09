@@ -97,7 +97,6 @@ if [[ ! -f "$CSV_PATH" ]]; then
 fi
 
 DOWNLOAD_DIR="/mnt/ant-storage/downloaded_files"
-SLEEP_INTERVAL=20
 FILE_REF_INDEX=1
 FILE_HASH_INDEX=2
 FILE_SIZE_INDEX=3
@@ -336,8 +335,8 @@ download_file() {
 current_line_index=2
 TOTAL_LINES=$(wc -l < "$CSV_PATH")
 
-SLEEP_DURATION=900  # 15 minutes
-HOURLY_SLEEP_INTERVAL=3600  # 1 hour
+SLEEP_DURATION={{ sleep_duration }}
+HOURLY_SLEEP_INTERVAL=3600
 last_sleep_time=$(date +%s)
 
 echo "CSV file: $CSV_PATH"
@@ -419,6 +418,4 @@ while true; do
       last_sleep_time=$(date +%s)
     fi
   fi
-  
-  sleep "$SLEEP_INTERVAL"
 done

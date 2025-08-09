@@ -250,6 +250,7 @@ impl TestnetDeployer {
                 .environment_details
                 .rewards_address
                 .clone(),
+            sleep_duration: None,
             symmetric_private_node_count: desired_symmetric_private_node_count,
             token_amount: None,
             upload_size: None,
@@ -580,6 +581,7 @@ impl TestnetDeployer {
                 .environment_details
                 .rewards_address
                 .clone(),
+            sleep_duration: None,
             symmetric_private_node_count: 0,
             token_amount: options.token_amount,
             uploaders_count: options.desired_uploaders_count,

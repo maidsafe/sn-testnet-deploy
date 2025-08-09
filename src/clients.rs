@@ -63,6 +63,7 @@ pub struct ClientsDeployOptions {
     pub uploaders_count: u16,
     pub upload_size: Option<u16>,
     pub upload_interval: u16,
+    pub sleep_duration: Option<u16>,
     pub wallet_secret_keys: Option<Vec<String>>,
 }
 
