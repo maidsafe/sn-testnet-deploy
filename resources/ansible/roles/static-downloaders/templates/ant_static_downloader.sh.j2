@@ -269,7 +269,13 @@ download_file() {
     log_output_arg="--log-output-dest $log_file_path"
     
     start_time=$(date +%s%N)
-    ant $CONTACT_PEER_ARG $NETWORK_CONTACTS_URL_ARG $NETWORK_ID_ARG $log_output_arg file download "$file_ref" "$download_path" $quorum_arg 2>&1
+    ant $CONTACT_PEER_ARG \
+        $NETWORK_CONTACTS_URL_ARG \
+        $NETWORK_ID_ARG \
+        $log_output_arg \
+        file download "$file_ref" "$download_path" \
+        $quorum_arg \
+        --disable-cache
     exit_code=$?
     end_time=$(date +%s%N)
     echo "Exit code: $exit_code"
