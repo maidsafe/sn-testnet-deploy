@@ -102,6 +102,9 @@ FILE_HASH_INDEX=2
 FILE_SIZE_INDEX=3
 FILE_NAME_INDEX=4
 
+# State file to persist line index for delayed mode resume functionality
+STATE_FILE_PATH="/mnt/ant-storage/state/downloader_state_${USER}.txt"
+
 case "$MODE" in
   performance)
     DOWNLOAD_METRICS_DIR="/mnt/ant-storage/logs/download_files/performance_verifier/${USER}"
@@ -145,6 +148,27 @@ if ! command -v ant &> /dev/null; then
   echo "Error: 'ant' not found in PATH."
   exit 1
 fi
+
+save_line_index() {
+  local index=$1
+  if [[ "$MODE" == "delayed" ]]; then
+    mkdir -p "$(dirname "$STATE_FILE_PATH")"
+    echo "$index" > "$STATE_FILE_PATH"
+  fi
+}
+
+load_line_index() {
+  if [[ "$MODE" == "delayed" && -f "$STATE_FILE_PATH" ]]; then
+    local saved_index=$(cat "$STATE_FILE_PATH")
+    if [[ "$saved_index" =~ ^[0-9]+$ ]]; then
+      echo "$saved_index"
+    else
+      echo "2"
+    fi
+  else
+    echo "2"
+  fi
+}
 
 get_error_enum() {
   local exit_code=$1
@@ -332,7 +356,7 @@ download_file() {
   )
 }
 
-current_line_index=2
+current_line_index=$(load_line_index)
 TOTAL_LINES=$(wc -l < "$CSV_PATH")
 
 SLEEP_DURATION={{ sleep_duration }}
@@ -406,6 +430,10 @@ while true; do
 
   echo "Downloading file: $file_name"
   download_file "$file_ref" "$file_hash" "$file_size"
+  
+  if [[ "$MODE" == "delayed" ]]; then
+    save_line_index "$current_line_index"
+  fi
   
   # Check if it's time for hourly sleep
   if [[ "$MODE" == "performance" || "$MODE" == "random" ]]; then
