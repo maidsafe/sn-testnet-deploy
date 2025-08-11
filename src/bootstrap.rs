@@ -41,6 +41,9 @@ pub struct BootstrapOptions {
     pub node_volume_size: Option<u16>,
     pub output_inventory_dir_path: PathBuf,
     pub peer: Option<String>,
+    pub port_restricted_cone_private_node_count: u16,
+    pub port_restricted_cone_private_node_vm_count: Option<u16>,
+    pub port_restricted_cone_private_node_volume_size: Option<u16>,
     pub region: String,
     pub rewards_address: String,
     pub symmetric_private_node_count: u16,
@@ -95,6 +98,9 @@ impl TestnetDeployer {
             peer_cache_node_vm_count: Some(0),
             peer_cache_node_vm_size: None,
             peer_cache_node_volume_size: None,
+            port_restricted_cone_nat_gateway_vm_size: None, // We can take the value from tfvars for bootstrap deployments.
+            port_restricted_cone_private_node_vm_count: options.port_restricted_cone_private_node_vm_count,
+            port_restricted_cone_private_node_volume_size: options.port_restricted_cone_private_node_volume_size,
             region: options.region.clone(),
             symmetric_nat_gateway_vm_size: None, // We can take the value from tfvars for bootstrap deployments.
             symmetric_private_node_vm_count: options.symmetric_private_node_vm_count,
@@ -144,6 +150,7 @@ impl TestnetDeployer {
         let private_node_inventory = PrivateNodeProvisionInventory::new(
             &self.ansible_provisioner,
             options.full_cone_private_node_vm_count,
+            None,
             options.symmetric_private_node_vm_count,
         )?;
 

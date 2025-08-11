@@ -1,0 +1,6 @@
+---
+- name: provision port restricted cone nat gateway
+  hosts: all
+  become: True
+  roles:
+    - port_restricted_cone_nat_gateway

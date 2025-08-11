@@ -176,6 +176,7 @@ pub async fn handle_update_peer_command(
             Some(NodeType::Genesis) => AnsibleInventoryType::Genesis,
             Some(NodeType::Generic) => AnsibleInventoryType::Nodes,
             Some(NodeType::PeerCache) => AnsibleInventoryType::PeerCacheNodes,
+            Some(NodeType::PortRestrictedConePrivateNode) => AnsibleInventoryType::PortRestrictedConePrivateNodes,
             Some(NodeType::SymmetricPrivateNode) => AnsibleInventoryType::SymmetricPrivateNodes,
             None => AnsibleInventoryType::Nodes,
         };

@@ -29,6 +29,11 @@ variable "symmetric_nat_gateway_droplet_size" {
   default = "s-1vcpu-2gb"
 }
 
+variable "port_restricted_cone_nat_gateway_droplet_size" {
+  description = "The size of the droplet for Port Restricted Cone NAT gateway VM"
+  default = "s-1vcpu-2gb"
+}
+
 variable "node_droplet_size" {
   description = "The size of the droplet for generic nodes VMs"
   default = "s-2vcpu-4gb"
@@ -97,6 +102,11 @@ variable "symmetric_private_node_vm_count" {
   description = "The number of droplets to launch for symmetric private nodes"
 }
 
+variable "port_restricted_cone_private_node_vm_count" {
+  default     = 1
+  description = "The number of droplets to launch for port restricted cone private nodes"
+}
+
 variable "ant_client_vm_count" {
   default     = 2
   description = "The number of droplets to launch for the ANT Clients"
@@ -154,6 +164,12 @@ variable "full_cone_private_node_volume_size" {
 
 variable "symmetric_private_node_volume_size" {
   description = "Size of each volume in GB for symmetric private nodes"
+  type        = number
+  default = 0
+}
+
+variable "port_restricted_cone_private_node_volume_size" {
+  description = "Size of each volume in GB for port restricted cone private nodes"
   type        = number
   default = 0
 }

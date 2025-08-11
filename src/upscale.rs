@@ -30,6 +30,8 @@ pub struct UpscaleOptions {
     pub desired_node_vm_count: Option<u16>,
     pub desired_peer_cache_node_count: Option<u16>,
     pub desired_peer_cache_node_vm_count: Option<u16>,
+    pub desired_port_restricted_cone_private_node_count: Option<u16>,
+    pub desired_port_restricted_cone_private_node_vm_count: Option<u16>,
     pub desired_symmetric_private_node_count: Option<u16>,
     pub desired_symmetric_private_node_vm_count: Option<u16>,
     pub desired_uploaders_count: Option<u16>,
@@ -106,6 +108,16 @@ impl TestnetDeployer {
         }
         debug!("Using {desired_symmetric_private_node_vm_count} for desired full cone private node VM count");
 
+        let desired_port_restricted_cone_private_node_vm_count = options
+            .desired_port_restricted_cone_private_node_vm_count
+            .unwrap_or(options.current_inventory.port_restricted_cone_private_node_vms.len() as u16);
+        if desired_port_restricted_cone_private_node_vm_count
+            < options.current_inventory.port_restricted_cone_private_node_vms.len() as u16
+        {
+            return Err(Error::InvalidUpscaleDesiredPortRestrictedConePrivateNodeVmCount);
+        }
+        debug!("Using {desired_port_restricted_cone_private_node_vm_count} for desired port restricted cone private node VM count");
+
         let desired_client_vm_count = options
             .desired_client_vm_count
             .unwrap_or(options.current_inventory.client_vms.len() as u16);
@@ -155,6 +167,18 @@ impl TestnetDeployer {
             "Using {desired_symmetric_private_node_count} for desired symmetric private node count"
         );
 
+        let desired_port_restricted_cone_private_node_count = options
+            .desired_port_restricted_cone_private_node_count
+            .unwrap_or(options.current_inventory.port_restricted_cone_private_node_count() as u16);
+        if desired_port_restricted_cone_private_node_count
+            < options.current_inventory.port_restricted_cone_private_node_count() as u16
+        {
+            return Err(Error::InvalidUpscaleDesiredPortRestrictedConePrivateNodeCount);
+        }
+        debug!(
+            "Using {desired_port_restricted_cone_private_node_count} for desired port restricted cone private node count"
+        );
+
         let mut infra_run_options = InfraRunOptions::generate_existing(
             &options.current_inventory.name,
             &options.current_inventory.environment_details.region,
@@ -168,6 +192,8 @@ impl TestnetDeployer {
             Some(desired_full_cone_private_node_vm_count);
         infra_run_options.symmetric_private_node_vm_count =
             Some(desired_symmetric_private_node_vm_count);
+        infra_run_options.port_restricted_cone_private_node_vm_count =
+            Some(desired_port_restricted_cone_private_node_vm_count);
         infra_run_options.client_vm_count = Some(desired_client_vm_count);
 
         if options.plan {
@@ -240,6 +266,7 @@ impl TestnetDeployer {
                 .join("ansible")
                 .join("inventory"),
             peer_cache_node_count: desired_peer_cache_node_count,
+            port_restricted_cone_private_node_count: desired_port_restricted_cone_private_node_count,
             public_rpc: options.public_rpc,
             rewards_address: options
                 .current_inventory
@@ -319,6 +346,7 @@ impl TestnetDeployer {
         let private_node_inventory = PrivateNodeProvisionInventory::new(
             &self.ansible_provisioner,
             Some(desired_full_cone_private_node_vm_count),
+            None,
             Some(desired_symmetric_private_node_vm_count),
         )?;
 
@@ -566,6 +594,7 @@ impl TestnetDeployer {
                 .join("ansible")
                 .join("inventory"),
             peer_cache_node_count: 0,
+            port_restricted_cone_private_node_count: 0,
             public_rpc: options.public_rpc,
             rewards_address: options
                 .current_inventory

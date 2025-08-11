@@ -441,6 +441,8 @@ impl DeploymentInventoryService {
             misc_vms,
             node_vms: generic_node_vms,
             peer_cache_node_vms,
+            port_restricted_cone_nat_gateway_vms: Vec::new(), // TODO: populate from actual inventory when implementing
+            port_restricted_cone_private_node_vms: Vec::new(), // TODO: populate from actual inventory when implementing
             ssh_user: self.cloud_provider.get_ssh_user(),
             ssh_private_key_path: self.ssh_client.private_key_path.clone(),
             symmetric_nat_gateway_vms,
@@ -893,6 +895,8 @@ pub struct DeploymentInventory {
     pub name: String,
     pub node_vms: Vec<NodeVirtualMachine>,
     pub peer_cache_node_vms: Vec<NodeVirtualMachine>,
+    pub port_restricted_cone_nat_gateway_vms: Vec<VirtualMachine>,
+    pub port_restricted_cone_private_node_vms: Vec<NodeVirtualMachine>,
     pub ssh_user: String,
     pub ssh_private_key_path: PathBuf,
     pub symmetric_nat_gateway_vms: Vec<VirtualMachine>,
@@ -918,6 +922,8 @@ impl DeploymentInventory {
             name: name.to_string(),
             node_vms: Default::default(),
             peer_cache_node_vms: Default::default(),
+            port_restricted_cone_nat_gateway_vms: Default::default(),
+            port_restricted_cone_private_node_vms: Default::default(),
             ssh_user: "root".to_string(),
             ssh_private_key_path: Default::default(),
             symmetric_nat_gateway_vms: Default::default(),
@@ -1058,6 +1064,14 @@ impl DeploymentInventory {
 
     pub fn full_cone_private_node_count(&self) -> usize {
         if let Some(first_vm) = self.full_cone_private_node_vms.first() {
+            first_vm.node_count
+        } else {
+            0
+        }
+    }
+
+    pub fn port_restricted_cone_private_node_count(&self) -> usize {
+        if let Some(first_vm) = self.port_restricted_cone_private_node_vms.first() {
             first_vm.node_count
         } else {
             0

@@ -99,8 +99,12 @@ pub enum Error {
     InvalidUpscaleDesiredFullConePrivateNodeVmCount,
     #[error("The desired symmetric private node VM count is smaller than the current count. This is invalid for an upscale operation.")]
     InvalidUpscaleDesiredSymmetricPrivateNodeVmCount,
+    #[error("The desired port restricted cone private node VM count is smaller than the current count. This is invalid for an upscale operation.")]
+    InvalidUpscaleDesiredPortRestrictedConePrivateNodeVmCount,
     #[error("The desired full cone private node count is smaller than the current count. This is invalid for an upscale operation.")]
     InvalidUpscaleDesiredFullConePrivateNodeCount,
+    #[error("The desired port restricted cone private node count is smaller than the current count. This is invalid for an upscale operation.")]
+    InvalidUpscaleDesiredPortRestrictedConePrivateNodeCount,
     #[error("The desired symmetric private node count is smaller than the current count. This is invalid for an upscale operation.")]
     InvalidUpscaleDesiredSymmetricPrivateNodeCount,
     #[error("Options were used that are not applicable to a bootstrap deployment")]

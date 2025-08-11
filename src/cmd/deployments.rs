@@ -136,6 +136,8 @@ pub async fn handle_bootstrap(
         .unwrap_or(environment_type.get_default_symmetric_private_node_count());
     let full_cone_private_node_count = full_cone_private_node_count
         .unwrap_or(environment_type.get_default_full_cone_private_node_count());
+    let port_restricted_cone_private_node_count = 
+        environment_type.get_default_port_restricted_cone_private_node_count();
 
     testnet_deployer
         .bootstrap(&BootstrapOptions {
@@ -171,6 +173,9 @@ pub async fn handle_bootstrap(
                 .join("ansible")
                 .join("inventory"),
             peer,
+            port_restricted_cone_private_node_count,
+            port_restricted_cone_private_node_vm_count: None, // Not exposed in CLI yet
+            port_restricted_cone_private_node_volume_size: None, // Not exposed in CLI yet
             region,
             rewards_address,
             symmetric_private_node_count,
@@ -330,6 +335,8 @@ pub async fn handle_deploy(
         .unwrap_or(environment_type.get_default_symmetric_private_node_count());
     let full_cone_private_node_count = full_cone_private_node_count
         .unwrap_or(environment_type.get_default_full_cone_private_node_count());
+    let port_restricted_cone_private_node_count = 
+        environment_type.get_default_port_restricted_cone_private_node_count();
 
     let deploy_options = DeployOptions {
         binary_option: binary_option.clone(),
@@ -383,6 +390,10 @@ pub async fn handle_deploy(
         peer_cache_node_vm_size,
         peer_cache_node_volume_size: peer_cache_node_volume_size
             .or_else(|| Some(calculate_size_per_attached_volume(peer_cache_node_count))),
+        port_restricted_cone_nat_gateway_vm_size: None, // Not exposed in CLI yet
+        port_restricted_cone_private_node_count,
+        port_restricted_cone_private_node_vm_count: None, // Not exposed in CLI yet
+        port_restricted_cone_private_node_volume_size: None, // Not exposed in CLI yet
         public_rpc,
         rewards_address,
         symmetric_nat_gateway_vm_size,
@@ -576,6 +587,8 @@ pub async fn handle_upscale(
             desired_node_vm_count,
             desired_peer_cache_node_count,
             desired_peer_cache_node_vm_count,
+            desired_port_restricted_cone_private_node_count: None, // Not exposed in CLI yet
+            desired_port_restricted_cone_private_node_vm_count: None, // Not exposed in CLI yet
             desired_symmetric_private_node_count,
             desired_symmetric_private_node_vm_count,
             desired_uploaders_count,

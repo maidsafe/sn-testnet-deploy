@@ -99,6 +99,7 @@ async fn handle_provision_nodes(name: String, node_type: NodeType) -> Result<()>
     let private_node_inventory = PrivateNodeProvisionInventory::new(
         &provisioner,
         deploy_options.full_cone_private_node_vm_count,
+        None,
         deploy_options.symmetric_private_node_vm_count,
     )?;
 

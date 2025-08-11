@@ -108,6 +108,7 @@ pub enum NodeType {
     Generic,
     Genesis,
     PeerCache,
+    PortRestrictedConePrivateNode,
     SymmetricPrivateNode,
 }
 
@@ -118,6 +119,7 @@ impl std::fmt::Display for NodeType {
             NodeType::Generic => write!(f, "generic"),
             NodeType::Genesis => write!(f, "genesis"),
             NodeType::PeerCache => write!(f, "peer-cache"),
+            NodeType::PortRestrictedConePrivateNode => write!(f, "port-restricted-cone-private"),
             NodeType::SymmetricPrivateNode => write!(f, "symmetric-private"),
         }
     }
@@ -132,6 +134,7 @@ impl std::str::FromStr for NodeType {
             "generic" => Ok(NodeType::Generic),
             "genesis" => Ok(NodeType::Genesis),
             "peer-cache" => Ok(NodeType::PeerCache),
+            "port-restricted-cone-private" => Ok(NodeType::PortRestrictedConePrivateNode),
             "symmetric-private" => Ok(NodeType::SymmetricPrivateNode),
             _ => Err(format!("Invalid node type: {s}")),
         }
@@ -145,6 +148,7 @@ impl NodeType {
             NodeType::Generic => "GENERIC_NODE",
             NodeType::Genesis => "GENESIS_NODE",
             NodeType::PeerCache => "PEER_CACHE_NODE",
+            NodeType::PortRestrictedConePrivateNode => "NAT_PORT_RESTRICTED_CONE_NODE",
             NodeType::SymmetricPrivateNode => "NAT_RANDOMIZED_NODE",
         }
     }
@@ -155,6 +159,7 @@ impl NodeType {
             NodeType::Generic => AnsibleInventoryType::Nodes,
             NodeType::Genesis => AnsibleInventoryType::Genesis,
             NodeType::PeerCache => AnsibleInventoryType::PeerCacheNodes,
+            NodeType::PortRestrictedConePrivateNode => AnsibleInventoryType::PortRestrictedConePrivateNodes,
             NodeType::SymmetricPrivateNode => AnsibleInventoryType::SymmetricPrivateNodes,
         }
     }
@@ -262,6 +267,10 @@ impl EnvironmentType {
     }
 
     pub fn get_default_full_cone_private_node_count(&self) -> u16 {
+        self.get_default_node_count()
+    }
+
+    pub fn get_default_port_restricted_cone_private_node_count(&self) -> u16 {
         self.get_default_node_count()
     }
 }

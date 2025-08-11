@@ -706,6 +706,8 @@ pub async fn handle_clients_command(cmd: ClientsCommands) -> Result<()> {
                     desired_node_vm_count: None,
                     desired_peer_cache_node_count: None,
                     desired_peer_cache_node_vm_count: None,
+                    desired_port_restricted_cone_private_node_count: None,
+                    desired_port_restricted_cone_private_node_vm_count: None,
                     desired_symmetric_private_node_count: None,
                     desired_symmetric_private_node_vm_count: None,
                     desired_uploaders_count,

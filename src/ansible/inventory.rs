@@ -55,6 +55,16 @@ pub enum AnsibleInventoryType {
     Nodes,
     /// Use to run a playbook against all Peer Cache nodes.
     PeerCacheNodes,
+    /// Use to run a playbook against the Port Restricted Cone NAT gateway.
+    PortRestrictedConeNatGateway,
+    /// Use to run a playbook against a static list of Port Restricted Cone NAT gateway.
+    PortRestrictedConeNatGatewayStatic,
+    /// Use to run a inventory against the Port Restricted Cone NAT private nodes. This does not route the ssh connection through
+    /// the NAT gateway and hence cannot run playbooks. Use PrivateNodesStatic for playbooks.
+    PortRestrictedConePrivateNodes,
+    /// Use to run a playbook against the private nodes. This is similar to the PrivateNodes inventory, but uses
+    /// a static custom inventory file. This is just used for running playbooks and not inventory.
+    PortRestrictedConePrivateNodesStatic,
     /// Use to run a playbook against the Symmetric NAT gateway.
     SymmetricNatGateway,
     /// Use to run a inventory against the Symmetric NAT private nodes. This does not route the ssh connection through
@@ -79,6 +89,10 @@ impl std::fmt::Display for AnsibleInventoryType {
             AnsibleInventoryType::FullConePrivateNodesStatic => "FullConePrivateNodesStatic",
             AnsibleInventoryType::Genesis => "Genesis",
             AnsibleInventoryType::Nodes => "Nodes",
+            AnsibleInventoryType::PortRestrictedConeNatGateway => "PortRestrictedConeNatGateway",
+            AnsibleInventoryType::PortRestrictedConeNatGatewayStatic => "PortRestrictedConeNatGatewayStatic",
+            AnsibleInventoryType::PortRestrictedConePrivateNodes => "PortRestrictedConePrivateNodes",
+            AnsibleInventoryType::PortRestrictedConePrivateNodesStatic => "PortRestrictedConePrivateNodesStatic",
             AnsibleInventoryType::SymmetricNatGateway => "SymmetricNatGateway",
             AnsibleInventoryType::SymmetricPrivateNodes => "SymmetricPrivateNodes",
             AnsibleInventoryType::SymmetricPrivateNodesStatic => "SymmetricPrivateNodesStatic",
@@ -110,6 +124,18 @@ impl AnsibleInventoryType {
             )),
             Self::Genesis => PathBuf::from(format!(".{name}_genesis_inventory_{provider}.yml")),
             Self::Nodes => PathBuf::from(format!(".{name}_node_inventory_{provider}.yml")),
+            Self::PortRestrictedConeNatGateway => PathBuf::from(format!(
+                ".{name}_port_restricted_cone_nat_gateway_inventory_{provider}.yml"
+            )),
+            Self::PortRestrictedConeNatGatewayStatic => PathBuf::from(format!(
+                ".{name}_port_restricted_cone_nat_gateway_static_inventory_{provider}.yml"
+            )),
+            Self::PortRestrictedConePrivateNodes => PathBuf::from(format!(
+                ".{name}_port_restricted_cone_private_node_inventory_{provider}.yml"
+            )),
+            Self::PortRestrictedConePrivateNodesStatic => PathBuf::from(format!(
+                ".{name}_port_restricted_cone_private_node_static_inventory_{provider}.yml"
+            )),
             Self::SymmetricNatGateway => PathBuf::from(format!(
                 ".{name}_symmetric_nat_gateway_inventory_{provider}.yml"
             )),
@@ -136,6 +162,10 @@ impl AnsibleInventoryType {
             Self::FullConePrivateNodesStatic => "full_cone_private_node",
             Self::Genesis => "genesis",
             Self::Nodes => "node",
+            Self::PortRestrictedConeNatGateway => "port_restricted_cone_nat_gateway",
+            Self::PortRestrictedConeNatGatewayStatic => "port_restricted_cone_nat_gateway",
+            Self::PortRestrictedConePrivateNodes => "port_restricted_cone_private_node",
+            Self::PortRestrictedConePrivateNodesStatic => "port_restricted_cone_private_node",
             Self::SymmetricNatGateway => "symmetric_nat_gateway",
             Self::SymmetricPrivateNodes => "symmetric_private_node",
             Self::SymmetricPrivateNodesStatic => "symmetric_private_node",
