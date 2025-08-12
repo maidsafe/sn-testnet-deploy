@@ -514,15 +514,30 @@ pub async fn drain_funds(
     if let (Some(network), Some(address)) =
         (evm_network, &environment_details.funding_wallet_address)
     {
-        ansible_provisioner
-            .drain_funds_from_ant_instances(
-                Address::from_str(address).map_err(|err| {
-                    log::error!("Invalid funding wallet public key: {err:?}");
-                    Error::FailedToParseKey
-                })?,
-                network,
-            )
-            .await?;
+        // Check if wallets exist before attempting to drain funds
+        match ansible_provisioner.get_current_ant_instance_count() {
+            Ok(ant_instances) if !ant_instances.is_empty() => {
+                let has_wallets = ant_instances.values().any(|&count| count > 0);
+                if has_wallets {
+                    ansible_provisioner
+                        .drain_funds_from_ant_instances(
+                            Address::from_str(address).map_err(|err| {
+                                log::error!("Invalid funding wallet public key: {err:?}");
+                                Error::FailedToParseKey
+                            })?,
+                            network,
+                        )
+                        .await?;
+                } else {
+                    println!("No wallets found to drain funds from. Skipping wallet removal.");
+                    log::info!("No wallets found to drain funds from. Skipping wallet removal.");
+                }
+            }
+            Ok(_) | Err(_) => {
+                println!("No client VMs or wallets found. Skipping wallet removal.");
+                log::info!("No client VMs or wallets found. Skipping wallet removal.");
+            }
+        }
         Ok(())
     } else {
         println!("Custom network provided. Not draining funds.");
