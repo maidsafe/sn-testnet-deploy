@@ -377,7 +377,7 @@ impl ClientsDeployer {
         self.ansible_provisioner
             .print_ansible_run_banner("Provision Clients");
         self.ansible_provisioner
-            .provision_clients(
+            .provision_uploaders(
                 &provision_options,
                 options.peer.clone(),
                 options.network_contacts_url.clone(),

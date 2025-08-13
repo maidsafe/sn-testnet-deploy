@@ -178,7 +178,7 @@ pub async fn handle_provision_clients(name: String) -> Result<()> {
 
     provisioner.print_ansible_run_banner("Provision Clients");
     provisioner
-        .provision_clients(
+        .provision_uploaders(
             &provision_options,
             Some(genesis_multiaddr.clone()),
             Some(genesis_network_contacts.clone()),

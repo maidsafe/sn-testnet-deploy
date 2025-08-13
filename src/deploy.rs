@@ -332,9 +332,9 @@ impl TestnetDeployer {
         }
 
         self.ansible_provisioner
-            .print_ansible_run_banner("Provision Clients");
+            .print_ansible_run_banner("Provision Uploaders");
         self.ansible_provisioner
-            .provision_clients(
+            .provision_uploaders(
                 &provision_options,
                 Some(genesis_multiaddr.clone()),
                 Some(genesis_network_contacts.clone()),
