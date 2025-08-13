@@ -221,15 +221,17 @@ generate_random_data_file_and_upload() {
   LOG_OUTPUT_ARG="--log-output-dest $log_file_path"
   
   start_time=$(date +%s%N)
-  stdout=$(ant \
+  temp_output_file=$(mktemp)
+  ant \
     $CONTACT_PEER_ARG \
     $NETWORK_CONTACTS_URL_ARG \
     $NETWORK_ID_ARG \
     $LOG_OUTPUT_ARG \
-    file upload "$tmpfile" 2>&1)
-  exit_code=$?
+    file upload "$tmpfile" 2>&1 | tee "$temp_output_file"
+  exit_code=${PIPESTATUS[0]}
   end_time=$(date +%s%N)
-  echo "$stdout"
+  stdout=$(cat "$temp_output_file")
+  rm "$temp_output_file"
   echo "Exit code: $exit_code"
   version_stdout=$(ant --version 2>&1)
   package_version=$(echo "$version_stdout" | grep "Package version:" | awk '{print $3}')
