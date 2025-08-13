@@ -1095,7 +1095,7 @@ impl AnsibleProvisioner {
         Ok(())
     }
 
-    pub async fn provision_clients(
+    pub async fn provision_uploaders(
         &self,
         options: &ProvisionOptions,
         genesis_multiaddr: Option<String>,

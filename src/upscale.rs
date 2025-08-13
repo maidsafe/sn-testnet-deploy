@@ -434,7 +434,7 @@ impl TestnetDeployer {
             self.ansible_provisioner
                 .print_ansible_run_banner("Provision Clients");
             self.ansible_provisioner
-                .provision_clients(
+                .provision_uploaders(
                     &provision_options,
                     Some(initial_multiaddr.clone()),
                     Some(genesis_network_contacts.clone()),
@@ -597,7 +597,7 @@ impl TestnetDeployer {
         self.ansible_provisioner
             .print_ansible_run_banner("Provision Clients");
         self.ansible_provisioner
-            .provision_clients(
+            .provision_uploaders(
                 &provision_options,
                 Some(initial_multiaddr),
                 Some(initial_network_contacts_url),
