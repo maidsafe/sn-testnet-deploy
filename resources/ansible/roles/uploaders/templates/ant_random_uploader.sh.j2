@@ -203,8 +203,14 @@ get_error_enum() {
 }
 
 generate_random_data_file_and_upload() {
-  tmpfile=$(mktemp)
-  dd if=/dev/urandom of="$tmpfile" bs={{ upload_size|default(100) }}M count=1 iflag=fullblock &> /dev/null
+  # Sometimes we want to use large files and the temporary file system only has about 2GB of
+  # storage, so we use the mounted volume rather than generating a file with `mktemp`.
+  # For large files you also need to use a smaller block size with `dd` otherwise it will
+  # consume a large amount of memory or even not have enough.
+  timestamp=$(date +"%Y%m%d_%H%M%S")
+  tmpfile="/mnt/client-logs/data/random_${timestamp}_${USER}_$$.dat"
+  touch "$tmpfile"
+  dd if=/dev/urandom of="$tmpfile" bs=1M count={{ upload_size }} iflag=fullblock &> /dev/null
 
   file_size_kb=$(du -k "$tmpfile" | cut -f1)
   file_hash=$(sha256sum "$tmpfile" | awk '{ print $1 }')

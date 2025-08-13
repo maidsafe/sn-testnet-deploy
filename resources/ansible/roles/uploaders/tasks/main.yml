@@ -63,6 +63,16 @@
   become: true
   loop: "{{ range(1, ant_uploader_instances | int + 1) | list }}"
 
+- name: ensure the data directory exists for random file generation
+  ansible.builtin.file:
+    path: "/mnt/client-logs/data"
+    state: directory
+    mode: '0775'
+    owner: root
+    group: ant
+    recurse: yes
+  become: true
+
 - name: copy ant_random_uploader.sh to remote for each ant user
   ansible.builtin.template:
     src: ant_random_uploader.sh.j2

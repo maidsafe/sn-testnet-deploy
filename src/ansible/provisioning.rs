@@ -341,7 +341,7 @@ impl From<DeployOptions> for ProvisionOptions {
             sleep_duration: None,
             symmetric_private_node_count: deploy_options.symmetric_private_node_count,
             token_amount: deploy_options.initial_tokens,
-            upload_size: None,
+            upload_size: Some(deploy_options.upload_size),
             upload_interval: Some(deploy_options.upload_interval),
             uploaders_count: Some(deploy_options.uploaders_count),
             wallet_secret_keys: None,
