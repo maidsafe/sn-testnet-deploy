@@ -3,3 +3,4 @@ ant_archive_filename: ant-latest-x86_64-unknown-linux-musl.tar.gz
 ant_archive_url: https://autonomi-cli.s3.eu-west-2.amazonaws.com/{{ autonomi_archive_filename }}
 log_output_dest: /mnt/client-logs/log/uploads
 enable_uploaders: true
+upload_size: 100 # megabytes

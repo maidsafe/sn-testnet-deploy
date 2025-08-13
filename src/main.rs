@@ -189,6 +189,7 @@ async fn main() -> Result<()> {
             to_genesis,
             uploaders_count,
             upload_interval,
+            upload_size,
         } => {
             cmd::deployments::handle_deploy(
                 ansible_verbose,
@@ -250,6 +251,7 @@ async fn main() -> Result<()> {
                 to_genesis,
                 uploaders_count,
                 upload_interval,
+                upload_size,
             )
             .await?;
             Ok(())
