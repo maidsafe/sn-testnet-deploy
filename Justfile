@@ -52,6 +52,14 @@ build-nat-gateway-image region="lon1":
     packer build -var 'size=s-1vcpu-2gb' -var 'region={{region}}' node.pkr.hcl
   )
 
+build-upnp-image region="lon1":
+  #!/usr/bin/env bash
+  (
+    cd resources/packer/upnp
+    packer init .
+    packer build -var 'size=s-2vcpu-4gb' -var 'region={{region}}' upnp.pkr.hcl
+  )
+
 # This target has been copied from another repository. On other repositories, more than one
 # architecture is supported. If we want to extend for other architectures, we can do so.
 build-release-artifacts arch:
@@ -134,6 +142,7 @@ build-all-images region:
   just build-node-image {{region}}
   just build-client-image {{region}}
   just build-nat-gateway-image {{region}}
+  just build-upnp-image {{region}}
 
 build-lon1-images:
   just build-all-images lon1
@@ -152,3 +161,9 @@ build-lon1-evm-node-image:
 
 build-ams3-evm-node-image:
   just build-evm-node-image ams3
+
+build-lon1-upnp-image:
+  just build-upnp-image lon1
+
+build-ams3-upnp-image:
+  just build-upnp-image ams3

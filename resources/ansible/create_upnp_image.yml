@@ -1,0 +1,27 @@
+---
+- name: build a custom UPnP node image
+  hosts: all
+  become: True
+  roles:
+    - role: prerequisites
+  tasks:
+    - name: Install necessary packages for miniupnpd daemon
+      become: true
+      ansible.builtin.apt:
+        name:
+          - libxtables-dev
+          - libiptc-dev
+          - libssl-dev
+          - libmnl-dev
+          - libnftnl-dev
+          - net-tools
+          - build-essential
+        state: present
+        update_cache: true
+
+    - name: stop telegraf
+      become: True
+      ansible.builtin.systemd:
+        name: telegraf
+        state: stopped
+        enabled: no
