@@ -29,6 +29,8 @@ const PEER_CACHE_NODE_ATTACHED_VOLUME: &str = "peer_cache_node_attached_volume";
 const SYMMETRIC_NAT_GATEWAY: &str = "symmetric_nat_gateway";
 const SYMMETRIC_PRIVATE_NODE: &str = "symmetric_private_node";
 const SYMMETRIC_PRIVATE_NODE_ATTACHED_VOLUME: &str = "symmetric_private_node_attached_volume";
+const UPNP_PRIVATE_NODE: &str = "upnp_private_node";
+const UPNP_PRIVATE_NODE_ATTACHED_VOLUME: &str = "upnp_private_node_attached_volume";
 
 const SIZE: &str = "size";
 const IMAGE: &str = "image";
@@ -67,6 +69,9 @@ pub struct InfraRunOptions {
     pub symmetric_private_node_vm_count: Option<u16>,
     pub symmetric_private_node_volume_size: Option<u16>,
     pub tfvars_filenames: Option<Vec<String>>,
+    pub upnp_vm_size: Option<String>,
+    pub upnp_private_node_vm_count: Option<u16>,
+    pub upnp_private_node_volume_size: Option<u16>,
 }
 
 impl InfraRunOptions {
@@ -178,6 +183,20 @@ impl InfraRunOptions {
                 (None, None)
             };
 
+        let upnp_private_node_vm_count = resource_count(UPNP_PRIVATE_NODE);
+        debug!("UPnP private node count: {upnp_private_node_vm_count}");
+        let (upnp_private_node_volume_size, upnp_vm_size) = if upnp_private_node_vm_count > 0 {
+            let upnp_private_node_volume_size =
+                get_value_for_resource(&resources, UPNP_PRIVATE_NODE_ATTACHED_VOLUME, SIZE)?;
+            debug!("UPnP private node volume size: {upnp_private_node_volume_size:?}");
+            let upnp_vm_size = get_value_for_resource(&resources, UPNP_PRIVATE_NODE, SIZE)?;
+            debug!("UPnP VM size: {upnp_vm_size:?}");
+
+            (upnp_private_node_volume_size, upnp_vm_size)
+        } else {
+            (None, None)
+        };
+
         let client_vm_count = resource_count(CLIENT);
         debug!("Client count: {client_vm_count}");
         let (client_vm_size, client_image_id) = if client_vm_count > 0 {
@@ -212,6 +231,12 @@ impl InfraRunOptions {
             debug!("Node size obtained from {FULL_CONE_PRIVATE_NODE}: {vm_size:?}");
             let image_id = get_value_for_resource(&resources, FULL_CONE_PRIVATE_NODE, IMAGE)?;
             debug!("Node image id obtained from {FULL_CONE_PRIVATE_NODE}: {image_id:?}");
+            (vm_size, image_id)
+        } else if upnp_private_node_vm_count > 0 {
+            let vm_size = get_value_for_resource(&resources, UPNP_PRIVATE_NODE, SIZE)?;
+            debug!("Node size obtained from {UPNP_PRIVATE_NODE}: {vm_size:?}");
+            let image_id = get_value_for_resource(&resources, UPNP_PRIVATE_NODE, IMAGE)?;
+            debug!("Node image id obtained from {UPNP_PRIVATE_NODE}: {image_id:?}");
             (vm_size, image_id)
         } else {
             (None, None)
@@ -258,6 +283,9 @@ impl InfraRunOptions {
             symmetric_private_node_volume_size,
             tfvars_filenames: environment_details
                 .map(|details| details.environment_type.get_tfvars_filenames(name, region)),
+            upnp_vm_size,
+            upnp_private_node_vm_count: Some(upnp_private_node_vm_count),
+            upnp_private_node_volume_size,
         };
 
         Ok(options)
@@ -524,6 +552,13 @@ pub fn build_terraform_args(options: &InfraRunOptions) -> Result<Vec<(String, St
         args.push((
             "symmetric_private_node_volume_size".to_string(),
             symmetric_private_node_volume_size.to_string(),
+        ));
+    }
+
+    if let Some(upnp_private_node_volume_size) = options.upnp_private_node_volume_size {
+        args.push((
+            "upnp_private_node_volume_size".to_string(),
+            upnp_private_node_volume_size.to_string(),
         ));
     }
 

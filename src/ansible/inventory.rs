@@ -63,6 +63,8 @@ pub enum AnsibleInventoryType {
     /// Use to run a playbook against the private nodes. This is similar to the PrivateNodes inventory, but uses
     /// a static custom inventory file. This is just used for running playbooks and not inventory.
     SymmetricPrivateNodesStatic,
+    /// Use to run a playbook against UPnP private nodes.
+    Upnp,
 }
 
 impl std::fmt::Display for AnsibleInventoryType {
@@ -82,6 +84,7 @@ impl std::fmt::Display for AnsibleInventoryType {
             AnsibleInventoryType::SymmetricNatGateway => "SymmetricNatGateway",
             AnsibleInventoryType::SymmetricPrivateNodes => "SymmetricPrivateNodes",
             AnsibleInventoryType::SymmetricPrivateNodesStatic => "SymmetricPrivateNodesStatic",
+            AnsibleInventoryType::Upnp => "Upnp",
         };
         write!(f, "{s}")
     }
@@ -119,6 +122,9 @@ impl AnsibleInventoryType {
             Self::SymmetricPrivateNodesStatic => PathBuf::from(format!(
                 ".{name}_symmetric_private_node_static_inventory_{provider}.yml"
             )),
+            Self::Upnp => PathBuf::from(format!(
+                ".{name}_upnp_private_node_inventory_{provider}.yml"
+            )),
             Self::Clients => PathBuf::from(format!(".{name}_clients_inventory_{provider}.yml")),
         }
     }
@@ -139,6 +145,7 @@ impl AnsibleInventoryType {
             Self::SymmetricNatGateway => "symmetric_nat_gateway",
             Self::SymmetricPrivateNodes => "symmetric_private_node",
             Self::SymmetricPrivateNodesStatic => "symmetric_private_node",
+            Self::Upnp => "upnp_private_node",
         }
     }
 
@@ -149,6 +156,7 @@ impl AnsibleInventoryType {
             Self::Nodes,
             Self::PeerCacheNodes,
             Self::SymmetricPrivateNodes,
+            Self::Upnp,
         ]
         .into_iter()
     }
@@ -256,6 +264,7 @@ pub fn generate_environment_inventory(
         AnsibleInventoryType::PeerCacheNodes,
         AnsibleInventoryType::SymmetricNatGateway,
         AnsibleInventoryType::SymmetricPrivateNodes,
+        AnsibleInventoryType::Upnp,
     ];
     for inventory_type in inventory_types.into_iter() {
         let src_path = base_inventory_path;
@@ -300,6 +309,7 @@ pub fn cleanup_environment_inventory(
         AnsibleInventoryType::SymmetricNatGateway,
         AnsibleInventoryType::SymmetricPrivateNodes,
         AnsibleInventoryType::SymmetricPrivateNodesStatic,
+        AnsibleInventoryType::Upnp,
     ];
     let inventory_types = inventory_types
         .as_deref()

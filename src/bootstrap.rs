@@ -46,6 +46,9 @@ pub struct BootstrapOptions {
     pub symmetric_private_node_count: u16,
     pub symmetric_private_node_vm_count: Option<u16>,
     pub symmetric_private_node_volume_size: Option<u16>,
+    pub upnp_private_node_count: u16,
+    pub upnp_private_node_vm_count: Option<u16>,
+    pub upnp_private_node_volume_size: Option<u16>,
 }
 
 impl TestnetDeployer {
@@ -104,6 +107,9 @@ impl TestnetDeployer {
                     .environment_type
                     .get_tfvars_filenames(&options.name, &options.region),
             ),
+            upnp_vm_size: None,
+            upnp_private_node_vm_count: options.upnp_private_node_vm_count,
+            upnp_private_node_volume_size: options.upnp_private_node_volume_size,
         })
         .map_err(|err| {
             println!("Failed to create infra {err:?}");

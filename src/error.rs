@@ -105,6 +105,8 @@ pub enum Error {
     InvalidUpscaleDesiredSymmetricPrivateNodeCount,
     #[error("Options were used that are not applicable to a bootstrap deployment")]
     InvalidUpscaleOptionsForBootstrapDeployment,
+    #[error("No {0} inventory found for {1} at {2}")]
+    InventoryNotFound(String, String, String),
     #[error("The vm count for the provided custom vms are not equal: {0:?} != {1:?}")]
     VmCountMismatch(Option<AnsibleInventoryType>, Option<AnsibleInventoryType>),
     #[error(transparent)]

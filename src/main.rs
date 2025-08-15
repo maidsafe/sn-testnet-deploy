@@ -74,6 +74,9 @@ async fn main() -> Result<()> {
             symmetric_private_node_count,
             symmetric_private_node_vm_count,
             symmetric_private_node_volume_size,
+            upnp_private_node_count,
+            upnp_private_node_vm_count,
+            upnp_private_node_volume_size,
         } => {
             cmd::deployments::handle_bootstrap(
                 ansible_verbose,
@@ -112,6 +115,9 @@ async fn main() -> Result<()> {
                 symmetric_private_node_count,
                 symmetric_private_node_vm_count,
                 symmetric_private_node_volume_size,
+                upnp_private_node_count,
+                upnp_private_node_vm_count,
+                upnp_private_node_volume_size,
             )
             .await?;
             Ok(())
@@ -190,6 +196,10 @@ async fn main() -> Result<()> {
             uploaders_count,
             upload_interval,
             upload_size,
+            upnp_vm_size,
+            upnp_private_node_count,
+            upnp_private_node_vm_count,
+            upnp_private_node_volume_size,
         } => {
             cmd::deployments::handle_deploy(
                 ansible_verbose,
@@ -252,6 +262,10 @@ async fn main() -> Result<()> {
                 uploaders_count,
                 upload_interval,
                 upload_size,
+                upnp_private_node_count,
+                upnp_private_node_vm_count,
+                upnp_private_node_volume_size,
+                upnp_vm_size,
             )
             .await?;
             Ok(())

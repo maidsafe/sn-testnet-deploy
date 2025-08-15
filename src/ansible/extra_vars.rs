@@ -341,7 +341,12 @@ pub fn build_node_extra_vars_doc(
             extra_vars.add_variable("private_ip", "true");
             extra_vars.add_variable("relay", "true");
         }
-        _ => {}
+        NodeType::Upnp => {
+            extra_vars.add_boolean_variable("enable_upnp", true);
+        }
+        _ => {
+            extra_vars.add_boolean_variable("enable_upnp", false);
+        }
     }
 
     if write_older_cache_files {

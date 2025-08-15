@@ -202,6 +202,10 @@ impl DeploymentInventoryService {
             ansible_runner.get_inventory(AnsibleInventoryType::PeerCacheNodes, false)
         });
         let ansible_runner = self.ansible_runner.clone();
+        let upnp_private_node_handle = std::thread::spawn(move || {
+            ansible_runner.get_inventory(AnsibleInventoryType::Upnp, false)
+        });
+        let ansible_runner = self.ansible_runner.clone();
         let client_handle = std::thread::spawn(move || {
             ansible_runner.get_inventory(AnsibleInventoryType::Clients, true)
         });
@@ -223,6 +227,7 @@ impl DeploymentInventoryService {
             .expect("Thread panicked")?;
         let generic_node_vms = generic_node_handle.join().expect("Thread panicked")?;
         let peer_cache_node_vms = peer_cache_node_handle.join().expect("Thread panicked")?;
+        let upnp_private_node_vms = upnp_private_node_handle.join().expect("Thread panicked")?;
         let client_vms = if !client_handle.join().expect("Thread panicked")?.is_empty()
             && environment_details.deployment_type != DeploymentType::Bootstrap
         {
@@ -298,6 +303,10 @@ impl DeploymentInventoryService {
             ansible_provisioner.get_node_registries(&AnsibleInventoryType::FullConePrivateNodes)
         });
         let ansible_provisioner = self.ansible_provisioner.clone();
+        let upnp_private_node_registries_handle = std::thread::spawn(move || {
+            ansible_provisioner.get_node_registries(&AnsibleInventoryType::Upnp)
+        });
+        let ansible_provisioner = self.ansible_provisioner.clone();
         let genesis_node_registry_handle = std::thread::spawn(move || {
             ansible_provisioner.get_node_registries(&AnsibleInventoryType::Genesis)
         });
@@ -312,6 +321,9 @@ impl DeploymentInventoryService {
             .join()
             .expect("Thread panicked")?;
         let full_cone_private_node_registries = full_cone_private_node_registries_handle
+            .join()
+            .expect("Thread panicked")?;
+        let upnp_private_node_registries = upnp_private_node_registries_handle
             .join()
             .expect("Thread panicked")?;
         let genesis_node_registry = genesis_node_registry_handle
@@ -343,6 +355,10 @@ impl DeploymentInventoryService {
         );
         debug!("full_cone_private_node_vms after conversion: {full_cone_private_node_vms:?}");
 
+        let upnp_private_node_vms =
+            NodeVirtualMachine::from_list(&upnp_private_node_vms, &upnp_private_node_registries);
+        debug!("upnp_private_node_vms after conversion: {upnp_private_node_vms:?}");
+
         let genesis_vm = NodeVirtualMachine::from_list(&genesis_vm, &genesis_node_registry);
         let genesis_vm = if !genesis_vm.is_empty() {
             Some(genesis_vm[0].clone())
@@ -355,6 +371,7 @@ impl DeploymentInventoryService {
         failed_node_registry_vms.extend(generic_node_registries.failed_vms);
         failed_node_registry_vms.extend(full_cone_private_node_registries.failed_vms);
         failed_node_registry_vms.extend(symmetric_private_node_registries.failed_vms);
+        failed_node_registry_vms.extend(upnp_private_node_registries.failed_vms);
         failed_node_registry_vms.extend(genesis_node_registry.failed_vms);
 
         let binary_option = if let Some(binary_option) = binary_option {
@@ -445,6 +462,7 @@ impl DeploymentInventoryService {
             ssh_private_key_path: self.ssh_client.private_key_path.clone(),
             symmetric_nat_gateway_vms,
             symmetric_private_node_vms,
+            upnp_private_node_vms,
             uploaded_files: Vec::new(),
         };
         debug!("Inventory: {inventory:?}");
@@ -897,6 +915,7 @@ pub struct DeploymentInventory {
     pub ssh_private_key_path: PathBuf,
     pub symmetric_nat_gateway_vms: Vec<VirtualMachine>,
     pub symmetric_private_node_vms: Vec<NodeVirtualMachine>,
+    pub upnp_private_node_vms: Vec<NodeVirtualMachine>,
     pub uploaded_files: Vec<(String, String)>,
 }
 
@@ -922,6 +941,7 @@ impl DeploymentInventory {
             ssh_private_key_path: Default::default(),
             symmetric_nat_gateway_vms: Default::default(),
             symmetric_private_node_vms: Default::default(),
+            upnp_private_node_vms: Default::default(),
             uploaded_files: Default::default(),
         }
     }
@@ -964,6 +984,11 @@ impl DeploymentInventory {
                 .iter()
                 .map(|node_vm| node_vm.vm.clone()),
         );
+        list.extend(
+            self.upnp_private_node_vms
+                .iter()
+                .map(|node_vm| node_vm.vm.clone()),
+        );
         list.extend(self.client_vms.iter().map(|client_vm| client_vm.vm.clone()));
         list
     }
@@ -975,6 +1000,7 @@ impl DeploymentInventory {
         list.extend(self.node_vms.iter().cloned());
         list.extend(self.full_cone_private_node_vms.iter().cloned());
         list.extend(self.symmetric_private_node_vms.iter().cloned());
+        list.extend(self.upnp_private_node_vms.iter().cloned());
 
         list
     }
@@ -1003,6 +1029,11 @@ impl DeploymentInventory {
         );
         list.extend(
             self.symmetric_private_node_vms
+                .iter()
+                .flat_map(|node_vm| node_vm.get_quic_addresses()),
+        );
+        list.extend(
+            self.upnp_private_node_vms
                 .iter()
                 .flat_map(|node_vm| node_vm.get_quic_addresses()),
         );
@@ -1066,6 +1097,14 @@ impl DeploymentInventory {
 
     pub fn symmetric_private_node_count(&self) -> usize {
         if let Some(first_vm) = self.symmetric_private_node_vms.first() {
+            first_vm.node_count
+        } else {
+            0
+        }
+    }
+
+    pub fn upnp_private_node_count(&self) -> usize {
+        if let Some(first_vm) = self.upnp_private_node_vms.first() {
             first_vm.node_count
         } else {
             0
@@ -1226,6 +1265,18 @@ impl DeploymentInventory {
             println!();
         }
 
+        if !self.upnp_private_node_vms.is_empty() {
+            println!("================");
+            println!("UPnP Private Node VMs");
+            println!("================");
+            for node_vm in self.upnp_private_node_vms.iter() {
+                println!("{}: {}", node_vm.vm.name, node_vm.vm.public_ip_addr);
+            }
+            println!("Nodes per VM: {}", self.upnp_private_node_count());
+            println!("SSH user: {}", self.ssh_user);
+            println!();
+        }
+
         if !self.client_vms.is_empty() {
             println!("==========");
             println!("Client VMs");
@@ -1274,7 +1325,14 @@ impl DeploymentInventory {
             let mut quic_listeners = Vec::new();
             let mut ws_listeners = Vec::new();
 
-            for node_vm in self.peer_cache_node_vms.iter().chain(self.node_vms.iter()) {
+            for node_vm in self
+                .peer_cache_node_vms
+                .iter()
+                .chain(self.node_vms.iter())
+                .chain(self.full_cone_private_node_vms.iter())
+                .chain(self.symmetric_private_node_vms.iter())
+                .chain(self.upnp_private_node_vms.iter())
+            {
                 for addresses in &node_vm.node_listen_addresses {
                     for addr in addresses {
                         if !addr.starts_with("/ip4/127.0.0.1") && !addr.starts_with("/ip4/10.") {
@@ -1310,6 +1368,9 @@ impl DeploymentInventory {
             self.peer_cache_node_vms
                 .iter()
                 .chain(self.node_vms.iter())
+                .chain(self.full_cone_private_node_vms.iter())
+                .chain(self.symmetric_private_node_vms.iter())
+                .chain(self.upnp_private_node_vms.iter())
                 .map(|node_vm| node_vm.vm.public_ip_addr.to_string())
                 .for_each(|ip| {
                     if let Some(peer) = self.peers().iter().find(|p| p.contains(&ip)) {

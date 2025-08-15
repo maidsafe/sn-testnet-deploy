@@ -53,6 +53,9 @@ pub async fn handle_bootstrap(
     symmetric_private_node_count: Option<u16>,
     symmetric_private_node_vm_count: Option<u16>,
     symmetric_private_node_volume_size: Option<u16>,
+    upnp_private_node_count: Option<u16>,
+    upnp_private_node_vm_count: Option<u16>,
+    upnp_private_node_volume_size: Option<u16>,
 ) -> Result<()> {
     if network_contacts_url.is_none() && peer.is_none() {
         return Err(eyre!(
@@ -136,6 +139,8 @@ pub async fn handle_bootstrap(
         .unwrap_or(environment_type.get_default_symmetric_private_node_count());
     let full_cone_private_node_count = full_cone_private_node_count
         .unwrap_or(environment_type.get_default_full_cone_private_node_count());
+    let upnp_private_node_count =
+        upnp_private_node_count.unwrap_or(environment_type.get_default_upnp_private_node_count());
 
     testnet_deployer
         .bootstrap(&BootstrapOptions {
@@ -180,6 +185,10 @@ pub async fn handle_bootstrap(
                     symmetric_private_node_count,
                 ))
             }),
+            upnp_private_node_count,
+            upnp_private_node_vm_count,
+            upnp_private_node_volume_size: upnp_private_node_volume_size
+                .or_else(|| Some(calculate_size_per_attached_volume(upnp_private_node_count))),
         })
         .await?;
 
@@ -254,6 +263,10 @@ pub async fn handle_deploy(
     uploaders_count: u16,
     upload_interval: u16,
     upload_size: u16,
+    upnp_private_node_count: Option<u16>,
+    upnp_private_node_vm_count: Option<u16>,
+    upnp_private_node_volume_size: Option<u16>,
+    upnp_vm_size: Option<String>,
 ) -> Result<()> {
     if evm_network_type == EvmNetwork::Custom {
         if evm_data_payments_address.is_none() {
@@ -331,6 +344,8 @@ pub async fn handle_deploy(
         .unwrap_or(environment_type.get_default_symmetric_private_node_count());
     let full_cone_private_node_count = full_cone_private_node_count
         .unwrap_or(environment_type.get_default_full_cone_private_node_count());
+    let upnp_private_node_count =
+        upnp_private_node_count.unwrap_or(environment_type.get_default_upnp_private_node_count());
 
     let deploy_options = DeployOptions {
         binary_option: binary_option.clone(),
@@ -385,6 +400,7 @@ pub async fn handle_deploy(
         peer_cache_node_volume_size: peer_cache_node_volume_size
             .or_else(|| Some(calculate_size_per_attached_volume(peer_cache_node_count))),
         public_rpc,
+        region,
         rewards_address,
         symmetric_nat_gateway_vm_size,
         symmetric_private_node_count,
@@ -397,7 +413,11 @@ pub async fn handle_deploy(
         uploaders_count,
         upload_interval,
         upload_size,
-        region,
+        upnp_vm_size,
+        upnp_private_node_count,
+        upnp_private_node_vm_count,
+        upnp_private_node_volume_size: upnp_private_node_volume_size
+            .or_else(|| Some(calculate_size_per_attached_volume(upnp_private_node_count))),
     };
 
     if to_genesis {

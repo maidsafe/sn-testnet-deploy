@@ -256,6 +256,7 @@ impl TestnetDeployer {
             upload_size: None,
             uploaders_count: options.desired_uploaders_count,
             upload_interval: None,
+            upnp_private_node_count: 0,
             wallet_secret_keys: None,
         };
         let mut node_provision_failed = false;
@@ -587,6 +588,7 @@ impl TestnetDeployer {
             uploaders_count: options.desired_uploaders_count,
             upload_size: None,
             upload_interval: None,
+            upnp_private_node_count: 0,
             wallet_secret_keys: None,
         };
 

@@ -92,6 +92,7 @@ pub struct ProvisionOptions {
     pub upload_size: Option<u16>,
     pub upload_interval: Option<u16>,
     pub uploaders_count: Option<u16>,
+    pub upnp_private_node_count: u16,
     pub wallet_secret_keys: Option<Vec<String>>,
 }
 
@@ -293,6 +294,7 @@ impl From<BootstrapOptions> for ProvisionOptions {
             upload_size: None,
             upload_interval: None,
             uploaders_count: None,
+            upnp_private_node_count: bootstrap_options.upnp_private_node_count,
             wallet_secret_keys: None,
         }
     }
@@ -344,6 +346,7 @@ impl From<DeployOptions> for ProvisionOptions {
             upload_size: Some(deploy_options.upload_size),
             upload_interval: Some(deploy_options.upload_interval),
             uploaders_count: Some(deploy_options.uploaders_count),
+            upnp_private_node_count: deploy_options.upnp_private_node_count,
             wallet_secret_keys: None,
         }
     }
@@ -395,6 +398,7 @@ impl From<ClientsDeployOptions> for ProvisionOptions {
             upload_size: client_options.upload_size,
             upload_interval: None,
             uploaders_count: Some(client_options.uploaders_count),
+            upnp_private_node_count: 0,
             wallet_secret_keys: client_options.wallet_secret_keys,
         }
     }
@@ -908,7 +912,6 @@ impl AnsibleProvisioner {
                 node_type.to_ansible_inventory_type(),
                 options.full_cone_private_node_count,
             ),
-            // use provision_genesis_node fn
             NodeType::Generic => (node_type.to_ansible_inventory_type(), options.node_count),
             NodeType::Genesis => return Err(Error::InvalidNodeType(node_type)),
             NodeType::PeerCache => {
@@ -921,6 +924,10 @@ impl AnsibleProvisioner {
             NodeType::SymmetricPrivateNode => (
                 node_type.to_ansible_inventory_type(),
                 options.symmetric_private_node_count,
+            ),
+            NodeType::Upnp => (
+                node_type.to_ansible_inventory_type(),
+                options.upnp_private_node_count,
             ),
         };
 
@@ -951,6 +958,7 @@ impl AnsibleProvisioner {
             NodeType::PeerCache => AnsiblePlaybook::PeerCacheNodes,
             NodeType::FullConePrivateNode => AnsiblePlaybook::Nodes,
             NodeType::SymmetricPrivateNode => AnsiblePlaybook::Nodes,
+            NodeType::Upnp => AnsiblePlaybook::Upnp,
             _ => return Err(Error::InvalidNodeType(node_type.clone())),
         };
         self.ansible_runner.run_playbook(

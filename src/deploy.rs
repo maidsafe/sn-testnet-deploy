@@ -71,6 +71,10 @@ pub struct DeployOptions {
     pub uploaders_count: u16,
     pub upload_interval: u16,
     pub upload_size: u16,
+    pub upnp_vm_size: Option<String>,
+    pub upnp_private_node_count: u16,
+    pub upnp_private_node_vm_count: Option<u16>,
+    pub upnp_private_node_volume_size: Option<u16>,
 }
 
 impl TestnetDeployer {
@@ -117,6 +121,9 @@ impl TestnetDeployer {
                     .environment_type
                     .get_tfvars_filenames(&options.name, &options.region),
             ),
+            upnp_vm_size: options.upnp_vm_size.clone(),
+            upnp_private_node_vm_count: options.upnp_private_node_vm_count,
+            upnp_private_node_volume_size: options.upnp_private_node_volume_size,
         })
         .map_err(|err| {
             println!("Failed to create infra {err:?}");
@@ -264,7 +271,7 @@ impl TestnetDeployer {
         }
 
         self.ansible_provisioner
-            .print_ansible_run_banner("Provision Normal Nodes");
+            .print_ansible_run_banner("Provision Public Nodes");
         match self.ansible_provisioner.provision_nodes(
             &provision_options,
             Some(genesis_multiaddr.clone()),
@@ -272,10 +279,27 @@ impl TestnetDeployer {
             NodeType::Generic,
         ) {
             Ok(()) => {
-                println!("Provisioned normal nodes");
+                println!("Provisioned public nodes");
             }
             Err(err) => {
-                error!("Failed to provision normal nodes: {err}");
+                error!("Failed to provision public nodes: {err}");
+                node_provision_failed = true;
+            }
+        }
+
+        self.ansible_provisioner
+            .print_ansible_run_banner("Provision UPnP Nodes");
+        match self.ansible_provisioner.provision_nodes(
+            &provision_options,
+            Some(genesis_multiaddr.clone()),
+            Some(genesis_network_contacts.clone()),
+            NodeType::Upnp,
+        ) {
+            Ok(()) => {
+                println!("Provisioned UPnP nodes");
+            }
+            Err(err) => {
+                error!("Failed to provision UPnP nodes: {err}");
                 node_provision_failed = true;
             }
         }
