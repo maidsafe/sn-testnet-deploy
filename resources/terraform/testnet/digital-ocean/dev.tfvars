@@ -9,3 +9,5 @@ node_vm_count = 10
 peer_cache_droplet_size = "s-2vcpu-4gb"
 peer_cache_node_vm_count = 1
 symmetric_private_node_vm_count = 0
+upnp_droplet_size = "s-2vcpu-4gb"
+upnp_private_node_vm_count = 1
