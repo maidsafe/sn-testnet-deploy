@@ -109,6 +109,7 @@ pub enum NodeType {
     Genesis,
     PeerCache,
     SymmetricPrivateNode,
+    Upnp,
 }
 
 impl std::fmt::Display for NodeType {
@@ -119,6 +120,7 @@ impl std::fmt::Display for NodeType {
             NodeType::Genesis => write!(f, "genesis"),
             NodeType::PeerCache => write!(f, "peer-cache"),
             NodeType::SymmetricPrivateNode => write!(f, "symmetric-private"),
+            NodeType::Upnp => write!(f, "upnp"),
         }
     }
 }
@@ -133,6 +135,7 @@ impl std::str::FromStr for NodeType {
             "genesis" => Ok(NodeType::Genesis),
             "peer-cache" => Ok(NodeType::PeerCache),
             "symmetric-private" => Ok(NodeType::SymmetricPrivateNode),
+            "upnp" => Ok(NodeType::Upnp),
             _ => Err(format!("Invalid node type: {s}")),
         }
     }
@@ -146,6 +149,7 @@ impl NodeType {
             NodeType::Genesis => "GENESIS_NODE",
             NodeType::PeerCache => "PEER_CACHE_NODE",
             NodeType::SymmetricPrivateNode => "NAT_RANDOMIZED_NODE",
+            NodeType::Upnp => "UPNP_NODE",
         }
     }
 
@@ -156,6 +160,7 @@ impl NodeType {
             NodeType::Genesis => AnsibleInventoryType::Genesis,
             NodeType::PeerCache => AnsibleInventoryType::PeerCacheNodes,
             NodeType::SymmetricPrivateNode => AnsibleInventoryType::SymmetricPrivateNodes,
+            NodeType::Upnp => AnsibleInventoryType::Upnp,
         }
     }
 }
@@ -262,6 +267,9 @@ impl EnvironmentType {
     }
 
     pub fn get_default_full_cone_private_node_count(&self) -> u16 {
+        self.get_default_node_count()
+    }
+    pub fn get_default_upnp_private_node_count(&self) -> u16 {
         self.get_default_node_count()
     }
 }

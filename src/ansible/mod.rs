@@ -215,6 +215,8 @@ pub enum AnsiblePlaybook {
     Uploaders,
     /// The update peer playbook will update the peer multiaddr in all node service definitions.
     UpdatePeer,
+    /// Provision nodes that use UPnP emulation.
+    Upnp,
 }
 
 impl AnsiblePlaybook {
@@ -268,6 +270,7 @@ impl AnsiblePlaybook {
             }
             AnsiblePlaybook::Uploaders => "uploaders.yml".to_string(),
             AnsiblePlaybook::UpdatePeer => "update_peer.yml".to_string(),
+            AnsiblePlaybook::Upnp => "upnp_node.yml".to_string(),
         }
     }
 }
@@ -381,8 +384,10 @@ impl AnsibleRunner {
         let path = self.working_directory_path.join("inventory").join(path);
         match path.exists() {
             true => Ok(path),
-            false => Err(Error::EnvironmentDoesNotExist(
+            false => Err(Error::InventoryNotFound(
+                inventory_type.to_string(),
                 self.environment_name.clone(),
+                path.display().to_string(),
             )),
         }
     }
