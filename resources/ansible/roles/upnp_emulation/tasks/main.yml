@@ -1,0 +1,156 @@
+---
+- name: Enable IPv4 forwarding
+  become: true
+  ansible.posix.sysctl:
+    name: net.ipv4.ip_forward
+    value: '1'
+    state: present
+    sysctl_set: true
+    sysctl_file: /etc/sysctl.conf
+
+- name: Install necessary packages for miniupnpd daemon
+  become: true
+  ansible.builtin.apt:
+    name:
+      - libxtables-dev
+      - libiptc-dev
+      - libssl-dev
+      - libmnl-dev
+      - libnftnl-dev
+      - net-tools
+      - build-essential
+    state: present
+    update_cache: true
+
+- name: Check if miniupnp repository already exists
+  ansible.builtin.stat:
+    path: "{{ miniupnpd_clone_dir }}"
+  register: miniupnp_repo
+
+- name: Clone miniupnpd repository
+  become: true
+  ansible.builtin.git:
+    repo: "{{ miniupnpd_repo_url }}"
+    dest: "{{ miniupnpd_clone_dir }}"
+    version: "{{ miniupnpd_branch }}"
+    force: true
+  when: not miniupnp_repo.stat.exists
+
+- name: Configure and build miniupnpd
+  become: true
+  ansible.builtin.shell: |
+    cd {{ miniupnpd_clone_dir }}/miniupnpd
+    ./configure --firewall=iptables
+    make install
+  args:
+    creates: /usr/sbin/miniupnpd
+
+- name: Create miniupnpd config directory
+  become: true
+  ansible.builtin.file:
+    path: "{{ miniupnpd_config_dir }}"
+    state: directory
+    mode: '0755'
+
+- name: Get external IP address from eth0
+  ansible.builtin.shell: ip -4 addr show {{ external_interface }} | grep -oP '(?<=inet\s)\d+(\.\d+){3}' | head -n1
+  register: external_ip
+  changed_when: false
+
+- name: Get internal IP address from eth1
+  ansible.builtin.shell: ip -4 addr show {{ internal_interface }} | grep -oP '(?<=inet\s)\d+(\.\d+){3}'
+  register: internal_ip
+  changed_when: false
+
+- name: Create miniupnpd configuration file
+  become: true
+  ansible.builtin.copy:
+    content: |
+      ext_ifname={{ external_interface }}
+      ext_ip={{ external_ip.stdout }}
+      listening_ip={{ internal_ip.stdout }}{{ internal_cidr }}
+      enable_upnp=yes
+      enable_natpmp=yes
+      secure_mode=no
+      system_uptime=yes
+      clean_ruleset_interval=7200
+      clean_ruleset_threshold=50
+    dest: "{{ miniupnpd_config_dir }}/{{ miniupnpd_config_file }}"
+    mode: '0644'
+
+- name: Add multicast route for UPnP traffic
+  become: true
+  ansible.builtin.shell: route add -net 239.255.255.250 netmask 255.255.255.255 {{ internal_interface }}
+  ignore_errors: true
+
+- name: Configure netplan for persistent multicast route
+  become: true
+  block:
+    - name: Check if netplan backup already exists
+      ansible.builtin.stat:
+        path: /etc/netplan/50-cloud-init.yaml.backup
+      register: netplan_backup_exists
+
+    - name: Backup original netplan config
+      ansible.builtin.copy:
+        src: /etc/netplan/50-cloud-init.yaml
+        dest: /etc/netplan/50-cloud-init.yaml.backup
+        remote_src: true
+      when: not netplan_backup_exists.stat.exists
+
+    - name: Retrieve current netplan config
+      ansible.builtin.slurp:
+        src: /etc/netplan/50-cloud-init.yaml
+      register: netplan_content
+      
+    - name: Parse netplan yaml
+      ansible.builtin.set_fact:
+        netplan_config: "{{ netplan_content.content | b64decode | from_yaml }}"
+        
+    - name: Add multicast route to eth1 config
+      ansible.builtin.set_fact:
+        updated_eth1: "{{ netplan_config.network.ethernets.eth1 | combine({
+          'routes': (netplan_config.network.ethernets.eth1.routes | default([])) + [{
+            'to': '239.255.255.250/32',
+            'via': '0.0.0.0'
+          }]
+        }) }}"
+        
+    - name: Update full netplan config
+      ansible.builtin.set_fact:
+        updated_netplan: "{{ netplan_config | combine({
+          'network': {
+            'ethernets': {
+              'eth1': updated_eth1
+            }
+          }
+        }, recursive=true) }}"
+        
+    - name: Write updated netplan config
+      ansible.builtin.copy:
+        content: "{{ updated_netplan | to_nice_yaml }}"
+        dest: /etc/netplan/50-cloud-init.yaml
+
+- name: Apply netplan configuration
+  become: true
+  ansible.builtin.shell: netplan apply
+  ignore_errors: true
+
+- name: Configure legacy iptables for miniupnpd compatibility
+  become: true
+  ansible.builtin.file:
+    src: "{{ item.src }}"
+    dest: "{{ item.dest }}"
+    state: link
+    force: true
+  loop:
+    - { src: xtables-legacy-multi, dest: /usr/sbin/iptables }
+    - { src: xtables-legacy-multi, dest: /usr/sbin/ip6tables }
+
+- name: Enable and start miniupnpd service
+  become: true
+  ansible.builtin.systemd:
+    name: miniupnpd
+    enabled: true
+    state: started
+    daemon_reload: true

@@ -1,0 +1,9 @@
+---
+miniupnpd_repo_url: https://github.com/miniupnp/miniupnp.git
+miniupnpd_branch: miniupnpd_2_3_6
+miniupnpd_clone_dir: /root/miniupnp
+miniupnpd_config_dir: /etc/miniupnpd
+miniupnpd_config_file: miniupnpd.conf
+external_interface: eth0
+internal_interface: eth1
+internal_cidr: /16
