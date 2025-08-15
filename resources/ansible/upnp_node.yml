@@ -1,0 +1,36 @@
+---
+- name: deploy antnode to upnp nodes
+  hosts: all
+  become: False
+  max_fail_percentage: 10
+  ignore_unreachable: yes
+  vars:
+    is_genesis: False
+  roles:
+    - role: ant_user
+      become: True
+    - role: setup_striped_storage
+      become: True
+    - antctl
+    - role: telegraf-node
+      become: True
+    - upnp_emulation
+    - node
+
+  tasks:
+    # Something is wrong with the journal service on Ubuntu that causes no
+    # output to be produced when running `journalctl`. The solution seemed
+    # to be restarting the service.
+    - name: restart systemd-journald
+      become: True
+      ansible.builtin.systemd:
+        name: systemd-journald
+        state: restarted
+        enabled: yes
+    - name: restart telegraf
+      become: True
+      ansible.builtin.systemd:
+        name: telegraf
+        state: restarted
+        enabled: yes
+      when: enable_telegraf | bool
