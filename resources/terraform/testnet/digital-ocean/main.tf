@@ -116,6 +116,16 @@ resource "digitalocean_droplet" "evm_node" {
   tags     = ["environment:${terraform.workspace}", "type:evm_node"]
 }
 
+resource "digitalocean_droplet" "upnp_private_node" {
+  count   = var.upnp_private_node_vm_count
+  image    = var.upnp_droplet_image_id
+  name     = "${terraform.workspace}-upnp-private-node-${count.index + 1}"
+  region   = var.region
+  size     = var.upnp_droplet_size
+  ssh_keys = var.droplet_ssh_keys
+  tags     = ["environment:${terraform.workspace}", "type:upnp_private_node"]
+}
+
 locals {
   peer_cache_node_volume_keys = flatten([
     for node_index in range(var.peer_cache_node_vm_count) : [
@@ -149,6 +159,12 @@ locals {
 
    symmetric_private_node_volume_keys = flatten([
     for node_index in range(var.symmetric_private_node_vm_count) : [
+      for volume_index in range(var.volumes_per_node) : "${node_index+1}-${volume_index+1}"
+    ]
+  ])
+
+  upnp_private_node_volume_keys = flatten([
+    for node_index in range(var.upnp_private_node_vm_count) : [
       for volume_index in range(var.volumes_per_node) : "${node_index+1}-${volume_index+1}"
     ]
   ])
@@ -231,4 +247,17 @@ resource "digitalocean_volume_attachment" "ant_client_volume_attachment" {
   for_each   = var.ant_client_volume_size > 0 ? { for key in local.ant_client_volume_keys : key => key } : {}
   droplet_id = digitalocean_droplet.ant_client[tonumber(split("-", each.key)[0]) - 1].id
   volume_id  = digitalocean_volume.ant_client_attached_volume[each.key].id
+}
+
+resource "digitalocean_volume" "upnp_private_node_attached_volume" {
+  for_each = var.upnp_private_node_volume_size > 0 ? { for key in local.upnp_private_node_volume_keys : key => key } : {}
+  name     = lower("${terraform.workspace}-upnp-private-node-${split("-", each.key)[0]}-volume-${split("-", each.key)[1]}")
+  size     = var.upnp_private_node_volume_size
+  region   = var.region
+}
+
+resource "digitalocean_volume_attachment" "upnp_private_node_volume_attachment" {
+  for_each   = var.upnp_private_node_volume_size > 0 ? { for key in local.upnp_private_node_volume_keys : key => key } : {}
+  droplet_id = digitalocean_droplet.upnp_private_node[tonumber(split("-", each.key)[0]) - 1].id
+  volume_id  = digitalocean_volume.upnp_private_node_attached_volume[each.key].id
 }

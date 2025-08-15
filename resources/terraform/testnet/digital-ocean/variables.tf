@@ -122,6 +122,10 @@ variable "evm_node_droplet_image_id" {
   description = "The ID of the EVM node droplet image. Varies per environment type."
 }
 
+variable "upnp_droplet_image_id" {
+  description = "The ID of the UPnP node droplet image. Varies per environment type."
+}
+
 variable "volumes_per_node" {
   description = "Number of volumes to attach to each node VM. This is set to the maximum number of volumes that can be attached to a droplet."
   type        = number
@@ -168,4 +172,20 @@ variable "ant_client_volume_size" {
   description = "Size of each volume in GB for the ANT Client VMs"
   type        = number
   default     = 70
+}
+
+variable "upnp_droplet_size" {
+  description = "The size of the droplet for UPnP host VMs"
+  default = "s-2vcpu-4gb"
+}
+
+variable "upnp_private_node_vm_count" {
+  default     = 10
+  description = "The number of droplets to launch for UPnP private nodes"
+}
+
+variable "upnp_private_node_volume_size" {
+  description = "Size of each volume in GB for UPnP private nodes"
+  type        = number
+  default = 0
 }
