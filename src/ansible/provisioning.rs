@@ -453,14 +453,12 @@ impl AnsibleProvisioner {
             let mut build_ant = false;
             let mut build_antnode = false;
             let mut build_antctl = false;
-            let mut build_antctld = false;
 
             for binary in &binaries {
                 match binary.as_str() {
                     "ant" => build_ant = true,
                     "antnode" => build_antnode = true,
                     "antctl" => build_antctl = true,
-                    "antctld" => build_antctld = true,
                     _ => return Err(Error::InvalidBinaryName(binary.clone())),
                 }
             }
@@ -475,10 +473,6 @@ impl AnsibleProvisioner {
                 map.insert(
                     "build_antctl".to_string(),
                     serde_json::Value::Bool(build_antctl),
-                );
-                map.insert(
-                    "build_antctld".to_string(),
-                    serde_json::Value::Bool(build_antctld),
                 );
             }
             json_value.to_string()

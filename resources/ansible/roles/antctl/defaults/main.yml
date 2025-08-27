@@ -5,5 +5,3 @@ node_instance_count: 20
 binary_dir: /usr/local/bin
 antctl_archive_filename: antctl-latest-x86_64-unknown-linux-musl.tar.gz
 antctl_archive_url: https://antctl.s3.eu-west-2.amazonaws.com/{{ antctl_archive_filename }}
-antctld_archive_filename: antctld-latest-x86_64-unknown-linux-musl.tar.gz
-antctld_archive_url: https://antctld.s3.eu-west-2.amazonaws.com/{{ antctld_archive_filename }}

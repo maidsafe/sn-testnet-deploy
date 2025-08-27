@@ -6,12 +6,7 @@
 mod cmd;
 
 use crate::cmd::{
-    network::{ChurnCommands, NetworkCommands},
-    nginx::NginxCommands,
-    nodes,
-    provision::ProvisionCommands,
-    telegraf::TelegrafCommands,
-    Commands,
+    nginx::NginxCommands, nodes, provision::ProvisionCommands, telegraf::TelegrafCommands, Commands,
 };
 use clap::Parser;
 use color_eyre::Result;
@@ -318,65 +313,6 @@ async fn main() -> Result<()> {
         }
         Commands::Logs(log_cmd) => {
             cmd::logs::handle_logs_command(log_cmd).await?;
-            Ok(())
-        }
-        Commands::Network(NetworkCommands::ChurnCommands(churn_cmds)) => {
-            let (name, provider) = match &churn_cmds {
-                ChurnCommands::FixedInterval { name, provider, .. } => (name, provider),
-                ChurnCommands::RandomInterval { name, provider, .. } => (name, provider),
-            };
-            let testnet_deployer = TestnetDeployBuilder::default()
-                .ansible_forks(1)
-                .environment_name(name)
-                .provider(*provider)
-                .build()?;
-            let inventory_service = DeploymentInventoryService::from(&testnet_deployer);
-            let inventory = inventory_service
-                .generate_or_retrieve_inventory(name, true, None)
-                .await?;
-
-            match churn_cmds {
-                ChurnCommands::FixedInterval {
-                    churn_cycles,
-                    concurrent_churns,
-                    interval,
-                    retain_peer_id,
-                    ..
-                } => {
-                    cmd::network::handle_fixed_interval_network_churn(
-                        inventory,
-                        interval,
-                        concurrent_churns,
-                        retain_peer_id,
-                        churn_cycles,
-                    )
-                    .await?;
-                }
-                ChurnCommands::RandomInterval {
-                    churn_count,
-                    churn_cycles,
-                    retain_peer_id,
-                    time_frame,
-                    ..
-                } => {
-                    cmd::network::handle_random_interval_network_churn(
-                        inventory,
-                        time_frame,
-                        churn_count,
-                        retain_peer_id,
-                        churn_cycles,
-                    )
-                    .await?;
-                }
-            }
-            Ok(())
-        }
-        Commands::Network(NetworkCommands::UpdateNodeLogLevel {
-            concurrent_updates,
-            log_level,
-            name,
-        }) => {
-            cmd::network::handle_update_node_log_level(concurrent_updates, log_level, name).await?;
             Ok(())
         }
         Commands::Notify { name } => {
