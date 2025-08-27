@@ -73,7 +73,7 @@ variable "region" {
 }
 
 variable "genesis_vm_count" {
-  default     = 5
+  default     = 7
   description = "The number of genesis droplets to launch"
 }
 

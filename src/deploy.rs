@@ -100,7 +100,8 @@ impl TestnetDeployer {
             full_cone_vm_size: options.full_cone_vm_size.clone(),
             full_cone_private_node_vm_count: options.full_cone_private_node_vm_count,
             full_cone_private_node_volume_size: options.full_cone_private_node_volume_size,
-            genesis_vm_count: Some(5),
+            // Will be set by terraform. Defaults to 7
+            genesis_vm_count: None,
             genesis_node_volume_size: options.genesis_node_volume_size,
             name: options.name.clone(),
             nat_gateway_image_id: None,
