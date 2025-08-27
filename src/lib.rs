@@ -1158,57 +1158,20 @@ pub fn get_genesis_multiaddr(
     Ok(Some((multiaddr, genesis_ip)))
 }
 
-pub fn get_anvil_node_data(
-    ansible_runner: &AnsibleRunner,
-    ssh_client: &SshClient,
-) -> Result<AnvilNodeData> {
+fn get_anvil_node_data_hardcoded(ansible_runner: &AnsibleRunner) -> Result<AnvilNodeData> {
     let evm_inventory = ansible_runner.get_inventory(AnsibleInventoryType::EvmNodes, true)?;
     if evm_inventory.is_empty() {
         return Err(Error::EvmNodeNotFound);
     }
-
     let evm_ip = evm_inventory[0].public_ip_addr;
-    debug!("Retrieved IP address for EVM node: {evm_ip}");
-    let csv_file_path = "/home/ant/.local/share/autonomi/evm_testnet_data.csv";
 
-    const MAX_ATTEMPTS: u8 = 5;
-    const RETRY_DELAY: Duration = Duration::from_secs(5);
-
-    for attempt in 1..=MAX_ATTEMPTS {
-        match ssh_client.run_command(&evm_ip, "ant", &format!("cat {csv_file_path}"), false) {
-            Ok(output) => {
-                if let Some(csv_contents) = output.first() {
-                    let parts: Vec<&str> = csv_contents.split(',').collect();
-                    if parts.len() != 4 {
-                        return Err(Error::EvmTestnetDataParsingError(
-                            "Expected 4 fields in the CSV".to_string(),
-                        ));
-                    }
-
-                    let evm_testnet_data = AnvilNodeData {
-                        rpc_url: parts[0].trim().to_string(),
-                        payment_token_address: parts[1].trim().to_string(),
-                        data_payments_address: parts[2].trim().to_string(),
-                        deployer_wallet_private_key: parts[3].trim().to_string(),
-                    };
-                    return Ok(evm_testnet_data);
-                }
-            }
-            Err(e) => {
-                if attempt == MAX_ATTEMPTS {
-                    return Err(e);
-                }
-                println!(
-                    "Attempt {} failed to read EVM testnet data. Retrying in {} seconds...",
-                    attempt,
-                    RETRY_DELAY.as_secs()
-                );
-            }
-        }
-        std::thread::sleep(RETRY_DELAY);
-    }
-
-    Err(Error::EvmTestnetDataNotFound)
+    Ok(AnvilNodeData {
+        data_payments_address: "0x8464135c8F25Da09e49BC8782676a84730C318bC".to_string(),
+        deployer_wallet_private_key:
+            "0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80".to_string(),
+        payment_token_address: "0x5FbDB2315678afecb367f032d93F642f64180aa3".to_string(),
+        rpc_url: format!("http://{evm_ip}:61611"),
+    })
 }
 
 pub fn get_multiaddr(

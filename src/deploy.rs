@@ -8,9 +8,10 @@ use crate::{
     ansible::provisioning::{PrivateNodeProvisionInventory, ProvisionOptions},
     error::{Error, Result},
     funding::get_address_from_sk,
-    get_anvil_node_data, get_bootstrap_cache_url, get_genesis_multiaddr, write_environment_details,
-    BinaryOption, DeploymentInventory, DeploymentType, EnvironmentDetails, EnvironmentType,
-    EvmDetails, EvmNetwork, InfraRunOptions, LogFormat, NodeType, TestnetDeployer,
+    get_anvil_node_data_hardcoded, get_bootstrap_cache_url, get_genesis_multiaddr,
+    write_environment_details, BinaryOption, DeploymentInventory, DeploymentType,
+    EnvironmentDetails, EnvironmentType, EvmDetails, EvmNetwork, InfraRunOptions, LogFormat,
+    NodeType, TestnetDeployer,
 };
 use alloy::{hex::ToHexExt, primitives::U256};
 use colored::Colorize;
@@ -178,11 +179,12 @@ impl TestnetDeployer {
                 })?;
 
             Some(
-                get_anvil_node_data(&self.ansible_provisioner.ansible_runner, &self.ssh_client)
-                    .map_err(|err| {
+                get_anvil_node_data_hardcoded(&self.ansible_provisioner.ansible_runner).map_err(
+                    |err| {
                         println!("Failed to get evm testnet data {err:?}");
                         err
-                    })?,
+                    },
+                )?,
             )
         } else {
             None

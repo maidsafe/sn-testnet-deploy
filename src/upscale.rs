@@ -10,7 +10,7 @@ use crate::{
         provisioning::{PrivateNodeProvisionInventory, ProvisionOptions},
     },
     error::{Error, Result},
-    get_anvil_node_data, get_bootstrap_cache_url, get_genesis_multiaddr, get_multiaddr,
+    get_anvil_node_data_hardcoded, get_bootstrap_cache_url, get_genesis_multiaddr, get_multiaddr,
     DeploymentInventory, DeploymentType, EvmNetwork, InfraRunOptions, NodeType, TestnetDeployer,
 };
 use colored::Colorize;
@@ -430,7 +430,7 @@ impl TestnetDeployer {
             // get anvil funding sk
             if provision_options.evm_network == EvmNetwork::Anvil {
                 let anvil_node_data =
-                    get_anvil_node_data(&self.ansible_provisioner.ansible_runner, &self.ssh_client)
+                    get_anvil_node_data_hardcoded(&self.ansible_provisioner.ansible_runner)
                         .map_err(|err| {
                             println!("Failed to get evm testnet data {err:?}");
                             err
