@@ -85,8 +85,7 @@
       - "--rewards-address={{ rewards_address }}"
       - "--max-archived-log-files={{ max_archived_log_files }}"
       - "--max-log-files={{ max_log_files }}"
-      - "{{ ('--node-ip=' + private_ip_eth1.stdout) if (enable_upnp | bool) or (private_ip | bool) else omit }}"
-      - --reachability-check
+      - "{{ ('--node-ip=' + private_ip_eth1.stdout) if enable_upnp | bool else omit }}"
       - "{{ ('--rpc-port=' + rpc_port) if not use_port_range else omit }}"
       - "{{ ('--rpc-port=' + rpc_start_port + '-' + rpc_end_port) if use_port_range else omit }}"
       - "{{ ('--metrics-port=' + metrics_port) if not use_port_range else omit }}"
