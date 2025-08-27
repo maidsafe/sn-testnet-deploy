@@ -191,35 +191,6 @@ impl ExtraVarsDocBuilder {
         }
     }
 
-    pub fn add_antctld_url(&mut self, deployment_name: &str, binary_option: &BinaryOption) {
-        match binary_option {
-            BinaryOption::BuildFromSource {
-                repo_owner, branch, ..
-            } => {
-                self.add_branch_url_variable(
-                    "antctld_archive_url",
-                    &format!(
-                        "{BRANCH_S3_BUCKET_URL}/{repo_owner}/{branch}/antctld-{deployment_name}-x86_64-unknown-linux-musl.tar.gz"
-                    ),
-                    branch,
-                    repo_owner,
-                );
-            }
-            BinaryOption::Versioned { antctl_version, .. } => {
-                // An unwrap would be justified here because the antctl version must be set for the
-                // type of deployment where this will apply.
-                self.add_variable(
-                    "antctld_archive_url",
-                    &format!(
-                        "{}/antctld-{}-x86_64-unknown-linux-musl.tar.gz",
-                        ANTCTL_S3_BUCKET_URL,
-                        antctl_version.as_ref().unwrap()
-                    ),
-                );
-            }
-        }
-    }
-
     pub fn add_ant_url_or_version(
         &mut self,
         deployment_name: &str,
@@ -359,7 +330,6 @@ pub fn build_node_extra_vars_doc(
 
     extra_vars.add_node_url_or_version(&options.name, &options.binary_option);
     extra_vars.add_antctl_url(&options.name, &options.binary_option);
-    extra_vars.add_antctld_url(&options.name, &options.binary_option);
 
     if let Some(env_vars) = &options.node_env_variables {
         extra_vars.add_env_variable_list("node_env_variables", env_vars.clone());

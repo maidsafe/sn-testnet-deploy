@@ -799,9 +799,6 @@ impl NodeVirtualMachine {
                         })
                         .collect()
                 }),
-                safenodemand_endpoint: node_registry
-                    .and_then(|reg| reg.daemon.as_ref())
-                    .and_then(|daemon| daemon.endpoint),
                 vm: vm.clone(),
             };
             node_vms.push(node_vm.clone());
@@ -845,7 +842,6 @@ pub struct NodeVirtualMachine {
     pub node_count: usize,
     pub node_listen_addresses: Vec<Vec<String>>,
     pub rpc_endpoint: HashMap<String, SocketAddr>,
-    pub safenodemand_endpoint: Option<SocketAddr>,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq, Hash)]
