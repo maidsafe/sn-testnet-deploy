@@ -31,6 +31,7 @@
       - add
       - --no-upnp
       - --first
+      - --skip-reachability-check
       - --data-dir-path=/mnt/antnode-storage/data
       - --log-dir-path=/mnt/antnode-storage/log
       - "--rpc-address={{ node_rpc_ip }}"
