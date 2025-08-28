@@ -183,7 +183,6 @@ async fn main() -> Result<()> {
             symmetric_private_node_vm_count,
             symmetric_private_node_volume_size,
             provider,
-            public_rpc,
             region,
             repo_owner,
             rewards_address,
@@ -249,7 +248,6 @@ async fn main() -> Result<()> {
                 symmetric_private_node_vm_count,
                 symmetric_private_node_volume_size,
                 provider,
-                public_rpc,
                 region,
                 repo_owner,
                 rewards_address,
@@ -461,7 +459,6 @@ async fn main() -> Result<()> {
             node_env_variables,
             plan,
             provider,
-            public_rpc,
             repo_owner,
             skip_binary_build,
         } => {
@@ -494,7 +491,6 @@ async fn main() -> Result<()> {
                 node_env_variables,
                 plan,
                 provider,
-                public_rpc,
                 repo_owner,
                 skip_binary_build,
             )

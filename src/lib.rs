@@ -15,7 +15,6 @@ pub mod infra;
 pub mod inventory;
 pub mod logs;
 pub mod reserved_ip;
-pub mod rpc_client;
 pub mod s3;
 pub mod safe;
 pub mod setup;
@@ -34,7 +33,6 @@ use crate::{
     },
     error::{Error, Result},
     inventory::{DeploymentInventory, VirtualMachine},
-    rpc_client::RpcClient,
     s3::S3Repository,
     ssh::SshClient,
     terraform::TerraformRunner,
@@ -300,12 +298,10 @@ impl FromStr for EnvironmentType {
 /// Specify the binary option for the deployment.
 ///
 /// There are several binaries involved in the deployment:
-/// * safenode
-/// * safenode_rpc_client
-/// * faucet
-/// * safe
+/// * antnode
+/// * ant
 ///
-/// The `safe` binary is only used for smoke testing the deployment, although we don't really do
+/// The `ant` binary is only used for smoke testing the deployment, although we don't really do
 /// that at the moment.
 ///
 /// The options are to build from source, or supply a pre-built, versioned binary, which will be
@@ -617,10 +613,6 @@ impl TestnetDeployBuilder {
         let ssh_client = SshClient::new(ssh_secret_key_path);
         let ansible_provisioner =
             AnsibleProvisioner::new(ansible_runner, provider, ssh_client.clone());
-        let rpc_client = RpcClient::new(
-            PathBuf::from("/usr/local/bin/safenode_rpc_client"),
-            working_directory_path.clone(),
-        );
 
         // Remove any `safe` binary from a previous deployment. Otherwise you can end up with
         // mismatched binaries.
@@ -634,7 +626,6 @@ impl TestnetDeployBuilder {
             provider,
             self.deployment_type.clone(),
             &self.environment_name,
-            rpc_client,
             S3Repository {},
             ssh_client,
             terraform_runner,
@@ -654,7 +645,6 @@ pub struct TestnetDeployer {
     pub environment_name: String,
     pub inventory_file_path: PathBuf,
     pub region: String,
-    pub rpc_client: RpcClient,
     pub s3_repository: S3Repository,
     pub ssh_client: SshClient,
     pub terraform_runner: TerraformRunner,
@@ -668,7 +658,6 @@ impl TestnetDeployer {
         cloud_provider: CloudProvider,
         deployment_type: EnvironmentType,
         environment_name: &str,
-        rpc_client: RpcClient,
         s3_repository: S3Repository,
         ssh_client: SshClient,
         terraform_runner: TerraformRunner,
@@ -689,7 +678,6 @@ impl TestnetDeployer {
             environment_name: environment_name.to_string(),
             inventory_file_path,
             region,
-            rpc_client,
             ssh_client,
             s3_repository,
             terraform_runner,
@@ -718,26 +706,6 @@ impl TestnetDeployer {
                 .workspace_new(&self.environment_name)?;
         } else {
             println!("Workspace {} already exists", self.environment_name);
-        }
-
-        let rpc_client_path = self.working_directory_path.join("safenode_rpc_client");
-        if !rpc_client_path.is_file() {
-            println!("Downloading the rpc client for safenode...");
-            let archive_name = "safenode_rpc_client-latest-x86_64-unknown-linux-musl.tar.gz";
-            get_and_extract_archive_from_s3(
-                &self.s3_repository,
-                "sn-node-rpc-client",
-                archive_name,
-                &self.working_directory_path,
-            )
-            .await?;
-            #[cfg(unix)]
-            {
-                use std::os::unix::fs::PermissionsExt;
-                let mut permissions = std::fs::metadata(&rpc_client_path)?.permissions();
-                permissions.set_mode(0o755); // rwxr-xr-x
-                std::fs::set_permissions(&rpc_client_path, permissions)?;
-            }
         }
 
         Ok(())

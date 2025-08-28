@@ -569,12 +569,6 @@ pub enum Commands {
         /// Valid values are "aws" or "digital-ocean".
         #[clap(long, default_value_t = CloudProvider::DigitalOcean, value_parser = parse_provider, verbatim_doc_comment)]
         provider: CloudProvider,
-        /// If set to true, the RPC of the node will be accessible remotely.
-        ///
-        /// By default, the antnode RPC is only accessible via the 'localhost' and is not exposed for
-        /// security reasons.
-        #[clap(long, default_value_t = false, verbatim_doc_comment)]
-        public_rpc: bool,
         /// The region to deploy to.
         ///
         /// Defaults to "lon1" for Digital Ocean.
@@ -1184,12 +1178,6 @@ pub enum Commands {
         /// The cloud provider for the network.
         #[clap(long, value_parser = parse_provider, verbatim_doc_comment, default_value_t = CloudProvider::DigitalOcean)]
         provider: CloudProvider,
-        /// If set to true, for new VMs the RPC of the node will be accessible remotely.
-        ///
-        /// By default, the antnode RPC is only accessible via the 'localhost' and is not exposed for
-        /// security reasons.
-        #[clap(long, default_value_t = false, verbatim_doc_comment)]
-        public_rpc: bool,
         /// The repo owner of a branch from which custom binaries were built.
         ///
         /// This only applies if the original deployment also used a custom branch. The upscale will

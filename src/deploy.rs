@@ -66,7 +66,6 @@ pub struct DeployOptions {
     pub symmetric_private_node_count: u16,
     pub symmetric_private_node_vm_count: Option<u16>,
     pub symmetric_private_node_volume_size: Option<u16>,
-    pub public_rpc: bool,
     pub region: String,
     pub rewards_address: String,
     pub uploaders_count: u16,
