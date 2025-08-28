@@ -15,7 +15,7 @@ name="testnet-deploy"
 [dependencies]
 alloy = { version = "0.15.6", default-features = false, features = ["signers"] }
 ant-releases = "0.4.0"
-ant-service-management = { version = "0.4.13" }
+ant-service-management = { git = "https://github.com/RolandSherwin/autonomi", branch = "auto_conn_det_manager" }
 async-recursion = "1.0.4"
 aws-config = "0.56.0"
 aws-sdk-s3 = "0.29.0"
@@ -30,7 +30,7 @@ evmlib = { version = "0.4.0" }
 flate2 = "1.0"
 futures = "~0.3.13"
 fs_extra = "1.2.0"
-libp2p = { version = "0.54.1", features = [] }
+libp2p = { version = "0.56.0" }
 log = "0.4"
 indicatif = "0.17.3"
 inquire = "0.6.2"
