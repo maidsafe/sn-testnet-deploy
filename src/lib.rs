@@ -774,35 +774,41 @@ impl TestnetDeployer {
     /// First, a playbook runs `safenode-manager status` against all the machines, to get the
     /// current state of all the nodes. Then all the node registry files are retrieved and
     /// deserialized to a `NodeRegistry`, allowing us to output the status of each node on each VM.
-    pub fn status(&self) -> Result<()> {
+    pub async fn status(&self) -> Result<()> {
         self.ansible_provisioner.status()?;
 
         let peer_cache_node_registries = self
             .ansible_provisioner
-            .get_node_registries(&AnsibleInventoryType::PeerCacheNodes)?;
+            .get_node_registries(&AnsibleInventoryType::PeerCacheNodes)
+            .await?;
         let generic_node_registries = self
             .ansible_provisioner
-            .get_node_registries(&AnsibleInventoryType::Nodes)?;
+            .get_node_registries(&AnsibleInventoryType::Nodes)
+            .await?;
         let symmetric_private_node_registries = self
             .ansible_provisioner
-            .get_node_registries(&AnsibleInventoryType::SymmetricPrivateNodes)?;
+            .get_node_registries(&AnsibleInventoryType::SymmetricPrivateNodes)
+            .await?;
         let full_cone_private_node_registries = self
             .ansible_provisioner
-            .get_node_registries(&AnsibleInventoryType::FullConePrivateNodes)?;
+            .get_node_registries(&AnsibleInventoryType::FullConePrivateNodes)
+            .await?;
         let upnp_private_node_registries = self
             .ansible_provisioner
-            .get_node_registries(&AnsibleInventoryType::Upnp)?;
+            .get_node_registries(&AnsibleInventoryType::Upnp)
+            .await?;
         let genesis_node_registry = self
             .ansible_provisioner
-            .get_node_registries(&AnsibleInventoryType::Genesis)?
+            .get_node_registries(&AnsibleInventoryType::Genesis)
+            .await?
             .clone();
 
-        peer_cache_node_registries.print();
-        generic_node_registries.print();
-        symmetric_private_node_registries.print();
-        full_cone_private_node_registries.print();
-        upnp_private_node_registries.print();
-        genesis_node_registry.print();
+        peer_cache_node_registries.print().await;
+        generic_node_registries.print().await;
+        symmetric_private_node_registries.print().await;
+        full_cone_private_node_registries.print().await;
+        upnp_private_node_registries.print().await;
+        genesis_node_registry.print().await;
 
         let all_registries = [
             &peer_cache_node_registries,
@@ -823,9 +829,9 @@ impl TestnetDeployer {
             .iter()
             .flat_map(|r| r.retrieved_registries.iter())
         {
-            for node in registry.nodes.iter() {
+            for node in registry.nodes.read().await.iter() {
                 total_nodes += 1;
-                match node.status {
+                match node.read().await.status {
                     ServiceStatus::Running => running_nodes += 1,
                     ServiceStatus::Stopped => stopped_nodes += 1,
                     ServiceStatus::Added => added_nodes += 1,
@@ -840,31 +846,11 @@ impl TestnetDeployer {
         let full_cone_private_hosts = full_cone_private_node_registries.retrieved_registries.len();
         let upnp_private_hosts = upnp_private_node_registries.retrieved_registries.len();
 
-        let peer_cache_nodes = peer_cache_node_registries
-            .retrieved_registries
-            .iter()
-            .flat_map(|(_, n)| n.nodes.iter())
-            .count();
-        let generic_nodes = generic_node_registries
-            .retrieved_registries
-            .iter()
-            .flat_map(|(_, n)| n.nodes.iter())
-            .count();
-        let symmetric_private_nodes = symmetric_private_node_registries
-            .retrieved_registries
-            .iter()
-            .flat_map(|(_, n)| n.nodes.iter())
-            .count();
-        let full_cone_private_nodes = full_cone_private_node_registries
-            .retrieved_registries
-            .iter()
-            .flat_map(|(_, n)| n.nodes.iter())
-            .count();
-        let upnp_private_nodes = upnp_private_node_registries
-            .retrieved_registries
-            .iter()
-            .flat_map(|(_, n)| n.nodes.iter())
-            .count();
+        let peer_cache_nodes = peer_cache_node_registries.get_node_count().await;
+        let generic_nodes = generic_node_registries.get_node_count().await;
+        let symmetric_private_nodes = symmetric_private_node_registries.get_node_count().await;
+        let full_cone_private_nodes = full_cone_private_node_registries.get_node_count().await;
+        let upnp_private_nodes = upnp_private_node_registries.get_node_count().await;
 
         println!("-------");
         println!("Summary");
