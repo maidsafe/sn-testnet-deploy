@@ -1291,7 +1291,6 @@ pub async fn handle_clients_command(cmd: ClientsCommands) -> Result<()> {
                     node_env_variables: None,
                     plan,
                     provision_only,
-                    public_rpc: false,
                     ant_version: Some(autonomi_version),
                     token_amount: None,
                 })

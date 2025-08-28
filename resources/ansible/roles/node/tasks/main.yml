@@ -1,15 +1,5 @@
 ---
 # This role assumes the existence of the node manager, which is setup using another role.
-- name: get the private IP for the instance
-  set_fact:
-    node_rpc_ip: "{{ instance_facts.instances[0].network_interfaces[0].private_ip_address }}"
-  when: provider == "aws" and public_rpc
-
-- name: use the public IP as the RPC address on DO
-  set_fact:
-    node_rpc_ip: "{{ ansible_host }}"
-  when: provider == "digital-ocean" and public_rpc
-
 #
 # Calculate the number of nodes to add
 #
@@ -33,7 +23,6 @@
 - name: check if we need a port range
   set_fact:
     use_port_range: "{{ nodes_to_add | default(0) | int > 1 }}"
-    rpc_port: "{{ initial_rpc_start_port | int + (current_node_count | default(0)) | int }}"
     metrics_port: "{{ initial_metrics_start_port | int + (current_node_count | default(0)) | int }}"
   when: nodes_to_add | default(0) | int > 0
 
@@ -44,13 +33,11 @@
 
 - name: calculate start port
   set_fact:
-    rpc_start_port: "{{ initial_rpc_start_port | int + (current_node_count | default(0)) | int }}"
     metrics_start_port: "{{ initial_metrics_start_port | int + (current_node_count | default(0)) | int }}"
   when: use_port_range | bool
 
 - name: calculate end port
   set_fact:
-    rpc_end_port: "{{ rpc_start_port | int + nodes_to_add | int - 1 | int }}"
     metrics_end_port: "{{ metrics_start_port | int + nodes_to_add | int - 1 | int }}"
   when: use_port_range
 
@@ -81,13 +68,10 @@
       - "{{ ('--peer=' + genesis_multiaddr) if genesis_multiaddr is defined else omit }}"
       - "{{ ('--network-contacts-url=' + network_contacts_url) if network_contacts_url is defined and network_contacts_url else omit }}"
       - "{{ ('--network-id=' + network_id) if network_id is defined and network_id else omit }}"
-      - "--rpc-address={{ node_rpc_ip }}"
       - "--rewards-address={{ rewards_address }}"
       - "--max-archived-log-files={{ max_archived_log_files }}"
       - "--max-log-files={{ max_log_files }}"
       - "{{ ('--node-ip=' + private_ip_eth1.stdout) if enable_upnp | bool else omit }}"
-      - "{{ ('--rpc-port=' + rpc_port) if not use_port_range else omit }}"
-      - "{{ ('--rpc-port=' + rpc_start_port + '-' + rpc_end_port) if use_port_range else omit }}"
       - "{{ ('--metrics-port=' + metrics_port) if not use_port_range else omit }}"
       - "{{ ('--metrics-port=' + metrics_start_port + '-' + metrics_end_port) if use_port_range else omit }}"
       - "{{ ('--log-format=' + log_format) if log_format is defined else omit }}"

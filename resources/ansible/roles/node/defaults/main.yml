@@ -1,7 +1,6 @@
 ---
-public_rpc: False
+enable_upnp: False
 write_older_cache_files: False
-node_rpc_ip: "127.0.0.1"
 node_instance_count: 20
 binary_dir: /usr/local/bin
 # If a custom branch / version is specified, this value must be overwritten.
@@ -12,4 +11,3 @@ node_archive_url: https://sn-node.s3.eu-west-2.amazonaws.com/safenode-latest-x86
 node_manager_archive_filename: safenode-manager-latest-x86_64-unknown-linux-musl.tar.gz
 node_manager_archive_url: https://sn-node-manager.s3.eu-west-2.amazonaws.com/{{ node_manager_archive_filename }}
 initial_metrics_start_port: 14000
-initial_rpc_start_port: 13000

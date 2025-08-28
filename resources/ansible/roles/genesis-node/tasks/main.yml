@@ -1,15 +1,5 @@
 ---
 # This role assumes the existence of the node manager, which is setup using another role.
-- name: get the private IP for the instance
-  set_fact:
-    node_rpc_ip: "{{ instance_facts.instances[0].network_interfaces[0].private_ip_address }}"
-  when: provider == "aws" and public_rpc
-
-- name: use the public IP as the RPC address on DO
-  set_fact:
-    node_rpc_ip: "{{ ansible_host }}"
-  when: provider == "digital-ocean" and public_rpc
-
 - name: check if genesis node is already set up
   become: True
   ansible.builtin.command: antctl status --json
@@ -34,7 +24,6 @@
       - --skip-reachability-check
       - --data-dir-path=/mnt/antnode-storage/data
       - --log-dir-path=/mnt/antnode-storage/log
-      - "--rpc-address={{ node_rpc_ip }}"
       - "--rewards-address={{ rewards_address }}"
       - "--max-archived-log-files={{ max_archived_log_files }}"
       - "--max-log-files={{ max_log_files }}"

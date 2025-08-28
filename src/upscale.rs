@@ -45,7 +45,6 @@ pub struct UpscaleOptions {
     pub network_dashboard_branch: Option<String>,
     pub node_env_variables: Option<Vec<(String, String)>>,
     pub plan: bool,
-    pub public_rpc: bool,
     pub provision_only: bool,
     pub token_amount: Option<U256>,
 }
@@ -244,7 +243,6 @@ impl TestnetDeployer {
                 .join("inventory"),
             peer_cache_node_count: desired_peer_cache_node_count,
             performance_verifier_batch_size: None,
-            public_rpc: options.public_rpc,
             random_verifier_batch_size: None,
             rewards_address: options
                 .current_inventory
@@ -575,7 +573,6 @@ impl TestnetDeployer {
                 .join("inventory"),
             peer_cache_node_count: 0,
             performance_verifier_batch_size: None,
-            public_rpc: options.public_rpc,
             random_verifier_batch_size: None,
             rewards_address: options
                 .current_inventory

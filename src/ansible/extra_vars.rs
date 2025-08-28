@@ -22,7 +22,6 @@ const ANTCTL_S3_BUCKET_URL: &str = "https://antctl.s3.eu-west-2.amazonaws.com";
 // The old `sn-node` S3 bucket will continue to be used to store custom branch builds.
 // They are stored in here regardless of which binary they are.
 const BRANCH_S3_BUCKET_URL: &str = "https://sn-node.s3.eu-west-2.amazonaws.com";
-const RPC_CLIENT_BUCKET_URL: &str = "https://antnode-rpc-client.s3.eu-west-2.amazonaws.com";
 
 #[derive(Default, Clone)]
 pub struct ExtraVarsDocBuilder {
@@ -105,35 +104,6 @@ impl ExtraVarsDocBuilder {
             }
             BinaryOption::Versioned { .. } => {
                 self.add_variable("custom_bin", "false");
-            }
-        }
-    }
-
-    pub fn add_rpc_client_url_or_version(
-        &mut self,
-        deployment_name: &str,
-        binary_option: &BinaryOption,
-    ) {
-        match binary_option {
-            BinaryOption::BuildFromSource {
-                repo_owner, branch, ..
-            } => {
-                self.add_branch_url_variable(
-                    "antnode_rpc_client_archive_url",
-                    &format!(
-                        "{BRANCH_S3_BUCKET_URL}/{repo_owner}/{branch}/antnode_rpc_client-{deployment_name}-x86_64-unknown-linux-musl.tar.gz"
-                    ),
-                    branch,
-                    repo_owner,
-                );
-            }
-            _ => {
-                self.add_variable(
-                    "antnode_rpc_client_archive_url",
-                    &format!(
-                        "{RPC_CLIENT_BUCKET_URL}/antnode_rpc_client-latest-x86_64-unknown-linux-musl.tar.gz"
-                    ),
-                );
             }
         }
     }
@@ -304,9 +274,6 @@ pub fn build_node_extra_vars_doc(
         &options.max_archived_log_files.to_string(),
     );
     extra_vars.add_variable("max_log_files", &options.max_log_files.to_string());
-    if options.public_rpc {
-        extra_vars.add_variable("public_rpc", "true");
-    }
 
     match node_type {
         NodeType::Upnp => {
