@@ -3,6 +3,7 @@ binary_dir: /usr/local/bin
 delayed_verifier_batch_size: 16
 delayed_verifier_quorum_value: majority
 log_output_dest: /mnt/client-logs/log/downloads
+manifest_dir: /mnt/client-logs/manifests
 random_verifier_batch_size: 16
 performance_verifier_batch_size: 16
 sleep_duration: 900

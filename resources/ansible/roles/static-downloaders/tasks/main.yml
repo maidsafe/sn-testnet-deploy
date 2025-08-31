@@ -34,8 +34,8 @@
 
 - name: copy ant_static_downloader.sh to remote
   ansible.builtin.template:
-    src: ant_static_downloader.sh.j2
-    dest: /home/ant1/ant_static_downloader.sh
+    src: ant_static_downloader.py.j2
+    dest: /home/ant1/ant_static_downloader.py
     owner: ant1
     group: ant
     mode: '0775'
@@ -100,6 +100,16 @@
     owner: ant1
     group: ant
     mode: '0644'
+  become: true
+
+- name: copy manifests directory to remote server
+  ansible.builtin.copy:
+    src: manifests/
+    dest: "{{ manifest_dir }}/"
+    owner: root
+    group: ant
+    mode: '0644'
+    directory_mode: '0755'
   become: true
 
 - name: Check if systemd ant_random_verifier service file exists
