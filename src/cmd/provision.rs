@@ -52,6 +52,13 @@ pub enum ProvisionCommands {
         #[arg(short = 'n', long)]
         name: String,
     },
+    /// Provision UPnP nodes for an environment
+    #[clap(name = "upnp-nodes")]
+    UpnpNodes {
+        /// The name of the environment
+        #[arg(short = 'n', long)]
+        name: String,
+    },
 }
 
 async fn init_provision(
@@ -165,6 +172,10 @@ pub async fn handle_provision_symmetric_private_nodes(name: String) -> Result<()
 
 pub async fn handle_provision_full_cone_private_nodes(name: String) -> Result<()> {
     handle_provision_nodes(name, NodeType::FullConePrivateNode).await
+}
+
+pub async fn handle_provision_upnp_nodes(name: String) -> Result<()> {
+    handle_provision_nodes(name, NodeType::Upnp).await
 }
 
 pub async fn handle_provision_clients(name: String) -> Result<()> {

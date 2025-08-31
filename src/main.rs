@@ -604,6 +604,10 @@ async fn main() -> Result<()> {
             Ok(())
         }
         Commands::Provision(provision_cmd) => match provision_cmd {
+            ProvisionCommands::Clients { name } => {
+                cmd::provision::handle_provision_clients(name).await?;
+                Ok(())
+            }
             ProvisionCommands::FullConePrivateNodes { name } => {
                 cmd::provision::handle_provision_full_cone_private_nodes(name).await?;
                 Ok(())
@@ -620,8 +624,8 @@ async fn main() -> Result<()> {
                 cmd::provision::handle_provision_symmetric_private_nodes(name).await?;
                 Ok(())
             }
-            ProvisionCommands::Clients { name } => {
-                cmd::provision::handle_provision_clients(name).await?;
+            ProvisionCommands::UpnpNodes { name } => {
+                cmd::provision::handle_provision_upnp_nodes(name).await?;
                 Ok(())
             }
         },
