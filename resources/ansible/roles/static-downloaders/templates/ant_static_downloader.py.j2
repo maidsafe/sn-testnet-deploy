@@ -1,0 +1,773 @@
+#!/usr/bin/env python3
+"""
+Continuous downloader script that processes a static CSV file.
+
+This Python script replaces the complex Bash implementation with better
+error handling, modularity, and maintainability.
+"""
+
+import argparse
+import csv
+import hashlib
+import json
+import os
+import random
+import shutil
+import subprocess
+import sys
+import time
+import uuid
+from dataclasses import dataclass
+from datetime import datetime
+from enum import Enum
+from pathlib import Path
+from typing import List, Tuple, Optional
+
+
+class DownloadMode(Enum):
+    """Download operation modes."""
+    PERFORMANCE = "performance"
+    DELAYED = "delayed"
+    RANDOM = "random"
+
+
+class FileType(Enum):
+    """File types for download operations."""
+    FILE_NO_ARCHIVE = "file_no_archive"
+    FILE_ARCHIVE = "file_archive"
+    DIRECTORY = "directory"
+
+
+@dataclass
+class FileRecord:
+    """Represents a file record from the CSV."""
+    file_type: FileType
+    file_ref: str
+    file_hash: str
+    file_size: str
+    file_name: str
+
+
+@dataclass
+class DownloadResult:
+    """Result of a download operation."""
+    success: bool
+    exit_status: str
+    start_time: int
+    end_time: int
+    elapsed_seconds: float
+    actual_hash: str
+    actual_file_size_kb: int
+    package_version: str
+    build_date: str
+    download_path: Path
+
+
+class ExitStatusMapper:
+    """Maps exit codes to error enums."""
+    
+    EXIT_CODE_MAP = {
+        0: "SUCCESS",
+        6: "INVALID_INPUT",
+        11: "SERIALIZATION_ERROR",
+        12: "IO_ERROR",
+        13: "NETWORK_ERROR",
+        14: "PROTOCOL_ERROR",
+        15: "SELF_ENCRYPTION_ERROR",
+        21: "EVM_WALLET_NETWORK_MISMATCH",
+        22: "EVM_WALLET_ERROR",
+        23: "PAY_COST_ERROR",
+        31: "INVALID_DATA_MAP",
+        32: "DECRYPTION_ERROR",
+        33: "RECORD_NOT_FOUND",
+        34: "RECORD_KIND_MISMATCH",
+        35: "CONFIGURATION",
+        36: "UNRECOGNIZED_INPUT",
+        37: "FAILED_GET",
+        41: "PUT_COST_ERROR",
+        42: "WALLET_ERROR",
+        43: "SCRATCHPAD_BAD_OWNER",
+        44: "PAYMENT_UNEXPECTEDLY_INVALID",
+        45: "PAYEES_MISSING",
+        51: "NO_BOOTSTRAP_PEERS_FOUND",
+        52: "FAILED_TO_PARSE_CACHE_DATA",
+        53: "COULD_NOT_OBTAIN_DATA_DIR",
+        54: "FAILED_TO_OBTAIN_ADDRS_FROM_URL",
+        55: "FAILED_TO_PARSE_URL",
+        56: "JSON_ERROR",
+        57: "HTTP_ERROR",
+        58: "LOCK_ERROR",
+        59: "CONNECTION_TIMED_OUT",
+        60: "CONNECTION_TIMED_OUT_WITH_INCOMPATIBLE_PROTOCOL",
+        61: "FAILED_TO_GET_EVM_NETWORK",
+        62: "EVM_FEES_ERROR",
+    }
+    
+    @classmethod
+    def get_exit_status(cls, exit_code) -> str:
+        return cls.EXIT_CODE_MAP.get(exit_code, "UNKNOWN_ERROR")
+
+
+class StateManager:
+    """Manages state persistence with crash detection support."""
+    
+    def __init__(self, mode: str):
+        self.mode = mode
+        user = os.environ["USER"]
+        self.state_dir = Path("/mnt/ant-storage/state")
+        self.state_dir.mkdir(parents=True, exist_ok=True)
+        self.state_file_path = self.state_dir / f"downloader_state_{mode}_{user}.json"
+    
+    def _load_state(self) -> dict:
+        """Load state from JSON file."""
+        if self.state_file_path.exists():
+            try:
+                with open(self.state_file_path, "r") as f:
+                    return json.load(f)
+            except (json.JSONDecodeError, OSError):
+                pass
+        return {"address_index": 0, "in_progress": None}
+    
+    def _save_state(self, state: dict) -> None:
+        """Save state to JSON file."""
+        try:
+            with open(self.state_file_path, "w") as f:
+                json.dump(state, f, indent=2)
+        except OSError as e:
+            print(f"Warning: Failed to save state: {e}")
+    
+    def save_address_index(self, index: int) -> None:
+        """Save current address index to state file."""
+        state = self._load_state()
+        state["address_index"] = index
+        self._save_state(state)
+    
+    def load_address_index(self) -> int:
+        """Load address index from state file."""
+        state = self._load_state()
+        index = state.get("address_index", 0)
+        return index if index >= 0 else 0
+    
+    def mark_download_in_progress(self, file_record: 'FileRecord') -> None:
+        """Mark a download as in progress."""
+        state = self._load_state()
+        state["in_progress"] = {
+            "file_ref": file_record.file_ref,
+            "file_name": file_record.file_name,
+            "file_hash": file_record.file_hash,
+            "file_size": file_record.file_size,
+            "file_type": file_record.file_type.value,
+            "start_time": time.time_ns()
+        }
+        self._save_state(state)
+    
+    def clear_download_in_progress(self) -> None:
+        """Clear the in-progress download marker."""
+        state = self._load_state()
+        state["in_progress"] = None
+        self._save_state(state)
+    
+    def get_crashed_download(self) -> Optional["FileRecord"]:
+        """Get in-progress download if exists (indicating a crash)."""
+        state = self._load_state()
+        in_progress = state.get("in_progress")
+        if in_progress:
+            # Reconstruct FileRecord from saved state
+            from enum import Enum
+            file_type = FileType(in_progress["file_type"])
+            return FileRecord(
+                file_type=file_type,
+                file_ref=in_progress["file_ref"],
+                file_hash=in_progress["file_hash"],
+                file_size=in_progress["file_size"],
+                file_name=in_progress["file_name"]
+            )
+        return None
+    
+    def get_crashed_download_duration(self) -> float:
+        """Get the duration of the crashed download (for metrics)."""
+        state = self._load_state()
+        in_progress = state.get("in_progress")
+        if in_progress and "start_time" in in_progress:
+            # Estimate duration as current time minus start time
+            return (time.time_ns() - in_progress["start_time"]) / 1e9
+        return 0.0
+
+
+class MetricsLogger:
+    """Handles CSV metrics logging."""
+    
+    HEADERS = [
+        "TIMESTAMP_START", "TIMESTAMP_FINISH", "DATA_ADDRESS", "DURATION",
+        "RETRIES", "FETCHED_RECORDS", "TOTAL_RECORDS", "EXIT_STATUS",
+        "SERVICE_TYPE", "ANT_USER", "SERVICE_NUMBER", "EXPECTED_TOTAL_SIZE",
+        "ACTUAL_TOTAL_SIZE", "ACTUAL_SHA256_HASH", "EXPECTED_SHA256_HASH",
+        "ANT_PACKAGE_VERSION", "ANT_PACKAGE_BUILD_DATE"
+    ]
+    
+    def __init__(self, metrics_dir: str, service_type: str):
+        self.metrics_dir = Path(metrics_dir)
+        self.service_type = service_type
+        self.success_file = self.metrics_dir / "metrics_success.csv"
+        self.failure_file = self.metrics_dir / "metrics_failure.csv"
+        self.metrics_dir.mkdir(parents=True, exist_ok=True)
+    
+    def _ensure_headers(self, file_path: Path) -> None:
+        """Ensure CSV file has headers."""
+        if not file_path.exists():
+            with open(file_path, "w", newline="") as f:
+                writer = csv.writer(f)
+                writer.writerow(self.HEADERS)
+    
+    def log_result(self, file_record: FileRecord, result: DownloadResult) -> None:
+        """Log download result to appropriate CSV file."""
+        user = os.environ["USER"]
+        
+        row = [
+            result.start_time, result.end_time, file_record.file_ref, result.elapsed_seconds,
+            0, 0, 0, result.exit_status, self.service_type, user, 1,
+            file_record.file_size, result.actual_file_size_kb, result.actual_hash,
+            file_record.file_hash, result.package_version, result.build_date
+        ]
+        
+        if result.success:
+            self._ensure_headers(self.success_file)
+            with open(self.success_file, "a", newline="") as f:
+                writer = csv.writer(f)
+                writer.writerow(row)
+            print(f"Recorded success at {self.success_file}")
+        else:
+            self._ensure_headers(self.failure_file)
+            with open(self.failure_file, "a", newline="") as f:
+                writer = csv.writer(f)
+                writer.writerow(row)
+            print(f"Recorded failure with exit status {result.exit_status} at {self.failure_file}")
+
+
+class FileValidator:
+    """Handles file validation operations."""
+    
+    def __init__(self, manifest_dir: str):
+        self.manifest_dir = Path(manifest_dir)
+    
+    def validate_file_hash(self, file_path: Path, expected_hash: str) -> Tuple[bool, str]:
+        """Validate a single file's hash."""
+        if not file_path.exists():
+            return False, "0x0"
+        
+        sha256_hash = hashlib.sha256()
+        with open(file_path, "rb") as f:
+            for chunk in iter(lambda: f.read(4096), b""):
+                sha256_hash.update(chunk)
+        
+        actual_hash = sha256_hash.hexdigest()
+        return actual_hash == expected_hash, actual_hash
+    
+    def validate_directory_with_manifest(self, download_path: Path, file_name: str) -> Tuple[bool, str, str, int]:
+        """Validate directory contents against manifest. Returns validation status, 
+        actual hash of first file (for metrics), expected hash of first file (for metrics), 
+        and total directory size in KB."""
+        manifest_file = self.manifest_dir / f"{file_name}_manifest.csv"
+        
+        if not manifest_file.exists():
+            raise FileNotFoundError(f"Required manifest file not found: {manifest_file}")
+        
+        print(f"Found manifest file: {manifest_file}")
+        print("Validating directory contents against manifest...")
+        
+        validated = False
+        validated_files = 0
+        total_manifest_files = 0
+        first_file_actual_hash = "0x0"
+        first_file_expected_hash = "0x0"
+        
+        with open(manifest_file, "r") as f:
+            reader = csv.reader(f)
+            next(reader)  # Skip header
+            
+            for row in reader:
+                total_manifest_files += 1
+                manifest_path = row[0].strip("\"")
+                expected_hash = row[1].strip("\"")
+                
+                downloaded_file = download_path / manifest_path
+                if downloaded_file.exists():
+                    is_valid, actual_hash = self.validate_file_hash(downloaded_file, expected_hash)
+                    
+                    if total_manifest_files == 1:
+                        first_file_actual_hash = actual_hash
+                        first_file_expected_hash = expected_hash
+                    
+                    if is_valid:
+                        print(f"✅ {manifest_path} - hash verified")
+                        validated_files += 1
+                        validated = True
+                    else:
+                        print(f"❌ {manifest_path} - HASH MISMATCH!")
+                        print(f"   Expected: {expected_hash}")
+                        print(f"   Actual:   {actual_hash}")
+                else:
+                    print(f"❌ {manifest_path} - FILE MISSING!")
+        
+        if validated:
+            print(f"✅ Directory validation successful - {validated_files}/{total_manifest_files} files verified")
+            actual_size_kb = sum(f.stat().st_size for f in download_path.rglob("*") if f.is_file()) // 1024
+            return True, first_file_actual_hash, first_file_expected_hash, actual_size_kb
+        print("❌ Directory validation FAILED")
+        return False, "0x0", "0x0", 0
+
+
+class AntDownloader:
+    """Main downloader class."""
+    
+    def __init__(self, config: dict):
+        self.config = config
+        self.mode = DownloadMode(config["mode"])
+        self.csv_path = Path(config["csv_path"])
+        self.contact_peer = config.get("contact_peer", "")
+        self.network_contacts_url = config.get("network_contacts_url", "")
+        self.network_id = config.get("network_id", "")
+        self.file_address = config.get("file_address", "")
+        
+        self.log_output_dest = "{{ log_output_dest }}"
+        self.manifest_dir = "{{ manifest_dir }}"
+        self.delayed_verifier_quorum_value = "{{ delayed_verifier_quorum_value }}"
+        self.sleep_duration = {{ sleep_duration }}
+        
+        self.root_download_dir = Path("/mnt/ant-storage/downloaded_files")
+        self.root_download_dir.mkdir(parents=True, exist_ok=True)
+        
+        mode_config = {
+            DownloadMode.PERFORMANCE: {
+                "metrics_dir": f"/mnt/ant-storage/logs/download_files/performance_verifier/{os.environ['USER']}",
+                "service_type": "PERFORMANCE_VERIFIER"
+            },
+            DownloadMode.DELAYED: {
+                "metrics_dir": f"/mnt/ant-storage/logs/download_files/download_verifier/{os.environ['USER']}",
+                "service_type": "DOWNLOAD_VERIFIER"
+            },
+            DownloadMode.RANDOM: {
+                "metrics_dir": f"/mnt/ant-storage/logs/download_files/random_verifier/{os.environ['USER']}",
+                "service_type": "RANDOM_VERIFIER"
+            }
+        }
+        
+        self.metrics_dir = mode_config[self.mode]["metrics_dir"]
+        self.service_type = mode_config[self.mode]["service_type"]
+        
+        self.state_manager = StateManager(self.mode.value)
+        self.metrics_logger = MetricsLogger(self.metrics_dir, self.service_type)
+        self.file_validator = FileValidator(self.manifest_dir)
+        
+        self.addresses = self._load_addresses_from_csv()
+        
+        # Cache version info once during initialization rather than retrieve it for every download
+        self.semantic_version, self.network_version, self.package_version, self.branch, self.git_hash, self.build_date = self._get_ant_version_info()
+        
+        self.current_address_index = self.state_manager.load_address_index()
+        self.last_sleep_time = time.time()
+        
+        self._handle_crashed_download_on_startup()
+        
+    def _handle_crashed_download_on_startup(self) -> None:
+        """Check for and log any crashed downloads on startup."""
+        crashed_download = self.state_manager.get_crashed_download()
+        if not crashed_download:
+            return
+
+        self.current_address_index = self.state_manager.load_address_index() + 1
+        print("=" * 60)
+        print("⚠️ CRASH DETECTED")
+        print(f"   Address: {crashed_download.file_ref}")
+        print(f"   File/dir: {crashed_download.file_name}")
+        print("   Logging as failed download")
+        print(f"   Will resume at file {self.current_address_index}...")
+        print("=" * 60)
+        
+        crashed_duration = self.state_manager.get_crashed_download_duration()
+        crash_time_ns = time.time_ns()
+        crash_start_time_ns = crash_time_ns - int(crashed_duration * 1e9)
+        
+        crash_result = DownloadResult(
+            success=False,
+            exit_status="SERVICE_CRASH",
+            start_time=crash_start_time_ns,
+            end_time=crash_time_ns,
+            elapsed_seconds=crashed_duration,
+            actual_hash="0x0",
+            actual_file_size_kb=0,
+            package_version=self.package_version,
+            build_date=self.build_date,
+            download_path=Path("/tmp/crashed")
+        )
+        
+        self.metrics_logger.log_result(crashed_download, crash_result)
+        
+        self.state_manager.clear_download_in_progress()
+        print("✅ Crash failure logged and state cleared")
+        # Sometimes the crash is correlated with a CPU usage spike on the machine.
+        # The sleep gives it some chance to settle.
+        print("Sleeping for 2 minutes before continuing...")
+        time.sleep(120)
+    
+    def _load_addresses_from_csv(self) -> List[FileRecord]:
+        """Load addresses from CSV into memory, skipping header row."""
+        addresses = []
+        with open(self.csv_path, "r") as f:
+            reader = csv.reader(f)
+            next(reader)  # Skip header row
+            
+            for row_num, row in enumerate(reader, start=2):  # Start at 2 since we skipped header
+                if len(row) != 5:
+                    raise ValueError(f"CSV row {row_num} has {len(row)} fields, expected exactly 5 fields")
+                addresses.append(FileRecord(
+                    file_type=FileType(row[0]),
+                    file_ref=row[1],
+                    file_hash=row[2],
+                    file_size=row[3],
+                    file_name=row[4]
+                ))
+        return addresses
+    
+    def _get_ant_version_info(self) -> Tuple[str, str, str, str, str, str]:
+        """Get ant CLI version information."""
+        try:
+            result = subprocess.run(["ant", "--version"], capture_output=True, text=True, timeout=10, check=True)
+            output = result.stdout
+            
+            semantic_version = None
+            network_version = None
+            package_version = None
+            branch = None
+            git_hash = None
+            build_date = None
+            
+            for line in output.split("\n"):
+                line = line.strip()
+                if line.startswith("Autonomi Client v"):
+                    semantic_version = line.split("v")[-1]
+                elif "Network version:" in line:
+                    network_version = line.split(":", 1)[-1].strip()
+                elif "Package version:" in line:
+                    package_version = line.split()[-1]
+                elif "Git info:" in line:
+                    parts = line.split()
+                    if len(parts) >= 7:
+                        branch = parts[2]
+                        git_hash = parts[4]
+                        build_date = parts[6]
+            
+            if package_version is None:
+                raise RuntimeError("Could not parse package version from ant --version output")
+            if build_date is None:
+                raise RuntimeError("Could not parse build date from ant --version output")
+            if semantic_version is None:
+                raise RuntimeError("Could not parse semantic version from ant --version output")
+            if network_version is None:
+                raise RuntimeError("Could not parse network version from ant --version output")
+            if branch is None or git_hash is None:
+                raise RuntimeError("Could not parse git info from ant --version output")
+                
+            return semantic_version, network_version, package_version, branch, git_hash, build_date
+        except subprocess.CalledProcessError as e:
+            raise RuntimeError(f"Failed to get ant version info: ant command failed with exit code {e.returncode}")
+        except subprocess.TimeoutExpired:
+            raise RuntimeError("Failed to get ant version info: ant --version command timed out")
+        except FileNotFoundError:
+            raise RuntimeError("Failed to get ant version info: ant command not found")
+    
+    def _build_ant_command(self, file_record: FileRecord, download_path: Path, 
+                           log_file_path: str) -> List[str]:
+        """Build the ant CLI command."""
+        cmd = ["ant"]
+        
+        if self.contact_peer:
+            cmd.extend(["--peer", self.contact_peer])
+        if self.network_contacts_url:
+            cmd.extend(["--network-contacts-url", self.network_contacts_url])
+        if self.network_id:
+            cmd.extend(["--network-id", self.network_id])
+        
+        cmd.extend(["--log-output-dest", log_file_path])
+        
+        cmd.append("file")
+        cmd.append("download")
+        cmd.append(file_record.file_ref)
+        
+        if file_record.file_type == FileType.FILE_NO_ARCHIVE:
+            cmd.append(str(download_path / file_record.file_name))
+        else:
+            cmd.append(str(download_path))
+        
+        if self.mode == DownloadMode.DELAYED:
+            cmd.extend(["--quorum", self.delayed_verifier_quorum_value])
+        
+        cmd.append("--disable-cache")
+        
+        return cmd
+    
+    def download_address(self, file_record: FileRecord) -> DownloadResult:
+        """Download an address from the network."""
+        download_subdir = str(uuid.uuid4())
+        download_path = self.root_download_dir / download_subdir
+        download_path.mkdir(parents=True, exist_ok=True)
+        
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        log_file_path = f"{self.log_output_dest}/{timestamp}"
+        
+        cmd = self._build_ant_command(file_record, download_path, log_file_path)
+        print(f"Running command: {' '.join(cmd)}")
+        start_time = time.time_ns()
+        
+        process = subprocess.Popen(
+            cmd,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
+            text=True,
+            bufsize=0,
+            universal_newlines=True
+        )
+        for line in process.stdout:
+            print(line.rstrip())
+
+        # The destination supplied to `ant` was a directory, but the file or directory at the
+        # address will then be created *inside* the destination given to `ant`.
+        download_path = download_path / file_record.file_name
+
+        return_code = process.wait()
+        end_time = time.time_ns()
+        elapsed_seconds = (end_time - start_time) / 1e9
+        
+        print(f"Exit code: {return_code}")
+        print(f"Package version: {self.package_version}")
+        print(f"Semantic version: {self.semantic_version}")
+        print(f"Branch: {self.branch}")
+        print(f"Git hash: {self.git_hash}")
+        print(f"Build date: {self.build_date}")
+        print(f"Elapsed time: {elapsed_seconds:.2f} seconds")
+        
+        return DownloadResult(
+            success=return_code == 0,
+            exit_status=ExitStatusMapper.get_exit_status(return_code),
+            start_time=start_time,
+            end_time=end_time,
+            elapsed_seconds=elapsed_seconds,
+            actual_hash="0x0",  # Will be set during validation
+            actual_file_size_kb=0,  # Will be set during validation
+            package_version=self.package_version,
+            build_date=self.build_date,
+            download_path=download_path
+        )
+    
+    def validate_download(self, file_record: FileRecord, result: DownloadResult) -> Tuple[DownloadResult, FileRecord]:
+        """Validate download and update result. Returns updated result and potentially updated file record."""
+        if not result.success:
+            return result, file_record
+        
+        actual_hash = "0x0"
+        actual_file_size_kb = 0
+        exit_status = result.exit_status
+        success = result.success
+        updated_file_record = file_record
+        
+        try:
+            if result.download_path.is_dir():
+                try:
+                    is_valid, actual_hash, expected_hash, actual_file_size_kb = self.file_validator.validate_directory_with_manifest(
+                        result.download_path, file_record.file_name
+                    )
+                    if not is_valid:
+                        exit_status = "MANIFEST_VALIDATION_FAILED"
+                        success = False
+                    else:
+                        # Update file record with expected hash from first file in manifest
+                        updated_file_record = FileRecord(
+                            file_type=file_record.file_type,
+                            file_ref=file_record.file_ref,
+                            file_hash=expected_hash,
+                            file_size=file_record.file_size,
+                            file_name=file_record.file_name
+                        )
+                except FileNotFoundError as e:
+                    print(f"❌{e}")
+                    exit_status = "MANIFEST_FILE_MISSING"
+                    success = False
+            else:
+                actual_file_size_kb = result.download_path.stat().st_size // 1024
+                is_valid, actual_hash = self.file_validator.validate_file_hash(
+                    result.download_path, file_record.file_hash
+                )
+                if is_valid:
+                    print("✅ Hash verification successful")
+                else:
+                    print("❌HASH MISMATCH!")
+                    print(f"Expected hash: {file_record.file_hash}")
+                    print(f"Actual hash:   {actual_hash}")
+                    exit_status = "HASH_MISMATCH"
+                    success = False
+            if success:
+                print("✅ Download validated")
+            else:
+                print("❌DOWNLOAD VALIDATION FAILED")
+                print(f"Error type: {ExitStatusMapper.get_exit_status(exit_status)}")
+                print("Please check the logs above for more details.")
+            
+            return DownloadResult(
+                success=success,
+                exit_status=exit_status,
+                start_time=result.start_time,
+                end_time=result.end_time,
+                elapsed_seconds=result.elapsed_seconds,
+                actual_hash=actual_hash,
+                actual_file_size_kb=actual_file_size_kb,
+                package_version=result.package_version,
+                build_date=result.build_date,
+                download_path=result.download_path
+            ), updated_file_record
+        finally:
+            if result.download_path.exists():
+                shutil.rmtree(result.download_path.parent)
+    
+    def get_next_file_record(self) -> FileRecord:
+        """Get the next file record based on the current mode."""
+        if self.mode == DownloadMode.PERFORMANCE:
+            if self.file_address:
+                for record in self.addresses:
+                    if record.file_ref == self.file_address:
+                        return record
+                raise ValueError(f"File address \"{self.file_address}\" not found in CSV file")
+            else:
+                return self.addresses[0]
+        elif self.mode == DownloadMode.DELAYED:
+            if self.current_address_index >= len(self.addresses):
+                self.current_address_index = 0
+                print(f"Completed full cycle: sleeping for {self.sleep_duration // 60} minutes...")
+                print("Returning to beginning of addresses")
+                time.sleep(self.sleep_duration)
+            
+            print(f"Processing address {self.current_address_index + 1} of {len(self.addresses)}")
+            record = self.addresses[self.current_address_index]
+            self.current_address_index += 1
+            return record
+        elif self.mode == DownloadMode.RANDOM:
+            random_index = random.randint(0, len(self.addresses) - 1)
+            print(f"Processing random line {random_index + 2} of {len(self.addresses) + 1}")
+            return self.addresses[random_index]
+    
+    def run(self) -> None:
+        """Main execution loop."""
+        print(f"CSV path: {self.csv_path}")
+        print(f"Total download addresses: {len(self.addresses)}")
+        print(f"Mode: {self.mode.value}")
+        
+        if self.mode == DownloadMode.PERFORMANCE and self.file_address:
+            print(f"Performance mode with specific file address: {self.file_address}")
+        
+        while True:
+            print("=" * 42)
+            print(f"{datetime.now().strftime('%Y-%m-%d %H:%M:%S')} -- Downloading Address")
+            print("=" * 42)
+            
+            file_record = self.get_next_file_record()
+            print(f"Address: {file_record.file_ref}")
+            print(f"File/dir: {file_record.file_name}")
+            
+            # Mark download as in progress to enable crash detection
+            self.state_manager.mark_download_in_progress(file_record)
+            
+            try:
+                result = self.download_address(file_record)
+                validated_result, updated_file_record = self.validate_download(file_record, result)
+                
+                self.metrics_logger.log_result(updated_file_record, validated_result)
+                self.state_manager.clear_download_in_progress()
+                
+                if self.mode == DownloadMode.DELAYED:
+                    self.state_manager.save_address_index(self.current_address_index)
+                
+                if self.mode in [DownloadMode.PERFORMANCE, DownloadMode.RANDOM]:
+                    current_time = time.time()
+                    time_since_last_sleep = current_time - self.last_sleep_time
+                    if time_since_last_sleep >= 3600:  # 1 hour
+                        print(f"Hourly bandwidth break: sleeping for {self.sleep_duration // 60} minutes...")
+                        time.sleep(self.sleep_duration)
+                        self.last_sleep_time = time.time()
+            except Exception as e:
+                self.state_manager.clear_download_in_progress()
+                print(f"❌ Unexpected error during download: {e}")
+                raise
+
+
+def parse_arguments() -> argparse.Namespace:
+    """Parse command line arguments."""
+    parser = argparse.ArgumentParser(
+        description="Continuous downloader script that processes a static CSV file",
+        formatter_class=argparse.RawDescriptionHelpFormatter
+    )
+    parser.add_argument(
+        "-m", "--mode",
+        required=True,
+        choices=["performance", "delayed", "random"],
+        help="Download mode: performance, delayed, or random"
+    )
+    parser.add_argument(
+        "-c", "--csv-path",
+        required=True,
+        help="Path to static CSV file containing file addresses"
+    )
+    parser.add_argument(
+        "-p", "--peer",
+        help="Optional contact peer"
+    )
+    parser.add_argument(
+        "-u", "--network-contacts-url",
+        help="Optional network contacts URL"
+    )
+    parser.add_argument(
+        "-n", "--network-id",
+        help="Optional network ID (also enables testnet mode)"
+    )
+    parser.add_argument(
+        "-f", "--file-address",
+        help="Optional specific file address to download repeatedly (performance mode only)"
+    )
+    
+    return parser.parse_args()
+
+
+def validate_arguments(args: argparse.Namespace) -> None:
+    """Validate command line arguments."""
+    if not Path(args.csv_path).exists():
+        print(f"Error: CSV file '{args.csv_path}' does not exist")
+        sys.exit(1)
+    
+    try:
+        subprocess.run(["ant", "--version"], capture_output=True, check=True, timeout=10)
+    except subprocess.TimeoutExpired:
+        print("Error: 'ant --version' timed out.")
+        sys.exit(1)
+    except (subprocess.CalledProcessError, FileNotFoundError):
+        print("Error: 'ant' not found in PATH.")
+        sys.exit(1)
+
+
+def main() -> None:
+    """Main entry point."""
+    args = parse_arguments()
+    validate_arguments(args)
+    
+    config = {
+        "mode": args.mode,
+        "csv_path": args.csv_path,
+        "contact_peer": args.peer,
+        "network_contacts_url": args.network_contacts_url,
+        "network_id": args.network_id,
+        "file_address": args.file_address,
+    }
+    
+    downloader = AntDownloader(config)
+    downloader.run()
+
+
+if __name__ == "__main__":
+    main()

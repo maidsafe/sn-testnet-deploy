@@ -13,12 +13,13 @@ Environment="EVM_NETWORK=arbitrum-sepolia"
 Environment="EVM_NETWORK=arbitrum-one"
 {% endif %}
 Environment="CHUNK_DOWNLOAD_BATCH_SIZE={{ performance_verifier_batch_size }}"
+Environment="PYTHONUNBUFFERED=1"
 User=ant1
 
 {% if network_id == "1" %}
-ExecStart=/home/ant1/ant_static_downloader.sh --mode performance --csv-path /home/ant1/prod.csv {% if file_address is defined %}--file-address "{{ file_address }}" {% endif %}
+ExecStart=/home/ant1/ant_static_downloader.py --mode performance --csv-path /home/ant1/prod.csv {% if file_address is defined %}--file-address "{{ file_address }}" {% endif %}
 {% else %}
-ExecStart=/home/ant1/ant_static_downloader.sh --mode performance --csv-path /home/ant1/prod.csv {% if peer is defined %}--peer "{{ peer }}" {% endif %} {% if network_contacts_url is defined %}--network-contacts-url "{{network_contacts_url}}" {% endif %} {% if network_id is defined %}--network-id "{{network_id}}" {% endif %} {% if file_address is defined %}--file-address "{{ file_address }}" {% endif %}
+ExecStart=/home/ant1/ant_static_downloader.py --mode performance --csv-path /home/ant1/prod.csv {% if peer is defined %}--peer "{{ peer }}" {% endif %} {% if network_contacts_url is defined %}--network-contacts-url "{{network_contacts_url}}" {% endif %} {% if network_id is defined %}--network-id "{{network_id}}" {% endif %} {% if file_address is defined %}--file-address "{{ file_address }}" {% endif %}
 
 {% endif %}
 

@@ -13,11 +13,12 @@ Environment="EVM_NETWORK=arbitrum-sepolia"
 Environment="EVM_NETWORK=arbitrum-one"
 {% endif %}
 Environment="CHUNK_DOWNLOAD_BATCH_SIZE={{ random_verifier_batch_size }}"
+Environment="PYTHONUNBUFFERED=1"
 User=ant1
 {% if network_id == "1" %}
-ExecStart=/home/ant1/ant_static_downloader.sh --mode random --csv-path /home/ant1/prod.csv
+ExecStart=/home/ant1/ant_static_downloader.py --mode random --csv-path /home/ant1/prod.csv
 {% else %}
-ExecStart=/home/ant1/ant_static_downloader.sh --mode random --csv-path /home/ant1/prod.csv --network-id "{{network_id}}" {% if peer is defined %}--peer "{{ peer }}" {% endif %} {% if network_contacts_url is defined %}--network-contacts-url "{{network_contacts_url}}"{% endif %}
+ExecStart=/home/ant1/ant_static_downloader.py --mode random --csv-path /home/ant1/prod.csv --network-id "{{network_id}}" {% if peer is defined %}--peer "{{ peer }}" {% endif %} {% if network_contacts_url is defined %}--network-contacts-url "{{network_contacts_url}}"{% endif %}
 {% endif %}
 
 Restart=always
