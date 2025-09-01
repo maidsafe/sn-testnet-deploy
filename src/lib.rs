@@ -789,6 +789,9 @@ impl TestnetDeployer {
         let full_cone_private_node_registries = self
             .ansible_provisioner
             .get_node_registries(&AnsibleInventoryType::FullConePrivateNodes)?;
+        let upnp_private_node_registries = self
+            .ansible_provisioner
+            .get_node_registries(&AnsibleInventoryType::Upnp)?;
         let genesis_node_registry = self
             .ansible_provisioner
             .get_node_registries(&AnsibleInventoryType::Genesis)?
@@ -798,6 +801,7 @@ impl TestnetDeployer {
         generic_node_registries.print();
         symmetric_private_node_registries.print();
         full_cone_private_node_registries.print();
+        upnp_private_node_registries.print();
         genesis_node_registry.print();
 
         let all_registries = [
@@ -805,6 +809,7 @@ impl TestnetDeployer {
             &generic_node_registries,
             &symmetric_private_node_registries,
             &full_cone_private_node_registries,
+            &upnp_private_node_registries,
             &genesis_node_registry,
         ];
 
@@ -833,6 +838,7 @@ impl TestnetDeployer {
         let generic_hosts = generic_node_registries.retrieved_registries.len();
         let symmetric_private_hosts = symmetric_private_node_registries.retrieved_registries.len();
         let full_cone_private_hosts = full_cone_private_node_registries.retrieved_registries.len();
+        let upnp_private_hosts = upnp_private_node_registries.retrieved_registries.len();
 
         let peer_cache_nodes = peer_cache_node_registries
             .retrieved_registries
@@ -850,6 +856,11 @@ impl TestnetDeployer {
             .flat_map(|(_, n)| n.nodes.iter())
             .count();
         let full_cone_private_nodes = full_cone_private_node_registries
+            .retrieved_registries
+            .iter()
+            .flat_map(|(_, n)| n.nodes.iter())
+            .count();
+        let upnp_private_nodes = upnp_private_node_registries
             .retrieved_registries
             .iter()
             .flat_map(|(_, n)| n.nodes.iter())
@@ -897,6 +908,16 @@ impl TestnetDeployer {
                 0
             },
             full_cone_private_nodes
+        );
+        println!(
+            "Total UPnP private nodes ({}x{}): {}",
+            upnp_private_hosts,
+            if upnp_private_hosts > 0 {
+                upnp_private_nodes / upnp_private_hosts
+            } else {
+                0
+            },
+            upnp_private_nodes
         );
         println!("Total nodes: {total_nodes}");
         println!("Running nodes: {running_nodes}");
