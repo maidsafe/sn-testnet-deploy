@@ -89,6 +89,7 @@ pub struct ProvisionOptions {
     pub sleep_duration: Option<u16>,
     pub symmetric_private_node_count: u16,
     pub token_amount: Option<U256>,
+    pub upload_batch_size: Option<u16>,
     pub upload_size: Option<u16>,
     pub upload_interval: Option<u16>,
     pub uploaders_count: Option<u16>,
@@ -291,6 +292,7 @@ impl From<BootstrapOptions> for ProvisionOptions {
             sleep_duration: None,
             symmetric_private_node_count: bootstrap_options.symmetric_private_node_count,
             token_amount: None,
+            upload_batch_size: None,
             upload_size: None,
             upload_interval: None,
             uploaders_count: None,
@@ -343,6 +345,7 @@ impl From<DeployOptions> for ProvisionOptions {
             sleep_duration: None,
             symmetric_private_node_count: deploy_options.symmetric_private_node_count,
             token_amount: deploy_options.initial_tokens,
+            upload_batch_size: None,
             upload_size: Some(deploy_options.upload_size),
             upload_interval: Some(deploy_options.upload_interval),
             uploaders_count: Some(deploy_options.uploaders_count),
@@ -395,6 +398,7 @@ impl From<ClientsDeployOptions> for ProvisionOptions {
             sleep_duration: client_options.sleep_duration,
             symmetric_private_node_count: 0,
             token_amount: client_options.initial_tokens,
+            upload_batch_size: client_options.upload_batch_size,
             upload_size: client_options.upload_size,
             upload_interval: None,
             uploaders_count: Some(client_options.uploaders_count),
@@ -1097,6 +1101,48 @@ impl AnsibleProvisioner {
                 options,
                 genesis_multiaddr,
                 genesis_network_contacts_url,
+            )?),
+        )?;
+        print_duration(start.elapsed());
+        Ok(())
+    }
+
+    pub async fn provision_static_uploader(
+        &self,
+        options: &ProvisionOptions,
+        genesis_multiaddr: Option<String>,
+        genesis_network_contacts_url: Option<String>,
+    ) -> Result<()> {
+        let start = Instant::now();
+
+        println!("Running ansible against client machine to provision the static uploader");
+        debug!("Running ansible against client machine to provision the static uploader");
+
+        let sk_map = if let Some(wallet_keys) = &options.wallet_secret_keys {
+            self.prepare_pre_funded_wallets(wallet_keys).await?
+        } else {
+            self.deposit_funds_to_clients(&FundingOptions {
+                evm_data_payments_address: options.evm_data_payments_address.clone(),
+                evm_network: options.evm_network.clone(),
+                evm_payment_token_address: options.evm_payment_token_address.clone(),
+                evm_rpc_url: options.evm_rpc_url.clone(),
+                funding_wallet_secret_key: options.funding_wallet_secret_key.clone(),
+                gas_amount: options.gas_amount,
+                token_amount: options.token_amount,
+                uploaders_count: Some(1),
+            })
+            .await?
+        };
+
+        self.ansible_runner.run_playbook(
+            AnsiblePlaybook::StaticUploader,
+            AnsibleInventoryType::Clients,
+            Some(extra_vars::build_clients_extra_vars_doc(
+                &self.cloud_provider.to_string(),
+                options,
+                genesis_multiaddr,
+                genesis_network_contacts_url,
+                &sk_map,
             )?),
         )?;
         print_duration(start.elapsed());

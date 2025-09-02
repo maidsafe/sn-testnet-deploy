@@ -609,10 +609,26 @@ pub fn build_clients_extra_vars_doc(
 
     extra_vars.add_serde_value("ant_secret_key_map", serde_map);
 
+    // If there's only one entry in the sk_map, add a secret_key variable for use with the static
+    // uploader.
+    if sk_map.len() == 1 {
+        if let Some((_, private_key_signers)) = sk_map.iter().next() {
+            if let Some(first_signer) = private_key_signers.first() {
+                let secret_key_hex =
+                    format!("{:?}", first_signer.to_bytes().encode_hex_with_prefix());
+                extra_vars.add_variable("secret_key", &secret_key_hex);
+            }
+        }
+    }
+
     if let Some(max_uploads) = options.max_uploads {
         extra_vars.add_variable("max_uploads", &max_uploads.to_string());
     }
 
+    extra_vars.add_variable(
+        "upload_batch_size",
+        &options.upload_batch_size.unwrap_or(16).to_string(),
+    );
     extra_vars.add_variable(
         "upload_size",
         &options.upload_size.unwrap_or(100).to_string(),
