@@ -146,10 +146,14 @@ pub enum AnsiblePlaybook {
     ///
     /// Use in combination with `AnsibleInventoryType::Clients`.
     StartDownloaders,
-    /// The static downloaders playbook will setup static downloader scripts on the Client VMs.
+    /// The static downloaders playbook will setup static downloader scripts on client VMs.
     ///
     /// Use in combination with `AnsibleInventoryType::Clients`.
     StaticDownloaders,
+    /// The static uploaders playbook will setup static uploader scripts on a client VM.
+    ///
+    /// Use in combination with `AnsibleInventoryType::Clients`.
+    StaticUploader,
     /// This playbook will start the faucet for the environment.
     StartFaucet,
     /// This playbook will start the Telegraf service on each machine.
@@ -240,7 +244,6 @@ impl AnsiblePlaybook {
             AnsiblePlaybook::RpcClient => "safenode_rpc_client.yml".to_string(),
             AnsiblePlaybook::ResetToNNodes => "reset_to_n_nodes.yml".to_string(),
             AnsiblePlaybook::StartDownloaders => "start_downloaders.yml".to_string(),
-            AnsiblePlaybook::StaticDownloaders => "static_downloaders.yml".to_string(),
             AnsiblePlaybook::StartFaucet => "start_faucet.yml".to_string(),
             AnsiblePlaybook::StartNodes => "start_nodes.yml".to_string(),
             AnsiblePlaybook::StartTelegraf => "start_telegraf.yml".to_string(),
@@ -248,6 +251,8 @@ impl AnsiblePlaybook {
             AnsiblePlaybook::StaticFullConeNatGateway => {
                 "static_full_cone_nat_gateway.yml".to_string()
             }
+            AnsiblePlaybook::StaticDownloaders => "static_downloaders.yml".to_string(),
+            AnsiblePlaybook::StaticUploader => "static_uploader.yml".to_string(),
             AnsiblePlaybook::Status => "node_status.yml".to_string(),
             AnsiblePlaybook::StopDownloaders => "stop_downloaders.yml".to_string(),
             AnsiblePlaybook::StopFaucet => "stop_faucet.yml".to_string(),

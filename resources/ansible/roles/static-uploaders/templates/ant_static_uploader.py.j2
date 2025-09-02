@@ -1,0 +1,260 @@
+#!/usr/bin/env python3
+
+import os
+import sys
+import argparse
+import subprocess
+import time
+import hashlib
+from datetime import datetime
+import shutil
+
+LOG_OUTPUT_DEST = "{{ log_output_dest }}"
+UPLOAD_METRIC_DIR = "{{ metrics_path }}"
+
+class ExitStatusMapper:
+    """Maps exit codes to error enums."""
+    
+    EXIT_CODE_MAP = {
+        0: "SUCCESS",
+        6: "INVALID_INPUT",
+        11: "SERIALIZATION_ERROR",
+        12: "IO_ERROR",
+        13: "NETWORK_ERROR",
+        14: "PROTOCOL_ERROR",
+        15: "SELF_ENCRYPTION_ERROR",
+        21: "EVM_WALLET_NETWORK_MISMATCH",
+        22: "EVM_WALLET_ERROR",
+        23: "PAY_COST_ERROR",
+        31: "INVALID_DATA_MAP",
+        32: "DECRYPTION_ERROR",
+        33: "RECORD_NOT_FOUND",
+        34: "RECORD_KIND_MISMATCH",
+        35: "CONFIGURATION",
+        36: "UNRECOGNIZED_INPUT",
+        37: "FAILED_GET",
+        41: "PUT_COST_ERROR",
+        42: "WALLET_ERROR",
+        43: "SCRATCHPAD_BAD_OWNER",
+        44: "PAYMENT_UNEXPECTEDLY_INVALID",
+        45: "PAYEES_MISSING",
+        51: "NO_BOOTSTRAP_PEERS_FOUND",
+        52: "FAILED_TO_PARSE_CACHE_DATA",
+        53: "COULD_NOT_OBTAIN_DATA_DIR",
+        54: "FAILED_TO_OBTAIN_ADDRS_FROM_URL",
+        55: "FAILED_TO_PARSE_URL",
+        56: "JSON_ERROR",
+        57: "HTTP_ERROR",
+        58: "LOCK_ERROR",
+        59: "CONNECTION_TIMED_OUT",
+        60: "CONNECTION_TIMED_OUT_WITH_INCOMPATIBLE_PROTOCOL",
+        61: "FAILED_TO_GET_EVM_NETWORK",
+        62: "EVM_FEES_ERROR",
+    }
+    
+    @classmethod
+    def get_exit_status(cls, exit_code) -> str:
+        return cls.EXIT_CODE_MAP.get(exit_code, "UNKNOWN_ERROR")
+
+def get_file_hash(file_path):
+    """Calculate SHA-256 hash of a file"""
+    hash_sha256 = hashlib.sha256()
+    with open(file_path, "rb") as f:
+        for chunk in iter(lambda: f.read(4096), b""):
+            hash_sha256.update(chunk)
+    return hash_sha256.hexdigest()
+
+def get_directory_info(dir_path):
+    """Get directory size in KB and hash of first file found"""
+    total_size = 0
+    hash_sha256 = hashlib.sha256()
+    first_file_hashed = False
+    
+    for root, _, files in os.walk(dir_path):
+        for file in files:
+            file_path = os.path.join(root, file)
+            file_size = os.path.getsize(file_path)
+            total_size += file_size
+            
+            if not first_file_hashed:
+                with open(file_path, "rb") as f:
+                    for chunk in iter(lambda: f.read(4096), b""):
+                        hash_sha256.update(chunk)
+                first_file_hashed = True
+    
+    return total_size // 1024, hash_sha256.hexdigest()
+
+def get_ant_version():
+    """Get ant binary version information"""
+    try:
+        result = subprocess.run(["ant", "--version"], capture_output=True, text=True)
+        lines = result.stdout.split('\n')
+        package_version = ""
+        build_date = ""
+        
+        for line in lines:
+            if "Package version:" in line:
+                package_version = line.split()[2]
+            elif "Git info:" in line:
+                parts = line.split()
+                if len(parts) >= 7:
+                    build_date = parts[6]
+        
+        return package_version, build_date
+    except Exception:
+        return "", ""
+
+def upload_content(content_path, contact_peer="", network_contacts_url="", network_id=""):
+    """Upload a file or directory using the ant binary"""
+    
+    cmd = ["ant"]
+    if contact_peer:
+        cmd.extend(["--peer", contact_peer])
+    if network_contacts_url:
+        cmd.extend(["--network-contacts-url", network_contacts_url])
+    if network_id:
+        cmd.extend(["--network-id", network_id])
+    
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    log_file_path = f"{LOG_OUTPUT_DEST}/{timestamp}"
+    cmd.extend(["--log-output-dest", log_file_path])
+    
+    if os.path.isfile(content_path):
+        cmd.extend(["file", "upload", content_path, "--no-archive", "--public"])
+        file_size_kb = os.path.getsize(content_path) // 1024
+        file_hash = get_file_hash(content_path)
+    else:
+        cmd.extend(["file", "upload", content_path, "--public"])
+        file_size_kb, file_hash = get_directory_info(content_path)
+    
+    print("=" * 42)
+    print(f"{datetime.now().strftime('%Y-%m-%d %H:%M:%S')} -- Uploading Content")
+    print("=" * 42)
+    
+    stdout = ""
+    try:
+        print(f"Running command: {' '.join(cmd)}")
+        start_time = time.time_ns()
+
+        process = subprocess.Popen(
+            cmd,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
+            text=True,
+            bufsize=0,
+            universal_newlines=True
+        )
+        for line in process.stdout:
+            print(line.rstrip())
+            stdout += line
+        exit_code = process.wait()
+    except Exception as e:
+        print(f"Error executing ant command: {e}")
+        return 1
+    
+    end_time = time.time_ns()
+    elapsed = (end_time - start_time) / 1000000000
+    
+    print(f"Exit code: {exit_code}")
+    package_version, build_date = get_ant_version()
+    print(f"Package version: {package_version}")
+    print(f"Build date: {build_date}")
+    print(f"Elapsed time: {elapsed:.2f} seconds")
+    
+    exit_status = ExitStatusMapper.get_exit_status(exit_code)
+    
+    os.makedirs(UPLOAD_METRIC_DIR, exist_ok=True)
+    
+    if exit_code == 0:
+        print(f"Successfully uploaded {content_path}")
+        
+        uploaded_address = ""
+        number_of_chunks = 0
+        chunks_already_uploaded = 0
+        store_cost = 0
+        
+        for line in stdout.split('\n'):
+            if "At address:" in line:
+                uploaded_address = line.split("At address:")[-1].strip()
+            elif "Number of chunks uploaded:" in line:
+                try:
+                    number_of_chunks = int(line.split(":")[-1].strip())
+                except ValueError:
+                    pass
+            elif "Number of chunks already paid/uploaded:" in line:
+                try:
+                    chunks_already_uploaded = int(line.split(":")[-1].strip())
+                except ValueError:
+                    pass
+            elif "Total cost:" in line:
+                try:
+                    store_cost = int(line.split(":")[-1].strip())
+                except ValueError:
+                    pass
+        
+        success_file = f"{UPLOAD_METRIC_DIR}/metrics_success.csv"
+        write_header = not os.path.exists(success_file)
+        with open(success_file, "a", newline="") as csvfile:
+            if write_header:
+                csvfile.write("TIMESTAMP_START,TIMESTAMP_FINISH,DATA_ADDRESS,DURATION,RETRIES,RECORDS_UPLOADED,RECORDS_ALREADY_PAID,TOTAL_RECORDS,EXIT_STATUS,SERVICE_TYPE,ANT_USER,SERVICE_NUMBER,STORE_COST,EXPECTED_TOTAL_SIZE,ACTUAL_TOTAL_SIZE,SHA256_HASH,ANT_PACKAGE_VERSION,ANT_PACKAGE_BUILD_DATE\n")
+            csvfile.write(f"{start_time},{end_time},{uploaded_address},{elapsed:.2f},0,{number_of_chunks},{chunks_already_uploaded},0,{exit_status},STATIC_UPLOADER,{os.environ.get('USER', '')},1,{store_cost},0,{file_size_kb},{file_hash},{package_version},{build_date}\n")
+    else:
+        print(f"Failed to upload {content_path}")
+        failure_file = f"{UPLOAD_METRIC_DIR}/metrics_failure.csv"
+        write_header = not os.path.exists(failure_file)
+        with open(failure_file, "a", newline="") as csvfile:
+            if write_header:
+                csvfile.write("TIMESTAMP_START,TIMESTAMP_FINISH,DATA_ADDRESS,DURATION,RETRIES,RECORDS_UPLOADED,RECORDS_ALREADY_PAID,TOTAL_RECORDS,EXIT_STATUS,SERVICE_TYPE,ANT_USER,SERVICE_NUMBER,STORE_COST,EXPECTED_TOTAL_SIZE,ACTUAL_TOTAL_SIZE,SHA256_HASH,ANT_PACKAGE_VERSION,ANT_PACKAGE_BUILD_DATE\n")
+            csvfile.write(f"{start_time},{end_time},0,{elapsed:.2f},0,0,0,0,{exit_status},STATIC_UPLOADER,{os.environ.get('USER', '')},1,0,0,{file_size_kb},{file_hash},{package_version},{build_date}\n")
+    return exit_code
+
+def main():
+    if not shutil.which("ant"):
+        print("Error: 'ant' not found in PATH.")
+        return 1
+
+    parser = argparse.ArgumentParser(description="Upload files and directories using ant binary")
+    parser.add_argument("-p", "--peer", help="Optional contact peer")
+    parser.add_argument("-u", "--network-contacts-url", help="Optional network contacts URL")
+    parser.add_argument("-n", "--network-id", help="Optional network ID (also enables testnet mode)")
+    parser.add_argument("directory", help="Directory to inspect and upload contents from")
+    args = parser.parse_args()
+    
+    if not os.path.exists(args.directory):
+        print(f"Error: Directory {args.directory} does not exist")
+        return 1
+    if not os.path.isdir(args.directory):
+        print(f"Error: {args.directory} is not a directory")
+        return 1
+    
+    try:
+        contents = os.listdir(args.directory)
+    except PermissionError:
+        print(f"Error: permission denied accessing {args.directory}")
+        return 1
+    if not contents:
+        print(f"{args.directory} is empty")
+        return 0
+    
+    print(f"Upload source directory: {args.directory}")
+    upload_count = 0
+    successful_upload_count = 0
+    
+    for item in contents:
+        item_path = os.path.join(args.directory, item)
+        exit_code = upload_content(
+            item_path,
+            contact_peer=args.peer or "",
+            network_contacts_url=args.network_contacts_url or "",
+            network_id=args.network_id or ""
+        )
+        
+        upload_count += 1
+        if exit_code == 0:
+            successful_upload_count += 1
+            print(f"{successful_upload_count} successful uploads so far")
+    print(f"Completed processing {upload_count} items with {successful_upload_count} successful uploads")
+    return 0
+
+if __name__ == "__main__":
+    sys.exit(main())

@@ -1,0 +1,6 @@
+ant_archive_filename: ant-latest-x86_64-unknown-linux-musl.tar.gz
+binary_dir: /usr/local/bin
+log_output_dest: /mnt/client-logs/log/uploads
+metrics_path: /mnt/client-logs
+upload_src_path: /mnt/client-logs/data
+upload_batch_size: 16

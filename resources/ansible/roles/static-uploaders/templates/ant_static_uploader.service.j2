@@ -1,0 +1,29 @@
+[Unit]
+Description=Ant Static Uploader
+After=network.target
+
+[Service]
+Environment="SECRET_KEY={{ secret_key }}"
+{% if evm_network_type == "evm-custom" %}
+Environment="RPC_URL={{ evm_rpc_url }}"
+Environment="PAYMENT_TOKEN_ADDRESS={{ evm_payment_token_address }}"
+Environment="DATA_PAYMENTS_ADDRESS={{ evm_data_payments_address }}"
+{% elif evm_network_type == "evm-arbitrum-sepolia" %}
+Environment="EVM_NETWORK=arbitrum-sepolia"
+{% elif evm_network_type == "evm-arbitrum-one" %}
+Environment="EVM_NETWORK=arbitrum-one"
+{% endif %}
+Environment="CHUNK_UPLOAD_BATCH_SIZE={{ upload_batch_size }}"
+Environment="PYTHONUNBUFFERED=1"
+User=ant1
+{% if network_id == "1" %}
+ExecStart=/home/ant1/ant_static_uploader.py {{ upload_src_path }}
+{% else %}
+ExecStart=/home/ant1/ant_static_uploader.py {{ upload_src_path }} --network-id "{{network_id}}" {% if peer is defined %}--peer "{{ peer }}" {% endif %} {% if network_contacts_url is defined %}--network-contacts-url "{{network_contacts_url}}"{% endif %}
+{% endif %}
+
+Restart=on-failure
+WorkingDirectory=/home/ant1
+
+[Install]
+WantedBy=multi-user.target

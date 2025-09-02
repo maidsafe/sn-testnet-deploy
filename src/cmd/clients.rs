@@ -387,6 +387,130 @@ pub enum ClientsCommands {
         #[arg(long)]
         sleep_duration: Option<u16>,
     },
+    /// Deploy a new static uploader environment.
+    DeployStaticUploader {
+        /// Supply a version number for the ant binary.
+        ///
+        /// There should be no 'v' prefix.
+        ///
+        /// The version arguments are mutually exclusive with the --branch and --repo-owner
+        /// arguments. You can only supply version numbers or a custom branch, not both.
+        #[arg(long, verbatim_doc_comment)]
+        ant_version: Option<String>,
+        /// The branch of the Github repository to build from.
+        ///
+        /// If used, the ant binary will be built from this branch. It is typically used for testing
+        /// changes on a fork.
+        ///
+        /// This argument must be used in conjunction with the --repo-owner argument.
+        ///
+        /// The --branch and --repo-owner arguments are mutually exclusive with the binary version
+        /// arguments. You can only supply version numbers or a custom branch, not both.
+        #[arg(long, verbatim_doc_comment)]
+        branch: Option<String>,
+        /// Specify the chunk size for the custom binaries using a 64-bit integer.
+        ///
+        /// This option only applies if the --branch and --repo-owner arguments are used.
+        #[clap(long, value_parser = parse_chunk_size)]
+        chunk_size: Option<u64>,
+        /// Provide environment variables for the antnode RPC client.
+        ///
+        /// This is useful to set the client's log levels. Each variable should be comma
+        /// separated without any space.
+        ///
+        /// Example: --client-env CLIENT_LOG=all,RUST_LOG=debug
+        #[clap(name = "client-env", long, use_value_delimiter = true, value_parser = parse_environment_variables, verbatim_doc_comment)]
+        client_env_variables: Option<Vec<(String, String)>>,
+        /// The number of client VMs to create.
+        ///
+        /// If the argument is not used, the value will be determined by the 'environment-type'
+        /// argument.
+        #[clap(long)]
+        client_vm_count: Option<u16>,
+        /// Override the size of the client VMs.
+        #[clap(long)]
+        client_vm_size: Option<String>,
+        /// Set to disable Telegraf metrics collection on all nodes.
+        #[clap(long)]
+        disable_telegraf: bool,
+        /// The type of deployment.
+        ///
+        /// Possible values are 'development', 'production' or 'staging'. The value used will
+        /// determine the sizes of VMs, the number of VMs, and the number of nodes deployed on
+        /// them. The specification will increase in size from development, to staging, to
+        /// production.
+        ///
+        /// The default is 'development'.
+        #[clap(long, default_value_t = EnvironmentType::Development, value_parser = parse_deployment_type, verbatim_doc_comment)]
+        environment_type: EnvironmentType,
+        /// The address of the data payments contract.
+        #[arg(long)]
+        evm_data_payments_address: Option<String>,
+        /// The EVM network type to use for the deployment.
+        ///
+        /// Possible values are 'arbitrum-one' or 'custom'.
+        ///
+        /// If not used, the default is 'arbitrum-one'.
+        #[clap(long, default_value = "arbitrum-one", value_parser = parse_evm_network)]
+        evm_network_type: EvmNetwork,
+        /// The address of the payment token contract.
+        #[arg(long)]
+        evm_payment_token_address: Option<String>,
+        /// The RPC URL for the EVM network.
+        ///
+        /// This argument only applies if the EVM network type is 'custom'.
+        #[arg(long)]
+        evm_rpc_url: Option<String>,
+        /// The name of the environment
+        #[arg(short = 'n', long)]
+        name: String,
+        /// Specify the network ID for the ant binary.
+        ///
+        /// This is used to ensure the client connects to the correct network.
+        ///
+        /// For a production deployment, use 1.
+        ///
+        /// For an alpha deployment, use 2.
+        ///
+        /// For a testnet deployment, use anything between 3 and 255.
+        #[clap(long, verbatim_doc_comment)]
+        network_id: u8,
+        /// The networks contacts URL from an existing network.
+        #[arg(long)]
+        network_contacts_url: Option<String>,
+        /// A peer from an existing network that the Ant client can connect to.
+        ///
+        /// Should be in the form of a multiaddr.
+        #[arg(long)]
+        peer: Option<String>,
+        /// The cloud provider to deploy to.
+        ///
+        /// Valid values are "aws" or "digital-ocean".
+        #[clap(long, default_value_t = CloudProvider::DigitalOcean, value_parser = parse_provider, verbatim_doc_comment)]
+        provider: CloudProvider,
+        /// The region to deploy to.
+        ///
+        /// Defaults to "lon1" for Digital Ocean.
+        #[clap(long, default_value = "lon1")]
+        region: String,
+        /// The owner/org of the Github repository to build from.
+        ///
+        /// If used, all binaries will be built from this repository. It is typically used for
+        /// testing changes on a fork.
+        ///
+        /// This argument must be used in conjunction with the --repo-owner argument.
+        ///
+        /// The --branch and --repo-owner arguments are mutually exclusive with the binary version
+        /// arguments. You can only supply version numbers or a custom branch, not both.
+        #[arg(long, verbatim_doc_comment)]
+        repo_owner: Option<String>,
+        /// The batch size for the uploads.
+        #[clap(long)]
+        upload_batch_size: Option<u16>,
+        /// The secret key for the wallet with the funds for uploading.
+        #[arg(long, verbatim_doc_comment)]
+        wallet_secret_key: String,
+    },
     /// Enable downloaders on all client VMs in an environment.
     EnableDownloaders {
         /// The name of the environment
@@ -703,6 +827,7 @@ pub async fn handle_clients_command(cmd: ClientsCommands) -> Result<()> {
                 upload_size: Some(upload_size),
                 sleep_duration: None,
                 uploaders_count,
+                upload_batch_size: None,
                 wallet_secret_keys: if wallet_secret_key.is_empty() {
                     None
                 } else {
@@ -854,12 +979,144 @@ pub async fn handle_clients_command(cmd: ClientsCommands) -> Result<()> {
                 upload_size: None,
                 sleep_duration,
                 uploaders_count: 0,
+                upload_batch_size: None,
                 wallet_secret_keys: None,
             };
 
             client_deployer.deploy_static_downloaders(options).await?;
 
             println!("Static downloader deployment for '{name}' completed successfully");
+            Ok(())
+        }
+        ClientsCommands::DeployStaticUploader {
+            ant_version,
+            branch,
+            chunk_size,
+            client_env_variables,
+            client_vm_count,
+            client_vm_size,
+            disable_telegraf,
+            environment_type,
+            evm_data_payments_address,
+            evm_network_type,
+            evm_payment_token_address,
+            evm_rpc_url,
+            name,
+            network_id,
+            network_contacts_url,
+            peer,
+            provider,
+            region,
+            repo_owner,
+            upload_batch_size,
+            wallet_secret_key,
+        } => {
+            if (branch.is_some() && repo_owner.is_none())
+                || (branch.is_none() && repo_owner.is_some())
+            {
+                return Err(eyre!(
+                    "Both --branch and --repo-owner must be provided together"
+                ));
+            }
+
+            if ant_version.is_some() && (branch.is_some() || repo_owner.is_some()) {
+                return Err(eyre!("Cannot specify both version and branch/repo-owner"));
+            }
+
+            if evm_network_type == EvmNetwork::Custom {
+                if evm_data_payments_address.is_none() {
+                    return Err(eyre!(
+                        "Data payments address must be provided for custom EVM network"
+                    ));
+                }
+                if evm_payment_token_address.is_none() {
+                    return Err(eyre!(
+                        "Payment token address must be provided for custom EVM network"
+                    ));
+                }
+                if evm_rpc_url.is_none() {
+                    return Err(eyre!("RPC URL must be provided for custom EVM network"));
+                }
+            }
+
+            let binary_option = get_binary_option(
+                branch,
+                repo_owner,
+                ant_version,
+                None,
+                None,
+                None,
+                false, // skip_binary_build - not exposed for static uploader
+            )
+            .await?;
+
+            let mut builder = ClientsDeployBuilder::new();
+            builder
+                .deployment_type(environment_type.clone())
+                .environment_name(&name)
+                .provider(provider);
+            let client_deployer = builder.build()?;
+            client_deployer.init().await?;
+
+            let inventory_service = DeploymentInventoryService::from(&client_deployer);
+            let inventory = inventory_service
+                .generate_or_retrieve_client_inventory(
+                    &name,
+                    &region,
+                    true,
+                    Some(binary_option.clone()),
+                )
+                .await?;
+            let evm_details = EvmDetails {
+                network: evm_network_type,
+                data_payments_address: evm_data_payments_address,
+                payment_token_address: evm_payment_token_address,
+                rpc_url: evm_rpc_url,
+            };
+
+            let options = ClientsDeployOptions {
+                binary_option,
+                chunk_size,
+                client_env_variables,
+                client_vm_count,
+                client_vm_size,
+                current_inventory: inventory,
+                delayed_verifier_batch_size: None,
+                delayed_verifier_quorum_value: None,
+                enable_delayed_verifier: false,
+                enable_performance_verifier: false,
+                enable_random_verifier: false,
+                enable_telegraf: !disable_telegraf,
+                enable_uploaders: true,
+                environment_type,
+                evm_details,
+                expected_hash: None,
+                expected_size: None,
+                file_address: None,
+                funding_wallet_secret_key: None,
+                initial_gas: None,
+                initial_tokens: None,
+                max_archived_log_files: 1,
+                max_log_files: 1,
+                max_uploads: None,
+                name: name.clone(),
+                network_contacts_url,
+                network_id: Some(network_id),
+                output_inventory_dir_path: client_deployer.working_directory_path.join("inventory"),
+                peer,
+                performance_verifier_batch_size: None,
+                random_verifier_batch_size: None,
+                upload_interval: 10,
+                upload_size: None,
+                sleep_duration: None,
+                uploaders_count: 1,
+                upload_batch_size,
+                wallet_secret_keys: Some(vec![wallet_secret_key]),
+            };
+
+            client_deployer.deploy_static_uploader(options).await?;
+
+            println!("Static uploader deployment for '{name}' completed successfully");
             Ok(())
         }
         ClientsCommands::StartDownloaders { name, provider } => {
