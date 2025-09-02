@@ -280,7 +280,13 @@ download_file() {
     LOG_OUTPUT_ARG="--log-output-dest $log_file_path"
     
     start_time=$(date +%s%N)
-    stdout=$(ant $CONTACT_PEER_ARG $NETWORK_CONTACTS_URL_ARG $NETWORK_ID_ARG $LOG_OUTPUT_ARG file download "$file_ref" "$download_path" $QUORUM_ARG 2>&1)
+    stdout=$(ant $CONTACT_PEER_ARG \
+        $NETWORK_CONTACTS_URL_ARG \
+        $NETWORK_ID_ARG \
+        $LOG_OUTPUT_ARG \
+        file download "$file_ref" "$download_path" \
+        $QUORUM_ARG \
+        --disable-cache 2>&1)
     exit_code=$?
     end_time=$(date +%s%N)
     echo "$stdout"
