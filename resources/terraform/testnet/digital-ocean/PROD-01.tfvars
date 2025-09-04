@@ -1,0 +1,14 @@
+ant_client_droplet_size = "s-2vcpu-4gb"
+ant_client_vm_count = 0
+evm_node_droplet_size = "s-2vcpu-4gb"
+evm_node_vm_count = 0
+full_cone_private_node_vm_count = 1
+full_cone_droplet_size = "s-2vcpu-4gb"
+node_droplet_size = "s-2vcpu-4gb"
+node_vm_count = 40
+peer_cache_droplet_size = "s-2vcpu-4gb"
+peer_cache_node_vm_count = 0
+symmetric_nat_gateway_droplet_size = "s-2vcpu-4gb"
+symmetric_private_node_vm_count = 1
+upnp_droplet_size = "s-2vcpu-4gb"
+upnp_private_node_vm_count = 1
