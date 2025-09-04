@@ -131,7 +131,7 @@ impl TestnetDeployer {
         let mut failed_to_provision = false;
 
         self.ansible_provisioner
-            .print_ansible_run_banner("Provision Normal Nodes");
+            .print_ansible_run_banner("Provision Public Nodes");
         match self.ansible_provisioner.provision_nodes(
             &provision_options,
             options.peer.clone(),
@@ -139,10 +139,27 @@ impl TestnetDeployer {
             NodeType::Generic,
         ) {
             Ok(()) => {
-                println!("Provisioned normal nodes");
+                println!("Provisioned public nodes");
             }
             Err(e) => {
-                println!("Failed to provision normal nodes: {e:?}");
+                println!("Failed to provision public nodes: {e:?}");
+                failed_to_provision = true;
+            }
+        }
+
+        self.ansible_provisioner
+            .print_ansible_run_banner("Provision UPnP Nodes");
+        match self.ansible_provisioner.provision_nodes(
+            &provision_options,
+            options.peer.clone(),
+            options.network_contacts_url.clone(),
+            NodeType::Upnp,
+        ) {
+            Ok(()) => {
+                println!("Provisioned UPnP nodes");
+            }
+            Err(e) => {
+                error!("Failed to provision UPnP nodes: {e:?}");
                 failed_to_provision = true;
             }
         }
@@ -162,10 +179,10 @@ impl TestnetDeployer {
                 None,
             ) {
                 Ok(()) => {
-                    println!("Provisioned Full Cone nodes and Gateway");
+                    println!("Provisioned full cone nodes and gateway");
                 }
                 Err(err) => {
-                    error!("Failed to provision Full Cone nodes and Gateway: {err}");
+                    error!("Failed to provision full cone nodes and gateway: {err}");
                     failed_to_provision = true;
                 }
             }
@@ -177,7 +194,7 @@ impl TestnetDeployer {
             self.ansible_provisioner
                 .provision_symmetric_nat_gateway(&provision_options, &private_node_inventory)
                 .map_err(|err| {
-                    println!("Failed to provision Symmetric NAT gateway {err:?}");
+                    println!("Failed to provision symmetric NAT gateway {err:?}");
                     err
                 })?;
 
@@ -190,10 +207,10 @@ impl TestnetDeployer {
                 &private_node_inventory,
             ) {
                 Ok(()) => {
-                    println!("Provisioned Symmetric private nodes");
+                    println!("Provisioned symmetric private nodes");
                 }
                 Err(err) => {
-                    error!("Failed to provision Symmetric Private nodes: {err}");
+                    error!("Failed to provision symmetric private nodes: {err}");
                     failed_to_provision = true;
                 }
             }
