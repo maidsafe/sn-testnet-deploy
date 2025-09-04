@@ -555,6 +555,13 @@ pub fn build_terraform_args(options: &InfraRunOptions) -> Result<Vec<(String, St
         ));
     }
 
+    if let Some(upnp_private_node_vm_count) = options.upnp_private_node_vm_count {
+        args.push((
+            "upnp_private_node_vm_count".to_string(),
+            upnp_private_node_vm_count.to_string(),
+        ));
+    }
+
     if let Some(upnp_private_node_volume_size) = options.upnp_private_node_volume_size {
         args.push((
             "upnp_private_node_volume_size".to_string(),
