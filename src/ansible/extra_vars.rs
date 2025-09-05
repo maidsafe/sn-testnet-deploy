@@ -22,7 +22,6 @@ const ANTCTL_S3_BUCKET_URL: &str = "https://antctl.s3.eu-west-2.amazonaws.com";
 // The old `sn-node` S3 bucket will continue to be used to store custom branch builds.
 // They are stored in here regardless of which binary they are.
 const BRANCH_S3_BUCKET_URL: &str = "https://sn-node.s3.eu-west-2.amazonaws.com";
-const RPC_CLIENT_BUCKET_URL: &str = "https://antnode-rpc-client.s3.eu-west-2.amazonaws.com";
 
 #[derive(Default, Clone)]
 pub struct ExtraVarsDocBuilder {
@@ -59,6 +58,12 @@ impl ExtraVarsDocBuilder {
                 .collect();
             self.map.insert(name.to_owned(), Value::Array(json_list));
         }
+        self
+    }
+
+    pub fn add_list_variable_as_csv(&mut self, name: &str, values: Vec<String>) -> &mut Self {
+        let joined_values = values.join(",");
+        self.add_variable(name, &joined_values);
         self
     }
 
@@ -99,35 +104,6 @@ impl ExtraVarsDocBuilder {
             }
             BinaryOption::Versioned { .. } => {
                 self.add_variable("custom_bin", "false");
-            }
-        }
-    }
-
-    pub fn add_rpc_client_url_or_version(
-        &mut self,
-        deployment_name: &str,
-        binary_option: &BinaryOption,
-    ) {
-        match binary_option {
-            BinaryOption::BuildFromSource {
-                repo_owner, branch, ..
-            } => {
-                self.add_branch_url_variable(
-                    "antnode_rpc_client_archive_url",
-                    &format!(
-                        "{BRANCH_S3_BUCKET_URL}/{repo_owner}/{branch}/antnode_rpc_client-{deployment_name}-x86_64-unknown-linux-musl.tar.gz"
-                    ),
-                    branch,
-                    repo_owner,
-                );
-            }
-            _ => {
-                self.add_variable(
-                    "antnode_rpc_client_archive_url",
-                    &format!(
-                        "{RPC_CLIENT_BUCKET_URL}/antnode_rpc_client-latest-x86_64-unknown-linux-musl.tar.gz"
-                    ),
-                );
             }
         }
     }
@@ -177,35 +153,6 @@ impl ExtraVarsDocBuilder {
                     "antctl_archive_url",
                     &format!(
                         "{}/antctl-{}-x86_64-unknown-linux-musl.tar.gz",
-                        ANTCTL_S3_BUCKET_URL,
-                        antctl_version.as_ref().unwrap()
-                    ),
-                );
-            }
-        }
-    }
-
-    pub fn add_antctld_url(&mut self, deployment_name: &str, binary_option: &BinaryOption) {
-        match binary_option {
-            BinaryOption::BuildFromSource {
-                repo_owner, branch, ..
-            } => {
-                self.add_branch_url_variable(
-                    "antctld_archive_url",
-                    &format!(
-                        "{BRANCH_S3_BUCKET_URL}/{repo_owner}/{branch}/antctld-{deployment_name}-x86_64-unknown-linux-musl.tar.gz"
-                    ),
-                    branch,
-                    repo_owner,
-                );
-            }
-            BinaryOption::Versioned { antctl_version, .. } => {
-                // An unwrap would be justified here because the antctl version must be set for the
-                // type of deployment where this will apply.
-                self.add_variable(
-                    "antctld_archive_url",
-                    &format!(
-                        "{}/antctld-{}-x86_64-unknown-linux-musl.tar.gz",
                         ANTCTL_S3_BUCKET_URL,
                         antctl_version.as_ref().unwrap()
                     ),
@@ -295,8 +242,8 @@ pub fn build_node_extra_vars_doc(
     cloud_provider: &str,
     options: &ProvisionOptions,
     node_type: NodeType,
-    genesis_multiaddr: Option<String>,
-    network_contacts_url: Option<String>,
+    genesis_multiaddrs: Vec<String>,
+    network_contacts_urls: Vec<String>,
     node_instance_count: u16,
     evm_network: EvmNetwork,
     write_older_cache_files: bool,
@@ -305,11 +252,11 @@ pub fn build_node_extra_vars_doc(
     extra_vars.add_variable("provider", cloud_provider);
     extra_vars.add_variable("testnet_name", &options.name);
     extra_vars.add_variable("node_type", node_type.telegraf_role());
-    if let Some(genesis_multiaddr) = genesis_multiaddr {
-        extra_vars.add_variable("genesis_multiaddr", &genesis_multiaddr);
+    if !genesis_multiaddrs.is_empty() {
+        extra_vars.add_list_variable_as_csv("genesis_multiaddr", genesis_multiaddrs);
     }
-    if let Some(network_contacts_url) = network_contacts_url {
-        extra_vars.add_variable("network_contacts_url", &network_contacts_url);
+    if !network_contacts_urls.is_empty() {
+        extra_vars.add_list_variable_as_csv("network_contacts_url", network_contacts_urls);
     }
 
     extra_vars.add_variable("node_instance_count", &node_instance_count.to_string());
@@ -327,22 +274,8 @@ pub fn build_node_extra_vars_doc(
         &options.max_archived_log_files.to_string(),
     );
     extra_vars.add_variable("max_log_files", &options.max_log_files.to_string());
-    if options.public_rpc {
-        extra_vars.add_variable("public_rpc", "true");
-    }
 
     match node_type {
-        NodeType::FullConePrivateNode => {
-            // Full cone private nodes do not need relay as it is a straight port forward.
-            extra_vars.add_variable("private_ip", "true");
-            extra_vars.add_boolean_variable("enable_upnp", false);
-        }
-        NodeType::SymmetricPrivateNode => {
-            // Symmetric private nodes need relay and private ip.
-            extra_vars.add_variable("private_ip", "true");
-            extra_vars.add_variable("relay", "true");
-            extra_vars.add_boolean_variable("enable_upnp", false);
-        }
         NodeType::Upnp => {
             extra_vars.add_boolean_variable("enable_upnp", true);
         }
@@ -363,7 +296,6 @@ pub fn build_node_extra_vars_doc(
 
     extra_vars.add_node_url_or_version(&options.name, &options.binary_option);
     extra_vars.add_antctl_url(&options.name, &options.binary_option);
-    extra_vars.add_antctld_url(&options.name, &options.binary_option);
 
     if let Some(env_vars) = &options.node_env_variables {
         extra_vars.add_env_variable_list("node_env_variables", env_vars.clone());
@@ -469,17 +401,17 @@ pub fn build_symmetric_private_node_config_extra_vars_doc(
 pub fn build_downloaders_extra_vars_doc(
     cloud_provider: &str,
     options: &ProvisionOptions,
-    peer: Option<String>,
-    network_contacts_url: Option<String>,
+    peers: Vec<String>,
+    network_contacts_urls: Vec<String>,
 ) -> Result<String> {
     let mut extra_vars: ExtraVarsDocBuilder = ExtraVarsDocBuilder::default();
     extra_vars.add_variable("provider", cloud_provider);
     extra_vars.add_variable("testnet_name", &options.name);
-    if let Some(peer) = peer {
-        extra_vars.add_variable("peer", &peer);
+    if !peers.is_empty() {
+        extra_vars.add_list_variable_as_csv("peer", peers);
     }
-    if let Some(network_contacts_url) = network_contacts_url {
-        extra_vars.add_variable("network_contacts_url", &network_contacts_url);
+    if !network_contacts_urls.is_empty() {
+        extra_vars.add_list_variable_as_csv("network_contacts_url", network_contacts_urls);
     }
 
     extra_vars.add_ant_url_or_version(
@@ -553,18 +485,18 @@ pub fn build_downloaders_extra_vars_doc(
 pub fn build_clients_extra_vars_doc(
     cloud_provider: &str,
     options: &ProvisionOptions,
-    peer: Option<String>,
-    network_contacts_url: Option<String>,
+    peers: Vec<String>,
+    network_contacts_urls: Vec<String>,
     sk_map: &HashMap<VirtualMachine, Vec<PrivateKeySigner>>,
 ) -> Result<String> {
     let mut extra_vars = ExtraVarsDocBuilder::default();
     extra_vars.add_variable("provider", cloud_provider);
     extra_vars.add_variable("testnet_name", &options.name);
-    if let Some(peer) = peer {
-        extra_vars.add_variable("peer", &peer);
+    if !peers.is_empty() {
+        extra_vars.add_list_variable_as_csv("peer", peers);
     }
-    if let Some(network_contacts_url) = network_contacts_url {
-        extra_vars.add_variable("network_contacts_url", &network_contacts_url);
+    if !network_contacts_urls.is_empty() {
+        extra_vars.add_list_variable_as_csv("network_contacts_url", network_contacts_urls);
     }
 
     extra_vars.add_ant_url_or_version(

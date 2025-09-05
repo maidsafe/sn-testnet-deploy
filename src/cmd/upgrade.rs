@@ -78,7 +78,7 @@ pub async fn handle_upgrade_command(
         .environment_name(&name)
         .provider(provider)
         .build()?;
-    testnet_deployer.status()?;
+    testnet_deployer.status().await?;
 
     Ok(())
 }

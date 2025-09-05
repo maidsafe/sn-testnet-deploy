@@ -255,7 +255,6 @@ pub async fn handle_deploy(
     symmetric_private_node_vm_count: Option<u16>,
     symmetric_private_node_volume_size: Option<u16>,
     provider: crate::CloudProvider,
-    public_rpc: bool,
     region: String,
     repo_owner: Option<String>,
     rewards_address: String,
@@ -399,7 +398,6 @@ pub async fn handle_deploy(
         peer_cache_node_vm_size,
         peer_cache_node_volume_size: peer_cache_node_volume_size
             .or_else(|| Some(calculate_size_per_attached_volume(peer_cache_node_count))),
-        public_rpc,
         region,
         rewards_address,
         symmetric_nat_gateway_vm_size,
@@ -490,7 +488,6 @@ pub async fn handle_upscale(
     node_env_variables: Option<Vec<(String, String)>>,
     plan: bool,
     provider: CloudProvider,
-    public_rpc: bool,
     repo_owner: Option<String>,
     skip_binary_build: bool,
 ) -> Result<()> {
@@ -614,7 +611,6 @@ pub async fn handle_upscale(
             node_env_variables,
             plan,
             provision_only: false,
-            public_rpc,
             token_amount: None,
         })
         .await?;

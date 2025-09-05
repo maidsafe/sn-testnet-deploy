@@ -35,16 +35,13 @@ antctl stop --interval {{ stop_interval }}
 
 ${ANTCTL} reset --force
 
-base_rpc_port=13000
 base_metrics_port=14000
 
 for ((i=0; i<node_count; i++)); do
-  current_rpc_port=$((base_rpc_port + i))
   current_metrics_port=$((base_metrics_port + i))
   
   ${ANTCTL} add \
     --version {{ version }} \
-    --rpc-port ${current_rpc_port} \
     --data-dir-path /mnt/antnode-storage/data \
     --log-dir-path /mnt/antnode-storage/log \
     --peer ${peer_multiaddr} \

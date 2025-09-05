@@ -50,7 +50,6 @@ The codebase follows a modular architecture with these main components:
 **Node and Network Management:**
 - `src/bootstrap.rs` - Network bootstrapping from existing deployments
 - `src/nodes.rs` - Node lifecycle management (start/stop/upgrade)
-- `src/rpc_client.rs` - RPC communication with nodes
 - `src/inventory.rs` - Infrastructure inventory management
 
 **Deployment Types:**

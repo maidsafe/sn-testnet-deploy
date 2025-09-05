@@ -122,10 +122,6 @@ pub enum AnsiblePlaybook {
     ///
     /// See the `reset-to-n-nodes` role for more details.
     ResetToNNodes,
-    /// The rpc client playbook will setup the `safenode_rpc_client` binary on the genesis node.
-    ///
-    /// Use in combination with `AnsibleInventoryType::Genesis`.
-    RpcClient,
     /// The start nodes playbook will use the node manager to start any node services on any
     /// machines it runs against.
     ///
@@ -241,7 +237,6 @@ impl AnsiblePlaybook {
             AnsiblePlaybook::Nodes => "nodes.yml".to_string(),
             AnsiblePlaybook::PeerCacheNodes => "peer_cache_node.yml".to_string(),
             AnsiblePlaybook::PrivateNodeConfig => "private_node_config.yml".to_string(),
-            AnsiblePlaybook::RpcClient => "safenode_rpc_client.yml".to_string(),
             AnsiblePlaybook::ResetToNNodes => "reset_to_n_nodes.yml".to_string(),
             AnsiblePlaybook::StartDownloaders => "start_downloaders.yml".to_string(),
             AnsiblePlaybook::StartFaucet => "start_faucet.yml".to_string(),

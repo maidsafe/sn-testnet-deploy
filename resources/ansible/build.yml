@@ -18,8 +18,3 @@
         bin_name: "antctl",
         when: custom_bin | bool and (build_antctl | default(true) | bool)
       }
-    - {
-        role: build_safe_network_binary,
-        bin_name: "antctld",
-        when: custom_bin | bool and (build_antctld | default(true) | bool)
-      }

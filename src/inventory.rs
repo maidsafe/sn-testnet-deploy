@@ -23,9 +23,9 @@ use crate::{
     EvmDetails, TestnetDeployer,
 };
 use alloy::hex::ToHexExt;
-use ant_service_management::{NodeRegistry, ServiceStatus};
+use ant_service_management::{NodeRegistryManager, ServiceStatus};
 use color_eyre::{eyre::eyre, Result};
-use log::debug;
+use log::{debug, error};
 use rand::seq::{IteratorRandom, SliceRandom};
 use semver::Version;
 use serde::{Deserialize, Serialize};
@@ -34,7 +34,7 @@ use std::{
     convert::From,
     fs::File,
     io::Write,
-    net::{IpAddr, SocketAddr},
+    net::IpAddr,
     path::PathBuf,
 };
 
@@ -210,7 +210,7 @@ impl DeploymentInventoryService {
             ansible_runner.get_inventory(AnsibleInventoryType::Clients, true)
         });
 
-        let genesis_vm = genesis_handle.join().expect("Thread panicked")?;
+        let genesis_vms = genesis_handle.join().expect("Thread panicked")?;
         let mut misc_vms = Vec::new();
         misc_vms.extend(build_handle.join().expect("Thread panicked")?);
         let full_cone_nat_gateway_vms = full_cone_nat_gateway_handle
@@ -287,59 +287,70 @@ impl DeploymentInventoryService {
 
         println!("Retrieving node registries from all VMs...");
         let ansible_provisioner = self.ansible_provisioner.clone();
-        let peer_cache_node_registries_handle = std::thread::spawn(move || {
-            ansible_provisioner.get_node_registries(&AnsibleInventoryType::PeerCacheNodes)
+        let peer_cache_node_registries_handle = tokio::spawn(async move {
+            ansible_provisioner
+                .get_node_registries(&AnsibleInventoryType::PeerCacheNodes)
+                .await
         });
         let ansible_provisioner = self.ansible_provisioner.clone();
-        let generic_node_registries_handle = std::thread::spawn(move || {
-            ansible_provisioner.get_node_registries(&AnsibleInventoryType::Nodes)
+        let generic_node_registries_handle = tokio::spawn(async move {
+            ansible_provisioner
+                .get_node_registries(&AnsibleInventoryType::Nodes)
+                .await
         });
         let ansible_provisioner = self.ansible_provisioner.clone();
-        let symmetric_private_node_registries_handle = std::thread::spawn(move || {
-            ansible_provisioner.get_node_registries(&AnsibleInventoryType::SymmetricPrivateNodes)
+        let symmetric_private_node_registries_handle = tokio::spawn(async move {
+            ansible_provisioner
+                .get_node_registries(&AnsibleInventoryType::SymmetricPrivateNodes)
+                .await
         });
         let ansible_provisioner = self.ansible_provisioner.clone();
-        let full_cone_private_node_registries_handle = std::thread::spawn(move || {
-            ansible_provisioner.get_node_registries(&AnsibleInventoryType::FullConePrivateNodes)
+        let full_cone_private_node_registries_handle = tokio::spawn(async move {
+            ansible_provisioner
+                .get_node_registries(&AnsibleInventoryType::FullConePrivateNodes)
+                .await
         });
         let ansible_provisioner = self.ansible_provisioner.clone();
-        let upnp_private_node_registries_handle = std::thread::spawn(move || {
-            ansible_provisioner.get_node_registries(&AnsibleInventoryType::Upnp)
+        let upnp_private_node_registries_handle = tokio::spawn(async move {
+            ansible_provisioner
+                .get_node_registries(&AnsibleInventoryType::Upnp)
+                .await
         });
         let ansible_provisioner = self.ansible_provisioner.clone();
-        let genesis_node_registry_handle = std::thread::spawn(move || {
-            ansible_provisioner.get_node_registries(&AnsibleInventoryType::Genesis)
+        let genesis_node_registry_handle = tokio::spawn(async move {
+            ansible_provisioner
+                .get_node_registries(&AnsibleInventoryType::Genesis)
+                .await
         });
 
         let peer_cache_node_registries = peer_cache_node_registries_handle
-            .join()
-            .expect("Thread panicked")?;
+            .await
+            .expect("Task panicked")?;
         let generic_node_registries = generic_node_registries_handle
-            .join()
-            .expect("Thread panicked")?;
+            .await
+            .expect("Task panicked")?;
         let symmetric_private_node_registries = symmetric_private_node_registries_handle
-            .join()
-            .expect("Thread panicked")?;
+            .await
+            .expect("Task panicked")?;
         let full_cone_private_node_registries = full_cone_private_node_registries_handle
-            .join()
-            .expect("Thread panicked")?;
+            .await
+            .expect("Task panicked")?;
         let upnp_private_node_registries = upnp_private_node_registries_handle
-            .join()
-            .expect("Thread panicked")?;
-        let genesis_node_registry = genesis_node_registry_handle
-            .join()
-            .expect("Thread panicked")?;
+            .await
+            .expect("Task panicked")?;
+        let genesis_node_registry = genesis_node_registry_handle.await.expect("Task panicked")?;
 
         let peer_cache_node_vms =
-            NodeVirtualMachine::from_list(&peer_cache_node_vms, &peer_cache_node_registries);
+            NodeVirtualMachine::from_list(&peer_cache_node_vms, &peer_cache_node_registries).await;
 
         let generic_node_vms =
-            NodeVirtualMachine::from_list(&generic_node_vms, &generic_node_registries);
+            NodeVirtualMachine::from_list(&generic_node_vms, &generic_node_registries).await;
 
         let symmetric_private_node_vms = NodeVirtualMachine::from_list(
             &symmetric_private_node_vms,
             &symmetric_private_node_registries,
-        );
+        )
+        .await;
         debug!("symmetric_private_node_vms after conversion: {symmetric_private_node_vms:?}");
 
         debug!("full_cone_private_node_vms: {full_cone_private_node_vms:?}");
@@ -352,19 +363,16 @@ impl DeploymentInventoryService {
         let full_cone_private_node_vms = NodeVirtualMachine::from_list(
             &full_cone_private_node_vms,
             &full_cone_private_node_registries,
-        );
+        )
+        .await;
         debug!("full_cone_private_node_vms after conversion: {full_cone_private_node_vms:?}");
 
         let upnp_private_node_vms =
-            NodeVirtualMachine::from_list(&upnp_private_node_vms, &upnp_private_node_registries);
+            NodeVirtualMachine::from_list(&upnp_private_node_vms, &upnp_private_node_registries)
+                .await;
         debug!("upnp_private_node_vms after conversion: {upnp_private_node_vms:?}");
 
-        let genesis_vm = NodeVirtualMachine::from_list(&genesis_vm, &genesis_node_registry);
-        let genesis_vm = if !genesis_vm.is_empty() {
-            Some(genesis_vm[0].clone())
-        } else {
-            None
-        };
+        let genesis_vms = NodeVirtualMachine::from_list(&genesis_vms, &genesis_node_registry).await;
 
         let mut failed_node_registry_vms = Vec::new();
         failed_node_registry_vms.extend(peer_cache_node_registries.failed_vms);
@@ -383,8 +391,8 @@ impl DeploymentInventoryService {
                     random_vm = generic_node_vms.first().cloned();
                 } else if !peer_cache_node_vms.is_empty() {
                     random_vm = peer_cache_node_vms.first().cloned();
-                } else if genesis_vm.is_some() {
-                    random_vm = genesis_vm.clone()
+                } else if !genesis_vms.is_empty() {
+                    random_vm = genesis_vms.first().cloned()
                 };
 
                 let Some(random_vm) = random_vm else {
@@ -435,25 +443,29 @@ impl DeploymentInventoryService {
             }
         };
 
-        let (genesis_multiaddr, genesis_ip) =
-            if environment_details.deployment_type == DeploymentType::New {
-                match get_genesis_multiaddr(&self.ansible_runner, &self.ssh_client) {
-                    Ok((multiaddr, ip)) => (Some(multiaddr), Some(ip)),
-                    Err(_) => (None, None),
+        let genesis_multiaddrs = if environment_details.deployment_type == DeploymentType::New {
+            match get_genesis_multiaddr(&self.ansible_runner, &self.ssh_client) {
+                Ok((genesis_multiaddr, _)) => genesis_multiaddr,
+                Err(_) => {
+                    error!("Failed to retrieve genesis multiaddr");
+                    vec![]
                 }
-            } else {
-                (None, None)
-            };
+            }
+        } else {
+            vec![]
+        };
         let inventory = DeploymentInventory {
             binary_option,
             client_vms,
             environment_details,
             failed_node_registry_vms,
-            faucet_address: genesis_ip.map(|ip| format!("{ip}:8000")),
+            faucet_address: genesis_vms
+                .first()
+                .map(|vm| format!("{}:8000", vm.vm.public_ip_addr)),
             full_cone_nat_gateway_vms,
             full_cone_private_node_vms,
-            genesis_multiaddr,
-            genesis_vm,
+            genesis_multiaddrs,
+            genesis_vms,
             name: name.to_string(),
             misc_vms,
             node_vms: generic_node_vms,
@@ -727,7 +739,7 @@ impl DeploymentInventoryService {
 }
 
 impl NodeVirtualMachine {
-    pub fn from_list(
+    pub async fn from_list(
         vms: &[VirtualMachine],
         node_registries: &DeploymentNodeRegistries,
     ) -> Vec<Self> {
@@ -749,40 +761,35 @@ impl NodeVirtualMachine {
                 })
                 .map(|(_, reg)| reg);
 
-            // We want to accommodate cases where the node registry is empty because the machine
-            // may not have been provisioned yet.
+            let node_registry = match node_registry {
+                Some(registry) => {
+                    debug!("Found node registry for VM: {vm:?}");
+                    registry
+                }
+                None => {
+                    debug!("No node registry found for VM: {vm:?}");
+                    let node_vm = Self {
+                        vm: vm.clone(),
+                        node_count: 0,
+                        node_listen_addresses: Default::default(),
+                    };
+                    node_vms.push(node_vm);
+                    continue;
+                }
+            };
+            let node_count = node_registry.nodes.read().await.len();
+            let mut node_listen_addresses = Vec::with_capacity(node_count);
+            for node in node_registry.nodes.read().await.iter() {
+                let addrs = node.read().await.listen_addr.clone();
+                if let Some(addrs) = addrs {
+                    node_listen_addresses.push(addrs.iter().map(|addr| addr.to_string()).collect());
+                }
+            }
+
             let node_vm = Self {
-                node_count: node_registry.map_or(0, |reg| reg.nodes.len()),
-                node_listen_addresses: node_registry.map_or_else(Vec::new, |reg| {
-                    if reg.nodes.is_empty() {
-                        Vec::new()
-                    } else {
-                        reg.nodes
-                            .iter()
-                            .map(|node| {
-                                node.listen_addr
-                                    .as_ref()
-                                    .map(|addrs| {
-                                        addrs.iter().map(|addr| addr.to_string()).collect()
-                                    })
-                                    .unwrap_or_default()
-                            })
-                            .collect()
-                    }
-                }),
-                rpc_endpoint: node_registry.map_or_else(HashMap::new, |reg| {
-                    reg.nodes
-                        .iter()
-                        .filter_map(|node| {
-                            node.peer_id
-                                .map(|peer_id| (peer_id.to_string(), node.rpc_socket_addr))
-                        })
-                        .collect()
-                }),
-                safenodemand_endpoint: node_registry
-                    .and_then(|reg| reg.daemon.as_ref())
-                    .and_then(|daemon| daemon.endpoint),
                 vm: vm.clone(),
+                node_count,
+                node_listen_addresses,
             };
             node_vms.push(node_vm.clone());
             debug!("Added node VM: {node_vm:?}");
@@ -824,8 +831,6 @@ pub struct NodeVirtualMachine {
     pub vm: VirtualMachine,
     pub node_count: usize,
     pub node_listen_addresses: Vec<Vec<String>>,
-    pub rpc_endpoint: HashMap<String, SocketAddr>,
-    pub safenodemand_endpoint: Option<SocketAddr>,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq, Hash)]
@@ -839,14 +844,22 @@ pub struct VirtualMachine {
 #[derive(Clone)]
 pub struct DeploymentNodeRegistries {
     pub inventory_type: AnsibleInventoryType,
-    /// The (name, NodeRegistry) pairs for each VM that was successfully retrieved.
+    /// The (name, NodeRegistryManager) pairs for each VM that was successfully retrieved.
     /// Note: for private nodes, the name is set to the private address of the VM.
-    pub retrieved_registries: Vec<(String, NodeRegistry)>,
+    pub retrieved_registries: Vec<(String, NodeRegistryManager)>,
     pub failed_vms: Vec<String>,
 }
 
 impl DeploymentNodeRegistries {
-    pub fn print(&self) {
+    pub async fn get_node_count(&self) -> usize {
+        let mut count = 0;
+        for (_, registry) in self.retrieved_registries.iter() {
+            count += registry.nodes.read().await.len();
+        }
+        count
+    }
+
+    pub async fn print(&self) {
         if self.retrieved_registries.is_empty() {
             return;
         }
@@ -854,7 +867,8 @@ impl DeploymentNodeRegistries {
         Self::print_banner(&self.inventory_type.to_string());
         for (vm_name, registry) in self.retrieved_registries.iter() {
             println!("{vm_name}:");
-            for node in registry.nodes.iter() {
+            for node in registry.nodes.read().await.iter() {
+                let node = node.read().await;
                 println!(
                     "  {}: {} {}",
                     node.service_name,
@@ -905,8 +919,8 @@ pub struct DeploymentInventory {
     pub faucet_address: Option<String>,
     pub full_cone_nat_gateway_vms: Vec<VirtualMachine>,
     pub full_cone_private_node_vms: Vec<NodeVirtualMachine>,
-    pub genesis_vm: Option<NodeVirtualMachine>,
-    pub genesis_multiaddr: Option<String>,
+    pub genesis_vms: Vec<NodeVirtualMachine>,
+    pub genesis_multiaddrs: Vec<String>,
     pub misc_vms: Vec<VirtualMachine>,
     pub name: String,
     pub node_vms: Vec<NodeVirtualMachine>,
@@ -927,8 +941,8 @@ impl DeploymentInventory {
             binary_option,
             client_vms: Default::default(),
             environment_details: EnvironmentDetails::default(),
-            genesis_vm: Default::default(),
-            genesis_multiaddr: Default::default(),
+            genesis_vms: Default::default(),
+            genesis_multiaddrs: Default::default(),
             failed_node_registry_vms: Default::default(),
             faucet_address: Default::default(),
             full_cone_nat_gateway_vms: Default::default(),
@@ -959,7 +973,7 @@ impl DeploymentInventory {
         if self.environment_details.deployment_type == DeploymentType::Bootstrap {
             return self.node_vms.is_empty();
         }
-        self.genesis_vm.is_none()
+        self.genesis_vms.is_empty()
     }
 
     pub fn vm_list(&self) -> Vec<VirtualMachine> {
@@ -971,7 +985,7 @@ impl DeploymentInventory {
                 .iter()
                 .map(|node_vm| node_vm.vm.clone()),
         );
-        list.extend(self.genesis_vm.iter().map(|node_vm| node_vm.vm.clone()));
+        list.extend(self.genesis_vms.iter().map(|node_vm| node_vm.vm.clone()));
         list.extend(self.node_vms.iter().map(|node_vm| node_vm.vm.clone()));
         list.extend(self.misc_vms.clone());
         list.extend(
@@ -996,7 +1010,7 @@ impl DeploymentInventory {
     pub fn node_vm_list(&self) -> Vec<NodeVirtualMachine> {
         let mut list = Vec::new();
         list.extend(self.peer_cache_node_vms.iter().cloned());
-        list.extend(self.genesis_vm.iter().cloned());
+        list.extend(self.genesis_vms.iter().cloned());
         list.extend(self.node_vms.iter().cloned());
         list.extend(self.full_cone_private_node_vms.iter().cloned());
         list.extend(self.symmetric_private_node_vms.iter().cloned());
@@ -1013,7 +1027,7 @@ impl DeploymentInventory {
                 .flat_map(|node_vm| node_vm.get_quic_addresses()),
         );
         list.extend(
-            self.genesis_vm
+            self.genesis_vms
                 .iter()
                 .flat_map(|node_vm| node_vm.get_quic_addresses()),
         );
@@ -1072,7 +1086,7 @@ impl DeploymentInventory {
     }
 
     pub fn genesis_node_count(&self) -> usize {
-        if let Some(genesis_vm) = &self.genesis_vm {
+        if let Some(genesis_vm) = self.genesis_vms.first() {
             genesis_vm.node_count
         } else {
             0
@@ -1178,7 +1192,7 @@ impl DeploymentInventory {
         println!("========");
         println!("Node VMs");
         println!("========");
-        if let Some(genesis_vm) = &self.genesis_vm {
+        for genesis_vm in self.genesis_vms.iter() {
             println!("{}: {}", genesis_vm.vm.name, genesis_vm.vm.public_ip_addr);
         }
         for node_vm in self.node_vms.iter() {
@@ -1380,12 +1394,15 @@ impl DeploymentInventory {
         }
         println!();
 
-        println!(
-            "Genesis: {}",
-            self.genesis_multiaddr
-                .as_ref()
-                .map_or("N/A", |genesis| genesis)
-        );
+        if self.genesis_multiaddrs.is_empty() {
+            println!("Genesis: N/A");
+        } else {
+            println!("Genesis:");
+            for genesis in self.genesis_multiaddrs.iter() {
+                println!("  {genesis}");
+            }
+        }
+
         let inventory_file_path =
             get_data_directory()?.join(format!("{}-inventory.json", self.name));
         println!(
@@ -1458,8 +1475,10 @@ impl DeploymentInventory {
         println!("=====================");
 
         for node_vm in &self.peer_cache_node_vms {
-            let webserver = get_bootstrap_cache_url(&node_vm.vm.public_ip_addr);
-            println!("{}: {webserver}", node_vm.vm.name);
+            let webservers = get_bootstrap_cache_url(std::slice::from_ref(&node_vm.vm));
+            for webserver in webservers {
+                println!("{}: {webserver}", node_vm.vm.name);
+            }
         }
     }
 }

@@ -26,7 +26,7 @@ use crate::{
     print_duration, run_external_command, BinaryOption, CloudProvider, EvmNetwork, LogFormat,
     NodeType, SshClient, UpgradeOptions,
 };
-use ant_service_management::NodeRegistry;
+use ant_service_management::NodeRegistryManager;
 use evmlib::common::U256;
 use log::{debug, error, trace};
 use semver::Version;
@@ -83,7 +83,6 @@ pub struct ProvisionOptions {
     pub output_inventory_dir_path: PathBuf,
     pub peer_cache_node_count: u16,
     pub performance_verifier_batch_size: Option<u16>,
-    pub public_rpc: bool,
     pub random_verifier_batch_size: Option<u16>,
     pub rewards_address: Option<String>,
     pub sleep_duration: Option<u16>,
@@ -286,7 +285,6 @@ impl From<BootstrapOptions> for ProvisionOptions {
             output_inventory_dir_path: bootstrap_options.output_inventory_dir_path,
             peer_cache_node_count: 0,
             performance_verifier_batch_size: None,
-            public_rpc: false,
             random_verifier_batch_size: None,
             rewards_address: Some(bootstrap_options.rewards_address),
             sleep_duration: None,
@@ -339,7 +337,6 @@ impl From<DeployOptions> for ProvisionOptions {
             output_inventory_dir_path: deploy_options.output_inventory_dir_path,
             peer_cache_node_count: deploy_options.peer_cache_node_count,
             performance_verifier_batch_size: None,
-            public_rpc: deploy_options.public_rpc,
             random_verifier_batch_size: None,
             rewards_address: Some(deploy_options.rewards_address),
             sleep_duration: None,
@@ -392,7 +389,6 @@ impl From<ClientsDeployOptions> for ProvisionOptions {
             output_inventory_dir_path: client_options.output_inventory_dir_path,
             peer_cache_node_count: 0,
             performance_verifier_batch_size: client_options.performance_verifier_batch_size,
-            public_rpc: false,
             random_verifier_batch_size: client_options.random_verifier_batch_size,
             rewards_address: None,
             sleep_duration: client_options.sleep_duration,
@@ -449,14 +445,12 @@ impl AnsibleProvisioner {
             let mut build_ant = false;
             let mut build_antnode = false;
             let mut build_antctl = false;
-            let mut build_antctld = false;
 
             for binary in &binaries {
                 match binary.as_str() {
                     "ant" => build_ant = true,
                     "antnode" => build_antnode = true,
                     "antctl" => build_antctl = true,
-                    "antctld" => build_antctld = true,
                     _ => return Err(Error::InvalidBinaryName(binary.clone())),
                 }
             }
@@ -471,10 +465,6 @@ impl AnsibleProvisioner {
                 map.insert(
                     "build_antctl".to_string(),
                     serde_json::Value::Bool(build_antctl),
-                );
-                map.insert(
-                    "build_antctld".to_string(),
-                    serde_json::Value::Bool(build_antctld),
                 );
             }
             json_value.to_string()
@@ -540,7 +530,7 @@ impl AnsibleProvisioner {
             .get_inventory(AnsibleInventoryType::Clients, false)
     }
 
-    pub fn get_node_registries(
+    pub async fn get_node_registries(
         &self,
         inventory_type: &AnsibleInventoryType,
     ) -> Result<DeploymentNodeRegistries> {
@@ -581,7 +571,7 @@ impl AnsibleProvisioner {
         let mut node_registries = Vec::new();
         let mut failed_vms = Vec::new();
         for (vm_name, file_path) in node_registry_paths {
-            match NodeRegistry::load(&file_path) {
+            match NodeRegistryManager::load(&file_path).await {
                 Ok(node_registry) => node_registries.push((vm_name.clone(), node_registry)),
                 Err(_) => failed_vms.push(vm_name.clone()),
             }
@@ -634,8 +624,8 @@ impl AnsibleProvisioner {
                 &self.cloud_provider.to_string(),
                 options,
                 NodeType::Genesis,
-                None,
-                None,
+                vec![],
+                vec![],
                 1,
                 options.evm_network.clone(),
                 false,
@@ -650,8 +640,8 @@ impl AnsibleProvisioner {
     pub fn provision_full_cone(
         &self,
         options: &ProvisionOptions,
-        initial_contact_peer: Option<String>,
-        initial_network_contacts_url: Option<String>,
+        initial_contact_peers: Vec<String>,
+        initial_network_contacts_urls: Vec<String>,
         private_node_inventory: PrivateNodeProvisionInventory,
         new_full_cone_nat_gateway_new_vms_for_upscale: Option<Vec<VirtualMachine>>,
     ) -> Result<()> {
@@ -846,8 +836,8 @@ impl AnsibleProvisioner {
 
         self.provision_nodes(
             options,
-            initial_contact_peer,
-            initial_network_contacts_url,
+            initial_contact_peers,
+            initial_network_contacts_urls,
             NodeType::FullConePrivateNode,
         )?;
 
@@ -905,8 +895,8 @@ impl AnsibleProvisioner {
     pub fn provision_nodes(
         &self,
         options: &ProvisionOptions,
-        initial_contact_peer: Option<String>,
-        initial_network_contacts_url: Option<String>,
+        initial_contact_peers: Vec<String>,
+        initial_network_contacts_urls: Vec<String>,
         node_type: NodeType,
     ) -> Result<()> {
         let start = Instant::now();
@@ -972,8 +962,8 @@ impl AnsibleProvisioner {
                 &self.cloud_provider.to_string(),
                 options,
                 node_type.clone(),
-                initial_contact_peer,
-                initial_network_contacts_url,
+                initial_contact_peers,
+                initial_network_contacts_urls,
                 node_count,
                 options.evm_network.clone(),
                 write_older_cache_files,
@@ -987,8 +977,8 @@ impl AnsibleProvisioner {
     pub fn provision_symmetric_private_nodes(
         &self,
         options: &mut ProvisionOptions,
-        initial_contact_peer: Option<String>,
-        initial_network_contacts_url: Option<String>,
+        initial_contact_peers: Vec<String>,
+        initial_network_contacts_urls: Vec<String>,
         private_node_inventory: &PrivateNodeProvisionInventory,
     ) -> Result<()> {
         let start = Instant::now();
@@ -1049,8 +1039,8 @@ impl AnsibleProvisioner {
 
         self.provision_nodes(
             options,
-            initial_contact_peer,
-            initial_network_contacts_url,
+            initial_contact_peers,
+            initial_network_contacts_urls,
             NodeType::SymmetricPrivateNode,
         )?;
 
@@ -1060,8 +1050,8 @@ impl AnsibleProvisioner {
     pub async fn provision_downloaders(
         &self,
         options: &ProvisionOptions,
-        genesis_multiaddr: Option<String>,
-        genesis_network_contacts_url: Option<String>,
+        genesis_multiaddrs: Vec<String>,
+        genesis_network_contacts_urls: Vec<String>,
     ) -> Result<()> {
         let start = Instant::now();
 
@@ -1074,8 +1064,8 @@ impl AnsibleProvisioner {
             Some(extra_vars::build_downloaders_extra_vars_doc(
                 &self.cloud_provider.to_string(),
                 options,
-                genesis_multiaddr,
-                genesis_network_contacts_url,
+                genesis_multiaddrs,
+                genesis_network_contacts_urls,
             )?),
         )?;
         print_duration(start.elapsed());
@@ -1085,8 +1075,8 @@ impl AnsibleProvisioner {
     pub async fn provision_static_downloaders(
         &self,
         options: &ProvisionOptions,
-        genesis_multiaddr: Option<String>,
-        genesis_network_contacts_url: Option<String>,
+        genesis_multiaddrs: Vec<String>,
+        genesis_network_contacts_urls: Vec<String>,
     ) -> Result<()> {
         let start = Instant::now();
 
@@ -1099,8 +1089,8 @@ impl AnsibleProvisioner {
             Some(extra_vars::build_downloaders_extra_vars_doc(
                 &self.cloud_provider.to_string(),
                 options,
-                genesis_multiaddr,
-                genesis_network_contacts_url,
+                genesis_multiaddrs,
+                genesis_network_contacts_urls,
             )?),
         )?;
         print_duration(start.elapsed());
@@ -1110,8 +1100,8 @@ impl AnsibleProvisioner {
     pub async fn provision_static_uploader(
         &self,
         options: &ProvisionOptions,
-        genesis_multiaddr: Option<String>,
-        genesis_network_contacts_url: Option<String>,
+        genesis_multiaddr: Vec<String>,
+        genesis_network_contacts_url: Vec<String>,
     ) -> Result<()> {
         let start = Instant::now();
 
@@ -1152,8 +1142,8 @@ impl AnsibleProvisioner {
     pub async fn provision_uploaders(
         &self,
         options: &ProvisionOptions,
-        genesis_multiaddr: Option<String>,
-        genesis_network_contacts_url: Option<String>,
+        genesis_multiaddrs: Vec<String>,
+        genesis_network_contacts_urls: Vec<String>,
     ) -> Result<()> {
         let start = Instant::now();
 
@@ -1179,8 +1169,8 @@ impl AnsibleProvisioner {
             Some(extra_vars::build_clients_extra_vars_doc(
                 &self.cloud_provider.to_string(),
                 options,
-                genesis_multiaddr,
-                genesis_network_contacts_url,
+                genesis_multiaddrs,
+                genesis_network_contacts_urls,
                 &sk_map,
             )?),
         )?;

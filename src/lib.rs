@@ -15,7 +15,6 @@ pub mod infra;
 pub mod inventory;
 pub mod logs;
 pub mod reserved_ip;
-pub mod rpc_client;
 pub mod s3;
 pub mod safe;
 pub mod setup;
@@ -34,7 +33,6 @@ use crate::{
     },
     error::{Error, Result},
     inventory::{DeploymentInventory, VirtualMachine},
-    rpc_client::RpcClient,
     s3::S3Repository,
     ssh::SshClient,
     terraform::TerraformRunner,
@@ -44,13 +42,13 @@ use flate2::read::GzDecoder;
 use indicatif::{ProgressBar, ProgressStyle};
 use infra::{build_terraform_args, InfraRunOptions};
 use log::{debug, trace};
+use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
 use semver::Version;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 use std::{
     fs::File,
     io::{BufRead, BufReader, BufWriter, Write},
-    net::IpAddr,
     path::{Path, PathBuf},
     process::{Command, Stdio},
     str::FromStr,
@@ -300,12 +298,10 @@ impl FromStr for EnvironmentType {
 /// Specify the binary option for the deployment.
 ///
 /// There are several binaries involved in the deployment:
-/// * safenode
-/// * safenode_rpc_client
-/// * faucet
-/// * safe
+/// * antnode
+/// * ant
 ///
-/// The `safe` binary is only used for smoke testing the deployment, although we don't really do
+/// The `ant` binary is only used for smoke testing the deployment, although we don't really do
 /// that at the moment.
 ///
 /// The options are to build from source, or supply a pre-built, versioned binary, which will be
@@ -617,10 +613,6 @@ impl TestnetDeployBuilder {
         let ssh_client = SshClient::new(ssh_secret_key_path);
         let ansible_provisioner =
             AnsibleProvisioner::new(ansible_runner, provider, ssh_client.clone());
-        let rpc_client = RpcClient::new(
-            PathBuf::from("/usr/local/bin/safenode_rpc_client"),
-            working_directory_path.clone(),
-        );
 
         // Remove any `safe` binary from a previous deployment. Otherwise you can end up with
         // mismatched binaries.
@@ -634,7 +626,6 @@ impl TestnetDeployBuilder {
             provider,
             self.deployment_type.clone(),
             &self.environment_name,
-            rpc_client,
             S3Repository {},
             ssh_client,
             terraform_runner,
@@ -654,7 +645,6 @@ pub struct TestnetDeployer {
     pub environment_name: String,
     pub inventory_file_path: PathBuf,
     pub region: String,
-    pub rpc_client: RpcClient,
     pub s3_repository: S3Repository,
     pub ssh_client: SshClient,
     pub terraform_runner: TerraformRunner,
@@ -668,7 +658,6 @@ impl TestnetDeployer {
         cloud_provider: CloudProvider,
         deployment_type: EnvironmentType,
         environment_name: &str,
-        rpc_client: RpcClient,
         s3_repository: S3Repository,
         ssh_client: SshClient,
         terraform_runner: TerraformRunner,
@@ -689,7 +678,6 @@ impl TestnetDeployer {
             environment_name: environment_name.to_string(),
             inventory_file_path,
             region,
-            rpc_client,
             ssh_client,
             s3_repository,
             terraform_runner,
@@ -718,26 +706,6 @@ impl TestnetDeployer {
                 .workspace_new(&self.environment_name)?;
         } else {
             println!("Workspace {} already exists", self.environment_name);
-        }
-
-        let rpc_client_path = self.working_directory_path.join("safenode_rpc_client");
-        if !rpc_client_path.is_file() {
-            println!("Downloading the rpc client for safenode...");
-            let archive_name = "safenode_rpc_client-latest-x86_64-unknown-linux-musl.tar.gz";
-            get_and_extract_archive_from_s3(
-                &self.s3_repository,
-                "sn-node-rpc-client",
-                archive_name,
-                &self.working_directory_path,
-            )
-            .await?;
-            #[cfg(unix)]
-            {
-                use std::os::unix::fs::PermissionsExt;
-                let mut permissions = std::fs::metadata(&rpc_client_path)?.permissions();
-                permissions.set_mode(0o755); // rwxr-xr-x
-                std::fs::set_permissions(&rpc_client_path, permissions)?;
-            }
         }
 
         Ok(())
@@ -774,35 +742,41 @@ impl TestnetDeployer {
     /// First, a playbook runs `safenode-manager status` against all the machines, to get the
     /// current state of all the nodes. Then all the node registry files are retrieved and
     /// deserialized to a `NodeRegistry`, allowing us to output the status of each node on each VM.
-    pub fn status(&self) -> Result<()> {
+    pub async fn status(&self) -> Result<()> {
         self.ansible_provisioner.status()?;
 
         let peer_cache_node_registries = self
             .ansible_provisioner
-            .get_node_registries(&AnsibleInventoryType::PeerCacheNodes)?;
+            .get_node_registries(&AnsibleInventoryType::PeerCacheNodes)
+            .await?;
         let generic_node_registries = self
             .ansible_provisioner
-            .get_node_registries(&AnsibleInventoryType::Nodes)?;
+            .get_node_registries(&AnsibleInventoryType::Nodes)
+            .await?;
         let symmetric_private_node_registries = self
             .ansible_provisioner
-            .get_node_registries(&AnsibleInventoryType::SymmetricPrivateNodes)?;
+            .get_node_registries(&AnsibleInventoryType::SymmetricPrivateNodes)
+            .await?;
         let full_cone_private_node_registries = self
             .ansible_provisioner
-            .get_node_registries(&AnsibleInventoryType::FullConePrivateNodes)?;
+            .get_node_registries(&AnsibleInventoryType::FullConePrivateNodes)
+            .await?;
         let upnp_private_node_registries = self
             .ansible_provisioner
-            .get_node_registries(&AnsibleInventoryType::Upnp)?;
+            .get_node_registries(&AnsibleInventoryType::Upnp)
+            .await?;
         let genesis_node_registry = self
             .ansible_provisioner
-            .get_node_registries(&AnsibleInventoryType::Genesis)?
+            .get_node_registries(&AnsibleInventoryType::Genesis)
+            .await?
             .clone();
 
-        peer_cache_node_registries.print();
-        generic_node_registries.print();
-        symmetric_private_node_registries.print();
-        full_cone_private_node_registries.print();
-        upnp_private_node_registries.print();
-        genesis_node_registry.print();
+        peer_cache_node_registries.print().await;
+        generic_node_registries.print().await;
+        symmetric_private_node_registries.print().await;
+        full_cone_private_node_registries.print().await;
+        upnp_private_node_registries.print().await;
+        genesis_node_registry.print().await;
 
         let all_registries = [
             &peer_cache_node_registries,
@@ -823,9 +797,9 @@ impl TestnetDeployer {
             .iter()
             .flat_map(|r| r.retrieved_registries.iter())
         {
-            for node in registry.nodes.iter() {
+            for node in registry.nodes.read().await.iter() {
                 total_nodes += 1;
-                match node.status {
+                match node.read().await.status {
                     ServiceStatus::Running => running_nodes += 1,
                     ServiceStatus::Stopped => stopped_nodes += 1,
                     ServiceStatus::Added => added_nodes += 1,
@@ -840,31 +814,11 @@ impl TestnetDeployer {
         let full_cone_private_hosts = full_cone_private_node_registries.retrieved_registries.len();
         let upnp_private_hosts = upnp_private_node_registries.retrieved_registries.len();
 
-        let peer_cache_nodes = peer_cache_node_registries
-            .retrieved_registries
-            .iter()
-            .flat_map(|(_, n)| n.nodes.iter())
-            .count();
-        let generic_nodes = generic_node_registries
-            .retrieved_registries
-            .iter()
-            .flat_map(|(_, n)| n.nodes.iter())
-            .count();
-        let symmetric_private_nodes = symmetric_private_node_registries
-            .retrieved_registries
-            .iter()
-            .flat_map(|(_, n)| n.nodes.iter())
-            .count();
-        let full_cone_private_nodes = full_cone_private_node_registries
-            .retrieved_registries
-            .iter()
-            .flat_map(|(_, n)| n.nodes.iter())
-            .count();
-        let upnp_private_nodes = upnp_private_node_registries
-            .retrieved_registries
-            .iter()
-            .flat_map(|(_, n)| n.nodes.iter())
-            .count();
+        let peer_cache_nodes = peer_cache_node_registries.get_node_count().await;
+        let generic_nodes = generic_node_registries.get_node_count().await;
+        let symmetric_private_nodes = symmetric_private_node_registries.get_node_count().await;
+        let full_cone_private_nodes = full_cone_private_node_registries.get_node_count().await;
+        let upnp_private_nodes = upnp_private_node_registries.get_node_count().await;
 
         println!("-------");
         println!("Summary");
@@ -1081,17 +1035,19 @@ impl TestnetDeployer {
 // Shared Helpers
 //
 
+/// Returns the list of genesis node multiaddresses and the machines
 pub fn get_genesis_multiaddr(
     ansible_runner: &AnsibleRunner,
     ssh_client: &SshClient,
-) -> Result<(String, IpAddr)> {
+) -> Result<(Vec<String>, Vec<VirtualMachine>)> {
     let genesis_inventory = ansible_runner.get_inventory(AnsibleInventoryType::Genesis, true)?;
-    let genesis_ip = genesis_inventory[0].public_ip_addr;
 
-    // It's possible for the genesis host to be altered from its original state where a node was
+    let addrs = genesis_inventory.par_iter().map(|vm| {
+        let genesis_ip = vm.public_ip_addr;
+         // It's possible for the genesis host to be altered from its original state where a node was
     // started with the `--first` flag.
     // First attempt: try to find node with first=true
-    let multiaddr = ssh_client
+        let multiaddr = ssh_client
         .run_command(
             &genesis_ip,
             "root",
@@ -1105,8 +1061,8 @@ pub fn get_genesis_multiaddr(
         });
 
     // Second attempt: if first attempt failed, see if any node is available.
-    let multiaddr = match multiaddr {
-        Some(addr) => addr,
+   match multiaddr {
+        Some(addr) => Ok(addr),
         None => ssh_client
             .run_command(
                 &genesis_ip,
@@ -1116,84 +1072,49 @@ pub fn get_genesis_multiaddr(
             )?
             .first()
             .cloned()
-            .ok_or_else(|| Error::GenesisListenAddress)?,
-    };
+            .ok_or_else(|| Error::GenesisListenAddress)
+    }}).collect::<Result<Vec<_>>>()?;
 
-    Ok((multiaddr, genesis_ip))
+    Ok((addrs, genesis_inventory))
 }
 
-pub fn get_anvil_node_data(
-    ansible_runner: &AnsibleRunner,
-    ssh_client: &SshClient,
-) -> Result<AnvilNodeData> {
+fn get_anvil_node_data_hardcoded(ansible_runner: &AnsibleRunner) -> Result<AnvilNodeData> {
     let evm_inventory = ansible_runner.get_inventory(AnsibleInventoryType::EvmNodes, true)?;
     if evm_inventory.is_empty() {
         return Err(Error::EvmNodeNotFound);
     }
-
     let evm_ip = evm_inventory[0].public_ip_addr;
-    debug!("Retrieved IP address for EVM node: {evm_ip}");
-    let csv_file_path = "/home/ant/.local/share/autonomi/evm_testnet_data.csv";
 
-    const MAX_ATTEMPTS: u8 = 5;
-    const RETRY_DELAY: Duration = Duration::from_secs(5);
-
-    for attempt in 1..=MAX_ATTEMPTS {
-        match ssh_client.run_command(&evm_ip, "ant", &format!("cat {csv_file_path}"), false) {
-            Ok(output) => {
-                if let Some(csv_contents) = output.first() {
-                    let parts: Vec<&str> = csv_contents.split(',').collect();
-                    if parts.len() != 4 {
-                        return Err(Error::EvmTestnetDataParsingError(
-                            "Expected 4 fields in the CSV".to_string(),
-                        ));
-                    }
-
-                    let evm_testnet_data = AnvilNodeData {
-                        rpc_url: parts[0].trim().to_string(),
-                        payment_token_address: parts[1].trim().to_string(),
-                        data_payments_address: parts[2].trim().to_string(),
-                        deployer_wallet_private_key: parts[3].trim().to_string(),
-                    };
-                    return Ok(evm_testnet_data);
-                }
-            }
-            Err(e) => {
-                if attempt == MAX_ATTEMPTS {
-                    return Err(e);
-                }
-                println!(
-                    "Attempt {} failed to read EVM testnet data. Retrying in {} seconds...",
-                    attempt,
-                    RETRY_DELAY.as_secs()
-                );
-            }
-        }
-        std::thread::sleep(RETRY_DELAY);
-    }
-
-    Err(Error::EvmTestnetDataNotFound)
+    Ok(AnvilNodeData {
+        data_payments_address: "0x8464135c8F25Da09e49BC8782676a84730C318bC".to_string(),
+        deployer_wallet_private_key:
+            "0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80".to_string(),
+        payment_token_address: "0x5FbDB2315678afecb367f032d93F642f64180aa3".to_string(),
+        rpc_url: format!("http://{evm_ip}:61611"),
+    })
 }
 
 pub fn get_multiaddr(
     ansible_runner: &AnsibleRunner,
     ssh_client: &SshClient,
-) -> Result<(String, IpAddr)> {
+) -> Result<(Vec<String>, Vec<VirtualMachine>)> {
     let node_inventory = ansible_runner.get_inventory(AnsibleInventoryType::Nodes, true)?;
     // For upscaling a bootstrap deployment, we'd need to select one of the nodes that's already
     // provisioned. So just try the first one.
-    let node_ip = node_inventory
-        .iter()
+    let node_vm = node_inventory
+        .into_iter()
         .find(|vm| vm.name.ends_with("-node-1"))
-        .ok_or_else(|| Error::NodeAddressNotFound)?
-        .public_ip_addr;
+        .ok_or_else(|| Error::NodeAddressNotFound)?;
 
-    debug!("Getting multiaddr from node {node_ip}");
+    debug!(
+        "Getting multiaddr from node-1 with ip: {}",
+        node_vm.public_ip_addr
+    );
 
     let multiaddr =
         ssh_client
         .run_command(
-            &node_ip,
+            &node_vm.public_ip_addr,
             "root",
             // fetch the first multiaddr which does not contain the localhost addr.
             "jq -r '.nodes[] | .listen_addr[] | select(contains(\"127.0.0.1\") | not)' /var/antctl/node_registry.json | head -n 1",
@@ -1204,7 +1125,7 @@ pub fn get_multiaddr(
 
     // The node_ip is obviously inside the multiaddr, but it's just being returned as a
     // separate item for convenience.
-    Ok((multiaddr, node_ip))
+    Ok((vec![multiaddr], vec![node_vm]))
 }
 
 pub async fn get_and_extract_archive_from_s3(
@@ -1506,6 +1427,8 @@ pub fn calculate_size_per_attached_volume(node_count: u16) -> u16 {
     (total_volume_required as f64 / 7.0).ceil() as u16
 }
 
-pub fn get_bootstrap_cache_url(ip_addr: &IpAddr) -> String {
-    format!("http://{ip_addr}/bootstrap_cache.json")
+pub fn get_bootstrap_cache_url(vms: &[VirtualMachine]) -> Vec<String> {
+    vms.iter()
+        .map(|vm| format!("http://{}/bootstrap_cache.json", vm.public_ip_addr))
+        .collect()
 }

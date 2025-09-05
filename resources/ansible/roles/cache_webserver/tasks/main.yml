@@ -5,6 +5,12 @@
     state: started
     enabled: yes
 
+- name: ensure version_1 directory exists
+  file:
+    path: "{{ bootstrap_cache_dir }}/version_1"
+    state: directory
+    mode: '0755'
+
 - name: find the version0 json file
   find:
     paths: "{{ bootstrap_cache_dir }}"
@@ -22,8 +28,8 @@
 - name: create a map of versions to their respective json files
   set_fact:
     version_files:
-      version0: "{{ version0_file.files[0].path }}"
-      version1: "{{ version1_file.files[0].path }}"
+      version0: "{{ version0_file.files[0].path if version0_file.files | length > 0 else '' }}"
+      version1: "{{ version1_file.files[0].path if version1_file.files | length > 0 else '' }}"
 
 - name: ensure nginx is serving the json file using a template
   template:
