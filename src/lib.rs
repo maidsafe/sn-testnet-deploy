@@ -1050,11 +1050,12 @@ pub fn get_genesis_multiaddr(
          // It's possible for the genesis host to be altered from its original state where a node was
     // started with the `--first` flag.
     // First attempt: try to find node with first=true
+        let first_node_command = "jq -r '.nodes[] | select(.initial_peers_config.first == true) | .listen_addr[] | select(contains(\"127.0.0.1\") or contains(\"10.\") or contains(\"192.168.\") or contains(\"172.1\") or contains(\"172.2\") or contains(\"172.3\") | not) | select(contains(\"quic-v1\"))' /var/antctl/node_registry.json | head -n 1";
         let multiaddr = ssh_client
         .run_command(
             &genesis_ip,
             "root",
-            "jq -r '.nodes[] | select(.initial_peers_config.first == true) | .listen_addr[] | select(contains(\"127.0.0.1\") | not) | select(contains(\"quic-v1\"))' /var/antctl/node_registry.json | head -n 1",
+            first_node_command,
             false,
         )
         .map(|output| output.first().cloned())
@@ -1064,13 +1065,14 @@ pub fn get_genesis_multiaddr(
         });
 
     // Second attempt: if first attempt failed, see if any node is available.
+        let any_node_command = "jq -r '.nodes[] | .listen_addr[] | select(contains(\"127.0.0.1\") or contains(\"10.\") or contains(\"192.168.\") or contains(\"172.1\") or contains(\"172.2\") or contains(\"172.3\") | not) | select(contains(\"quic-v1\"))' /var/antctl/node_registry.json | head -n 1";
    match multiaddr {
         Some(addr) => Ok(addr),
         None => ssh_client
             .run_command(
                 &genesis_ip,
                 "root",
-                "jq -r '.nodes[] | .listen_addr[] | select(contains(\"127.0.0.1\") | not) | select(contains(\"quic-v1\"))' /var/antctl/node_registry.json | head -n 1",
+                any_node_command,
                 false,
             )?
             .first()
@@ -1114,15 +1116,17 @@ pub fn get_multiaddr(
         node_vm.public_ip_addr
     );
 
-    let multiaddr =
-        ssh_client
+    let command= "jq -r '.nodes[] | .listen_addr[] | select(contains(\"127.0.0.1\") or contains(\"10.\") or contains(\"192.168.\") or contains(\"172.1\") or contains(\"172.2\") or contains(\"172.3\") | not) | select(contains(\"quic-v1\"))' /var/antctl/node_registry.json | head -n 1";
+
+    let multiaddr = ssh_client
         .run_command(
             &node_vm.public_ip_addr,
             "root",
             // fetch the first multiaddr which does not contain the localhost addr.
-            "jq -r '.nodes[] | .listen_addr[] | select(contains(\"127.0.0.1\") | not)' /var/antctl/node_registry.json | head -n 1",
+            command,
             false,
-        )?.first()
+        )?
+        .first()
         .cloned()
         .ok_or_else(|| Error::NodeAddressNotFound)?;
 
