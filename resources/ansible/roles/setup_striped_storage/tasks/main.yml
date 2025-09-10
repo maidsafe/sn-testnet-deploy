@@ -1,10 +1,11 @@
 - name: check fstab
   command: cat /etc/fstab
   register: fstab_output
+  failed_when: false
 
 - name: set fact if volume is in fstab.
   set_fact:
-    volume_in_fstab: "{{ '/dev/lvm_vol_group/striped_logical_volume' in fstab_output.stdout }}"
+    volume_in_fstab: "{{ fstab_output.stdout is defined and '/dev/lvm_vol_group/striped_logical_volume' in fstab_output.stdout }}"
 
 # todo: use dynamic volume count
 - name: mark physical volume via lvm
@@ -27,8 +28,9 @@
 - name: make sure physical volumes are registered via LVM
   assert:
     that:
+      - pvs_output.stdout is defined
       - item in pvs_output.stdout
-    fail_msg: "Physical volume {{ item }} is registered via LVM"
+    fail_msg: "Physical volume {{ item }} is not registered via LVM"
   loop:
     - sda
     - sdb

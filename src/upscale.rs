@@ -257,6 +257,7 @@ impl TestnetDeployer {
             uploaders_count: options.desired_uploaders_count,
             upload_interval: None,
             upnp_private_node_count: 0,
+            port_restricted_cone_private_node_count: 0,
             wallet_secret_keys: None,
         };
         let mut node_provision_failed = false;
@@ -327,6 +328,7 @@ impl TestnetDeployer {
             &self.ansible_provisioner,
             Some(desired_full_cone_private_node_vm_count),
             Some(desired_symmetric_private_node_vm_count),
+            None, // TODO: Add port restricted cone upscale support
         )?;
 
         if private_node_inventory.should_provision_full_cone_private_nodes() {
@@ -587,6 +589,7 @@ impl TestnetDeployer {
             upload_size: None,
             upload_interval: None,
             upnp_private_node_count: 0,
+            port_restricted_cone_private_node_count: 0,
             wallet_secret_keys: None,
         };
 

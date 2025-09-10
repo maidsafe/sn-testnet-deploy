@@ -8,6 +8,7 @@ use super::{
     extra_vars::ExtraVarsDocBuilder,
     inventory::{
         generate_full_cone_private_node_static_environment_inventory,
+        generate_port_restricted_cone_private_node_static_environment_inventory,
         generate_symmetric_private_node_static_environment_inventory,
     },
     AnsibleInventoryType, AnsiblePlaybook, AnsibleRunner,
@@ -16,6 +17,7 @@ use crate::{
     ansible::inventory::{
         generate_custom_environment_inventory,
         generate_full_cone_nat_gateway_static_environment_inventory,
+        generate_port_restricted_cone_nat_gateway_static_environment_inventory,
     },
     bootstrap::BootstrapOptions,
     clients::ClientsDeployOptions,
@@ -84,6 +86,7 @@ pub struct ProvisionOptions {
     pub output_inventory_dir_path: PathBuf,
     pub peer_cache_node_count: u16,
     pub performance_verifier_batch_size: Option<u16>,
+    pub port_restricted_cone_private_node_count: u16,
     pub random_verifier_batch_size: Option<u16>,
     pub rewards_address: Option<String>,
     pub sleep_duration: Option<u16>,
@@ -104,6 +107,8 @@ pub struct PrivateNodeProvisionInventory {
     pub full_cone_private_node_vms: Vec<VirtualMachine>,
     pub symmetric_nat_gateway_vms: Vec<VirtualMachine>,
     pub symmetric_private_node_vms: Vec<VirtualMachine>,
+    pub port_restricted_cone_nat_gateway_vms: Vec<VirtualMachine>,
+    pub port_restricted_cone_private_node_vms: Vec<VirtualMachine>,
 }
 
 impl PrivateNodeProvisionInventory {
@@ -111,6 +116,7 @@ impl PrivateNodeProvisionInventory {
         provisioner: &AnsibleProvisioner,
         full_cone_private_node_vm_count: Option<u16>,
         symmetric_private_node_vm_count: Option<u16>,
+        port_restricted_cone_private_node_vm_count: Option<u16>,
     ) -> Result<Self> {
         // All the environment types set private_node_vm count to >0 if not specified.
         let should_provision_full_cone_private_nodes = full_cone_private_node_vm_count
@@ -119,12 +125,18 @@ impl PrivateNodeProvisionInventory {
         let should_provision_symmetric_private_nodes = symmetric_private_node_vm_count
             .map(|count| count > 0)
             .unwrap_or(true);
+        let should_provision_port_restricted_cone_private_nodes =
+            port_restricted_cone_private_node_vm_count
+                .map(|count| count > 0)
+                .unwrap_or(true);
 
         let mut inventory = Self {
             full_cone_nat_gateway_vms: Default::default(),
             full_cone_private_node_vms: Default::default(),
             symmetric_nat_gateway_vms: Default::default(),
             symmetric_private_node_vms: Default::default(),
+            port_restricted_cone_nat_gateway_vms: Default::default(),
+            port_restricted_cone_private_node_vms: Default::default(),
         };
 
         if should_provision_full_cone_private_nodes {
@@ -181,6 +193,36 @@ impl PrivateNodeProvisionInventory {
             inventory.symmetric_nat_gateway_vms = symmetric_nat_gateway_inventory;
         }
 
+        if should_provision_port_restricted_cone_private_nodes {
+            let port_restricted_cone_private_node_vms = provisioner
+                .ansible_runner
+                .get_inventory(AnsibleInventoryType::PortRestrictedConePrivateNodes, true)
+                .inspect_err(|err| {
+                    println!("Failed to get Port Restricted Cone Private Node inventory {err:?}");
+                })?;
+
+            let port_restricted_cone_nat_gateway_inventory = provisioner
+                .ansible_runner
+                .get_inventory(AnsibleInventoryType::PortRestrictedConeNatGateway, true)
+                .inspect_err(|err| {
+                    println!("Failed to get Port Restricted Cone NAT Gateway inventory {err:?}");
+                })?;
+
+            if port_restricted_cone_nat_gateway_inventory.len()
+                != port_restricted_cone_private_node_vms.len()
+            {
+                println!("The number of Port Restricted Cone private nodes does not match the number of Port Restricted Cone NAT Gateway VMs");
+                return Err(Error::VmCountMismatch(
+                    Some(AnsibleInventoryType::PortRestrictedConePrivateNodes),
+                    Some(AnsibleInventoryType::PortRestrictedConeNatGateway),
+                ));
+            }
+
+            inventory.port_restricted_cone_private_node_vms = port_restricted_cone_private_node_vms;
+            inventory.port_restricted_cone_nat_gateway_vms =
+                port_restricted_cone_nat_gateway_inventory;
+        }
+
         Ok(inventory)
     }
 
@@ -190,6 +232,10 @@ impl PrivateNodeProvisionInventory {
 
     pub fn should_provision_symmetric_private_nodes(&self) -> bool {
         !self.symmetric_private_node_vms.is_empty()
+    }
+
+    pub fn should_provision_port_restricted_cone_private_nodes(&self) -> bool {
+        !self.port_restricted_cone_private_node_vms.is_empty()
     }
 
     pub fn symmetric_private_node_and_gateway_map(
@@ -207,6 +253,15 @@ impl PrivateNodeProvisionInventory {
         Self::match_private_node_vm_and_gateway_vm(
             &self.full_cone_private_node_vms,
             &self.full_cone_nat_gateway_vms,
+        )
+    }
+
+    pub fn port_restricted_cone_private_node_and_gateway_map(
+        &self,
+    ) -> Result<HashMap<VirtualMachine, VirtualMachine>> {
+        Self::match_private_node_vm_and_gateway_vm(
+            &self.port_restricted_cone_private_node_vms,
+            &self.port_restricted_cone_nat_gateway_vms,
         )
     }
 
@@ -297,6 +352,7 @@ impl From<BootstrapOptions> for ProvisionOptions {
             upload_interval: None,
             uploaders_count: None,
             upnp_private_node_count: bootstrap_options.upnp_private_node_count,
+            port_restricted_cone_private_node_count: 0,
             wallet_secret_keys: None,
         }
     }
@@ -350,6 +406,8 @@ impl From<DeployOptions> for ProvisionOptions {
             upload_interval: Some(deploy_options.upload_interval),
             uploaders_count: Some(deploy_options.uploaders_count),
             upnp_private_node_count: deploy_options.upnp_private_node_count,
+            port_restricted_cone_private_node_count: deploy_options
+                .port_restricted_cone_private_node_count,
             wallet_secret_keys: None,
         }
     }
@@ -403,6 +461,7 @@ impl From<ClientsDeployOptions> for ProvisionOptions {
             upload_interval: None,
             uploaders_count: Some(client_options.uploaders_count),
             upnp_private_node_count: 0,
+            port_restricted_cone_private_node_count: 0,
             wallet_secret_keys: client_options.wallet_secret_keys,
         }
     }
@@ -848,6 +907,219 @@ impl AnsibleProvisioner {
         print_duration(start.elapsed());
         Ok(())
     }
+
+    pub fn provision_port_restricted_cone(
+        &self,
+        options: &ProvisionOptions,
+        initial_contact_peers: Vec<String>,
+        initial_network_contacts_urls: Vec<String>,
+        private_node_inventory: PrivateNodeProvisionInventory,
+        new_port_restricted_cone_nat_gateway_new_vms_for_upscale: Option<Vec<VirtualMachine>>,
+    ) -> Result<()> {
+        // Step 1 of Port Restricted Cone NAT Gateway
+        let start = Instant::now();
+        self.print_ansible_run_banner("Provision Port Restricted Cone NAT Gateway - Step 1");
+
+        for vm in new_port_restricted_cone_nat_gateway_new_vms_for_upscale
+            .as_ref()
+            .unwrap_or(&private_node_inventory.port_restricted_cone_nat_gateway_vms)
+            .iter()
+        {
+            println!(
+                "Checking SSH availability for Port Restricted Cone NAT Gateway: {}",
+                vm.public_ip_addr
+            );
+            self.ssh_client
+                .wait_for_ssh_availability(&vm.public_ip_addr, &self.cloud_provider.get_ssh_user())
+                .map_err(|e| {
+                    println!("Failed to establish SSH connection to Port Restricted Cone NAT Gateway: {e}");
+                    e
+                })?;
+        }
+
+        let mut modified_private_node_inventory = private_node_inventory.clone();
+
+        // If we are upscaling, then we cannot access the gateway VMs which are already deployed.
+        if let Some(new_port_restricted_cone_nat_gateway_new_vms_for_upscale) =
+            &new_port_restricted_cone_nat_gateway_new_vms_for_upscale
+        {
+            debug!("Removing existing port restricted cone NAT Gateway and private node VMs from the inventory. Old inventory: {modified_private_node_inventory:?}");
+            let mut names_to_keep = Vec::new();
+
+            for vm in new_port_restricted_cone_nat_gateway_new_vms_for_upscale.iter() {
+                let nat_gateway_name = vm.name.split('-').next_back().unwrap();
+                names_to_keep.push(nat_gateway_name);
+            }
+
+            modified_private_node_inventory
+                .port_restricted_cone_nat_gateway_vms
+                .retain(|vm| {
+                    let nat_gateway_name = vm.name.split('-').next_back().unwrap();
+                    names_to_keep.contains(&nat_gateway_name)
+                });
+            modified_private_node_inventory
+                .port_restricted_cone_private_node_vms
+                .retain(|vm| {
+                    let nat_gateway_name = vm.name.split('-').next_back().unwrap();
+                    names_to_keep.contains(&nat_gateway_name)
+                });
+            debug!("New inventory after removing existing port restricted cone NAT Gateway and private node VMs: {modified_private_node_inventory:?}");
+        }
+
+        if modified_private_node_inventory
+            .port_restricted_cone_nat_gateway_vms
+            .is_empty()
+        {
+            error!("There are no port restricted cone NAT Gateway VMs available to upscale");
+            return Ok(());
+        }
+
+        let private_node_ip_map = modified_private_node_inventory
+            .port_restricted_cone_private_node_and_gateway_map()?
+            .into_iter()
+            .map(|(k, v)| {
+                let gateway_name =
+                    if new_port_restricted_cone_nat_gateway_new_vms_for_upscale.is_some() {
+                        debug!("Upscaling, using public IP address for gateway name");
+                        v.public_ip_addr.to_string()
+                    } else {
+                        v.name.clone()
+                    };
+                (gateway_name, k.private_ip_addr)
+            })
+            .collect::<HashMap<String, IpAddr>>();
+
+        if private_node_ip_map.is_empty() {
+            println!("There are no port restricted cone private node VM available to be routed through the port restricted cone NAT Gateway");
+            return Err(Error::EmptyInventory(
+                AnsibleInventoryType::PortRestrictedConePrivateNodes,
+            ));
+        }
+
+        let vars = extra_vars::build_nat_gateway_extra_vars_doc(
+            &options.name,
+            private_node_ip_map.clone(),
+            "step1",
+        );
+        debug!("Provisioning Port Restricted Cone NAT Gateway - Step 1 with vars: {vars}");
+        let gateway_inventory =
+            if new_port_restricted_cone_nat_gateway_new_vms_for_upscale.is_some() {
+                debug!("Upscaling, using static inventory for port restricted cone nat gateway.");
+                generate_port_restricted_cone_nat_gateway_static_environment_inventory(
+                    &modified_private_node_inventory.port_restricted_cone_nat_gateway_vms,
+                    &options.name,
+                    &options.output_inventory_dir_path,
+                )?;
+
+                AnsibleInventoryType::PortRestrictedConeNatGatewayStatic
+            } else {
+                AnsibleInventoryType::PortRestrictedConeNatGateway
+            };
+        self.ansible_runner.run_playbook(
+            AnsiblePlaybook::PortRestrictedConeNatGateway,
+            gateway_inventory,
+            Some(vars),
+        )?;
+
+        // setup private node config
+        self.print_ansible_run_banner("Provisioning Port Restricted Cone Private Node Config");
+
+        generate_port_restricted_cone_private_node_static_environment_inventory(
+            &options.name,
+            &options.output_inventory_dir_path,
+            &private_node_inventory.port_restricted_cone_private_node_vms,
+            &private_node_inventory.port_restricted_cone_nat_gateway_vms,
+            &self.ssh_client.private_key_path,
+        )
+        .inspect_err(|err| {
+            error!(
+                "Failed to generate port restricted cone private node static inv with err: {err:?}"
+            )
+        })?;
+
+        // For a new deployment, it's quite probable that SSH is available, because this part occurs
+        // after the genesis node has been provisioned. However, for a bootstrap deploy, we need to
+        // check that SSH is available before proceeding.
+        println!("Obtaining IP addresses for nodes...");
+        let inventory = self
+            .ansible_runner
+            .get_inventory(AnsibleInventoryType::PortRestrictedConePrivateNodes, true)?;
+
+        println!("Waiting for SSH availability on Port Restricted Cone Private nodes...");
+        for vm in inventory.iter() {
+            println!(
+                "Checking SSH availability for {}: {}",
+                vm.name, vm.public_ip_addr
+            );
+            self.ssh_client
+                .wait_for_ssh_availability(&vm.public_ip_addr, &self.cloud_provider.get_ssh_user())
+                .map_err(|e| {
+                    println!("Failed to establish SSH connection to {}: {}", vm.name, e);
+                    e
+                })?;
+        }
+
+        println!("SSH is available on all nodes. Proceeding with provisioning...");
+
+        self.ansible_runner.run_playbook(
+            AnsiblePlaybook::PrivateNodeConfig,
+            AnsibleInventoryType::PortRestrictedConePrivateNodesStatic,
+            Some(
+                extra_vars::build_port_restricted_cone_private_node_config_extra_vars_docs(
+                    &private_node_inventory,
+                )?,
+            ),
+        )?;
+
+        // Step 2 of Port Restricted Cone NAT Gateway
+
+        let vars = extra_vars::build_nat_gateway_extra_vars_doc(
+            &options.name,
+            private_node_ip_map,
+            "step2",
+        );
+
+        self.print_ansible_run_banner("Provisioning Port Restricted Cone NAT Gateway - Step 2");
+        debug!("Provisioning Port Restricted Cone NAT Gateway - Step 2 with vars: {vars}");
+        self.ansible_runner.run_playbook(
+            AnsiblePlaybook::PortRestrictedConeNatGateway,
+            gateway_inventory,
+            Some(vars),
+        )?;
+
+        // provision the nodes
+
+        let home_dir = std::env::var("HOME").inspect_err(|err| {
+            println!("Failed to get home directory with error: {err:?}",);
+        })?;
+        let known_hosts_path = format!("{home_dir}/.ssh/known_hosts");
+        debug!("Cleaning up known hosts file at {known_hosts_path} ");
+        run_external_command(
+            PathBuf::from("rm"),
+            std::env::current_dir()?,
+            vec![known_hosts_path],
+            false,
+            false,
+        )?;
+
+        self.print_ansible_run_banner("Provision Port Restricted Cone Private Nodes");
+
+        self.ssh_client.set_port_restricted_cone_nat_routed_vms(
+            &private_node_inventory.port_restricted_cone_private_node_vms,
+            &private_node_inventory.port_restricted_cone_nat_gateway_vms,
+        )?;
+
+        self.provision_nodes(
+            options,
+            initial_contact_peers,
+            initial_network_contacts_urls,
+            NodeType::PortRestrictedConePrivateNode,
+        )?;
+
+        print_duration(start.elapsed());
+        Ok(())
+    }
+
     pub fn provision_symmetric_nat_gateway(
         &self,
         options: &ProvisionOptions,
@@ -927,6 +1199,10 @@ impl AnsibleProvisioner {
                 node_type.to_ansible_inventory_type(),
                 options.upnp_private_node_count,
             ),
+            NodeType::PortRestrictedConePrivateNode => (
+                node_type.to_ansible_inventory_type(),
+                options.port_restricted_cone_private_node_count,
+            ),
         };
 
         // For a new deployment, it's quite probable that SSH is available, because this part occurs
@@ -955,6 +1231,7 @@ impl AnsibleProvisioner {
             NodeType::Generic => AnsiblePlaybook::Nodes,
             NodeType::PeerCache => AnsiblePlaybook::PeerCacheNodes,
             NodeType::FullConePrivateNode => AnsiblePlaybook::Nodes,
+            NodeType::PortRestrictedConePrivateNode => AnsiblePlaybook::Nodes,
             NodeType::SymmetricPrivateNode => AnsiblePlaybook::Nodes,
             NodeType::Upnp => AnsiblePlaybook::Upnp,
             _ => return Err(Error::InvalidNodeType(node_type.clone())),

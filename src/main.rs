@@ -177,6 +177,10 @@ async fn main() -> Result<()> {
             peer_cache_node_vm_count,
             peer_cache_node_vm_size,
             peer_cache_node_volume_size,
+            port_restricted_cone_vm_size,
+            port_restricted_cone_private_node_count,
+            port_restricted_cone_private_node_vm_count,
+            port_restricted_cone_private_node_volume_size,
             skip_binary_build,
             symmetric_nat_gateway_vm_size,
             symmetric_private_node_count,
@@ -242,6 +246,10 @@ async fn main() -> Result<()> {
                 peer_cache_node_vm_count,
                 peer_cache_node_vm_size,
                 peer_cache_node_volume_size,
+                port_restricted_cone_vm_size,
+                port_restricted_cone_private_node_count,
+                port_restricted_cone_private_node_vm_count,
+                port_restricted_cone_private_node_volume_size,
                 skip_binary_build,
                 symmetric_nat_gateway_vm_size,
                 symmetric_private_node_count,
@@ -546,6 +554,17 @@ async fn main() -> Result<()> {
             } => {
                 cmd::provision::handle_provision_full_cone_private_nodes(name, disable_nodes)
                     .await?;
+                Ok(())
+            }
+            ProvisionCommands::PortRestrictedConePrivateNodes {
+                name,
+                disable_nodes,
+            } => {
+                cmd::provision::handle_provision_port_restricted_cone_private_nodes(
+                    name,
+                    disable_nodes,
+                )
+                .await?;
                 Ok(())
             }
             ProvisionCommands::PeerCacheNodes {
