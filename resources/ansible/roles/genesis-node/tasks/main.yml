@@ -40,7 +40,7 @@
 
 - name: start the genesis node service
   become: True
-  command: antctl --trace start --interval {{ interval}}
+  command: antctl -v start --interval {{ interval}}
   register: start_services_result
   failed_when: false
 
