@@ -179,14 +179,20 @@ impl AnsibleRunner {
             } else {
                 debug!("Running inventory list.");
             }
+
+            // This debugging output can be useful when testnet-deploy is running in a workflow and
+            // you don't have access to the generated inventory.
+            let inventory_path = self.get_inventory_path(&inventory_type)?;
+            debug!("Using inventory file: {}", inventory_path.to_string_lossy());
+            let inventory_contents = std::fs::read_to_string(&inventory_path)?;
+            debug!("Inventory file contents:\n{}", inventory_contents);
+
             let output = run_external_command(
                 AnsibleBinary::AnsibleInventory.get_binary_path()?,
                 self.working_directory_path.clone(),
                 vec![
                     "--inventory".to_string(),
-                    self.get_inventory_path(&inventory_type)?
-                        .to_string_lossy()
-                        .to_string(),
+                    inventory_path.to_string_lossy().to_string(),
                     "--list".to_string(),
                     "-vvvv".to_string(),
                 ],
