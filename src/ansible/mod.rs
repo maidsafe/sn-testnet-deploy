@@ -112,6 +112,10 @@ pub enum AnsiblePlaybook {
     ///
     /// Use in combination with `AnsibleInventoryType::PeerCache`.
     PeerCacheNodes,
+    /// This playbool will setup the VM to act as a port restricted code NAT gateway and will route the private node through it. 
+    ///
+    /// Use in combination with `AnsibleInventoryType::PortRestrictedConeNatGateway`.
+    PortRestrictedConeNatGateway,
     /// The private node playbook will setup the configs required for the routing the private node through a
     /// NAT gateway. This has to be run before running the Nodes playbook.
     ///
@@ -240,6 +244,7 @@ impl AnsiblePlaybook {
             AnsiblePlaybook::Genesis => "genesis_node.yml".to_string(),
             AnsiblePlaybook::Nodes => "nodes.yml".to_string(),
             AnsiblePlaybook::PeerCacheNodes => "peer_cache_node.yml".to_string(),
+            AnsiblePlaybook::PortRestrictedConeNatGateway => "port_restricted_cone_nat_gateway.yml".to_string(),
             AnsiblePlaybook::PrivateNodeConfig => "private_node_config.yml".to_string(),
             AnsiblePlaybook::RpcClient => "safenode_rpc_client.yml".to_string(),
             AnsiblePlaybook::ResetToNNodes => "reset_to_n_nodes.yml".to_string(),

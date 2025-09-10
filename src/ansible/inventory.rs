@@ -55,6 +55,10 @@ pub enum AnsibleInventoryType {
     Nodes,
     /// Use to run a playbook against all Peer Cache nodes.
     PeerCacheNodes,
+    /// Use to run a playbook against all Port Restricted gateway.
+    PortRestrictedConeNatGateway,
+    /// Use to run a playbook against all Port Restricted Private Nodes.
+    PortRestrictedConePrivateNodes,
     /// Use to run a playbook against the Symmetric NAT gateway.
     SymmetricNatGateway,
     /// Use to run a inventory against the Symmetric NAT private nodes. This does not route the ssh connection through
@@ -79,6 +83,8 @@ impl std::fmt::Display for AnsibleInventoryType {
             AnsibleInventoryType::FullConeNatGatewayStatic => "FullConeNatGatewayStatic",
             AnsibleInventoryType::FullConePrivateNodes => "FullConePrivateNodes",
             AnsibleInventoryType::FullConePrivateNodesStatic => "FullConePrivateNodesStatic",
+            AnsibleInventoryType::PortRestrictedConeNatGateway => "PortRestrictedConeNateGateway",
+            AnsibleInventoryType::PortRestrictedConePrivateNodes => "PortRestrictedConePrivateNodes",
             AnsibleInventoryType::Genesis => "Genesis",
             AnsibleInventoryType::Nodes => "Nodes",
             AnsibleInventoryType::SymmetricNatGateway => "SymmetricNatGateway",
@@ -140,6 +146,8 @@ impl AnsibleInventoryType {
             Self::FullConeNatGatewayStatic => "full_cone_nat_gateway",
             Self::FullConePrivateNodes => "full_cone_private_node",
             Self::FullConePrivateNodesStatic => "full_cone_private_node",
+            Self::PortRestrictedConeNatGateway => "port_restricted_cone_nat_gateway",
+            Self::PortRestrictedConePrivateNodes => "port_restricted_cone_private_node",
             Self::Genesis => "genesis",
             Self::Nodes => "node",
             Self::SymmetricNatGateway => "symmetric_nat_gateway",

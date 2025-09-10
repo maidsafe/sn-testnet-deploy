@@ -565,6 +565,10 @@ pub enum Commands {
         /// If it is not used, the value will be determined by the 'environment-type' argument.
         #[clap(long)]
         peer_cache_node_volume_size: Option<u16>,
+        /// The size of the volumes to attach to each port-restricted cone NAT gateway and private node VM.
+        ///
+        #[clap(long)]
+        port_restricted_cone_vm_size: Option<String>,
         /// The cloud provider to deploy to.
         ///
         /// Valid values are "aws" or "digital-ocean".

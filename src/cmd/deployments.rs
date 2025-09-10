@@ -249,6 +249,7 @@ pub async fn handle_deploy(
     peer_cache_node_vm_count: Option<u16>,
     peer_cache_node_vm_size: Option<String>,
     peer_cache_node_volume_size: Option<u16>,
+    port_restricted_cone_vm_size: Option<String>,
     skip_binary_build: bool,
     symmetric_nat_gateway_vm_size: Option<String>,
     symmetric_private_node_count: Option<u16>,

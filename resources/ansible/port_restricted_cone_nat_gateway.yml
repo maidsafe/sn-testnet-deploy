@@ -1,0 +1,6 @@
+---
+- name: provision port restricted nat gateway
+  hosts: all
+  become: True
+  roles:
+    - port_restricted_nat_gateway
