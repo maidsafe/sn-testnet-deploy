@@ -12,7 +12,7 @@ use crate::{
     run_external_command, Result,
 };
 use log::{debug, error, warn};
-use serde::Deserialize;
+use serde::{Deserialize, Deserializer};
 use std::{
     collections::HashMap,
     fs::File,
@@ -663,8 +663,9 @@ enum IpType {
 
 #[derive(Debug, Deserialize, Clone)]
 struct IpDetails {
+    #[serde(deserialize_with = "deserialize_ansible_unsafe")]
     ip_address: IpAddr,
-    #[serde(rename = "type")]
+    #[serde(rename = "type", deserialize_with = "deserialize_ansible_unsafe")]
     ip_type: IpType,
 }
 
@@ -676,6 +677,7 @@ struct DigitalOceanNetwork {
 #[derive(Debug, Deserialize)]
 struct HostVar {
     do_id: u64,
+    #[serde(deserialize_with = "deserialize_ansible_unsafe")]
     do_name: String,
     do_networks: DigitalOceanNetwork,
 }
@@ -686,4 +688,24 @@ struct Meta {
 #[derive(Debug, Deserialize)]
 struct Output {
     _meta: Meta,
+}
+
+// Custom deserializer to handle Ansible's __ansible_unsafe wrapper
+fn deserialize_ansible_unsafe<'de, D, T>(deserializer: D) -> Result<T, D::Error>
+where
+    D: Deserializer<'de>,
+    T: Deserialize<'de>,
+{
+    #[derive(Deserialize)]
+    #[serde(untagged)]
+    enum AnsibleValue<T> {
+        Unsafe { __ansible_unsafe: T },
+        Direct(T),
+    }
+
+    let value = AnsibleValue::deserialize(deserializer)?;
+    match value {
+        AnsibleValue::Unsafe { __ansible_unsafe } => Ok(__ansible_unsafe),
+        AnsibleValue::Direct(val) => Ok(val),
+    }
 }
