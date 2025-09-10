@@ -1,6 +1,7 @@
 variable "droplet_ssh_keys" {
   type = list(number)
   default = [
+    50457610, # Ermine
     44147181, # Ermine Jose
     37243057, # Benno Zeeman
     38313409, # Roland Sherwin
@@ -29,9 +30,14 @@ variable "symmetric_nat_gateway_droplet_size" {
   default = "s-1vcpu-2gb"
 }
 
-variable "port_restricted_cone_nate_gateway_droplet_size" {
+variable "port_restricted_cone_nat_gateway_droplet_size" {
   description = "The size of the droplet for port restricted cone NAT gateway VM"
   default = "s-1vcpu-2gb"
+}
+
+variable "port_restricted_cone_droplet_size" {
+  description = "The size of the droplet for port restricted cone NAT gateway and private node VMs"
+  default = "s-2vcpu-4gb"
 }
 
 variable "node_droplet_size" {
@@ -97,9 +103,14 @@ variable "full_cone_private_node_vm_count" {
   description = "The number of droplets to launch for full cone private nodes"
 }
 
-variable "port_restricted_private_noe_vm_count" {
+variable "port_restricted_cone_node_vm_count" {
   default     = 1
-  description = "The number of droplets to launch for full cone private nodes"
+  description = "The number of droplets to launch for port restricted cone nodes"
+}
+
+variable "port_restricted_private_node_vm_count" {
+  default     = 1
+  description = "The number of droplets to launch for port restricted private nodes"
 }
 
 variable "symmetric_private_node_vm_count" {
@@ -162,6 +173,12 @@ variable "node_volume_size" {
 
 variable "full_cone_private_node_volume_size" {
   description = "Size of each volume in GB for full cone private nodes"
+  type        = number
+  default = 0
+}
+
+variable "port_restricted_private_node_volume_size" {
+  description = "Size of each volume in GB for port restricted private nodes"
   type        = number
   default = 0
 }

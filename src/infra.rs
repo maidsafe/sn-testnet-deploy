@@ -28,7 +28,8 @@ const PEER_CACHE_NODE: &str = "peer_cache_node";
 const PEER_CACHE_NODE_ATTACHED_VOLUME: &str = "peer_cache_node_attached_volume";
 const PORT_RESTRICTED_CONE_NAT_GATEWAY: &str = "port_restricted_cone_nat_gateway";
 const PORT_RESTRICTED_PRIVATE_NODE: &str = "port_restricted_private_node";
-const PORT_RESTRICTED_PRIVATE_NODE_ATTACHED_VOLUME: &str = "port_restricted_private_node_attached_volume";
+const PORT_RESTRICTED_PRIVATE_NODE_ATTACHED_VOLUME: &str =
+    "port_restricted_private_node_attached_volume";
 const SYMMETRIC_NAT_GATEWAY: &str = "symmetric_nat_gateway";
 const SYMMETRIC_PRIVATE_NODE: &str = "symmetric_private_node";
 const SYMMETRIC_PRIVATE_NODE_ATTACHED_VOLUME: &str = "symmetric_private_node_attached_volume";
@@ -210,7 +211,10 @@ impl InfraRunOptions {
                     get_value_for_resource(&resources, PORT_RESTRICTED_CONE_NAT_GATEWAY, IMAGE)?;
                 debug!("Nat gateway image: {nat_gateway_image_id:?}");
 
-                (port_restricted_private_node_volume_size, port_restricted_cone_vm_size)
+                (
+                    port_restricted_private_node_volume_size,
+                    port_restricted_cone_vm_size,
+                )
             } else {
                 (None, None)
             };
@@ -508,16 +512,37 @@ pub fn build_terraform_args(options: &InfraRunOptions) -> Result<Vec<(String, St
             "port_restricted_cone_droplet_size".to_string(),
             port_restricted_cone_vm_size.clone(),
         ));
+        // Also set the NAT gateway size to the same as private nodes
+        args.push((
+            "port_restricted_cone_nat_gateway_droplet_size".to_string(),
+            port_restricted_cone_vm_size.clone(),
+        ));
     }
 
-    if let Some(port_restricted_private_node_vm_count) = options.port_restricted_private_node_vm_count {
+    // Set the port restricted cone NAT gateway VM count based on private node VM count
+    if let Some(port_restricted_private_node_vm_count) =
+        options.port_restricted_private_node_vm_count
+    {
+        if port_restricted_private_node_vm_count > 0 {
+            args.push((
+                "port_restricted_cone_node_vm_count".to_string(),
+                port_restricted_private_node_vm_count.to_string(),
+            ));
+        }
+    }
+
+    if let Some(port_restricted_private_node_vm_count) =
+        options.port_restricted_private_node_vm_count
+    {
         args.push((
             "port_restricted_private_node_vm_count".to_string(),
             port_restricted_private_node_vm_count.to_string(),
         ));
     }
 
-    if let Some(port_restricted_private_node_volume_size) = options.port_restricted_private_node_volume_size {
+    if let Some(port_restricted_private_node_volume_size) =
+        options.port_restricted_private_node_volume_size
+    {
         args.push((
             "port_restricted_private_node_volume_size".to_string(),
             port_restricted_private_node_volume_size.to_string(),

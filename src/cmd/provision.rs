@@ -107,6 +107,7 @@ async fn handle_provision_nodes(name: String, node_type: NodeType) -> Result<()>
         &provisioner,
         deploy_options.full_cone_private_node_vm_count,
         deploy_options.symmetric_private_node_vm_count,
+        Some(deploy_options.port_restricted_cone_private_node_vm_count),
     )?;
 
     match node_type {

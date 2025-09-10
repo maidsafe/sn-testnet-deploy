@@ -99,6 +99,8 @@ impl TestnetDeployer {
             peer_cache_node_vm_size: None,
             peer_cache_node_volume_size: None,
             port_restricted_cone_vm_size: None,
+            port_restricted_private_node_vm_count: Some(0),
+            port_restricted_private_node_volume_size: None,
             region: options.region.clone(),
             symmetric_nat_gateway_vm_size: None, // We can take the value from tfvars for bootstrap deployments.
             symmetric_private_node_vm_count: options.symmetric_private_node_vm_count,
@@ -169,6 +171,7 @@ impl TestnetDeployer {
             &self.ansible_provisioner,
             options.full_cone_private_node_vm_count,
             options.symmetric_private_node_vm_count,
+            None, // TODO: Add port restricted cone support to bootstrap
         )?;
 
         if private_node_inventory.should_provision_full_cone_private_nodes() {

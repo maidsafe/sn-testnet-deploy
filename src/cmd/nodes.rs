@@ -178,6 +178,9 @@ pub async fn handle_update_peer_command(
             Some(NodeType::PeerCache) => AnsibleInventoryType::PeerCacheNodes,
             Some(NodeType::SymmetricPrivateNode) => AnsibleInventoryType::SymmetricPrivateNodes,
             Some(NodeType::Upnp) => AnsibleInventoryType::Upnp,
+            Some(NodeType::PortRestrictedConePrivateNode) => {
+                AnsibleInventoryType::PortRestrictedConePrivateNodes
+            }
             None => AnsibleInventoryType::Nodes,
         };
         println!("Updating peers against {inventory_type:?}");

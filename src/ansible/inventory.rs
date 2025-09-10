@@ -57,8 +57,13 @@ pub enum AnsibleInventoryType {
     PeerCacheNodes,
     /// Use to run a playbook against all Port Restricted gateway.
     PortRestrictedConeNatGateway,
+    /// Use to run a playbook against a static list of Port Restricted Cone NAT gateway.
+    PortRestrictedConeNatGatewayStatic,
     /// Use to run a playbook against all Port Restricted Private Nodes.
     PortRestrictedConePrivateNodes,
+    /// Use to run a playbook against the port restricted cone private nodes. This is similar to the PortRestrictedConePrivateNodes inventory, but uses
+    /// a static custom inventory file. This is just used for running playbooks and not inventory.
+    PortRestrictedConePrivateNodesStatic,
     /// Use to run a playbook against the Symmetric NAT gateway.
     SymmetricNatGateway,
     /// Use to run a inventory against the Symmetric NAT private nodes. This does not route the ssh connection through
@@ -83,8 +88,16 @@ impl std::fmt::Display for AnsibleInventoryType {
             AnsibleInventoryType::FullConeNatGatewayStatic => "FullConeNatGatewayStatic",
             AnsibleInventoryType::FullConePrivateNodes => "FullConePrivateNodes",
             AnsibleInventoryType::FullConePrivateNodesStatic => "FullConePrivateNodesStatic",
-            AnsibleInventoryType::PortRestrictedConeNatGateway => "PortRestrictedConeNateGateway",
-            AnsibleInventoryType::PortRestrictedConePrivateNodes => "PortRestrictedConePrivateNodes",
+            AnsibleInventoryType::PortRestrictedConeNatGateway => "PortRestrictedConeNatGateway",
+            AnsibleInventoryType::PortRestrictedConeNatGatewayStatic => {
+                "PortRestrictedConeNatGatewayStatic"
+            }
+            AnsibleInventoryType::PortRestrictedConePrivateNodes => {
+                "PortRestrictedConePrivateNodes"
+            }
+            AnsibleInventoryType::PortRestrictedConePrivateNodesStatic => {
+                "PortRestrictedConePrivateNodesStatic"
+            }
             AnsibleInventoryType::Genesis => "Genesis",
             AnsibleInventoryType::Nodes => "Nodes",
             AnsibleInventoryType::SymmetricNatGateway => "SymmetricNatGateway",
@@ -132,6 +145,18 @@ impl AnsibleInventoryType {
                 ".{name}_upnp_private_node_inventory_{provider}.yml"
             )),
             Self::Clients => PathBuf::from(format!(".{name}_clients_inventory_{provider}.yml")),
+            Self::PortRestrictedConeNatGateway => PathBuf::from(format!(
+                ".{name}_port_restricted_cone_nat_gateway_inventory_{provider}.yml"
+            )),
+            Self::PortRestrictedConePrivateNodes => PathBuf::from(format!(
+                ".{name}_port_restricted_cone_private_nodes_inventory_{provider}.yml"
+            )),
+            Self::PortRestrictedConeNatGatewayStatic => PathBuf::from(format!(
+                ".{name}_port_restricted_cone_nat_gateway_static_inventory_{provider}.yml"
+            )),
+            Self::PortRestrictedConePrivateNodesStatic => PathBuf::from(format!(
+                ".{name}_port_restricted_cone_private_node_static_inventory_{provider}.yml"
+            )),
         }
     }
 
@@ -147,7 +172,9 @@ impl AnsibleInventoryType {
             Self::FullConePrivateNodes => "full_cone_private_node",
             Self::FullConePrivateNodesStatic => "full_cone_private_node",
             Self::PortRestrictedConeNatGateway => "port_restricted_cone_nat_gateway",
+            Self::PortRestrictedConeNatGatewayStatic => "port_restricted_cone_nat_gateway",
             Self::PortRestrictedConePrivateNodes => "port_restricted_cone_private_node",
+            Self::PortRestrictedConePrivateNodesStatic => "port_restricted_cone_private_node",
             Self::Genesis => "genesis",
             Self::Nodes => "node",
             Self::SymmetricNatGateway => "symmetric_nat_gateway",
@@ -163,6 +190,7 @@ impl AnsibleInventoryType {
             Self::FullConePrivateNodes,
             Self::Nodes,
             Self::PeerCacheNodes,
+            Self::PortRestrictedConePrivateNodes,
             Self::SymmetricPrivateNodes,
             Self::Upnp,
         ]
@@ -270,6 +298,8 @@ pub fn generate_environment_inventory(
         AnsibleInventoryType::Genesis,
         AnsibleInventoryType::Nodes,
         AnsibleInventoryType::PeerCacheNodes,
+        AnsibleInventoryType::PortRestrictedConeNatGateway,
+        AnsibleInventoryType::PortRestrictedConePrivateNodes,
         AnsibleInventoryType::SymmetricNatGateway,
         AnsibleInventoryType::SymmetricPrivateNodes,
         AnsibleInventoryType::Upnp,
@@ -314,6 +344,9 @@ pub fn cleanup_environment_inventory(
         AnsibleInventoryType::Genesis,
         AnsibleInventoryType::Nodes,
         AnsibleInventoryType::PeerCacheNodes,
+        AnsibleInventoryType::PortRestrictedConeNatGateway,
+        AnsibleInventoryType::PortRestrictedConePrivateNodes,
+        AnsibleInventoryType::PortRestrictedConePrivateNodesStatic,
         AnsibleInventoryType::SymmetricNatGateway,
         AnsibleInventoryType::SymmetricPrivateNodes,
         AnsibleInventoryType::SymmetricPrivateNodesStatic,
@@ -387,6 +420,35 @@ pub fn generate_full_cone_nat_gateway_static_environment_inventory(
     Ok(())
 }
 
+/// Generate the Port Restricted Cone NAT gateway static inventory for the environment.
+/// This is used during upscale of the Port Restricted Cone NAT gateway.
+pub fn generate_port_restricted_cone_nat_gateway_static_environment_inventory(
+    vm_list: &[VirtualMachine],
+    environment_name: &str,
+    output_inventory_dir_path: &Path,
+) -> Result<()> {
+    let dest_path = output_inventory_dir_path.join(
+        AnsibleInventoryType::PortRestrictedConeNatGatewayStatic
+            .get_inventory_path(environment_name, "digital_ocean"),
+    );
+    debug!("Creating port restricted cone nat gateway static inventory file at {dest_path:#?}");
+    let file = File::create(&dest_path)?;
+    let mut writer = BufWriter::new(file);
+
+    writeln!(writer, "[port_restricted_cone_nat_gateway]")?;
+    for vm in vm_list.iter() {
+        debug!(
+            "Adding VM to port restricted cone nat gateway static inventory: {}",
+            vm.public_ip_addr
+        );
+        writeln!(writer, "{}", vm.public_ip_addr)?;
+    }
+
+    debug!("Created port restricted cone nat gateway inventory file at {dest_path:#?}");
+
+    Ok(())
+}
+
 /// Generate the static inventory for the private node that are behind a Symmetric NAT gateway.
 /// This is just used during ansible-playbook.
 pub fn generate_symmetric_private_node_static_environment_inventory(
@@ -436,6 +498,69 @@ pub fn generate_symmetric_private_node_static_environment_inventory(
     }
 
     debug!("Created symmetric private node inventory file with ssh proxy at {dest_path:?}");
+
+    Ok(())
+}
+
+/// Generate the static inventory for the private node that are behind a Port Restricted Cone NAT gateway.
+/// This is just used during ansible-playbook.
+pub fn generate_port_restricted_cone_private_node_static_environment_inventory(
+    environment_name: &str,
+    output_inventory_dir_path: &Path,
+    port_restricted_cone_private_node_vms: &[VirtualMachine],
+    port_restricted_cone_nat_gateway_vms: &[VirtualMachine],
+    ssh_sk_path: &Path,
+) -> Result<()> {
+    if port_restricted_cone_nat_gateway_vms.is_empty() {
+        println!("No port restricted cone NAT gateway VMs found. Skipping port restricted cone private node static inventory generation.");
+        return Ok(());
+    };
+
+    if port_restricted_cone_private_node_vms.is_empty() {
+        return Err(Error::EmptyInventory(
+            AnsibleInventoryType::PortRestrictedConePrivateNodes,
+        ));
+    }
+
+    let private_node_nat_gateway_map =
+        PrivateNodeProvisionInventory::match_private_node_vm_and_gateway_vm(
+            port_restricted_cone_private_node_vms,
+            port_restricted_cone_nat_gateway_vms,
+        )?;
+
+    let dest_path = output_inventory_dir_path.join(
+        AnsibleInventoryType::PortRestrictedConePrivateNodesStatic
+            .get_inventory_path(environment_name, "digital_ocean"),
+    );
+    debug!("Generating port restricted cone private node static inventory at {dest_path:?}",);
+
+    let mut file = File::create(&dest_path)?;
+
+    for (private_node_vm, nat_gateway_vm) in private_node_nat_gateway_map.iter() {
+        let node_number = private_node_vm.name.split('-').next_back().unwrap();
+        writeln!(file, "[port_restricted_cone_private_node_{node_number}]")?;
+
+        writeln!(file, "{}", private_node_vm.private_ip_addr)?;
+
+        writeln!(
+            file,
+            "[port_restricted_cone_private_node_{node_number}:vars]"
+        )?;
+        writeln!(
+            file,
+            "ansible_ssh_common_args='-o ProxyCommand=\"ssh -p 22 -W %h:%p -q root@{} -i \"{}\" -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null\"'",
+            nat_gateway_vm.public_ip_addr,
+            ssh_sk_path.to_string_lossy()
+
+        )?;
+
+        writeln!(file, "ansible_ssh_extra_args='-o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no -i \"{}\"'", ssh_sk_path.to_string_lossy())?;
+        writeln!(file, "ansible_host_key_checking=False")?;
+    }
+
+    debug!(
+        "Created port restricted cone private node inventory file with ssh proxy at {dest_path:?}"
+    );
 
     Ok(())
 }

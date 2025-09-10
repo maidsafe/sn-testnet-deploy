@@ -117,8 +117,11 @@ impl TestnetDeployer {
             peer_cache_node_vm_size: options.peer_cache_node_vm_size.clone(),
             peer_cache_node_volume_size: options.peer_cache_node_volume_size,
             port_restricted_cone_vm_size: options.port_restricted_cone_vm_size.clone(),
-            port_restricted_cone_private_node_vm_count: options.port_restricted_private_cone_vm_count,
-            port_restricted_cone_private_node_volume_size: options.port_restricted_cone_private_node_volume_size,
+            port_restricted_private_node_vm_count: Some(
+                options.port_restricted_cone_private_node_vm_count,
+            ),
+            port_restricted_private_node_volume_size: options
+                .port_restricted_cone_private_node_volume_size,
             region: options.region.clone(),
             symmetric_nat_gateway_vm_size: options.symmetric_nat_gateway_vm_size.clone(),
             symmetric_private_node_vm_count: options.symmetric_private_node_vm_count,
@@ -315,6 +318,7 @@ impl TestnetDeployer {
             &self.ansible_provisioner,
             options.full_cone_private_node_vm_count,
             options.symmetric_private_node_vm_count,
+            Some(options.port_restricted_cone_private_node_vm_count),
         )?;
 
         if private_node_inventory.should_provision_full_cone_private_nodes() {
@@ -330,6 +334,24 @@ impl TestnetDeployer {
                 }
                 Err(err) => {
                     error!("Failed to provision Full Cone nodes and Gateway: {err}");
+                    node_provision_failed = true;
+                }
+            }
+        }
+
+        if private_node_inventory.should_provision_port_restricted_cone_private_nodes() {
+            match self.ansible_provisioner.provision_port_restricted_cone(
+                &provision_options,
+                Some(genesis_multiaddr.clone()),
+                Some(genesis_network_contacts.clone()),
+                private_node_inventory.clone(),
+                None,
+            ) {
+                Ok(()) => {
+                    println!("Provisioned Port Restricted Cone nodes and Gateway");
+                }
+                Err(err) => {
+                    error!("Failed to provision Port Restricted Cone nodes and Gateway: {err}");
                     node_provision_failed = true;
                 }
             }

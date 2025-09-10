@@ -569,6 +569,28 @@ pub enum Commands {
         ///
         #[clap(long)]
         port_restricted_cone_vm_size: Option<String>,
+        /// The number of antnode services to run behind a port-restricted cone NAT gateway.
+        ///
+        /// The number applies to each VM, so the total number of nodes will be the number of VMs
+        /// multiplied by this number.
+        ///
+        /// If it is not used, the value will be determined by the 'environment-type' argument.
+        #[clap(long, verbatim_doc_comment)]
+        port_restricted_cone_private_node_count: Option<u16>,
+        /// The number of VMs to use for hosting nodes behind a port-restricted cone NAT gateway.
+        ///
+        /// Each VM will run many antnode services.
+        ///
+        /// If it is not used, the value will be determined by the 'environment-type' argument.
+        #[clap(long, verbatim_doc_comment)]
+        port_restricted_cone_private_node_vm_count: Option<u16>,
+        /// The size of the volumes to attach to each port-restricted cone private node VM.
+        ///
+        /// This argument will set the size of all 7 attached volumes.
+        ///
+        /// If it is not used, the value will be determined by the 'environment-type' argument.
+        #[clap(long)]
+        port_restricted_cone_private_node_volume_size: Option<u16>,
         /// The cloud provider to deploy to.
         ///
         /// Valid values are "aws" or "digital-ocean".

@@ -437,6 +437,35 @@ pub fn build_full_cone_private_node_config_extra_vars_docs(
     Ok(extra_vars.build())
 }
 
+pub fn build_port_restricted_cone_private_node_config_extra_vars_docs(
+    private_node_inventory: &PrivateNodeProvisionInventory,
+) -> Result<String> {
+    let mut extra_vars = ExtraVarsDocBuilder::default();
+
+    let map = private_node_inventory.port_restricted_cone_private_node_and_gateway_map()?;
+    if map.is_empty() {
+        error!("Private node inventory map is empty");
+        return Err(Error::EmptyInventory(
+            AnsibleInventoryType::PortRestrictedConePrivateNodes,
+        ));
+    }
+
+    let serde_map = Value::Object(
+        map.into_iter()
+            .map(|(private_node_vm, nat_gateway_vm)| {
+                (
+                    // hostname of private node returns the private ip address, since we're using static inventory.
+                    private_node_vm.private_ip_addr.to_string(),
+                    Value::String(nat_gateway_vm.private_ip_addr.to_string()),
+                )
+            })
+            .collect(),
+    );
+    extra_vars.add_serde_value("nat_gateway_private_ip_map", serde_map);
+
+    Ok(extra_vars.build())
+}
+
 pub fn build_symmetric_private_node_config_extra_vars_doc(
     private_node_inventory: &PrivateNodeProvisionInventory,
 ) -> Result<String> {

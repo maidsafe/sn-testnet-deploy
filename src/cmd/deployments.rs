@@ -250,6 +250,9 @@ pub async fn handle_deploy(
     peer_cache_node_vm_size: Option<String>,
     peer_cache_node_volume_size: Option<u16>,
     port_restricted_cone_vm_size: Option<String>,
+    port_restricted_cone_private_node_count: Option<u16>,
+    port_restricted_cone_private_node_vm_count: Option<u16>,
+    port_restricted_cone_private_node_volume_size: Option<u16>,
     skip_binary_build: bool,
     symmetric_nat_gateway_vm_size: Option<String>,
     symmetric_private_node_count: Option<u16>,
@@ -347,6 +350,8 @@ pub async fn handle_deploy(
         .unwrap_or(environment_type.get_default_full_cone_private_node_count());
     let upnp_private_node_count =
         upnp_private_node_count.unwrap_or(environment_type.get_default_upnp_private_node_count());
+    let port_restricted_cone_private_node_count =
+        port_restricted_cone_private_node_count.unwrap_or(0);
 
     let deploy_options = DeployOptions {
         binary_option: binary_option.clone(),
@@ -400,6 +405,16 @@ pub async fn handle_deploy(
         peer_cache_node_vm_size,
         peer_cache_node_volume_size: peer_cache_node_volume_size
             .or_else(|| Some(calculate_size_per_attached_volume(peer_cache_node_count))),
+        port_restricted_cone_vm_size,
+        port_restricted_cone_private_node_count,
+        port_restricted_cone_private_node_vm_count: port_restricted_cone_private_node_vm_count
+            .unwrap_or(0),
+        port_restricted_cone_private_node_volume_size:
+            port_restricted_cone_private_node_volume_size.or_else(|| {
+                Some(calculate_size_per_attached_volume(
+                    port_restricted_cone_private_node_count,
+                ))
+            }),
         public_rpc,
         region,
         rewards_address,

@@ -57,11 +57,11 @@ resource "digitalocean_droplet" "full_cone_nat_gateway" {
 }
 
 resource "digitalocean_droplet" "port_restricted_cone_nat_gateway" {
-  count    = var.port_restricted_cone_droplet_size
+  count    = var.port_restricted_cone_node_vm_count
   image    = var.nat_gateway_droplet_image_id
   name     = "${terraform.workspace}-port-restricted-cone-nat-gateway-${count.index + 1}"
   region   = var.region
-  size     = var.port_restricted_cone_droplet_size
+  size     = var.port_restricted_cone_nat_gateway_droplet_size
   ssh_keys = var.droplet_ssh_keys
   tags     = ["environment:${terraform.workspace}", "type:full_cone_nat_gateway"]
 }
@@ -99,7 +99,7 @@ resource "digitalocean_droplet" "full_cone_private_node" {
 resource "digitalocean_droplet" "port_restricted_cone_private_node" {
   count   = var.port_restricted_cone_node_vm_count
   image    = var.node_droplet_image_id
-  name     = "${terraform.workspace}-full-cone-private-node-${count.index + 1}"
+  name     = "${terraform.workspace}-port-restricted-cone-private-node-${count.index + 1}"
   region   = var.region
   size     = var.port_restricted_cone_droplet_size
   ssh_keys = var.droplet_ssh_keys

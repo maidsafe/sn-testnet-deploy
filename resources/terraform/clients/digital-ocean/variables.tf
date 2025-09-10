@@ -1,6 +1,7 @@
 variable "droplet_ssh_keys" {
   type = list(number)
   default = [
+    50457610, # Ermine
     44147181, # Ermine Jose
     37243057, # Benno Zeeman
     38313409, # Roland Sherwin

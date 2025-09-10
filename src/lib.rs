@@ -160,7 +160,9 @@ impl NodeType {
     pub fn to_ansible_inventory_type(&self) -> AnsibleInventoryType {
         match self {
             NodeType::FullConePrivateNode => AnsibleInventoryType::FullConePrivateNodes,
-            NodeType::PortRestrictedConePrivateNode => AnsibleInventoryType::PortRestrictedConePrivateNodes,
+            NodeType::PortRestrictedConePrivateNode => {
+                AnsibleInventoryType::PortRestrictedConePrivateNodes
+            }
             NodeType::Generic => AnsibleInventoryType::Nodes,
             NodeType::Genesis => AnsibleInventoryType::Genesis,
             NodeType::PeerCache => AnsibleInventoryType::PeerCacheNodes,
