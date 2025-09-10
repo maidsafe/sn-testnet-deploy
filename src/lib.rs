@@ -52,6 +52,7 @@ use std::{
     path::{Path, PathBuf},
     process::{Command, Stdio},
     str::FromStr,
+    thread,
     time::Duration,
 };
 use tar::Archive;
@@ -1044,43 +1045,170 @@ pub fn get_genesis_multiaddr(
     if genesis_inventory.is_empty() {
         return Ok(None);
     }
+    println!(
+        "Starting genesis multiaddr retrieval for {} VMs",
+        genesis_inventory.len()
+    );
 
-    let addrs = genesis_inventory.par_iter().map(|vm| {
-        let genesis_ip = vm.public_ip_addr;
-         // It's possible for the genesis host to be altered from its original state where a node was
-    // started with the `--first` flag.
+    let results: Vec<_> = genesis_inventory
+        .par_iter()
+        .map(|vm| match try_get_multiaddr_for_vm(ssh_client, vm) {
+            Ok(addr) => {
+                println!(
+                    "Successfully retrieved multiaddr from {} (parallel): {addr:?}",
+                    vm.public_ip_addr
+                );
+                Ok(addr)
+            }
+            Err(_) => {
+                println!(
+                    "Failed to retrieve multiaddr from {} (parallel), will retry sequentially",
+                    vm.public_ip_addr
+                );
+                Err(vm.clone())
+            }
+        })
+        .collect();
+
+    let (successful, failed_vms): (Vec<_>, Vec<_>) =
+        results.into_iter().partition(|result| result.is_ok());
+
+    let successful: Vec<String> = successful.into_iter().map(|r| r.unwrap()).collect();
+    let failed_vms: Vec<VirtualMachine> = failed_vms.into_iter().map(|r| r.unwrap_err()).collect();
+
+    println!(
+        "First pass results: {} successful, {} failed",
+        successful.len(),
+        failed_vms.len()
+    );
+
+    // Early return if no failures - no need for sequential retry
+    if failed_vms.is_empty() {
+        println!("Successfully retrieved genesis multiaddrs: {successful:?}",);
+        return Ok(Some((successful, genesis_inventory)));
+    }
+
+    let mut remaining_results = Vec::new();
+    for vm in &failed_vms {
+        println!("Attempting sequential retry for VM: {}", vm.public_ip_addr);
+        match try_get_multiaddr_for_vm(ssh_client, vm) {
+            Ok(addr) => {
+                println!(
+                    "Successfully retrieved multiaddr from {} (sequential retry)",
+                    vm.public_ip_addr
+                );
+                remaining_results.push(addr);
+            }
+            Err(_) => {
+                println!(
+                    "Failed to retrieve multiaddr from {} (sequential retry)",
+                    vm.public_ip_addr
+                );
+                continue;
+            }
+        }
+    }
+
+    // Combine successful results
+    let mut all_addrs = successful;
+    all_addrs.extend(remaining_results);
+
+    println!(
+        "Final results: {} total multiaddrs retrieved",
+        all_addrs.len()
+    );
+
+    // Check if we have any error
+    if !failed_vms.is_empty() {
+        let failed_ips: Vec<_> = failed_vms.iter().map(|vm| vm.public_ip_addr).collect();
+        println!("Failed to retrieve multiaddrs from the following IPs: {failed_ips:?}",);
+        return Err(Error::GenesisListenAddress);
+    }
+
+    println!("Successfully retrieved genesis multiaddrs: {all_addrs:?}",);
+    Ok(Some((all_addrs, genesis_inventory)))
+}
+
+fn try_get_multiaddr_for_vm(ssh_client: &SshClient, vm: &VirtualMachine) -> Result<String> {
+    const MAX_RETRIES: u32 = 3;
+    const RETRY_DELAY_SECS: u64 = 5;
+
+    let genesis_ip = vm.public_ip_addr;
+
+    // Shared jq filter to exclude private IP addresses from multiaddrs
+    let private_ip_filter = r#"select(
+        test("/ip4/127\\.") or 
+        test("/ip4/10\\.") or 
+        test("/ip4/192\\.168\\.") or 
+        test("/ip4/172\\.(1[6-9]|2[0-9]|3[01])\\.") 
+        | not
+    )"#;
+
     // First attempt: try to find node with first=true
-        let first_node_command = "jq -r '.nodes[] | select(.initial_peers_config.first == true) | .listen_addr[] | select(contains(\"127.0.0.1\") or contains(\"10.\") or contains(\"192.168.\") or contains(\"172.1\") or contains(\"172.2\") or contains(\"172.3\") | not) | select(contains(\"quic-v1\"))' /var/antctl/node_registry.json | head -n 1";
-        let multiaddr = ssh_client
-        .run_command(
-            &genesis_ip,
-            "root",
-            first_node_command,
-            false,
-        )
-        .map(|output| output.first().cloned())
-        .unwrap_or_else(|err| {
-            log::error!("Failed to find first node with quic-v1 protocol: {err:?}");
-            None
-        });
+    let first_node_command = format!(
+        r#"jq -r '.nodes[] | 
+        select(.initial_peers_config.first == true) | 
+        .listen_addr[] | 
+        {} | 
+        select(contains("quic-v1"))' /var/antctl/node_registry.json | head -n 1"#,
+        private_ip_filter
+    );
 
-    // Second attempt: if first attempt failed, see if any node is available.
-        let any_node_command = "jq -r '.nodes[] | .listen_addr[] | select(contains(\"127.0.0.1\") or contains(\"10.\") or contains(\"192.168.\") or contains(\"172.1\") or contains(\"172.2\") or contains(\"172.3\") | not) | select(contains(\"quic-v1\"))' /var/antctl/node_registry.json | head -n 1";
-   match multiaddr {
-        Some(addr) => Ok(addr),
-        None => ssh_client
-            .run_command(
-                &genesis_ip,
-                "root",
-                any_node_command,
-                false,
-            )?
-            .first()
-            .cloned()
-            .ok_or_else(|| Error::GenesisListenAddress)
-    }}).collect::<Result<Vec<_>>>()?;
+    // Try first command with retries
+    for attempt in 1..=MAX_RETRIES {
+        println!(
+            "First command attempt {}/{} for {}",
+            attempt, MAX_RETRIES, genesis_ip
+        );
+        match ssh_client.run_command(&genesis_ip, "root", &first_node_command, false) {
+            Ok(output) => {
+                if let Some(addr) = output.first() {
+                    return Ok(addr.clone());
+                }
+                // No output, try next attempt or fallback
+                break;
+            }
+            Err(err) => {
+                if attempt < MAX_RETRIES {
+                    log::warn!("SSH command attempt {attempt}/{MAX_RETRIES} failed for {genesis_ip}: {err:?}. Retrying in {RETRY_DELAY_SECS} seconds...");
+                    thread::sleep(Duration::from_secs(RETRY_DELAY_SECS));
+                }
+            }
+        }
+    }
 
-    Ok(Some((addrs, genesis_inventory)))
+    // Second attempt: if first attempt failed, see if any node is available
+    let any_node_command = format!(
+        r#"jq -r '.nodes[] | 
+        .listen_addr[] | 
+        {} | 
+        select(contains("quic-v1"))' /var/antctl/node_registry.json | head -n 1"#,
+        private_ip_filter
+    );
+
+    for attempt in 1..=MAX_RETRIES {
+        println!(
+            "Second command attempt {}/{} for {}",
+            attempt, MAX_RETRIES, genesis_ip
+        );
+        match ssh_client.run_command(&genesis_ip, "root", &any_node_command, false) {
+            Ok(output) => {
+                if let Some(addr) = output.first() {
+                    return Ok(addr.clone());
+                }
+            }
+            Err(err) => {
+                if attempt < MAX_RETRIES {
+                    log::warn!("SSH command attempt {attempt}/{MAX_RETRIES} failed for {genesis_ip}: {err:?}. Retrying in {RETRY_DELAY_SECS} seconds...");
+                    thread::sleep(Duration::from_secs(RETRY_DELAY_SECS));
+                } else {
+                    return Err(Error::GenesisListenAddress);
+                }
+            }
+        }
+    }
+
+    Err(Error::GenesisListenAddress)
 }
 
 fn get_anvil_node_data_hardcoded(ansible_runner: &AnsibleRunner) -> Result<AnvilNodeData> {
@@ -1357,7 +1485,7 @@ pub async fn get_environment_details(
                 let content = match std::fs::read_to_string(temp_file.path()) {
                     Ok(content) => content,
                     Err(err) => {
-                        log::error!("Could not read the environment details file: {err:?}");
+                        println!("Could not read the environment details file: {err:?}");
                         if retries < max_retries {
                             debug!("Retrying to read the environment details file");
                             retries += 1;
@@ -1374,7 +1502,7 @@ pub async fn get_environment_details(
                 match serde_json::from_str(&content) {
                     Ok(environment_details) => break environment_details,
                     Err(err) => {
-                        log::error!("Could not parse the environment details file: {err:?}");
+                        println!("Could not parse the environment details file: {err:?}");
                         if retries < max_retries {
                             debug!("Retrying to parse the environment details file");
                             retries += 1;
@@ -1388,7 +1516,7 @@ pub async fn get_environment_details(
                 }
             }
             Err(err) => {
-                log::error!(
+                println!(
                     "Could not download the environment details file for {environment_name} from S3: {err:?}"
                 );
                 if retries < max_retries {
