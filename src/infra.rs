@@ -26,6 +26,10 @@ const NODE: &str = "node";
 const NODE_ATTACHED_VOLUME: &str = "node_attached_volume";
 const PEER_CACHE_NODE: &str = "peer_cache_node";
 const PEER_CACHE_NODE_ATTACHED_VOLUME: &str = "peer_cache_node_attached_volume";
+const PORT_RESTRICTED_CONE_NAT_GATEWAY: &str = "port_restricted_cone_nat_gateway";
+const PORT_RESTRICTED_PRIVATE_NODE: &str = "port_restricted_private_node";
+const PORT_RESTRICTED_PRIVATE_NODE_ATTACHED_VOLUME: &str =
+    "port_restricted_private_node_attached_volume";
 const SYMMETRIC_NAT_GATEWAY: &str = "symmetric_nat_gateway";
 const SYMMETRIC_PRIVATE_NODE: &str = "symmetric_private_node";
 const SYMMETRIC_PRIVATE_NODE_ATTACHED_VOLUME: &str = "symmetric_private_node_attached_volume";
@@ -64,6 +68,9 @@ pub struct InfraRunOptions {
     pub peer_cache_node_vm_count: Option<u16>,
     pub peer_cache_node_vm_size: Option<String>,
     pub peer_cache_node_volume_size: Option<u16>,
+    pub port_restricted_cone_vm_size: Option<String>,
+    pub port_restricted_private_node_vm_count: Option<u16>,
+    pub port_restricted_private_node_volume_size: Option<u16>,
     pub region: String,
     pub symmetric_nat_gateway_vm_size: Option<String>,
     pub symmetric_private_node_vm_count: Option<u16>,
@@ -183,6 +190,35 @@ impl InfraRunOptions {
                 (None, None)
             };
 
+        let port_restricted_private_node_vm_count = resource_count(PORT_RESTRICTED_PRIVATE_NODE);
+        debug!("Port restricted cone private node count: {port_restricted_private_node_vm_count}");
+        let (port_restricted_private_node_volume_size, port_restricted_cone_vm_size) =
+            if port_restricted_private_node_vm_count > 0 {
+                let port_restricted_private_node_volume_size = get_value_for_resource(
+                    &resources,
+                    PORT_RESTRICTED_PRIVATE_NODE_ATTACHED_VOLUME,
+                    SIZE,
+                )?;
+                debug!(
+                    "Port restricted cone private node volume size: {port_restricted_private_node_volume_size:?}"
+                );
+                // gateways should exists if private nodes exist
+                let port_restricted_cone_vm_size =
+                    get_value_for_resource(&resources, PORT_RESTRICTED_CONE_NAT_GATEWAY, SIZE)?;
+                debug!("Port restricted cone nat gateway size: {port_restricted_cone_vm_size:?}");
+
+                nat_gateway_image_id =
+                    get_value_for_resource(&resources, PORT_RESTRICTED_CONE_NAT_GATEWAY, IMAGE)?;
+                debug!("Nat gateway image: {nat_gateway_image_id:?}");
+
+                (
+                    port_restricted_private_node_volume_size,
+                    port_restricted_cone_vm_size,
+                )
+            } else {
+                (None, None)
+            };
+
         let upnp_private_node_vm_count = resource_count(UPNP_PRIVATE_NODE);
         debug!("UPnP private node count: {upnp_private_node_vm_count}");
         let (upnp_private_node_volume_size, upnp_vm_size) = if upnp_private_node_vm_count > 0 {
@@ -277,6 +313,9 @@ impl InfraRunOptions {
             peer_cache_node_vm_count: Some(peer_cache_node_vm_count),
             peer_cache_node_vm_size,
             peer_cache_node_volume_size,
+            port_restricted_cone_vm_size,
+            port_restricted_private_node_vm_count: Some(port_restricted_private_node_vm_count),
+            port_restricted_private_node_volume_size,
             region: region.to_string(),
             symmetric_nat_gateway_vm_size,
             symmetric_private_node_vm_count: Some(symmetric_private_node_vm_count),
@@ -465,6 +504,48 @@ pub fn build_terraform_args(options: &InfraRunOptions) -> Result<Vec<(String, St
         args.push((
             "full_cone_private_node_volume_size".to_string(),
             full_cone_private_node_volume_size.to_string(),
+        ));
+    }
+
+    if let Some(port_restricted_cone_vm_size) = &options.port_restricted_cone_vm_size {
+        args.push((
+            "port_restricted_cone_droplet_size".to_string(),
+            port_restricted_cone_vm_size.clone(),
+        ));
+        // Also set the NAT gateway size to the same as private nodes
+        args.push((
+            "port_restricted_cone_nat_gateway_droplet_size".to_string(),
+            port_restricted_cone_vm_size.clone(),
+        ));
+    }
+
+    // Set the port restricted cone NAT gateway VM count based on private node VM count
+    if let Some(port_restricted_private_node_vm_count) =
+        options.port_restricted_private_node_vm_count
+    {
+        if port_restricted_private_node_vm_count > 0 {
+            args.push((
+                "port_restricted_cone_node_vm_count".to_string(),
+                port_restricted_private_node_vm_count.to_string(),
+            ));
+        }
+    }
+
+    if let Some(port_restricted_private_node_vm_count) =
+        options.port_restricted_private_node_vm_count
+    {
+        args.push((
+            "port_restricted_private_node_vm_count".to_string(),
+            port_restricted_private_node_vm_count.to_string(),
+        ));
+    }
+
+    if let Some(port_restricted_private_node_volume_size) =
+        options.port_restricted_private_node_volume_size
+    {
+        args.push((
+            "port_restricted_private_node_volume_size".to_string(),
+            port_restricted_private_node_volume_size.to_string(),
         ));
     }
 

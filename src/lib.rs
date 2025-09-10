@@ -104,6 +104,7 @@ impl std::str::FromStr for DeploymentType {
 #[derive(Debug, Clone)]
 pub enum NodeType {
     FullConePrivateNode,
+    PortRestrictedConePrivateNode,
     Generic,
     Genesis,
     PeerCache,
@@ -115,6 +116,7 @@ impl std::fmt::Display for NodeType {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             NodeType::FullConePrivateNode => write!(f, "full-cone-private"),
+            NodeType::PortRestrictedConePrivateNode => write!(f, "port-restricted-cone-private"),
             NodeType::Generic => write!(f, "generic"),
             NodeType::Genesis => write!(f, "genesis"),
             NodeType::PeerCache => write!(f, "peer-cache"),
@@ -130,6 +132,7 @@ impl std::str::FromStr for NodeType {
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         match s.to_lowercase().as_str() {
             "full-cone-private" => Ok(NodeType::FullConePrivateNode),
+            "port-restricted-cone-private" => Ok(NodeType::PortRestrictedConePrivateNode),
             "generic" => Ok(NodeType::Generic),
             "genesis" => Ok(NodeType::Genesis),
             "peer-cache" => Ok(NodeType::PeerCache),
@@ -144,6 +147,7 @@ impl NodeType {
     pub fn telegraf_role(&self) -> &'static str {
         match self {
             NodeType::FullConePrivateNode => "NAT_STATIC_FULL_CONE_NODE",
+            NodeType::PortRestrictedConePrivateNode => "PORT_RESTRICTED_CONE_NODE",
             NodeType::Generic => "GENERIC_NODE",
             NodeType::Genesis => "GENESIS_NODE",
             NodeType::PeerCache => "PEER_CACHE_NODE",
@@ -155,6 +159,9 @@ impl NodeType {
     pub fn to_ansible_inventory_type(&self) -> AnsibleInventoryType {
         match self {
             NodeType::FullConePrivateNode => AnsibleInventoryType::FullConePrivateNodes,
+            NodeType::PortRestrictedConePrivateNode => {
+                AnsibleInventoryType::PortRestrictedConePrivateNodes
+            }
             NodeType::Generic => AnsibleInventoryType::Nodes,
             NodeType::Genesis => AnsibleInventoryType::Genesis,
             NodeType::PeerCache => AnsibleInventoryType::PeerCacheNodes,

@@ -59,7 +59,7 @@
             ]
           }) }}
         
-    - name: update eth1 config with default route
+    - name: update eth1 config with default route and DNS
       set_fact:
         updated_eth1: >-
           {{ netplan_config.network.ethernets.eth1 | combine({
@@ -68,7 +68,8 @@
                 'to': '0.0.0.0/0',
                 'via': nat_gateway_private_ip_eth1
               }
-            ]
+            ],
+
           }) }}
         
     - name: update full config

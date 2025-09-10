@@ -9,6 +9,7 @@ use crate::{
         inventory::{
             generate_environment_inventory,
             generate_full_cone_private_node_static_environment_inventory,
+            generate_port_restricted_cone_private_node_static_environment_inventory,
             generate_symmetric_private_node_static_environment_inventory, AnsibleInventoryType,
         },
         provisioning::{AnsibleProvisioner, PrivateNodeProvisionInventory},
@@ -202,6 +203,15 @@ impl DeploymentInventoryService {
             ansible_runner.get_inventory(AnsibleInventoryType::PeerCacheNodes, false)
         });
         let ansible_runner = self.ansible_runner.clone();
+        let port_restricted_cone_nat_gateway_handle = std::thread::spawn(move || {
+            ansible_runner.get_inventory(AnsibleInventoryType::PortRestrictedConeNatGateway, false)
+        });
+        let ansible_runner = self.ansible_runner.clone();
+        let port_restricted_cone_private_node_handle = std::thread::spawn(move || {
+            ansible_runner
+                .get_inventory(AnsibleInventoryType::PortRestrictedConePrivateNodes, false)
+        });
+        let ansible_runner = self.ansible_runner.clone();
         let upnp_private_node_handle = std::thread::spawn(move || {
             ansible_runner.get_inventory(AnsibleInventoryType::Upnp, false)
         });
@@ -227,6 +237,12 @@ impl DeploymentInventoryService {
             .expect("Thread panicked")?;
         let generic_node_vms = generic_node_handle.join().expect("Thread panicked")?;
         let peer_cache_node_vms = peer_cache_node_handle.join().expect("Thread panicked")?;
+        let port_restricted_cone_nat_gateway_vms = port_restricted_cone_nat_gateway_handle
+            .join()
+            .expect("Thread panicked")?;
+        let port_restricted_cone_private_node_vms = port_restricted_cone_private_node_handle
+            .join()
+            .expect("Thread panicked")?;
         let upnp_private_node_vms = upnp_private_node_handle.join().expect("Thread panicked")?;
         let client_vms = if !client_handle.join().expect("Thread panicked")?.is_empty()
             && environment_details.deployment_type != DeploymentType::Bootstrap
@@ -252,6 +268,8 @@ impl DeploymentInventoryService {
 
         debug!("full_cone_private_node_vms: {full_cone_private_node_vms:?}");
         debug!("full_cone_nat_gateway_vms: {full_cone_nat_gateway_vms:?}");
+        debug!("port_restricted_cone_private_node_vms: {port_restricted_cone_private_node_vms:?}");
+        debug!("port_restricted_cone_nat_gateway_vms: {port_restricted_cone_nat_gateway_vms:?}");
         debug!("symmetric_private_node_vms: {symmetric_private_node_vms:?}");
         debug!("symmetric_nat_gateway_vms: {symmetric_nat_gateway_vms:?}");
 
@@ -270,6 +288,13 @@ impl DeploymentInventoryService {
             &symmetric_nat_gateway_vms,
             &self.ssh_client.private_key_path,
         )?;
+        generate_port_restricted_cone_private_node_static_environment_inventory(
+            name,
+            &output_inventory_dir_path,
+            &port_restricted_cone_private_node_vms,
+            &port_restricted_cone_nat_gateway_vms,
+            &self.ssh_client.private_key_path,
+        )?;
 
         // Set up the SSH client to route through the NAT gateway if it exists. This updates all the client clones.
         if !symmetric_nat_gateway_vms.is_empty() {
@@ -282,6 +307,12 @@ impl DeploymentInventoryService {
             self.ssh_client.set_full_cone_nat_routed_vms(
                 &full_cone_private_node_vms,
                 &full_cone_nat_gateway_vms,
+            )?;
+        }
+        if !port_restricted_cone_nat_gateway_vms.is_empty() {
+            self.ssh_client.set_port_restricted_cone_nat_routed_vms(
+                &port_restricted_cone_private_node_vms,
+                &port_restricted_cone_nat_gateway_vms,
             )?;
         }
 
@@ -311,6 +342,12 @@ impl DeploymentInventoryService {
                 .await
         });
         let ansible_provisioner = self.ansible_provisioner.clone();
+        let port_restricted_cone_private_node_registries_handle = tokio::spawn(async move {
+            ansible_provisioner
+                .get_node_registries(&AnsibleInventoryType::PortRestrictedConePrivateNodesStatic)
+                .await
+        });
+        let ansible_provisioner = self.ansible_provisioner.clone();
         let upnp_private_node_registries_handle = tokio::spawn(async move {
             ansible_provisioner
                 .get_node_registries(&AnsibleInventoryType::Upnp)
@@ -335,6 +372,10 @@ impl DeploymentInventoryService {
         let full_cone_private_node_registries = full_cone_private_node_registries_handle
             .await
             .expect("Task panicked")?;
+        let port_restricted_cone_private_node_registries =
+            port_restricted_cone_private_node_registries_handle
+                .await
+                .expect("Task panicked")?;
         let upnp_private_node_registries = upnp_private_node_registries_handle
             .await
             .expect("Task panicked")?;
@@ -367,6 +408,20 @@ impl DeploymentInventoryService {
         .await;
         debug!("full_cone_private_node_vms after conversion: {full_cone_private_node_vms:?}");
 
+        debug!("port_restricted_cone_private_node_vms: {port_restricted_cone_private_node_vms:?}");
+        let port_restricted_cone_private_node_gateway_vm_map =
+            PrivateNodeProvisionInventory::match_private_node_vm_and_gateway_vm(
+                &port_restricted_cone_private_node_vms,
+                &port_restricted_cone_nat_gateway_vms,
+            )?;
+        debug!("port_restricted_cone_private_node_gateway_vm_map: {port_restricted_cone_private_node_gateway_vm_map:?}");
+        let port_restricted_cone_private_node_vms = NodeVirtualMachine::from_list(
+            &port_restricted_cone_private_node_vms,
+            &port_restricted_cone_private_node_registries,
+        )
+        .await;
+        debug!("port_restricted_cone_private_node_vms after conversion: {port_restricted_cone_private_node_vms:?}");
+
         let upnp_private_node_vms =
             NodeVirtualMachine::from_list(&upnp_private_node_vms, &upnp_private_node_registries)
                 .await;
@@ -378,6 +433,7 @@ impl DeploymentInventoryService {
         failed_node_registry_vms.extend(peer_cache_node_registries.failed_vms);
         failed_node_registry_vms.extend(generic_node_registries.failed_vms);
         failed_node_registry_vms.extend(full_cone_private_node_registries.failed_vms);
+        failed_node_registry_vms.extend(port_restricted_cone_private_node_registries.failed_vms);
         failed_node_registry_vms.extend(symmetric_private_node_registries.failed_vms);
         failed_node_registry_vms.extend(upnp_private_node_registries.failed_vms);
         failed_node_registry_vms.extend(genesis_node_registry.failed_vms);
@@ -469,6 +525,8 @@ impl DeploymentInventoryService {
             misc_vms,
             node_vms: generic_node_vms,
             peer_cache_node_vms,
+            port_restricted_cone_nat_gateway_vms,
+            port_restricted_cone_private_node_vms,
             ssh_user: self.cloud_provider.get_ssh_user(),
             ssh_private_key_path: self.ssh_client.private_key_path.clone(),
             symmetric_nat_gateway_vms,
@@ -509,6 +567,13 @@ impl DeploymentInventoryService {
             .ansible_runner
             .get_inventory(AnsibleInventoryType::SymmetricPrivateNodes, false)?;
 
+        let port_restricted_cone_nat_gateway_vms = self
+            .ansible_runner
+            .get_inventory(AnsibleInventoryType::PortRestrictedConeNatGateway, false)?;
+        let port_restricted_cone_private_node_vms = self
+            .ansible_runner
+            .get_inventory(AnsibleInventoryType::PortRestrictedConePrivateNodes, false)?;
+
         // Create static inventory for private nodes. Will be used during ansible-playbook run.
         generate_symmetric_private_node_static_environment_inventory(
             name,
@@ -526,6 +591,14 @@ impl DeploymentInventoryService {
             &self.ssh_client.private_key_path,
         )?;
 
+        generate_port_restricted_cone_private_node_static_environment_inventory(
+            name,
+            &output_inventory_dir_path,
+            &port_restricted_cone_private_node_vms,
+            &port_restricted_cone_nat_gateway_vms,
+            &self.ssh_client.private_key_path,
+        )?;
+
         // Set up the SSH client to route through the NAT gateway if it exists. This updates all the client clones.
         if !full_cone_nat_gateway_vms.is_empty() {
             self.ssh_client.set_full_cone_nat_routed_vms(
@@ -538,6 +611,13 @@ impl DeploymentInventoryService {
             self.ssh_client.set_symmetric_nat_routed_vms(
                 &symmetric_private_node_vms,
                 &symmetric_nat_gateway_vms,
+            )?;
+        }
+
+        if !port_restricted_cone_nat_gateway_vms.is_empty() {
+            self.ssh_client.set_port_restricted_cone_nat_routed_vms(
+                &port_restricted_cone_private_node_vms,
+                &port_restricted_cone_nat_gateway_vms,
             )?;
         }
 
@@ -946,6 +1026,8 @@ pub struct DeploymentInventory {
     pub name: String,
     pub node_vms: Vec<NodeVirtualMachine>,
     pub peer_cache_node_vms: Vec<NodeVirtualMachine>,
+    pub port_restricted_cone_nat_gateway_vms: Vec<VirtualMachine>,
+    pub port_restricted_cone_private_node_vms: Vec<NodeVirtualMachine>,
     pub ssh_user: String,
     pub ssh_private_key_path: PathBuf,
     pub symmetric_nat_gateway_vms: Vec<VirtualMachine>,
@@ -972,6 +1054,8 @@ impl DeploymentInventory {
             name: name.to_string(),
             node_vms: Default::default(),
             peer_cache_node_vms: Default::default(),
+            port_restricted_cone_nat_gateway_vms: Default::default(),
+            port_restricted_cone_private_node_vms: Default::default(),
             ssh_user: "root".to_string(),
             ssh_private_key_path: Default::default(),
             symmetric_nat_gateway_vms: Default::default(),
@@ -1003,6 +1087,7 @@ impl DeploymentInventory {
         let mut list = Vec::new();
         list.extend(self.symmetric_nat_gateway_vms.clone());
         list.extend(self.full_cone_nat_gateway_vms.clone());
+        list.extend(self.port_restricted_cone_nat_gateway_vms.clone());
         list.extend(
             self.peer_cache_node_vms
                 .iter()
@@ -1022,6 +1107,11 @@ impl DeploymentInventory {
                 .map(|node_vm| node_vm.vm.clone()),
         );
         list.extend(
+            self.port_restricted_cone_private_node_vms
+                .iter()
+                .map(|node_vm| node_vm.vm.clone()),
+        );
+        list.extend(
             self.upnp_private_node_vms
                 .iter()
                 .map(|node_vm| node_vm.vm.clone()),
@@ -1036,6 +1126,7 @@ impl DeploymentInventory {
         list.extend(self.genesis_vms.iter().cloned());
         list.extend(self.node_vms.iter().cloned());
         list.extend(self.full_cone_private_node_vms.iter().cloned());
+        list.extend(self.port_restricted_cone_private_node_vms.iter().cloned());
         list.extend(self.symmetric_private_node_vms.iter().cloned());
         list.extend(self.upnp_private_node_vms.iter().cloned());
 
@@ -1061,6 +1152,11 @@ impl DeploymentInventory {
         );
         list.extend(
             self.full_cone_private_node_vms
+                .iter()
+                .flat_map(|node_vm| node_vm.get_quic_addresses()),
+        );
+        list.extend(
+            self.port_restricted_cone_private_node_vms
                 .iter()
                 .flat_map(|node_vm| node_vm.get_quic_addresses()),
         );
@@ -1126,6 +1222,14 @@ impl DeploymentInventory {
 
     pub fn full_cone_private_node_count(&self) -> usize {
         if let Some(first_vm) = self.full_cone_private_node_vms.first() {
+            first_vm.node_count
+        } else {
+            0
+        }
+    }
+
+    pub fn port_restricted_cone_private_node_count(&self) -> usize {
+        if let Some(first_vm) = self.port_restricted_cone_private_node_vms.first() {
             first_vm.node_count
         } else {
             0
@@ -1266,6 +1370,51 @@ impl DeploymentInventory {
             println!();
         }
 
+        if !self.port_restricted_cone_private_node_vms.is_empty() {
+            println!("============================");
+            println!("Port Restricted Cone Private Node VMs");
+            println!("============================");
+            let port_restricted_cone_private_node_nat_gateway_map =
+                PrivateNodeProvisionInventory::match_private_node_vm_and_gateway_vm(
+                    self.port_restricted_cone_private_node_vms
+                        .iter()
+                        .map(|node_vm| node_vm.vm.clone())
+                        .collect::<Vec<_>>()
+                        .as_slice(),
+                    &self.port_restricted_cone_nat_gateway_vms,
+                )?;
+
+            for (node_vm, nat_gateway_vm) in
+                port_restricted_cone_private_node_nat_gateway_map.iter()
+            {
+                println!(
+                    "{}: {} ==routed through==> {}: {}",
+                    node_vm.name,
+                    node_vm.public_ip_addr,
+                    nat_gateway_vm.name,
+                    nat_gateway_vm.public_ip_addr
+                );
+                let ssh = if let Some(ssh_key_path) = self.ssh_private_key_path.to_str() {
+                    format!(
+                        "ssh -i {ssh_key_path} -o ProxyCommand=\"ssh -W %h:%p root@{} -i {ssh_key_path}\" root@{}",
+                        nat_gateway_vm.public_ip_addr, node_vm.private_ip_addr
+                    )
+                } else {
+                    format!(
+                        "ssh -o ProxyCommand=\"ssh -W %h:%p root@{}\" root@{}",
+                        nat_gateway_vm.public_ip_addr, node_vm.private_ip_addr
+                    )
+                };
+                println!("SSH using NAT gateway: {ssh}");
+            }
+            println!(
+                "Nodes per VM: {}",
+                self.port_restricted_cone_private_node_count()
+            );
+            println!("SSH user: {}", self.ssh_user);
+            println!();
+        }
+
         if !self.symmetric_private_node_vms.is_empty() {
             println!("=================");
             println!("Symmetric Private Node VMs");
@@ -1352,6 +1501,10 @@ impl DeploymentInventory {
             println!("{}: {}", nat_gateway_vm.name, nat_gateway_vm.public_ip_addr);
         }
 
+        for nat_gateway_vm in self.port_restricted_cone_nat_gateway_vms.iter() {
+            println!("{}: {}", nat_gateway_vm.name, nat_gateway_vm.public_ip_addr);
+        }
+
         for nat_gateway_vm in self.symmetric_nat_gateway_vms.iter() {
             println!("{}: {}", nat_gateway_vm.name, nat_gateway_vm.public_ip_addr);
         }
@@ -1371,6 +1524,7 @@ impl DeploymentInventory {
                 .iter()
                 .chain(self.node_vms.iter())
                 .chain(self.full_cone_private_node_vms.iter())
+                .chain(self.port_restricted_cone_private_node_vms.iter())
                 .chain(self.symmetric_private_node_vms.iter())
                 .chain(self.upnp_private_node_vms.iter())
             {
@@ -1410,6 +1564,7 @@ impl DeploymentInventory {
                 .iter()
                 .chain(self.node_vms.iter())
                 .chain(self.full_cone_private_node_vms.iter())
+                .chain(self.port_restricted_cone_private_node_vms.iter())
                 .chain(self.symmetric_private_node_vms.iter())
                 .chain(self.upnp_private_node_vms.iter())
                 .map(|node_vm| node_vm.vm.public_ip_addr.to_string())

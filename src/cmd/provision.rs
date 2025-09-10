@@ -35,6 +35,16 @@ pub enum ProvisionCommands {
         #[arg(long, default_value = "false")]
         disable_nodes: bool,
     },
+    /// Provision port restricted cone private nodes for an environment
+    #[clap(name = "port-restricted-cone-private-nodes")]
+    PortRestrictedConePrivateNodes {
+        /// The name of the environment
+        #[arg(short = 'n', long)]
+        name: String,
+        /// Should the nodes be disabled after provisioning
+        #[arg(long, default_value = "false")]
+        disable_nodes: bool,
+    },
     /// Provision generic nodes for an environment
     #[clap(name = "generic-nodes")]
     GenericNodes {
@@ -127,6 +137,7 @@ async fn handle_provision_nodes(
         &provisioner,
         deploy_options.full_cone_private_node_vm_count,
         deploy_options.symmetric_private_node_vm_count,
+        Some(deploy_options.port_restricted_cone_private_node_vm_count),
     )?;
 
     match node_type {
@@ -141,6 +152,19 @@ async fn handle_provision_nodes(
                 )?;
             } else {
                 println!("Full cone private nodes have not been requested for this environment");
+            }
+        }
+        NodeType::PortRestrictedConePrivateNode => {
+            if private_node_inventory.should_provision_port_restricted_cone_private_nodes() {
+                provisioner.provision_port_restricted_cone(
+                    &provision_options,
+                    initial_contact_peers.clone(),
+                    initial_network_contacts_urls.clone(),
+                    private_node_inventory,
+                    None,
+                )?;
+            } else {
+                println!("Port restricted cone private nodes have not been requested for this environment");
             }
         }
         NodeType::SymmetricPrivateNode => {
@@ -198,6 +222,13 @@ pub async fn handle_provision_full_cone_private_nodes(
     disable_nodes: bool,
 ) -> Result<()> {
     handle_provision_nodes(name, NodeType::FullConePrivateNode, disable_nodes).await
+}
+
+pub async fn handle_provision_port_restricted_cone_private_nodes(
+    name: String,
+    disable_nodes: bool,
+) -> Result<()> {
+    handle_provision_nodes(name, NodeType::PortRestrictedConePrivateNode, disable_nodes).await
 }
 
 pub async fn handle_provision_upnp_nodes(name: String, disable_nodes: bool) -> Result<()> {
