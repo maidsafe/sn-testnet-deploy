@@ -77,7 +77,7 @@ impl TestnetDeployer {
                     args
                 } else if vm.name.contains("full-cone") {
                     let args = self.construct_full_cone_private_node_args(vm, &log_base_dir)?;
-                    debug!("Using symmetric rsync args for {:?}", vm.name);
+                    debug!("Using full-cone rsync args for {:?}", vm.name);
                     debug!("Args for {}: {:?}", vm.name, args);
                     args
                 } else if vm.name.contains("ant-client") {
@@ -212,13 +212,17 @@ impl TestnetDeployer {
         rsync_args.extend(vec![
             "-e".to_string(),
             format!(
-                "ssh -i {} -q -o StrictHostKeyChecking=no -o BatchMode=yes -o ConnectTimeout=30",
+                "ssh -i {} -q -o StrictHostKeyChecking=no -o BatchMode=yes -o ConnectTimeout=30 -o ProxyCommand='ssh -o StrictHostKeyChecking=no -o BatchMode=yes root@{gateway_ip} -W %h:%p -i {}'",
                 self.ssh_client
                     .get_private_key_path()
                     .to_string_lossy()
-                    .as_ref()
+                    .as_ref(),
+                self.ssh_client
+                    .get_private_key_path()
+                    .to_string_lossy()
+                    .as_ref(),
             ),
-            format!("root@{}:{NODE_LOG_DIR}", gateway_ip),
+            format!("root@{}:{NODE_LOG_DIR}", private_vm.private_ip_addr),
             vm_path.to_string_lossy().to_string(),
         ]);
 
