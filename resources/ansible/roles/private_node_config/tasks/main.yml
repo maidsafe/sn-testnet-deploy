@@ -18,7 +18,7 @@
   set_fact:
     nat_gateway_is_configured: true
   when: >
-    ip_route_output.stdout is search('via {{ nat_gateway_private_ip_eth1 }} dev')
+    ip_route_output.stdout is search('via ' + nat_gateway_private_ip_eth1 + ' dev')
   
 - name: obtain do gateway ip
   command: curl -s http://169.254.169.254/metadata/v1/interfaces/public/0/ipv4/gateway
@@ -47,38 +47,41 @@
         
     - name: update eth0 config with metadata route
       set_fact:
-        updated_eth0: "{{ netplan_config.network.ethernets.eth0 | combine({
-          'addresses': eth0_addresses,
-          'routes': [
-            {
-              'to': '169.254.169.254',
-              'via': do_gateway_ip.stdout,
-              'on-link': true
-            }
-          ]
-        }) }}"
+        updated_eth0: >-
+          {{ netplan_config.network.ethernets.eth0 | combine({
+            'addresses': eth0_addresses,
+            'routes': [
+              {
+                'to': '169.254.169.254',
+                'via': do_gateway_ip.stdout,
+                'on-link': true
+              }
+            ]
+          }) }}
         
     - name: update eth1 config with default route
       set_fact:
-        updated_eth1: "{{ netplan_config.network.ethernets.eth1 | combine({
-          'routes': [
-            {
-              'to': '0.0.0.0/0',
-              'via': nat_gateway_private_ip_eth1
-            }
-          ]
-        }) }}"
+        updated_eth1: >-
+          {{ netplan_config.network.ethernets.eth1 | combine({
+            'routes': [
+              {
+                'to': '0.0.0.0/0',
+                'via': nat_gateway_private_ip_eth1
+              }
+            ]
+          }) }}
         
     - name: update full config
       set_fact:
-        updated_netplan: "{{ netplan_config | combine({
-          'network': {
-            'ethernets': {
-              'eth0': updated_eth0,
-              'eth1': updated_eth1
+        updated_netplan: >-
+          {{ netplan_config | combine({
+            'network': {
+              'ethernets': {
+                'eth0': updated_eth0,
+                'eth1': updated_eth1
+              }
             }
-          }
-        }, recursive=true) }}"
+          }, recursive=true) }}
         
     - name: write updated netplan config
       copy:
