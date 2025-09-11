@@ -275,6 +275,7 @@ impl TestnetDeployer {
                     println!("Failed to get genesis multiaddr {err:?}");
                     err
                 })?
+                .ok_or_else(|| Error::GenesisListenAddress)?
         };
         let initial_network_contacts_url = get_bootstrap_cache_url(&initial_ip_addr);
         debug!("Retrieved initial peer {initial_multiaddr} and initial network contacts {initial_network_contacts_url}");
@@ -510,11 +511,8 @@ impl TestnetDeployer {
         }
 
         let (initial_multiaddr, initial_ip_addr) =
-            get_genesis_multiaddr(&self.ansible_provisioner.ansible_runner, &self.ssh_client)
-                .map_err(|err| {
-                    println!("Failed to get genesis multiaddr {err:?}");
-                    err
-                })?;
+            get_genesis_multiaddr(&self.ansible_provisioner.ansible_runner, &self.ssh_client)?
+                .ok_or_else(|| Error::GenesisListenAddress)?;
         let initial_network_contacts_url = get_bootstrap_cache_url(&initial_ip_addr);
         debug!("Retrieved initial peer {initial_multiaddr} and initial network contacts {initial_network_contacts_url}");
 
