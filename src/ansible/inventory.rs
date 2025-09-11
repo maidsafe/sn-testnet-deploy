@@ -365,7 +365,7 @@ pub fn generate_full_cone_nat_gateway_static_environment_inventory(
     let file = File::create(&dest_path)?;
     let mut writer = BufWriter::new(file);
 
-    writeln!(writer, "[full_cone_nat_gateway]")?;
+    writeln!(writer, "[full-cone-nat-gateway]")?;
     for vm in vm_list.iter() {
         debug!(
             "Adding VM to full cone nat gateway static inventory: {}",
@@ -415,9 +415,9 @@ pub fn generate_symmetric_private_node_static_environment_inventory(
 
     for (privat_node_vm, nat_gateway_vm) in private_node_nat_gateway_map.iter() {
         let node_number = privat_node_vm.name.split('-').next_back().unwrap();
-        writeln!(file, "[symmetric_private_node_{node_number}]")?;
+        writeln!(file, "[symmetric-private-node-{node_number}]")?;
         writeln!(file, "{}", privat_node_vm.private_ip_addr)?;
-        writeln!(file, "[symmetric_private_node_{node_number}:vars]")?;
+        writeln!(file, "[symmetric-private-node-{node_number}:vars]")?;
         writeln!(
             file,
             "ansible_ssh_common_args='-o ProxyCommand=\"ssh -p 22 -W %h:%p -q root@{} -i \"{}\" -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null\"'",
@@ -468,11 +468,11 @@ pub fn generate_full_cone_private_node_static_environment_inventory(
 
     for (privat_node_vm, nat_gateway_vm) in private_node_nat_gateway_map.iter() {
         let node_number = privat_node_vm.name.split('-').next_back().unwrap();
-        writeln!(file, "[full_cone_private_node_{node_number}]")?;
+        writeln!(file, "[full-cone-private-node-{node_number}]")?;
 
         writeln!(file, "{}", privat_node_vm.private_ip_addr)?;
 
-        writeln!(file, "[full_cone_private_node_{node_number}:vars]")?;
+        writeln!(file, "[full-cone-private-node-{node_number}:vars]")?;
         writeln!(
             file,
             "ansible_ssh_common_args='-o ProxyCommand=\"ssh -p 22 -W %h:%p -q root@{} -i \"{}\" -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null\"'",
