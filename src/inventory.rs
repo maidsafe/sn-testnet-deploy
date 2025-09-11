@@ -335,7 +335,7 @@ impl DeploymentInventoryService {
         });
         let ansible_provisioner = self.ansible_provisioner.clone();
         let port_restricted_cone_private_node_registries_handle = std::thread::spawn(move || {
-            ansible_provisioner.get_node_registries(&AnsibleInventoryType::PortRestrictedConePrivateNodes)
+            ansible_provisioner.get_node_registries(&AnsibleInventoryType::PortRestrictedConePrivateNodesStatic)
         });
         let ansible_provisioner = self.ansible_provisioner.clone();
         let upnp_private_node_registries_handle = std::thread::spawn(move || {

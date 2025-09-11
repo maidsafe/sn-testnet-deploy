@@ -63,7 +63,7 @@ resource "digitalocean_droplet" "port_restricted_cone_nat_gateway" {
   region   = var.region
   size     = var.port_restricted_cone_nat_gateway_droplet_size
   ssh_keys = var.droplet_ssh_keys
-  tags     = ["environment:${terraform.workspace}", "type:full_cone_nat_gateway"]
+  tags     = ["environment:${terraform.workspace}", "type:port_restricted_cone_nat_gateway"]
 }
 
 resource "digitalocean_droplet" "symmetric_nat_gateway" {
@@ -103,7 +103,7 @@ resource "digitalocean_droplet" "port_restricted_cone_private_node" {
   region   = var.region
   size     = var.port_restricted_cone_droplet_size
   ssh_keys = var.droplet_ssh_keys
-  tags     = ["environment:${terraform.workspace}", "type:full_cone_private_node"]
+  tags     = ["environment:${terraform.workspace}", "type:port_restricted_cone_private_node"]
 }
 
 resource "digitalocean_droplet" "symmetric_private_node" {

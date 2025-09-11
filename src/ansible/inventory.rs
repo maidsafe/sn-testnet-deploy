@@ -289,6 +289,13 @@ pub fn generate_environment_inventory(
     base_inventory_path: &Path,
     output_inventory_dir_path: &Path,
 ) -> Result<()> {
+    // Ensure the output directory exists
+    if !output_inventory_dir_path.exists() {
+        std::fs::create_dir_all(output_inventory_dir_path).inspect_err(|err| {
+            error!("Failed to create inventory directory at {output_inventory_dir_path:?}: {err}")
+        })?;
+    }
+
     let inventory_types = [
         AnsibleInventoryType::Build,
         AnsibleInventoryType::Clients,
@@ -458,6 +465,13 @@ pub fn generate_symmetric_private_node_static_environment_inventory(
     symmetric_nat_gateway_vms: &[VirtualMachine],
     ssh_sk_path: &Path,
 ) -> Result<()> {
+    // Ensure the output directory exists
+    if !output_inventory_dir_path.exists() {
+        std::fs::create_dir_all(output_inventory_dir_path).inspect_err(|err| {
+            error!("Failed to create inventory directory at {output_inventory_dir_path:?}: {err}")
+        })?;
+    }
+
     if symmetric_nat_gateway_vms.is_empty() {
         println!("No Symmetric NAT gateway VMs found. Skipping symmetric private node static inventory generation.");
         return Ok(());
@@ -511,6 +525,13 @@ pub fn generate_port_restricted_cone_private_node_static_environment_inventory(
     port_restricted_cone_nat_gateway_vms: &[VirtualMachine],
     ssh_sk_path: &Path,
 ) -> Result<()> {
+    // Ensure the output directory exists
+    if !output_inventory_dir_path.exists() {
+        std::fs::create_dir_all(output_inventory_dir_path).inspect_err(|err| {
+            error!("Failed to create inventory directory at {output_inventory_dir_path:?}: {err}")
+        })?;
+    }
+
     if port_restricted_cone_nat_gateway_vms.is_empty() {
         println!("No port restricted cone NAT gateway VMs found. Skipping port restricted cone private node static inventory generation.");
         return Ok(());
@@ -574,6 +595,13 @@ pub fn generate_full_cone_private_node_static_environment_inventory(
     full_cone_nat_gateway_vms: &[VirtualMachine],
     ssh_sk_path: &Path,
 ) -> Result<()> {
+    // Ensure the output directory exists
+    if !output_inventory_dir_path.exists() {
+        std::fs::create_dir_all(output_inventory_dir_path).inspect_err(|err| {
+            error!("Failed to create inventory directory at {output_inventory_dir_path:?}: {err}")
+        })?;
+    }
+
     if full_cone_nat_gateway_vms.is_empty() {
         println!("No full cone NAT gateway VMs found. Skipping full cone private node static inventory generation.");
         return Ok(());

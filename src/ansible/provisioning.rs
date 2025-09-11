@@ -928,7 +928,7 @@ impl AnsibleProvisioner {
 
         for vm in new_port_restricted_cone_nat_gateway_new_vms_for_upscale
             .as_ref()
-            .unwrap_or(&private_node_inventory.full_cone_nat_gateway_vms)
+            .unwrap_or(&private_node_inventory.port_restricted_cone_nat_gateway_vms)
             .iter()
         {
             println!(
@@ -958,13 +958,13 @@ impl AnsibleProvisioner {
             }
 
             modified_private_node_inventory
-                .full_cone_nat_gateway_vms
+                .port_restricted_cone_nat_gateway_vms
                 .retain(|vm| {
                     let nat_gateway_name = vm.name.split('-').next_back().unwrap();
                     names_to_keep.contains(&nat_gateway_name)
                 });
             modified_private_node_inventory
-                .full_cone_private_node_vms
+                .port_restricted_cone_private_node_vms
                 .retain(|vm| {
                     let nat_gateway_name = vm.name.split('-').next_back().unwrap();
                     names_to_keep.contains(&nat_gateway_name)
@@ -973,7 +973,7 @@ impl AnsibleProvisioner {
         }
 
         if modified_private_node_inventory
-            .full_cone_nat_gateway_vms
+            .port_restricted_cone_nat_gateway_vms
             .is_empty()
         {
             error!("There are no port restricted cone NAT Gateway VMs available to upscale");
@@ -981,7 +981,7 @@ impl AnsibleProvisioner {
         }
 
         let private_node_ip_map = modified_private_node_inventory
-            .full_cone_private_node_and_gateway_map()?
+            .port_restricted_cone_private_node_and_gateway_map()?
             .into_iter()
             .map(|(k, v)| {
                 let gateway_name =
@@ -1110,16 +1110,16 @@ impl AnsibleProvisioner {
 
         self.print_ansible_run_banner("Provision Port Restricted Cone Private Nodes");
 
-        self.ssh_client.set_full_cone_nat_routed_vms(
-            &private_node_inventory.full_cone_private_node_vms,
-            &private_node_inventory.full_cone_nat_gateway_vms,
+        self.ssh_client.set_port_restricted_cone_nat_routed_vms(
+            &private_node_inventory.port_restricted_cone_private_node_vms,
+            &private_node_inventory.port_restricted_cone_nat_gateway_vms,
         )?;
 
         self.provision_nodes(
             options,
             initial_contact_peer,
             initial_network_contacts_url,
-            NodeType::FullConePrivateNode,
+            NodeType::PortRestrictedConePrivateNode,
         )?;
 
         print_duration(start.elapsed());
