@@ -58,7 +58,7 @@
           ]
         }) }}"
         
-    - name: update eth1 config with default route
+    - name: update eth1 config with default route and DNS
       set_fact:
         updated_eth1: "{{ netplan_config.network.ethernets.eth1 | combine({
           'routes': [
@@ -66,7 +66,10 @@
               'to': '0.0.0.0/0',
               'via': nat_gateway_private_ip_eth1
             }
-          ]
+          ],
+          'nameservers': {
+            'addresses': ['8.8.8.8', '8.8.4.4', '1.1.1.1']
+          }
         }) }}"
         
     - name: update full config
@@ -88,6 +91,49 @@
 
 - name: apply the netplan rules
   command: netplan apply -debug
+  when: not nat_gateway_is_configured
+
+- name: add S3 endpoints to hosts file as DNS bypass
+  lineinfile:
+    path: /etc/hosts
+    line: "{{ item }}"
+    state: present
+    backup: yes
+  loop:
+    - "52.95.148.18 antctl.s3.eu-west-2.amazonaws.com"
+    - "52.95.142.114 s3-r-w.eu-west-2.amazonaws.com"
+  when: not nat_gateway_is_configured
+
+- name: configure DNS servers for private nodes
+  copy:
+    content: |
+      nameserver 8.8.8.8
+      nameserver 8.8.4.4
+      nameserver 1.1.1.1
+    dest: /etc/resolv.conf
+    backup: yes
+  when: not nat_gateway_is_configured
+
+- name: test DNS resolution after configuration
+  shell: nslookup google.com 8.8.8.8
+  register: dns_test_result
+  failed_when: false
+  when: not nat_gateway_is_configured
+
+- name: display DNS test result
+  debug:
+    var: dns_test_result
+  when: not nat_gateway_is_configured
+
+- name: test connectivity to antctl S3
+  shell: ping -c 1 antctl.s3.eu-west-2.amazonaws.com || echo "DNS resolution failed"
+  register: s3_connectivity_result
+  failed_when: false
+  when: not nat_gateway_is_configured
+
+- name: display S3 connectivity test result
+  debug:
+    var: s3_connectivity_result
   when: not nat_gateway_is_configured
 
 - name: create systemd network config for eth1 with vpc peering routes

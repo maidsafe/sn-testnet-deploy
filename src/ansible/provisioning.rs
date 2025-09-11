@@ -1237,6 +1237,7 @@ impl AnsibleProvisioner {
             NodeType::Generic => AnsiblePlaybook::Nodes,
             NodeType::PeerCache => AnsiblePlaybook::PeerCacheNodes,
             NodeType::FullConePrivateNode => AnsiblePlaybook::Nodes,
+            NodeType::PortRestrictedConePrivateNode => AnsiblePlaybook::Nodes,
             NodeType::SymmetricPrivateNode => AnsiblePlaybook::Nodes,
             NodeType::Upnp => AnsiblePlaybook::Upnp,
             _ => return Err(Error::InvalidNodeType(node_type.clone())),

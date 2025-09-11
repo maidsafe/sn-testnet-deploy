@@ -177,6 +177,12 @@ locals {
     ]
   ])
 
+  port_restricted_cone_private_node_volume_keys = flatten([
+    for node_index in range(var.port_restricted_cone_node_vm_count) : [
+      for volume_index in range(var.volumes_per_node) : "${node_index+1}-${volume_index+1}"
+    ]
+  ])
+
    symmetric_private_node_volume_keys = flatten([
     for node_index in range(var.symmetric_private_node_vm_count) : [
       for volume_index in range(var.volumes_per_node) : "${node_index+1}-${volume_index+1}"
@@ -242,6 +248,18 @@ resource "digitalocean_volume_attachment" "full_cone_private_node_volume_attachm
   volume_id  = digitalocean_volume.full_cone_private_node_attached_volume[each.key].id
 }
 
+resource "digitalocean_volume" "port_restricted_cone_private_node_attached_volume" {
+  for_each = var.port_restricted_private_node_volume_size > 0 ? { for key in local.port_restricted_cone_private_node_volume_keys : key => key } : {}
+  name     = lower("${terraform.workspace}-port-restricted-cone-private-node-${split("-", each.key)[0]}-volume-${split("-", each.key)[1]}")
+  size     = var.port_restricted_private_node_volume_size
+  region   = var.region
+}
+
+resource "digitalocean_volume_attachment" "port_restricted_cone_private_node_volume_attachment" {
+  for_each   = var.port_restricted_private_node_volume_size > 0 ? { for key in local.port_restricted_cone_private_node_volume_keys : key => key } : {}
+  droplet_id = digitalocean_droplet.port_restricted_cone_private_node[tonumber(split("-", each.key)[0]) -1 ].id
+  volume_id  = digitalocean_volume.port_restricted_cone_private_node_attached_volume[each.key].id
+}
 
 resource "digitalocean_volume" "symmetric_private_node_attached_volume" {
   for_each = var.symmetric_private_node_volume_size > 0 ? { for key in local.symmetric_private_node_volume_keys : key => key } : {}

@@ -620,6 +620,10 @@ async fn main() -> Result<()> {
                 cmd::provision::handle_provision_full_cone_private_nodes(name).await?;
                 Ok(())
             }
+            ProvisionCommands::PortRestrictedConePrivateNodes { name } => {
+                cmd::provision::handle_provision_port_restricted_cone_private_nodes(name).await?;
+                Ok(())
+            }
             ProvisionCommands::PeerCacheNodes { name } => {
                 cmd::provision::handle_provision_peer_cache_nodes(name).await?;
                 Ok(())

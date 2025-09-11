@@ -31,6 +31,13 @@ pub enum ProvisionCommands {
         #[arg(short = 'n', long)]
         name: String,
     },
+    /// Provision port restricted cone private nodes for an environment
+    #[clap(name = "port-restricted-cone-private-nodes")]
+    PortRestrictedConePrivateNodes {
+        /// The name of the environment
+        #[arg(short = 'n', long)]
+        name: String,
+    },
     /// Provision generic nodes for an environment
     #[clap(name = "generic-nodes")]
     GenericNodes {
@@ -124,6 +131,19 @@ async fn handle_provision_nodes(name: String, node_type: NodeType) -> Result<()>
                 println!("Full cone private nodes have not been requested for this environment");
             }
         }
+        NodeType::PortRestrictedConePrivateNode => {
+            if private_node_inventory.should_provision_port_restricted_cone_private_nodes() {
+                provisioner.provision_port_restricted_cone(
+                    &provision_options,
+                    Some(genesis_multiaddr),
+                    Some(genesis_network_contacts),
+                    private_node_inventory,
+                    None,
+                )?;
+            } else {
+                println!("Port restricted cone private nodes have not been requested for this environment");
+            }
+        }
         NodeType::SymmetricPrivateNode => {
             if private_node_inventory.should_provision_symmetric_private_nodes() {
                 provisioner.print_ansible_run_banner("Provision Symmetric NAT Gateway");
@@ -173,6 +193,10 @@ pub async fn handle_provision_symmetric_private_nodes(name: String) -> Result<()
 
 pub async fn handle_provision_full_cone_private_nodes(name: String) -> Result<()> {
     handle_provision_nodes(name, NodeType::FullConePrivateNode).await
+}
+
+pub async fn handle_provision_port_restricted_cone_private_nodes(name: String) -> Result<()> {
+    handle_provision_nodes(name, NodeType::PortRestrictedConePrivateNode).await
 }
 
 pub async fn handle_provision_upnp_nodes(name: String) -> Result<()> {

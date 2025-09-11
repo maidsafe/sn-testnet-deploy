@@ -1,0 +1,163 @@
+---
+- name: Retrieve private IP of the corresponding private node vm
+  set_fact:
+    node_private_ip_eth1: "{{ node_private_ip_map[inventory_hostname] }}"
+
+- name: public IP of the gateway vm
+  set_fact:
+    gateway_public_ip: "{{ ansible_host }}"
+
+- name: get VPC CIDR for private node droplet
+  shell: ip route | grep eth1 | grep kernel | awk '{print $1}' | grep -v default
+  register: vpc_cidr_output
+  delegate_to: "{{ node_private_ip_eth1 }}"
+  become: yes
+
+- name: set VPC CIDR fact
+  set_fact:
+    private_node_vpc_cidr: "{{ vpc_cidr_output.stdout }}"
+
+- name: check if port restricted cone NAT is already configured
+  command: iptables -t nat -L POSTROUTING -v
+  register: nat_gateway_output
+
+- name: Load ip_conntrack module
+  modprobe:
+    name: ip_conntrack
+    state: present
+
+- name: set netfilter conntrack max
+  sysctl:
+    name: net.netfilter.nf_conntrack_max
+    value: 1048576
+    state: present
+    reload: true
+
+- name: ensure netfilter conntrack max is set in sysctl.conf
+  lineinfile:
+    path: /etc/sysctl.conf
+    line: 'net.netfilter.nf_conntrack_max=1048576'
+    state: present
+
+- name: flush nat table
+  iptables:
+    table: nat
+    flush: yes
+  when: nat_gateway_output.stdout.find(node_private_ip_eth1) == -1
+
+- name: flush mangle table
+  iptables:
+    table: mangle
+    flush: yes
+  when: nat_gateway_output.stdout.find(node_private_ip_eth1) == -1
+
+# Port Restricted Cone NAT - Full port forwarding (similar to full cone for now)
+- name: DNAT external TCP (eth0) → internal server
+  iptables:
+    table: nat
+    chain: PREROUTING
+    in_interface: eth0
+    protocol: tcp
+    destination: "{{ gateway_public_ip }}"
+    jump: DNAT
+    to_destination: "{{ node_private_ip_eth1 }}"
+  when: nat_gateway_output.stdout.find(node_private_ip_eth1) == -1
+
+- name: DNAT external UDP (eth0) → internal server
+  iptables:
+    table: nat
+    chain: PREROUTING
+    in_interface: eth0
+    protocol: udp
+    destination: "{{ gateway_public_ip }}"
+    jump: DNAT
+    to_destination: "{{ node_private_ip_eth1 }}"
+  when: nat_gateway_output.stdout.find(node_private_ip_eth1) == -1
+
+- name: DNAT hairpin TCP (eth1) → internal server
+  iptables:
+    table: nat
+    chain: PREROUTING
+    in_interface: eth1
+    protocol: tcp
+    destination: "{{ gateway_public_ip }}"
+    jump: DNAT
+    to_destination: "{{ node_private_ip_eth1 }}"
+  when: nat_gateway_output.stdout.find(node_private_ip_eth1) == -1
+
+- name: DNAT hairpin UDP (eth1) → internal server
+  iptables:
+    table: nat
+    chain: PREROUTING
+    in_interface: eth1
+    protocol: udp
+    destination: "{{ gateway_public_ip }}"
+    jump: DNAT
+    to_destination: "{{ node_private_ip_eth1 }}"
+  when: nat_gateway_output.stdout.find(node_private_ip_eth1) == -1
+
+- name: SNAT for hairpinned traffic (rewrite source to WAN IP, not LAN IP)
+  iptables:
+    table: nat
+    chain: POSTROUTING
+    source: "{{ private_node_vpc_cidr }}"
+    destination: "{{ node_private_ip_eth1 }}"
+    jump: SNAT
+    to_source: "{{ gateway_public_ip }}"
+  when: nat_gateway_output.stdout.find(node_private_ip_eth1) == -1
+
+- name: SNAT for outbound traffic from private node to internet
+  iptables:
+    table: nat
+    chain: POSTROUTING
+    source: "{{ node_private_ip_eth1 }}"
+    out_interface: eth0
+    jump: SNAT
+    to_source: "{{ gateway_public_ip }}"
+  when: nat_gateway_output.stdout.find(node_private_ip_eth1) == -1
+
+- name: Allow TCP forwarding to private node
+  iptables:
+    chain: FORWARD
+    protocol: tcp
+    destination: "{{ node_private_ip_eth1 }}"
+    jump: ACCEPT
+  when: nat_gateway_output.stdout.find(node_private_ip_eth1) == -1
+
+- name: Allow UDP forwarding to private node
+  iptables:
+    chain: FORWARD
+    protocol: udp
+    destination: "{{ node_private_ip_eth1 }}"
+    jump: ACCEPT
+  when: nat_gateway_output.stdout.find(node_private_ip_eth1) == -1
+
+- name: Allow outbound TCP forwarding from private node
+  iptables:
+    chain: FORWARD
+    protocol: tcp
+    source: "{{ node_private_ip_eth1 }}"
+    out_interface: eth0
+    jump: ACCEPT
+  when: nat_gateway_output.stdout.find(node_private_ip_eth1) == -1
+
+- name: Allow outbound UDP forwarding from private node
+  iptables:
+    chain: FORWARD
+    protocol: udp
+    source: "{{ node_private_ip_eth1 }}"
+    out_interface: eth0
+    jump: ACCEPT
+  when: nat_gateway_output.stdout.find(node_private_ip_eth1) == -1
+
+- name: Allow established and related connections
+  iptables:
+    chain: FORWARD
+    match: state
+    ctstate: ESTABLISHED,RELATED
+    jump: ACCEPT
+  when: nat_gateway_output.stdout.find(node_private_ip_eth1) == -1
+
+- name: persist iptables rules to disk
+  command: service netfilter-persistent save
+  when: nat_gateway_output.stdout.find(node_private_ip_eth1) == -1
