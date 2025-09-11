@@ -26,10 +26,27 @@
   command: iptables -t nat -L POSTROUTING -v
   register: nat_gateway_output
 
-- name: Load ip_conntrack module
+- name: Check if nf_conntrack module is already loaded
+  command: lsmod | grep nf_conntrack
+  register: nf_conntrack_check
+  failed_when: false
+  changed_when: false
+
+- name: Debug - Show nf_conntrack module status
+  debug:
+    msg: "nf_conntrack module check result: rc={{ nf_conntrack_check.rc }}, stdout={{ nf_conntrack_check.stdout }}"
+
+- name: Load nf_conntrack module if not already present
   modprobe:
-    name: ip_conntrack
+    name: nf_conntrack
     state: present
+  register: modprobe_result
+  when: nf_conntrack_check.rc != 0
+
+- name: Debug - Show modprobe result
+  debug:
+    msg: "modprobe result: {{ modprobe_result }}"
+  when: nf_conntrack_check.rc != 0
 
 - name: set netfilter conntrack max
   sysctl:
