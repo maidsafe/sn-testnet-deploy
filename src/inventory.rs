@@ -974,10 +974,12 @@ impl DeploymentInventory {
     }
 
     pub fn is_empty(&self) -> bool {
-        if self.environment_details.deployment_type == DeploymentType::Bootstrap {
-            return self.node_vms.is_empty();
-        }
         self.genesis_vm.is_none()
+            && self.node_vms.is_empty()
+            && self.peer_cache_node_vms.is_empty()
+            && self.full_cone_private_node_vms.is_empty()
+            && self.symmetric_private_node_vms.is_empty()
+            && self.client_vms.is_empty()
     }
 
     pub fn vm_list(&self) -> Vec<VirtualMachine> {

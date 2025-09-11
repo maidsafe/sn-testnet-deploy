@@ -6,7 +6,7 @@
 
 use crate::{
     ansible::provisioning::{PrivateNodeProvisionInventory, ProvisionOptions},
-    error::Result,
+    error::{Error, Result},
     funding::get_address_from_sk,
     get_anvil_node_data, get_bootstrap_cache_url, get_genesis_multiaddr, write_environment_details,
     BinaryOption, DeploymentInventory, DeploymentType, EnvironmentDetails, EnvironmentType,
@@ -234,12 +234,8 @@ impl TestnetDeployer {
             })?;
 
         let (genesis_multiaddr, genesis_ip) =
-            get_genesis_multiaddr(&self.ansible_provisioner.ansible_runner, &self.ssh_client)
-                .map_err(|err| {
-                    println!("Failed to get genesis multiaddr {err:?}");
-                    err
-                })?;
-
+            get_genesis_multiaddr(&self.ansible_provisioner.ansible_runner, &self.ssh_client)?
+                .ok_or_else(|| Error::GenesisListenAddress)?;
         Ok((
             provision_options,
             (genesis_multiaddr, get_bootstrap_cache_url(&genesis_ip)),

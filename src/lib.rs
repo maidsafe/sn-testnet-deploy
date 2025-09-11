@@ -1084,8 +1084,11 @@ impl TestnetDeployer {
 pub fn get_genesis_multiaddr(
     ansible_runner: &AnsibleRunner,
     ssh_client: &SshClient,
-) -> Result<(String, IpAddr)> {
+) -> Result<Option<(String, IpAddr)>> {
     let genesis_inventory = ansible_runner.get_inventory(AnsibleInventoryType::Genesis, true)?;
+    if genesis_inventory.is_empty() {
+        return Ok(None);
+    }
     let genesis_ip = genesis_inventory[0].public_ip_addr;
 
     // It's possible for the genesis host to be altered from its original state where a node was
@@ -1119,7 +1122,7 @@ pub fn get_genesis_multiaddr(
             .ok_or_else(|| Error::GenesisListenAddress)?,
     };
 
-    Ok((multiaddr, genesis_ip))
+    Ok(Some((multiaddr, genesis_ip)))
 }
 
 pub fn get_anvil_node_data(

@@ -10,6 +10,7 @@ use color_eyre::Result;
 use sn_testnet_deploy::{
     ansible::provisioning::{PrivateNodeProvisionInventory, ProvisionOptions},
     deploy::DeployOptions,
+    error::Error,
     get_bootstrap_cache_url, get_genesis_multiaddr,
     inventory::DeploymentInventoryService,
     CloudProvider, NodeType, TestnetDeployBuilder,
@@ -97,10 +98,8 @@ async fn handle_provision_nodes(name: String, node_type: NodeType) -> Result<()>
         init_provision(&name).await?;
 
     let (genesis_multiaddr, genesis_ip) =
-        get_genesis_multiaddr(&provisioner.ansible_runner, &ssh_client).map_err(|err| {
-            println!("Failed to get genesis multiaddr {err:?}");
-            err
-        })?;
+        get_genesis_multiaddr(&provisioner.ansible_runner, &ssh_client)?
+            .ok_or_else(|| Error::GenesisListenAddress)?;
     let genesis_network_contacts = get_bootstrap_cache_url(&genesis_ip);
 
     let private_node_inventory = PrivateNodeProvisionInventory::new(
@@ -181,10 +180,8 @@ pub async fn handle_provision_upnp_nodes(name: String) -> Result<()> {
 pub async fn handle_provision_clients(name: String) -> Result<()> {
     let (_, provision_options, provisioner, ssh_client) = init_provision(&name).await?;
     let (genesis_multiaddr, genesis_ip) =
-        get_genesis_multiaddr(&provisioner.ansible_runner, &ssh_client).map_err(|err| {
-            println!("Failed to get genesis multiaddr {err:?}");
-            err
-        })?;
+        get_genesis_multiaddr(&provisioner.ansible_runner, &ssh_client)?
+            .ok_or_else(|| Error::GenesisListenAddress)?;
     let genesis_network_contacts = get_bootstrap_cache_url(&genesis_ip);
 
     provisioner.print_ansible_run_banner("Provision Clients");
