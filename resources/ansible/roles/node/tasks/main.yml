@@ -5,7 +5,7 @@
 #
 - name: check current number of node services
   become: True
-  ansible.builtin.command: antctl status --json
+  ansible.builtin.command: antctl --trace --log-output-dest=data-dir status --json
   register: node_status
 
 - name: calculate current non-genesis node count
@@ -59,7 +59,8 @@
   vars:
     command_args:
       - "{{ binary_dir }}/antctl"
-      - -v
+      - --trace
+      - --log-output-dest=data-dir
       - add
       - "{{ '--no-upnp' if not (enable_upnp | default(false)) else omit }}"
       - --data-dir-path=/mnt/antnode-storage/data
@@ -86,7 +87,7 @@
 
 - name: start the node services
   become: True
-  command: antctl -v start --interval {{ interval}}
+  command: antctl --trace --log-output-dest=data-dir start --interval {{ interval}}
   register: start_services_result
   failed_when: false
 

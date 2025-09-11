@@ -2,7 +2,7 @@
 # This role assumes the existence of the node manager, which is setup using another role.
 - name: check if genesis node is already set up
   become: True
-  ansible.builtin.command: antctl status --json
+  ansible.builtin.command: antctl --trace --log-output-dest=data-dir status --json
   register: genesis_status
 
 - name: parse genesis node status
@@ -17,7 +17,8 @@
   vars:
     command_args:
       - "{{ binary_dir }}/antctl"
-      - -v
+      - --trace
+      - --log-output-dest=data-dir
       - add
       - --no-upnp
       - --first
@@ -40,7 +41,7 @@
 
 - name: start the genesis node service
   become: True
-  command: antctl -v start --interval {{ interval}}
+  command: antctl --trace --log-output-dest=data-dir start --interval {{ interval}}
   register: start_services_result
   failed_when: false
 
