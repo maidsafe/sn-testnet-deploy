@@ -391,12 +391,7 @@ impl DeploymentInventoryService {
                     return Err(eyre!("Unable to obtain a VM to retrieve versions"));
                 };
 
-                // It's reasonable to make the assumption that one antnode service is running.
-                let antnode_version = self.get_bin_version(
-                    &random_vm.vm,
-                    "/mnt/antnode-storage/data/antnode1/antnode --version",
-                    "Autonomi Node v",
-                )?;
+                let antnode_version = self.get_antnode_version(&random_vm.vm)?;
                 let antctl_version = self.get_bin_version(
                     &random_vm.vm,
                     "antctl --version",
@@ -438,7 +433,8 @@ impl DeploymentInventoryService {
         let (genesis_multiaddr, genesis_ip) =
             if environment_details.deployment_type == DeploymentType::New {
                 match get_genesis_multiaddr(&self.ansible_runner, &self.ssh_client) {
-                    Ok((multiaddr, ip)) => (Some(multiaddr), Some(ip)),
+                    Ok(Some((multiaddr, ip))) => (Some(multiaddr), Some(ip)),
+                    Ok(None) => (None, None),
                     Err(_) => (None, None),
                 }
             } else {
@@ -601,6 +597,28 @@ impl DeploymentInventoryService {
             .strip_prefix(prefix)
             .ok_or_else(|| eyre!("Unexpected output format from {} command", command))?;
         Version::parse(version_str).map_err(|e| eyre!("Failed to parse {} version: {}", command, e))
+    }
+
+    /// Connects to a VM with SSH and retrieves the version of an available antnode service.
+    /// Uses antctl status --json to find running nodes and extract version information.
+    fn get_antnode_version(&self, vm: &VirtualMachine) -> Result<Version> {
+        let output = self.ssh_client.run_command(
+            &vm.public_ip_addr,
+            &self.cloud_provider.get_ssh_user(),
+            "antctl status --json | jq -r '.nodes[] | select(.status == \"Running\") | .version' | head -n1",
+            true,
+        )?;
+
+        let version_line = output
+            .first()
+            .ok_or_else(|| eyre!("No running antnode found from antctl status"))?;
+
+        if version_line.trim().is_empty() || version_line.trim() == "null" {
+            return Err(eyre!("No running antnode services found"));
+        }
+
+        Version::parse(version_line.trim())
+            .map_err(|e| eyre!("Failed to parse antnode version from antctl: {}", e))
     }
 
     /// Generate or retrieve the Client inventory for the deployment.
