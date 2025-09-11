@@ -1249,11 +1249,15 @@ impl DeploymentInventory {
                 );
                 let ssh = if let Some(ssh_key_path) = self.ssh_private_key_path.to_str() {
                     format!(
-                        "ssh -i {ssh_key_path} root@{}",
+                        "ssh -o ProxyCommand=\"ssh -W %h:%p -i {ssh_key_path} root@{}\" -i {ssh_key_path} root@{}",
                         nat_gateway_vm.public_ip_addr,
+                        node_vm.private_ip_addr
                     )
                 } else {
-                    format!("ssh root@{}", nat_gateway_vm.public_ip_addr,)
+                    format!(
+                        "ssh -o ProxyCommand=\"ssh -W %h:%p root@{}\" root@{}",
+                        nat_gateway_vm.public_ip_addr, node_vm.private_ip_addr
+                    )
                 };
                 println!("SSH using NAT gateway: {ssh}");
             }
