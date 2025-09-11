@@ -188,6 +188,7 @@ impl AnsibleRunner {
                         .to_string_lossy()
                         .to_string(),
                     "--list".to_string(),
+                    "-vvvv".to_string(),
                 ],
                 true,
                 false,
