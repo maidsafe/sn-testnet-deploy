@@ -96,6 +96,12 @@
     to_destination: "{{ node_private_ip_eth1 }}"
   when: nat_gateway_output.stdout.find(node_private_ip_eth1) == -1
 
+# Nat masquerade setup
+- name: Add eth1 of node VM to the NAT gateway
+  command: >
+    iptables -t nat -A POSTROUTING -s {{ node_private_ip_eth1 }} -o eth0 -j MASQUERADE
+  when: nat_gateway_output.stdout.find(node_private_ip_eth1) == -1
+
 - name: SNAT for hairpinned traffic (rewrite source to WAN IP, not LAN IP)
   iptables:
     table: nat
@@ -114,22 +120,6 @@
     out_interface: eth0
     jump: SNAT
     to_source: "{{ gateway_public_ip }}"
-  when: nat_gateway_output.stdout.find(node_private_ip_eth1) == -1
-
-- name: Allow TCP forwarding to private node
-  iptables:
-    chain: FORWARD
-    protocol: tcp
-    destination: "{{ node_private_ip_eth1 }}"
-    jump: ACCEPT
-  when: nat_gateway_output.stdout.find(node_private_ip_eth1) == -1
-
-- name: Allow UDP forwarding to private node
-  iptables:
-    chain: FORWARD
-    protocol: udp
-    destination: "{{ node_private_ip_eth1 }}"
-    jump: ACCEPT
   when: nat_gateway_output.stdout.find(node_private_ip_eth1) == -1
 
 - name: Allow outbound TCP forwarding from private node
@@ -157,6 +147,41 @@
     ctstate: ESTABLISHED,RELATED
     jump: ACCEPT
   when: nat_gateway_output.stdout.find(node_private_ip_eth1) == -1
+
+- name: Allow established and related connections
+  iptables:
+    chain: FORWARD
+    match: state
+    ctstate: ESTABLISHED,RELATED
+    jump: ACCEPT
+
+- name: Allow forwarding from private node eth1
+  iptables:
+    chain: FORWARD
+    source: "{{ node_private_ip_eth1 }}"
+    jump: ACCEPT
+
+- name: Allow forwarding from VPC CIDR to private node eth1
+  iptables:
+    chain: FORWARD
+    source: "{{ private_node_vpc_cidr }}"
+    destination: "{{ node_private_ip_eth1 }}"
+    jump: ACCEPT
+
+- name: Drop inbound TCP to private node except SSH
+  iptables:
+    chain: FORWARD
+    protocol: tcp
+    destination: "{{ node_private_ip_eth1 }}"
+    destination_port: "!22"
+    jump: DROP
+
+- name: Drop inbound UDP to private node
+  iptables:
+    chain: FORWARD
+    protocol: udp
+    destination: "{{ node_private_ip_eth1 }}"
+    jump: DROP
 
 - name: persist iptables rules to disk
   command: service netfilter-persistent save
