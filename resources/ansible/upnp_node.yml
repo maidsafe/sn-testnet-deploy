@@ -15,7 +15,8 @@
     - role: telegraf-node
       become: True
     - upnp_emulation
-    - node
+    - role: node
+      when: not (disable_nodes | default(false) | bool)
 
   tasks:
     # Something is wrong with the journal service on Ubuntu that causes no
