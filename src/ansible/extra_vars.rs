@@ -275,13 +275,8 @@ pub fn build_node_extra_vars_doc(
     );
     extra_vars.add_variable("max_log_files", &options.max_log_files.to_string());
 
-    match node_type {
-        NodeType::Upnp => {
-            extra_vars.add_boolean_variable("enable_upnp", true);
-        }
-        _ => {
-            extra_vars.add_boolean_variable("enable_upnp", false);
-        }
+    if matches!(node_type, NodeType::Upnp) {
+        extra_vars.add_boolean_variable("enable_upnp", true);
     }
 
     if write_older_cache_files {

@@ -42,14 +42,6 @@
   when: use_port_range
 
 #
-# Obtain private IP if relay is set
-#
-- name: get private ip of eth1
-  shell: ip -4 addr show dev eth1 | grep inet | awk '{print $2}' | cut -d/ -f1
-  register: private_ip_eth1
-  when: enable_upnp | bool
-
-#
 # Add the nodes
 #
 - name: add node services
@@ -72,7 +64,6 @@
       - "--rewards-address={{ rewards_address }}"
       - "--max-archived-log-files={{ max_archived_log_files }}"
       - "--max-log-files={{ max_log_files }}"
-      - "{{ ('--node-ip=' + private_ip_eth1.stdout) if enable_upnp | bool else omit }}"
       - "{{ ('--metrics-port=' + metrics_port) if not use_port_range else omit }}"
       - "{{ ('--metrics-port=' + metrics_start_port + '-' + metrics_end_port) if use_port_range else omit }}"
       - "{{ ('--log-format=' + log_format) if log_format is defined else omit }}"
