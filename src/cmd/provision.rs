@@ -31,6 +31,9 @@ pub enum ProvisionCommands {
         /// The name of the environment
         #[arg(short = 'n', long)]
         name: String,
+        /// Disable nodes during provisioning
+        #[arg(long, default_value = "false")]
+        disable_nodes: bool,
     },
     /// Provision generic nodes for an environment
     #[clap(name = "generic-nodes")]
@@ -38,6 +41,9 @@ pub enum ProvisionCommands {
         /// The name of the environment
         #[arg(short = 'n', long)]
         name: String,
+        /// Disable nodes during provisioning
+        #[arg(long, default_value = "false")]
+        disable_nodes: bool,
     },
     /// Provision peer cache nodes for an environment
     #[clap(name = "peer-cache-nodes")]
@@ -45,6 +51,9 @@ pub enum ProvisionCommands {
         /// The name of the environment
         #[arg(short = 'n', long)]
         name: String,
+        /// Disable nodes during provisioning
+        #[arg(long, default_value = "false")]
+        disable_nodes: bool,
     },
     /// Provision symmetric private nodes for an environment
     #[clap(name = "symmetric-private-nodes")]
@@ -52,6 +61,9 @@ pub enum ProvisionCommands {
         /// The name of the environment
         #[arg(short = 'n', long)]
         name: String,
+        /// Disable nodes during provisioning
+        #[arg(long, default_value = "false")]
+        disable_nodes: bool,
     },
     /// Provision UPnP nodes for an environment
     #[clap(name = "upnp-nodes")]
@@ -59,6 +71,9 @@ pub enum ProvisionCommands {
         /// The name of the environment
         #[arg(short = 'n', long)]
         name: String,
+        /// Disable nodes during provisioning
+        #[arg(long, default_value = "false")]
+        disable_nodes: bool,
     },
 }
 
@@ -93,9 +108,15 @@ async fn init_provision(
     Ok((deploy_options, provision_options, provisioner, ssh_client))
 }
 
-async fn handle_provision_nodes(name: String, node_type: NodeType) -> Result<()> {
+async fn handle_provision_nodes(
+    name: String,
+    node_type: NodeType,
+    disable_nodes: bool,
+) -> Result<()> {
     let (deploy_options, mut provision_options, provisioner, ssh_client) =
         init_provision(&name).await?;
+
+    provision_options.disable_nodes = disable_nodes;
 
     let (genesis_multiaddr, genesis_ip) =
         get_genesis_multiaddr(&provisioner.ansible_runner, &ssh_client)?
@@ -157,24 +178,30 @@ async fn handle_provision_nodes(name: String, node_type: NodeType) -> Result<()>
     Ok(())
 }
 
-pub async fn handle_provision_peer_cache_nodes(name: String) -> Result<()> {
-    handle_provision_nodes(name, NodeType::PeerCache).await
+pub async fn handle_provision_peer_cache_nodes(name: String, disable_nodes: bool) -> Result<()> {
+    handle_provision_nodes(name, NodeType::PeerCache, disable_nodes).await
 }
 
-pub async fn handle_provision_generic_nodes(name: String) -> Result<()> {
-    handle_provision_nodes(name, NodeType::Generic).await
+pub async fn handle_provision_generic_nodes(name: String, disable_nodes: bool) -> Result<()> {
+    handle_provision_nodes(name, NodeType::Generic, disable_nodes).await
 }
 
-pub async fn handle_provision_symmetric_private_nodes(name: String) -> Result<()> {
-    handle_provision_nodes(name, NodeType::SymmetricPrivateNode).await
+pub async fn handle_provision_symmetric_private_nodes(
+    name: String,
+    disable_nodes: bool,
+) -> Result<()> {
+    handle_provision_nodes(name, NodeType::SymmetricPrivateNode, disable_nodes).await
 }
 
-pub async fn handle_provision_full_cone_private_nodes(name: String) -> Result<()> {
-    handle_provision_nodes(name, NodeType::FullConePrivateNode).await
+pub async fn handle_provision_full_cone_private_nodes(
+    name: String,
+    disable_nodes: bool,
+) -> Result<()> {
+    handle_provision_nodes(name, NodeType::FullConePrivateNode, disable_nodes).await
 }
 
-pub async fn handle_provision_upnp_nodes(name: String) -> Result<()> {
-    handle_provision_nodes(name, NodeType::Upnp).await
+pub async fn handle_provision_upnp_nodes(name: String, disable_nodes: bool) -> Result<()> {
+    handle_provision_nodes(name, NodeType::Upnp, disable_nodes).await
 }
 
 pub async fn handle_provision_clients(name: String) -> Result<()> {

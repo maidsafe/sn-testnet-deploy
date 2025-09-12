@@ -608,24 +608,41 @@ async fn main() -> Result<()> {
                 cmd::provision::handle_provision_clients(name).await?;
                 Ok(())
             }
-            ProvisionCommands::FullConePrivateNodes { name } => {
-                cmd::provision::handle_provision_full_cone_private_nodes(name).await?;
+            ProvisionCommands::FullConePrivateNodes {
+                name,
+                disable_nodes,
+            } => {
+                cmd::provision::handle_provision_full_cone_private_nodes(name, disable_nodes)
+                    .await?;
                 Ok(())
             }
-            ProvisionCommands::PeerCacheNodes { name } => {
-                cmd::provision::handle_provision_peer_cache_nodes(name).await?;
+            ProvisionCommands::PeerCacheNodes {
+                name,
+                disable_nodes,
+            } => {
+                cmd::provision::handle_provision_peer_cache_nodes(name, disable_nodes).await?;
                 Ok(())
             }
-            ProvisionCommands::GenericNodes { name } => {
-                cmd::provision::handle_provision_generic_nodes(name).await?;
+            ProvisionCommands::GenericNodes {
+                name,
+                disable_nodes,
+            } => {
+                cmd::provision::handle_provision_generic_nodes(name, disable_nodes).await?;
                 Ok(())
             }
-            ProvisionCommands::SymmetricPrivateNodes { name } => {
-                cmd::provision::handle_provision_symmetric_private_nodes(name).await?;
+            ProvisionCommands::SymmetricPrivateNodes {
+                name,
+                disable_nodes,
+            } => {
+                cmd::provision::handle_provision_symmetric_private_nodes(name, disable_nodes)
+                    .await?;
                 Ok(())
             }
-            ProvisionCommands::UpnpNodes { name } => {
-                cmd::provision::handle_provision_upnp_nodes(name).await?;
+            ProvisionCommands::UpnpNodes {
+                name,
+                disable_nodes,
+            } => {
+                cmd::provision::handle_provision_upnp_nodes(name, disable_nodes).await?;
                 Ok(())
             }
         },

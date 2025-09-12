@@ -16,7 +16,8 @@
       become: True
     - role: telegraf-geoip
       become: True
-    - node
+    - role: node
+      when: not (disable_nodes | default(false) | bool)
     - role: cache_webserver
       become: True
 
