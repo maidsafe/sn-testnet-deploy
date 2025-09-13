@@ -41,6 +41,9 @@ pub enum ProvisionCommands {
         /// The name of the environment
         #[arg(short = 'n', long)]
         name: String,
+        /// Should the nodes be disabled after provisioning
+        #[arg(long, default_value = "false")]
+        disable_nodes: bool,
     },
     /// Provision generic nodes for an environment
     #[clap(name = "generic-nodes")]
@@ -221,8 +224,8 @@ pub async fn handle_provision_full_cone_private_nodes(
     handle_provision_nodes(name, NodeType::FullConePrivateNode, disable_nodes).await
 }
 
-pub async fn handle_provision_port_restricted_cone_private_nodes(name: String) -> Result<()> {
-    handle_provision_nodes(name, NodeType::PortRestrictedConePrivateNode).await
+pub async fn handle_provision_port_restricted_cone_private_nodes(name: String, disable_nodes: bool) -> Result<()> {
+    handle_provision_nodes(name, NodeType::PortRestrictedConePrivateNode, disable_nodes).await
 }
 
 pub async fn handle_provision_upnp_nodes(name: String, disable_nodes: bool) -> Result<()> {

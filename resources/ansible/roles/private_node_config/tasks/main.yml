@@ -90,3 +90,12 @@
 - name: apply the netplan rules
   command: netplan apply -debug
   when: not nat_gateway_is_configured
+
+- name: create systemd network config for eth1 with vpc peering routes
+  template:
+    src: 10-eth1.network.j2
+    dest: /etc/systemd/network/10-eth1.network
+    owner: root
+    group: root
+    mode: '0644'
+  when: not nat_gateway_is_configured

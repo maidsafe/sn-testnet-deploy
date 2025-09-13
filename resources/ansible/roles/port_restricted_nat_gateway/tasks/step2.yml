@@ -112,16 +112,6 @@
     to_source: "{{ gateway_public_ip }}"
   when: nat_gateway_output.stdout.find(node_private_ip_eth1) == -1
 
-- name: SNAT for outbound traffic from private node to internet
-  iptables:
-    table: nat
-    chain: POSTROUTING
-    source: "{{ node_private_ip_eth1 }}"
-    out_interface: eth0
-    jump: SNAT
-    to_source: "{{ gateway_public_ip }}"
-  when: nat_gateway_output.stdout.find(node_private_ip_eth1) == -1
-
 - name: Allow outbound TCP forwarding from private node
   iptables:
     chain: FORWARD
@@ -148,18 +138,12 @@
     jump: ACCEPT
   when: nat_gateway_output.stdout.find(node_private_ip_eth1) == -1
 
-- name: Allow established and related connections
-  iptables:
-    chain: FORWARD
-    match: state
-    ctstate: ESTABLISHED,RELATED
-    jump: ACCEPT
-
 - name: Allow forwarding from private node eth1
   iptables:
     chain: FORWARD
     source: "{{ node_private_ip_eth1 }}"
     jump: ACCEPT
+  when: nat_gateway_output.stdout.find(node_private_ip_eth1) == -1
 
 - name: Allow forwarding from VPC CIDR to private node eth1
   iptables:
@@ -167,6 +151,7 @@
     source: "{{ private_node_vpc_cidr }}"
     destination: "{{ node_private_ip_eth1 }}"
     jump: ACCEPT
+  when: nat_gateway_output.stdout.find(node_private_ip_eth1) == -1
 
 - name: Drop inbound TCP to private node except SSH
   iptables:
@@ -175,6 +160,7 @@
     destination: "{{ node_private_ip_eth1 }}"
     destination_port: "!22"
     jump: DROP
+  when: nat_gateway_output.stdout.find(node_private_ip_eth1) == -1
 
 - name: Drop inbound UDP to private node
   iptables:
@@ -182,7 +168,8 @@
     protocol: udp
     destination: "{{ node_private_ip_eth1 }}"
     jump: DROP
-
+  when: nat_gateway_output.stdout.find(node_private_ip_eth1) == -1
+  
 - name: persist iptables rules to disk
   command: service netfilter-persistent save
   when: nat_gateway_output.stdout.find(node_private_ip_eth1) == -1
