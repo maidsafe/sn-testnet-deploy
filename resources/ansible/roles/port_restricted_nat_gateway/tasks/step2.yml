@@ -112,24 +112,6 @@
     to_source: "{{ gateway_public_ip }}"
   when: nat_gateway_output.stdout.find(node_private_ip_eth1) == -1
 
-- name: Allow outbound TCP forwarding from private node
-  iptables:
-    chain: FORWARD
-    protocol: tcp
-    source: "{{ node_private_ip_eth1 }}"
-    out_interface: eth0
-    jump: ACCEPT
-  when: nat_gateway_output.stdout.find(node_private_ip_eth1) == -1
-
-- name: Allow outbound UDP forwarding from private node
-  iptables:
-    chain: FORWARD
-    protocol: udp
-    source: "{{ node_private_ip_eth1 }}"
-    out_interface: eth0
-    jump: ACCEPT
-  when: nat_gateway_output.stdout.find(node_private_ip_eth1) == -1
-
 - name: Allow established and related connections
   iptables:
     chain: FORWARD
