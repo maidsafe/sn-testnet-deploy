@@ -1303,9 +1303,9 @@ impl DeploymentInventory {
         }
 
         if !self.peer_cache_node_vms.is_empty() {
-            println!("==============");
-            println!("Peer Cache VMs");
-            println!("==============");
+            println!("================");
+            println!("Peer Cache Hosts");
+            println!("================");
             for node_vm in self.peer_cache_node_vms.iter() {
                 println!("{}: {}", node_vm.vm.name, node_vm.vm.public_ip_addr);
             }
@@ -1316,9 +1316,9 @@ impl DeploymentInventory {
             self.print_peer_cache_webserver();
         }
 
-        println!("========");
-        println!("Node VMs");
-        println!("========");
+        println!("=================");
+        println!("Public Node Hosts");
+        println!("=================");
         for genesis_vm in self.genesis_vms.iter() {
             println!("{}: {}", genesis_vm.vm.name, genesis_vm.vm.public_ip_addr);
         }
@@ -1330,9 +1330,9 @@ impl DeploymentInventory {
         println!();
 
         if !self.full_cone_private_node_vms.is_empty() {
-            println!("=================");
-            println!("Full Cone Private Node VMs");
-            println!("=================");
+            println!("================================");
+            println!("Full Cone NAT Private Node Hosts");
+            println!("================================");
             let full_cone_private_node_nat_gateway_map =
                 PrivateNodeProvisionInventory::match_private_node_vm_and_gateway_vm(
                     self.full_cone_private_node_vms
@@ -1371,9 +1371,9 @@ impl DeploymentInventory {
         }
 
         if !self.port_restricted_cone_private_node_vms.is_empty() {
-            println!("============================");
-            println!("Port Restricted Cone Private Node VMs");
-            println!("============================");
+            println!("===========================================");
+            println!("Port Restricted Cone NAT Private Node Hosts");
+            println!("===========================================");
             let port_restricted_cone_private_node_nat_gateway_map =
                 PrivateNodeProvisionInventory::match_private_node_vm_and_gateway_vm(
                     self.port_restricted_cone_private_node_vms
@@ -1416,9 +1416,9 @@ impl DeploymentInventory {
         }
 
         if !self.symmetric_private_node_vms.is_empty() {
-            println!("=================");
-            println!("Symmetric Private Node VMs");
-            println!("=================");
+            println!("================================");
+            println!("Symmetric NAT Private Node Hosts");
+            println!("================================");
             let symmetric_private_node_nat_gateway_map =
                 PrivateNodeProvisionInventory::match_private_node_vm_and_gateway_vm(
                     self.symmetric_private_node_vms
@@ -1456,9 +1456,9 @@ impl DeploymentInventory {
         }
 
         if !self.upnp_private_node_vms.is_empty() {
-            println!("================");
-            println!("UPnP Private Node VMs");
-            println!("================");
+            println!("=======================");
+            println!("UPnP Private Node Hosts");
+            println!("=======================");
             for node_vm in self.upnp_private_node_vms.iter() {
                 println!("{}: {}", node_vm.vm.name, node_vm.vm.public_ip_addr);
             }
@@ -1468,9 +1468,9 @@ impl DeploymentInventory {
         }
 
         if !self.client_vms.is_empty() {
-            println!("==========");
-            println!("Client VMs");
-            println!("==========");
+            println!("============");
+            println!("Client Hosts");
+            println!("============");
             for client_vm in self.client_vms.iter() {
                 println!("{}: {}", client_vm.vm.name, client_vm.vm.public_ip_addr);
             }

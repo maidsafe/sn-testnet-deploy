@@ -773,6 +773,10 @@ impl TestnetDeployer {
             .ansible_provisioner
             .get_node_registries(&AnsibleInventoryType::Upnp)
             .await?;
+        let port_restricted_cone_private_node_registries = self
+            .ansible_provisioner
+            .get_node_registries(&AnsibleInventoryType::PortRestrictedConePrivateNodes)
+            .await?;
         let genesis_node_registry = self
             .ansible_provisioner
             .get_node_registries(&AnsibleInventoryType::Genesis)
@@ -784,6 +788,7 @@ impl TestnetDeployer {
         symmetric_private_node_registries.print().await;
         full_cone_private_node_registries.print().await;
         upnp_private_node_registries.print().await;
+        port_restricted_cone_private_node_registries.print().await;
         genesis_node_registry.print().await;
 
         let all_registries = [
@@ -792,6 +797,7 @@ impl TestnetDeployer {
             &symmetric_private_node_registries,
             &full_cone_private_node_registries,
             &upnp_private_node_registries,
+            &port_restricted_cone_private_node_registries,
             &genesis_node_registry,
         ];
 
@@ -821,12 +827,18 @@ impl TestnetDeployer {
         let symmetric_private_hosts = symmetric_private_node_registries.retrieved_registries.len();
         let full_cone_private_hosts = full_cone_private_node_registries.retrieved_registries.len();
         let upnp_private_hosts = upnp_private_node_registries.retrieved_registries.len();
+        let port_restricted_cone_private_hosts = port_restricted_cone_private_node_registries
+            .retrieved_registries
+            .len();
 
         let peer_cache_nodes = peer_cache_node_registries.get_node_count().await;
         let generic_nodes = generic_node_registries.get_node_count().await;
         let symmetric_private_nodes = symmetric_private_node_registries.get_node_count().await;
         let full_cone_private_nodes = full_cone_private_node_registries.get_node_count().await;
         let upnp_private_nodes = upnp_private_node_registries.get_node_count().await;
+        let port_restricted_cone_private_nodes = port_restricted_cone_private_node_registries
+            .get_node_count()
+            .await;
 
         println!("-------");
         println!("Summary");
@@ -880,6 +892,16 @@ impl TestnetDeployer {
                 0
             },
             upnp_private_nodes
+        );
+        println!(
+            "Total port restricted cone private nodes ({}x{}): {}",
+            port_restricted_cone_private_hosts,
+            if port_restricted_cone_private_hosts > 0 {
+                port_restricted_cone_private_nodes / port_restricted_cone_private_hosts
+            } else {
+                0
+            },
+            port_restricted_cone_private_nodes
         );
         println!("Total nodes: {total_nodes}");
         println!("Running nodes: {running_nodes}");
