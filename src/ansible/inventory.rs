@@ -79,31 +79,31 @@ pub enum AnsibleInventoryType {
 impl std::fmt::Display for AnsibleInventoryType {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let s = match self {
-            AnsibleInventoryType::PeerCacheNodes => "PeerCacheNodes",
+            AnsibleInventoryType::PeerCacheNodes => "Peer Cache Nodes",
             AnsibleInventoryType::Build => "Build",
             AnsibleInventoryType::Clients => "Clients",
             AnsibleInventoryType::Custom => "Custom",
-            AnsibleInventoryType::EvmNodes => "EvmNodes",
-            AnsibleInventoryType::FullConeNatGateway => "FullConeNatGateway",
+            AnsibleInventoryType::EvmNodes => "EVM Nodes",
+            AnsibleInventoryType::FullConeNatGateway => "Full Cone NAT Gateway",
             AnsibleInventoryType::FullConeNatGatewayStatic => "FullConeNatGatewayStatic",
-            AnsibleInventoryType::FullConePrivateNodes => "FullConePrivateNodes",
+            AnsibleInventoryType::FullConePrivateNodes => "Full Cone NAT Private Nodes",
             AnsibleInventoryType::FullConePrivateNodesStatic => "FullConePrivateNodesStatic",
             AnsibleInventoryType::PortRestrictedConeNatGateway => "PortRestrictedConeNatGateway",
             AnsibleInventoryType::PortRestrictedConeNatGatewayStatic => {
                 "PortRestrictedConeNatGatewayStatic"
             }
             AnsibleInventoryType::PortRestrictedConePrivateNodes => {
-                "PortRestrictedConePrivateNodes"
+                "Port Restricted Cone NAT Private Nodes"
             }
             AnsibleInventoryType::PortRestrictedConePrivateNodesStatic => {
                 "PortRestrictedConePrivateNodesStatic"
             }
-            AnsibleInventoryType::Genesis => "Genesis",
-            AnsibleInventoryType::Nodes => "Nodes",
+            AnsibleInventoryType::Genesis => "Genesis Nodes",
+            AnsibleInventoryType::Nodes => "Public Nodes",
             AnsibleInventoryType::SymmetricNatGateway => "SymmetricNatGateway",
-            AnsibleInventoryType::SymmetricPrivateNodes => "SymmetricPrivateNodes",
+            AnsibleInventoryType::SymmetricPrivateNodes => "Symmetric NAT Private Nodes",
             AnsibleInventoryType::SymmetricPrivateNodesStatic => "SymmetricPrivateNodesStatic",
-            AnsibleInventoryType::Upnp => "Upnp",
+            AnsibleInventoryType::Upnp => "UPnP Nodes",
         };
         write!(f, "{s}")
     }
