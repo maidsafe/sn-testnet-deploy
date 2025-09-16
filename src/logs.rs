@@ -80,6 +80,7 @@ enum VmType {
     Public,
     SymmetricPrivate,
     FullConePrivate,
+    PortRestrictedConePrivate,
     Client,
 }
 
@@ -89,6 +90,8 @@ impl VmType {
             VmType::SymmetricPrivate
         } else if name.contains("full-cone") {
             VmType::FullConePrivate
+        } else if name.contains("port-restricted-cone") {
+            VmType::PortRestrictedConePrivate
         } else if name.contains("ant-client") {
             VmType::Client
         } else {
@@ -179,6 +182,12 @@ impl TestnetDeployer {
                         let args_list =
                             self.construct_full_cone_private_node_args(vm, &log_base_dir)?;
                         debug!("Using full-cone rsync args for {:?}", vm.name);
+                        args_list
+                    }
+                    VmType::PortRestrictedConePrivate => {
+                        let args_list = self
+                            .construct_port_restricted_cone_private_node_args(vm, &log_base_dir)?;
+                        debug!("Using port-restricted-cone rsync args for {:?}", vm.name);
                         args_list
                     }
                     VmType::Client => {
@@ -333,6 +342,48 @@ impl TestnetDeployer {
             .as_ref()
             .and_then(|routed_vms| {
                 routed_vms.find_symmetric_nat_routed_node(&private_vm.public_ip_addr)
+            })
+            .ok_or(Error::RoutedVmNotFound(private_vm.public_ip_addr))?;
+
+        let ssh_cmd = self.build_ssh_with_proxy(gateway_ip);
+
+        Ok(LogType::all()
+            .iter()
+            .map(|&log_type| {
+                let local_path = if let Some(subdir) = log_type.local_subdir() {
+                    vm_path.join(subdir)
+                } else {
+                    vm_path.clone()
+                };
+
+                self.build_rsync_args(
+                    &ssh_cmd,
+                    &format!(
+                        "root@{}:{}",
+                        private_vm.private_ip_addr,
+                        log_type.remote_path()
+                    ),
+                    &local_path,
+                )
+            })
+            .collect())
+    }
+
+    fn construct_port_restricted_cone_private_node_args(
+        &self,
+        private_vm: &VirtualMachine,
+        log_base_dir: &Path,
+    ) -> Result<Vec<Vec<String>>> {
+        let vm_path = log_base_dir.join(&private_vm.name);
+
+        let read_lock = self.ssh_client.routed_vms.read().map_err(|err| {
+            log::error!("Failed to set routed VMs: {err}");
+            Error::SshSettingsRwLockError
+        })?;
+        let (_, gateway_ip) = read_lock
+            .as_ref()
+            .and_then(|routed_vms| {
+                routed_vms.find_port_restricted_cone_nat_routed_node(&private_vm.public_ip_addr)
             })
             .ok_or(Error::RoutedVmNotFound(private_vm.public_ip_addr))?;
 
