@@ -36,7 +36,7 @@ jobs:
     if: |
       github.repository_owner == 'maidsafe' &&
       startsWith(github.event.head_commit.message, 'chore(release):')
-    name: publish and release
+    name: tag and release
     runs-on: ubuntu-latest
     needs: [build]
     env:
@@ -64,7 +64,7 @@ jobs:
         run: |
           cargo binstall --no-confirm just
           cargo binstall --no-confirm release-plz
-      - name: publish and release
+      - name: tag and release
         shell: bash
         run: |
           cargo login ${{ secrets.CRATES_IO_TOKEN }}
