@@ -74,28 +74,6 @@
     to_destination: "{{ node_private_ip_eth1 }}"
   when: nat_gateway_output.stdout.find(node_private_ip_eth1) == -1
 
-- name: DNAT hairpin TCP (eth1) → internal server
-  iptables:
-    table: nat
-    chain: PREROUTING
-    in_interface: eth1
-    protocol: tcp
-    destination: "{{ gateway_public_ip }}"
-    jump: DNAT
-    to_destination: "{{ node_private_ip_eth1 }}"
-  when: nat_gateway_output.stdout.find(node_private_ip_eth1) == -1
-
-- name: DNAT hairpin UDP (eth1) → internal server
-  iptables:
-    table: nat
-    chain: PREROUTING
-    in_interface: eth1
-    protocol: udp
-    destination: "{{ gateway_public_ip }}"
-    jump: DNAT
-    to_destination: "{{ node_private_ip_eth1 }}"
-  when: nat_gateway_output.stdout.find(node_private_ip_eth1) == -1
-
 # Nat masquerade setup
 - name: Add eth1 of node VM to the NAT gateway
   command: >
