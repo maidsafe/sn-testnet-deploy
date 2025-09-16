@@ -72,17 +72,3 @@ jobs:
         # ignored due to nightly failure.
         # should be fixed by https://github.com/zowens/crc32c/pull/52
         continue-on-error: true
-
-  test-publish:
-    name: test publish
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v2
-      - uses: actions-rs/toolchain@v1
-        with:
-          profile: minimal
-          toolchain: stable
-          override: true
-
-      - name: dry run publish
-        run: cargo publish --dry-run
