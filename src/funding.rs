@@ -128,7 +128,7 @@ impl AnsibleProvisioner {
 
         let total_keys = wallet_keys.len();
         let vm_count = client_vms.len();
-        if total_keys % vm_count != 0 {
+        if !total_keys.is_multiple_of(vm_count) {
             return Err(Error::InvalidWalletCount(total_keys, vm_count));
         }
 
