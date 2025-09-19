@@ -951,6 +951,9 @@ pub enum Commands {
         /// unreachable during the main run.
         #[clap(name = "custom-inventory", long, use_value_delimiter = true)]
         custom_inventory: Option<Vec<String>>,
+        /// Use this flag to disable running the node status update after the nodes complete.
+        #[clap(long, default_value_t = false)]
+        disable_status: bool,
         /// Set to force the node manager to accept the antnode version provided.
         ///
         /// This can be used to downgrade antnode to a known good version.
