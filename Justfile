@@ -167,3 +167,32 @@ build-lon1-upnp-image:
 
 build-ams3-upnp-image:
   just build-upnp-image ams3
+
+upload-testnet-deploy-package:
+  #!/usr/bin/env bash
+  set -e
+
+  cargo build --release
+  timestamp=$(date +%s)
+  package_name="testnet-deploy-package-$timestamp"
+
+  temp_dir="/tmp/$package_name"
+  mkdir -p "$temp_dir/sn-testnet-deploy"
+  cp -r . "$temp_dir/sn-testnet-deploy"
+  cp target/release/testnet-deploy "$temp_dir/"
+
+  (
+    cd "$temp_dir/sn-testnet-deploy"
+    rm -rf target/
+    rm -rf .claude/
+    rm -rf .git/
+    rm -f .env
+    find . -type d -name ".terraform" -exec rm -rf {} + 2>/dev/null || true
+    find . -path "*/ansible/inventory*" -name ".*" -type f -delete 2>/dev/null || true
+  )
+  (
+    cd "$temp_dir"
+    zip -r "$package_name.zip" .
+    aws s3 cp "$package_name.zip" s3://sn-testnet-deploy --acl public-read
+    echo "Package available at https://sn-testnet-deploy.s3.eu-west-2.amazonaws.com/$package_name.zip"
+  )
