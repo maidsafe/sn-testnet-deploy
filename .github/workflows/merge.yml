@@ -18,6 +18,7 @@ jobs:
           profile: minimal
           toolchain: stable
           override: true
+          components: rustfmt
       - shell: bash
         run: cargo build --all-targets --all-features
   checks:
