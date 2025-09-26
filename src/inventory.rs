@@ -344,7 +344,7 @@ impl DeploymentInventoryService {
         let ansible_provisioner = self.ansible_provisioner.clone();
         let port_restricted_cone_private_node_registries_handle = tokio::spawn(async move {
             ansible_provisioner
-                .get_node_registries(&AnsibleInventoryType::PortRestrictedConePrivateNodesStatic)
+                .get_node_registries(&AnsibleInventoryType::PortRestrictedConePrivateNodes)
                 .await
         });
         let ansible_provisioner = self.ansible_provisioner.clone();
