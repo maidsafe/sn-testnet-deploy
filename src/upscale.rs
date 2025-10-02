@@ -251,6 +251,7 @@ impl TestnetDeployer {
                 .environment_details
                 .rewards_address
                 .clone(),
+            single_node_payment: false,
             sleep_duration: None,
             symmetric_private_node_count: desired_symmetric_private_node_count,
             token_amount: None,
@@ -585,6 +586,7 @@ impl TestnetDeployer {
                 .environment_details
                 .rewards_address
                 .clone(),
+            single_node_payment: false,
             sleep_duration: None,
             symmetric_private_node_count: 0,
             token_amount: options.token_amount,

@@ -1,10 +1,11 @@
 #!/usr/bin/env bash
 
-# Usage: ./script.sh [-p PEER] [-u URL] [-n ID]
+# Usage: ./script.sh [-p PEER] [-u URL] [-n ID] [-s]
 #
 #   -p, --peer: Optional contact peer
 #   -u, --network-contacts-url: Optional network contacts URL
 #   -n, --network-id: Optional network ID (also enables testnet mode)
+#   -s, --single-node-payment: Optional flag to enable single node payment mode
 
 LOG_OUTPUT_DEST="{{ log_output_dest }}"
 UPLOAD_METRIC_DIR="/mnt/ant-storage/logs/upload_files/random_uploader/${USER}"
@@ -34,16 +35,18 @@ fi
 CONTACT_PEER=""
 NETWORK_CONTACTS_URL=""
 NETWORK_ID=""
+SINGLE_NODE_PAYMENT=false
 
 usage() {
-  echo "Usage: $0 [-p PEER] [-u URL] [-n ID]"
-  echo "  -p, --peer                PEER: Optional contact peer"
-  echo "  -u, --network-contacts-url URL: Optional network contacts URL"
-  echo "  -n, --network-id          ID: Optional network ID (also enables testnet mode)"
+  echo "Usage: $0 [-p PEER] [-u URL] [-n ID] [-s]"
+  echo "  -p, --peer                    PEER: Optional contact peer"
+  echo "  -u, --network-contacts-url    URL: Optional network contacts URL"
+  echo "  -n, --network-id              ID: Optional network ID (also enables testnet mode)"
+  echo "  -s, --single-node-payment     Enable single node payment mode"
   exit 1
 }
 
-TEMP=$(getopt -o p:u:n: --long peer:,network-contacts-url:,network-id: -n 'ant_random_uploader.sh' -- "$@")
+TEMP=$(getopt -o p:u:n:s --long peer:,network-contacts-url:,network-id:,single-node-payment -n 'ant_random_uploader.sh' -- "$@")
 
 if [[ $? != 0 ]]; then
   echo "Failed to parse arguments" >&2
@@ -67,6 +70,10 @@ while true; do
       NETWORK_ID="$2"
       shift 2
       ;;
+    -s|--single-node-payment)
+      SINGLE_NODE_PAYMENT=true
+      shift
+      ;;
     --)
       shift
       break
@@ -81,6 +88,7 @@ done
 CONTACT_PEER_ARG=""
 NETWORK_CONTACTS_URL_ARG=""
 NETWORK_ID_ARG=""
+SINGLE_NODE_PAYMENT_ARG=""
 
 if [[ -n "$CONTACT_PEER" ]]; then
   echo "Setting contact peer arg to $CONTACT_PEER"
@@ -93,6 +101,10 @@ fi
 if [[ -n "$NETWORK_ID" ]]; then
   echo "Setting network ID arg to $NETWORK_ID"
   NETWORK_ID_ARG="--network-id $NETWORK_ID"
+fi
+if [[ "$SINGLE_NODE_PAYMENT" == "true" ]]; then
+  echo "Enabling single node payment mode"
+  SINGLE_NODE_PAYMENT_ARG="--single-node-payment"
 fi
 
 if ! command -v ant &> /dev/null; then
@@ -227,7 +239,9 @@ generate_random_data_file_and_upload() {
     $NETWORK_CONTACTS_URL_ARG \
     $NETWORK_ID_ARG \
     $LOG_OUTPUT_ARG \
-    file upload "$tmpfile" 2>&1 | tee "$temp_output_file"
+    file upload \
+    $SINGLE_NODE_PAYMENT_ARG \
+    "$tmpfile" 2>&1 | tee "$temp_output_file"
   exit_code=${PIPESTATUS[0]}
   end_time=$(date +%s%N)
   stdout=$(cat "$temp_output_file")

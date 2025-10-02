@@ -667,6 +667,7 @@ pub fn build_clients_extra_vars_doc(
         "upload_interval",
         &options.upload_interval.unwrap_or(10).to_string(),
     );
+    extra_vars.add_boolean_variable("single_node_payments", options.single_node_payment);
 
     Ok(extra_vars.build())
 }

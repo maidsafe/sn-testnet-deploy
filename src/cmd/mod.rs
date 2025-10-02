@@ -627,6 +627,11 @@ pub enum Commands {
         /// This is useful to re-run any failed deployments without rebuilding the binaries.
         #[arg(long, default_value_t = false)]
         skip_binary_build: bool,
+        /// Enable single node payment mode for uploads.
+        ///
+        /// When enabled, uploads will use the --single-node-payment flag.
+        #[clap(long, default_value_t = false)]
+        single_node_payment: bool,
         /// Override the size of the symmetric NAT gateway VM.
         #[clap(long)]
         symmetric_nat_gateway_vm_size: Option<String>,

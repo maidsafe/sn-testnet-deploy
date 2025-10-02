@@ -75,6 +75,7 @@ pub struct DeployOptions {
     pub uploaders_count: u16,
     pub upload_interval: u16,
     pub upload_size: u16,
+    pub single_node_payment: bool,
     pub upnp_vm_size: Option<String>,
     pub upnp_private_node_count: u16,
     pub upnp_private_node_vm_count: Option<u16>,

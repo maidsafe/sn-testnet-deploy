@@ -4,3 +4,4 @@ ant_archive_url: https://autonomi-cli.s3.eu-west-2.amazonaws.com/{{ autonomi_arc
 log_output_dest: /mnt/client-logs/log/uploads
 enable_uploaders: true
 upload_size: 100 # megabytes
+single_node_payments: false
