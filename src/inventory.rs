@@ -683,7 +683,7 @@ impl DeploymentInventoryService {
         let output = self.ssh_client.run_command(
             &vm.public_ip_addr,
             &self.cloud_provider.get_ssh_user(),
-            "antctl status --json | jq -r '.nodes[] | select(.status == \"Running\") | .version' | head -n1",
+            "antctl status --json | jq -r '.nodes[] | .version' | head -n1",
             true,
         )?;
 
