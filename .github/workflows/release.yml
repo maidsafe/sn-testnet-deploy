@@ -17,6 +17,7 @@ jobs:
           profile: minimal
           toolchain: stable
           override: true
+          components: rustfmt
       # This method was copied from another repository, where we support multiple architectures. We
       # will just leave the mechanism in place in this repository, even though we're only using one
       # architecture. We can extend it later if need be.
