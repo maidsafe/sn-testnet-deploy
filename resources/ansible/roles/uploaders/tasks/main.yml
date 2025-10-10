@@ -90,10 +90,6 @@
   register: service_file_stat
   loop: "{{ range(1, ant_uploader_instances | int + 1) | list }}"
 
-- name: Retrieve secret keys
-  set_fact:
-    secret_keys_per_machine: "{{ ant_secret_key_map[inventory_hostname] | regex_replace('\"', '') }}"
-
 - name: create ant_random_uploader service file
   ansible.builtin.template:
     src: ant_random_uploader.service.j2
@@ -103,7 +99,7 @@
     mode: '0644'
   become: true
   when: not service_file_stat.results[item.0 - 1].stat.exists
-  loop: "{{ range(1, ant_uploader_instances | int + 1) | zip(secret_keys_per_machine) }}"
+  loop: "{{ range(1, ant_uploader_instances | int + 1) | zip(ant_secret_key_map[inventory_hostname]) }}"
   vars: 
     count: "{{ item.0 }}"
     secret_key: "{{ item.1 }}"
