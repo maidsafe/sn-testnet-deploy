@@ -630,13 +630,12 @@ pub fn build_clients_extra_vars_doc(
     for (k, v) in sk_map {
         let sks = v
             .iter()
-            .map(|sk| format!("{:?}", sk.to_bytes().encode_hex_with_prefix()))
+            .map(|sk| sk.to_bytes().encode_hex_with_prefix())
             .collect::<Vec<String>>();
         let sks = Value::Array(sks.into_iter().map(Value::String).collect());
         serde_map.insert(k.name.clone(), sks);
     }
     let serde_map = Value::Object(serde_map);
-
     extra_vars.add_serde_value("ant_secret_key_map", serde_map);
 
     // If there's only one entry in the sk_map, add a secret_key variable for use with the static
@@ -644,8 +643,7 @@ pub fn build_clients_extra_vars_doc(
     if sk_map.len() == 1 {
         if let Some((_, private_key_signers)) = sk_map.iter().next() {
             if let Some(first_signer) = private_key_signers.first() {
-                let secret_key_hex =
-                    format!("{:?}", first_signer.to_bytes().encode_hex_with_prefix());
+                let secret_key_hex = first_signer.to_bytes().encode_hex_with_prefix();
                 extra_vars.add_variable("secret_key", &secret_key_hex);
             }
         }
