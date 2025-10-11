@@ -10,6 +10,10 @@
     genesis_exists: "{{ (genesis_status.stdout | from_json).nodes | selectattr('initial_peers_config.first', 'equalto', true) | list | length > 0 }}"
   when: genesis_status.stdout != ""
 
+- name: obtain the public wan ip of the node
+  set_fact:
+    wan_ip: "{{ ansible_host }}"
+
 - name: add genesis node service
   become: True
   ansible.builtin.command:
@@ -22,6 +26,7 @@
       - add
       - --no-upnp
       - --first
+      - "--node-ip={{ wan_ip }}"
       - --skip-reachability-check
       - --data-dir-path=/mnt/antnode-storage/data
       - --log-dir-path=/mnt/antnode-storage/log
