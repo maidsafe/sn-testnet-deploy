@@ -519,16 +519,13 @@ pub fn build_terraform_args(options: &InfraRunOptions) -> Result<Vec<(String, St
         ));
     }
 
-    // Set the port restricted cone NAT gateway VM count based on private node VM count
     if let Some(port_restricted_private_node_vm_count) =
         options.port_restricted_private_node_vm_count
     {
-        if port_restricted_private_node_vm_count > 0 {
-            args.push((
-                "port_restricted_cone_node_vm_count".to_string(),
-                port_restricted_private_node_vm_count.to_string(),
-            ));
-        }
+        args.push((
+            "port_restricted_cone_node_vm_count".to_string(),
+            port_restricted_private_node_vm_count.to_string(),
+        ));
     }
 
     if let Some(port_restricted_private_node_vm_count) =

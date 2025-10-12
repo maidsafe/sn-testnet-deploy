@@ -335,7 +335,8 @@ impl DeploymentInventoryService {
         });
         let ansible_provisioner = self.ansible_provisioner.clone();
         let port_restricted_cone_private_node_registries_handle = std::thread::spawn(move || {
-            ansible_provisioner.get_node_registries(&AnsibleInventoryType::PortRestrictedConePrivateNodesStatic)
+            ansible_provisioner
+                .get_node_registries(&AnsibleInventoryType::PortRestrictedConePrivateNodes)
         });
         let ansible_provisioner = self.ansible_provisioner.clone();
         let upnp_private_node_registries_handle = std::thread::spawn(move || {
@@ -358,9 +359,10 @@ impl DeploymentInventoryService {
         let full_cone_private_node_registries = full_cone_private_node_registries_handle
             .join()
             .expect("Thread panicked")?;
-        let port_restricted_cone_private_node_registries = port_restricted_cone_private_node_registries_handle
-            .join()
-            .expect("Thread panicked")?;
+        let port_restricted_cone_private_node_registries =
+            port_restricted_cone_private_node_registries_handle
+                .join()
+                .expect("Thread panicked")?;
         let upnp_private_node_registries = upnp_private_node_registries_handle
             .join()
             .expect("Thread panicked")?;
@@ -1359,7 +1361,9 @@ impl DeploymentInventory {
                     &self.port_restricted_cone_nat_gateway_vms,
                 )?;
 
-            for (node_vm, nat_gateway_vm) in port_restricted_cone_private_node_nat_gateway_map.iter() {
+            for (node_vm, nat_gateway_vm) in
+                port_restricted_cone_private_node_nat_gateway_map.iter()
+            {
                 println!(
                     "{}: {} ==routed through==> {}: {}",
                     node_vm.name,
@@ -1380,7 +1384,10 @@ impl DeploymentInventory {
                 };
                 println!("SSH using NAT gateway: {ssh}");
             }
-            println!("Nodes per VM: {}", self.port_restricted_cone_private_node_count());
+            println!(
+                "Nodes per VM: {}",
+                self.port_restricted_cone_private_node_count()
+            );
             println!("SSH user: {}", self.ssh_user);
             println!();
         }
