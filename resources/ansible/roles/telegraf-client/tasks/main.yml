@@ -36,6 +36,10 @@
     accept_hostkey: yes
     force: yes
   when: repo_stat.stat.exists
+  register: git_update
+  retries: 3
+  delay: 5
+  until: git_update is success
 
 - name: copy telegraf environment file
   copy:
