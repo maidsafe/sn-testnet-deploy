@@ -1,0 +1,223 @@
+#!/usr/bin/env python3
+"""
+Data retrieval script that verifies all files in a CSV can be downloaded.
+
+This script processes each file/directory in the CSV file and attempts to download
+it with retry logic. It writes a simple success/failure status for each file.
+Always runs against the production network.
+"""
+
+import argparse
+import csv
+import hashlib
+import subprocess
+import sys
+import uuid
+from datetime import datetime
+from enum import Enum
+from pathlib import Path
+
+
+class FileType(Enum):
+    """File types for download operations."""
+    FILE_NO_ARCHIVE = "file_no_archive"
+    FILE_ARCHIVE = "file_archive"
+    DIRECTORY = "directory"
+
+
+def validate_file_hash(file_path: Path, expected_hash: str) -> bool:
+    """Validate a single file's hash. Returns True if no hash provided or hash matches."""
+    if not file_path.exists():
+        return False
+
+    if not expected_hash:
+        return file_path.stat().st_size > 0
+
+    sha256_hash = hashlib.sha256()
+    with open(file_path, "rb") as f:
+        for chunk in iter(lambda: f.read(4096), b""):
+            sha256_hash.update(chunk)
+
+    actual_hash = sha256_hash.hexdigest()
+    return actual_hash == expected_hash
+
+
+def validate_directory_with_manifest(download_path: Path, file_name: str, manifest_dir: Path) -> bool:
+    """Validate directory contents against manifest. If no manifest exists, just check directory exists."""
+    manifest_file = manifest_dir / f"{file_name}_manifest.csv"
+
+    if not manifest_file.exists():
+        return download_path.exists() and any(download_path.iterdir())
+
+    with open(manifest_file, "r") as f:
+        reader = csv.reader(f)
+        next(reader)
+
+        for row in reader:
+            manifest_path = row[0].strip('"')
+            expected_hash = row[1].strip('"')
+
+            downloaded_file = download_path / manifest_path
+            if not downloaded_file.exists():
+                return False
+            if not validate_file_hash(downloaded_file, expected_hash):
+                return False
+
+    return True
+
+
+def attempt_download(file_ref: str, file_name: str, file_type: FileType, file_hash: str,
+                     manifest_dir_path: Path, log_output_dest_path: str) -> bool:
+    """Attempt to download and validate a file/directory. Returns True if successful."""
+    download_subdir = str(uuid.uuid4())
+    download_path = Path("/mnt/ant-storage/downloaded_files") / download_subdir
+    download_path.mkdir(parents=True, exist_ok=True)
+
+    timestamp_str = datetime.now().strftime("%Y%m%d_%H%M%S")
+    log_file_path = f"{log_output_dest_path}/{timestamp_str}"
+
+    cmd = ["ant", "--log-output-dest", log_file_path, "file", "download", file_ref]
+    if file_type == FileType.FILE_NO_ARCHIVE:
+        cmd.append(str(download_path / file_name))
+    else:
+        cmd.append(str(download_path))
+    cmd.extend(["--quorum", "one", "--retries", "20"])
+
+    print(f"Running {''.join(cmd)}")
+
+    process = subprocess.Popen(
+        cmd,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.STDOUT,
+        text=True,
+        bufsize=0,
+        universal_newlines=True
+    )
+
+    for line in process.stdout:
+        print(line.rstrip())
+
+    return_code = process.wait()
+
+    if return_code != 0:
+        return False
+
+    actual_download_path = download_path / file_name
+    if actual_download_path.is_dir():
+        success = validate_directory_with_manifest(actual_download_path, file_name, manifest_dir_path)
+    else:
+        success = validate_file_hash(actual_download_path, file_hash)
+    return success
+
+def test_file(file_ref: str, file_name: str, file_type: FileType, file_hash: str,
+              manifest_dir: Path, log_output_dest: str, max_retries: int,
+              output_file: Path) -> bool:
+    """Test a single file with retry logic. Returns True if successful."""
+    for attempt in range(1, max_retries + 1):
+        print("\n" + "=" * 160)
+        print(f"DOWNLOAD ATTEMPT {attempt}/{max_retries}: {file_name}")
+        print("=" * 160 + "\n")
+
+        if attempt_download(file_ref, file_name, file_type, file_hash, manifest_dir, log_output_dest):
+            with open(output_file, "a") as f:
+                f.write(f"SUCCESS: {file_name} ({file_ref}) succeeded on attempt {attempt}/{max_retries}\n")
+            return True
+
+    with open(output_file, "a") as f:
+        f.write(f"FAILED: {file_name} ({file_ref}) failed after {max_retries} attempts\n")
+    return False
+
+
+def main():
+    parser = argparse.ArgumentParser(
+        description="Data loss testing script - verifies all files can be downloaded from production network"
+    )
+    parser.add_argument("-c", "--csv-path", required=True, help="Path to CSV file with file addresses")
+    parser.add_argument("-r", "--max-retries", type=int, default=20, help="Max retry attempts per file (default: 20)")
+    args = parser.parse_args()
+
+    csv_path = Path(args.csv_path)
+    max_retries = args.max_retries
+
+    if not csv_path.exists():
+        print(f"Error: CSV file '{csv_path}' does not exist")
+        sys.exit(1)
+
+    if max_retries < 1:
+        print(f"Error: max-retries must be at least 1")
+        sys.exit(1)
+
+    try:
+        subprocess.run(["ant", "--version"], capture_output=True, check=True, timeout=10)
+    except:
+        print("Error: 'ant' not found in PATH.")
+        sys.exit(1)
+
+    log_output_dest_path = "{{ log_output_dest }}"
+    manifest_dir_path = Path("{{ manifest_dir }}")
+    output_dir_path = Path(f"/home/ant1")
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    progress_log_path = output_dir_path / f"data_loss_test_{timestamp}.log"
+
+    with open(progress_log_path, "w") as f:
+        f.write(f"Data loss test started: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n")
+        f.write(f"Max retries per file: {max_retries}\n")
+        f.write("=" * 80 + "\n\n")
+
+    print(f"CSV path: {csv_path}")
+    print(f"Max retries per file: {max_retries}")
+    print(f"Progress log: {progress_log_path}")
+    print("=" * 80)
+
+    successful_count = 0
+    failed_count = 0
+    total_count = 0
+
+    with open(csv_path, "r") as f:
+        reader = csv.reader(f)
+        next(reader)
+
+        for row in reader:
+            if len(row) != 5 or not row[0] or not row[1]:
+                continue
+
+            total_count += 1
+            file_type = FileType(row[0])
+            file_ref = row[1]
+            file_hash = row[2]
+            file_name = row[4]
+
+            print(f"[{total_count}] Testing: {file_name}")
+
+            if test_file(file_ref, file_name, file_type, file_hash, manifest_dir_path,
+                        log_output_dest_path, max_retries, progress_log_path):
+                successful_count += 1
+                print(f"  ✅ SUCCESS")
+            else:
+                failed_count += 1
+                print(f"  ❌ FAILED")
+
+    with open(progress_log_path, "a") as f:
+        f.write("\n" + "=" * 80 + "\n")
+        f.write("FINAL SUMMARY\n")
+        f.write("=" * 80 + "\n")
+        f.write(f"Total files tested: {total_count}\n")
+        f.write(f"Successful: {successful_count}\n")
+        f.write(f"Failed: {failed_count}\n")
+        if failed_count == 0:
+            f.write("\n✅ NO DATA LOSS DETECTED\n")
+        else:
+            f.write(f"\n❌ POSSIBLE DATA LOSS DETECTED: {failed_count} file(s) failed\n")
+
+    print("\n" + "=" * 80)
+    print(f"Total: {total_count}, Success: {successful_count}, Failed: {failed_count}")
+    if failed_count == 0:
+        print("✅ NO DATA LOSS DETECTED")
+    else:
+        print(f"❌ POSSIBLE DATA LOSS DETECTED: {failed_count} file(s) failed")
+
+    sys.exit(0 if failed_count == 0 else 1)
+
+
+if __name__ == "__main__":
+    main()
