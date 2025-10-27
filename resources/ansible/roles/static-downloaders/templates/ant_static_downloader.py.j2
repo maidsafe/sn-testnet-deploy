@@ -561,16 +561,16 @@ class AntDownloader:
     
     def validate_download(self, file_record: FileRecord, result: DownloadResult) -> Tuple[DownloadResult, FileRecord]:
         """Validate download and update result. Returns updated result and potentially updated file record."""
-        if not result.success:
-            return result, file_record
-        
-        actual_hash = "0x0"
-        actual_file_size_kb = 0
-        exit_status = result.exit_status
-        success = result.success
-        updated_file_record = file_record
-        
         try:
+            if not result.success:
+                return result, file_record
+
+            actual_hash = "0x0"
+            actual_file_size_kb = 0
+            exit_status = result.exit_status
+            success = result.success
+            updated_file_record = file_record
+
             if result.download_path.is_dir():
                 try:
                     is_valid, actual_hash, expected_hash, actual_file_size_kb = self.file_validator.validate_directory_with_manifest(
@@ -611,7 +611,7 @@ class AntDownloader:
                 print("❌DOWNLOAD VALIDATION FAILED")
                 print(f"Error type: {ExitStatusMapper.get_exit_status(exit_status)}")
                 print("Please check the logs above for more details.")
-            
+
             return DownloadResult(
                 success=success,
                 exit_status=exit_status,
@@ -626,6 +626,7 @@ class AntDownloader:
             ), updated_file_record
         finally:
             if result.download_path.exists():
+                print(f"Removing {result.download_path}")
                 shutil.rmtree(result.download_path.parent)
     
     def get_next_file_record(self) -> FileRecord:
