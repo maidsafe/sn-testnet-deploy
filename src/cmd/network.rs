@@ -208,7 +208,7 @@ pub async fn handle_random_interval_network_churn(
     // print the time to churn all these nodes
     {
         let total_num_nodes = inventory.peers().len() - 1;
-        let n_timeframes_to_churn_all_nodes = if total_num_nodes % churn_count > 0 {
+        let n_timeframes_to_churn_all_nodes = if !total_num_nodes.is_multiple_of(churn_count) {
             total_num_nodes / churn_count + 1
         } else {
             total_num_nodes / churn_count
