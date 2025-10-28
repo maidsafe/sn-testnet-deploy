@@ -337,10 +337,12 @@ impl AnsibleRunner {
             println!("Using symmetric static private node inventory to run playbook");
             inventory_type = AnsibleInventoryType::SymmetricPrivateNodesStatic;
         }
-        if matches!(inventory_type, AnsibleInventoryType::PortRestrictedConePrivateNodes)
-            && self
-                .get_inventory_path(&AnsibleInventoryType::PortRestrictedConePrivateNodesStatic)
-                .is_ok()
+        if matches!(
+            inventory_type,
+            AnsibleInventoryType::PortRestrictedConePrivateNodes
+        ) && self
+            .get_inventory_path(&AnsibleInventoryType::PortRestrictedConePrivateNodesStatic)
+            .is_ok()
         {
             println!("Using port restricted cone static private node inventory to run playbook");
             inventory_type = AnsibleInventoryType::PortRestrictedConePrivateNodesStatic;

@@ -224,7 +224,10 @@ pub async fn handle_provision_full_cone_private_nodes(
     handle_provision_nodes(name, NodeType::FullConePrivateNode, disable_nodes).await
 }
 
-pub async fn handle_provision_port_restricted_cone_private_nodes(name: String, disable_nodes: bool) -> Result<()> {
+pub async fn handle_provision_port_restricted_cone_private_nodes(
+    name: String,
+    disable_nodes: bool,
+) -> Result<()> {
     handle_provision_nodes(name, NodeType::PortRestrictedConePrivateNode, disable_nodes).await
 }
 
