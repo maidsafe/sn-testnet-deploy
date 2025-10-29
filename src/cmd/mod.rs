@@ -387,6 +387,9 @@ pub enum Commands {
         /// Set to disable metrics collection on all nodes.
         #[clap(long)]
         disable_metrics: bool,
+        /// Set to disable logging to Elasticsearch on all nodes.
+        #[clap(long)]
+        disable_logging: bool,
         /// The type of deployment.
         ///
         /// Possible values are 'development', 'production' or 'staging'. The value used will

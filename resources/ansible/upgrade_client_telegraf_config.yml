@@ -14,12 +14,3 @@
       retries: 3
       delay: 5
       until: telegraf_restart is success
-    - name: restart telegraf-elasticsearch service
-      ansible.builtin.systemd:
-        name: telegraf-elasticsearch
-        enabled: yes
-        state: restarted
-      register: telegraf_elasticsearch_restart
-      retries: 3
-      delay: 5
-      until: telegraf_elasticsearch_restart is success

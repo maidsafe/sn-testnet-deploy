@@ -132,7 +132,7 @@
   retries: 3
   delay: 5
   until: telegraf_elasticsearch_start is not failed
-  when: enable_metrics | bool
+  when: enable_logging | bool
 
 - name: start telegraf service
   systemd:
