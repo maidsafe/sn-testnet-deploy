@@ -146,6 +146,7 @@ pub async fn handle_bootstrap(
         .bootstrap(&BootstrapOptions {
             binary_option,
             chunk_size,
+            enable_logging: true,
             environment_type: environment_type.clone(),
             evm_data_payments_address,
             evm_network: evm_network_type,
@@ -216,6 +217,7 @@ pub async fn handle_deploy(
     disable_download_verifier: bool,
     disable_performance_verifier: bool,
     disable_random_verifier: bool,
+    disable_logging: bool,
     disable_metrics: bool,
     environment_type: crate::EnvironmentType,
     evm_data_payments_address: Option<String>,
@@ -362,6 +364,7 @@ pub async fn handle_deploy(
         client_vm_size,
         current_inventory: inventory,
         enable_delayed_verifier: !disable_download_verifier,
+        enable_logging: !disable_logging,
         enable_metrics: !disable_metrics,
         enable_performance_verifier: !disable_performance_verifier,
         enable_random_verifier: !disable_random_verifier,

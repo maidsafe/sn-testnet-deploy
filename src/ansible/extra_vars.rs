@@ -359,6 +359,7 @@ pub fn build_node_extra_vars_doc(
         extra_vars.add_variable("network_id", &network_id.to_string());
     }
 
+    extra_vars.add_boolean_variable("enable_logging", options.enable_logging);
     extra_vars.add_boolean_variable("enable_metrics", options.enable_metrics);
     extra_vars.add_boolean_variable("disable_nodes", options.disable_nodes);
 
@@ -699,14 +700,12 @@ pub fn build_node_telegraf_upgrade(name: &str, node_type: &NodeType) -> Result<S
     let mut extra_vars: ExtraVarsDocBuilder = ExtraVarsDocBuilder::default();
     extra_vars.add_variable("testnet_name", name);
     extra_vars.add_variable("node_type", node_type.telegraf_role());
-    extra_vars.add_boolean_variable("enable_metrics", true);
     Ok(extra_vars.build())
 }
 
 pub fn build_client_telegraf_upgrade(name: &str) -> Result<String> {
     let mut extra_vars: ExtraVarsDocBuilder = ExtraVarsDocBuilder::default();
     extra_vars.add_variable("testnet_name", name);
-    extra_vars.add_boolean_variable("enable_metrics", true);
     Ok(extra_vars.build())
 }
 

@@ -19,6 +19,7 @@ use log::error;
 pub struct BootstrapOptions {
     pub binary_option: BinaryOption,
     pub chunk_size: Option<u64>,
+    pub enable_logging: bool,
     pub environment_type: EnvironmentType,
     pub evm_data_payments_address: Option<String>,
     pub evm_network: EvmNetwork,
