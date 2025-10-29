@@ -143,4 +143,4 @@
     name: telegraf
     enabled: yes
     state: started
-  when: enable_telegraf | bool
+  when: enable_metrics | bool

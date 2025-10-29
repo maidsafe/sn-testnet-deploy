@@ -83,9 +83,9 @@ pub enum ClientsCommands {
         /// Set to disable the random-verifier downloader on the VMs.
         #[clap(long)]
         disable_random_verifier: bool,
-        /// Set to disable Telegraf metrics collection on all nodes.
+        /// Set to disable metrics collection on all nodes.
         #[clap(long)]
-        disable_telegraf: bool,
+        disable_metrics: bool,
         /// Set to disable uploaders on the VMs. Use this when you only want to run downloader services.
         #[clap(long)]
         disable_uploaders: bool,
@@ -289,9 +289,9 @@ pub enum ClientsCommands {
         /// Set to disable the random-verifier downloader on the VMs.
         #[clap(long)]
         disable_random_verifier: bool,
-        /// Set to disable Telegraf metrics collection on all nodes.
+        /// Set to disable metrics collection on all nodes.
         #[clap(long)]
-        disable_telegraf: bool,
+        disable_metrics: bool,
         /// The type of deployment.
         ///
         /// Possible values are 'development', 'production' or 'staging'. The value used will
@@ -430,9 +430,9 @@ pub enum ClientsCommands {
         /// Override the size of the client VMs.
         #[clap(long)]
         client_vm_size: Option<String>,
-        /// Set to disable Telegraf metrics collection on all nodes.
+        /// Set to disable metrics collection on all nodes.
         #[clap(long)]
-        disable_telegraf: bool,
+        disable_metrics: bool,
         /// The type of deployment.
         ///
         /// Possible values are 'development', 'production' or 'staging'. The value used will
@@ -669,7 +669,7 @@ pub async fn handle_clients_command(cmd: ClientsCommands) -> Result<()> {
             client_env_variables,
             client_vm_count,
             client_vm_size,
-            disable_telegraf,
+            disable_metrics,
             disable_download_verifier,
             disable_random_verifier,
             disable_performance_verifier,
@@ -801,9 +801,9 @@ pub async fn handle_clients_command(cmd: ClientsCommands) -> Result<()> {
                 delayed_verifier_batch_size: None,
                 delayed_verifier_quorum_value: None,
                 enable_delayed_verifier: !disable_download_verifier,
+                enable_metrics: !disable_metrics,
                 enable_performance_verifier: !disable_performance_verifier,
                 enable_random_verifier: !disable_random_verifier,
-                enable_telegraf: !disable_telegraf,
                 enable_uploaders: !disable_uploaders,
                 environment_type,
                 evm_details,
@@ -853,7 +853,7 @@ pub async fn handle_clients_command(cmd: ClientsCommands) -> Result<()> {
             disable_delayed_verifier,
             disable_performance_verifier,
             disable_random_verifier,
-            disable_telegraf,
+            disable_metrics,
             environment_type,
             evm_data_payments_address,
             evm_network_type,
@@ -953,9 +953,9 @@ pub async fn handle_clients_command(cmd: ClientsCommands) -> Result<()> {
                 delayed_verifier_batch_size,
                 delayed_verifier_quorum_value,
                 enable_delayed_verifier: !disable_delayed_verifier,
+                enable_metrics: !disable_metrics,
                 enable_performance_verifier: !disable_performance_verifier,
                 enable_random_verifier: !disable_random_verifier,
-                enable_telegraf: !disable_telegraf,
                 enable_uploaders: false,
                 environment_type,
                 evm_details,
@@ -995,7 +995,7 @@ pub async fn handle_clients_command(cmd: ClientsCommands) -> Result<()> {
             client_env_variables,
             client_vm_count,
             client_vm_size,
-            disable_telegraf,
+            disable_metrics,
             environment_type,
             evm_data_payments_address,
             evm_network_type,
@@ -1084,9 +1084,9 @@ pub async fn handle_clients_command(cmd: ClientsCommands) -> Result<()> {
                 delayed_verifier_batch_size: None,
                 delayed_verifier_quorum_value: None,
                 enable_delayed_verifier: false,
+                enable_metrics: !disable_metrics,
                 enable_performance_verifier: false,
                 enable_random_verifier: false,
-                enable_telegraf: !disable_telegraf,
                 enable_uploaders: true,
                 environment_type,
                 evm_details,

@@ -384,9 +384,9 @@ pub enum Commands {
         /// Set to disable the random-verifier downloader on the VMs.
         #[clap(long)]
         disable_random_verifier: bool,
-        /// Set to disable Telegraf metrics collection on all nodes.
+        /// Set to disable metrics collection on all nodes.
         #[clap(long)]
-        disable_telegraf: bool,
+        disable_metrics: bool,
         /// The type of deployment.
         ///
         /// Possible values are 'development', 'production' or 'staging'. The value used will

@@ -34,7 +34,7 @@
         name: telegraf
         state: restarted
         enabled: yes
-      when: enable_telegraf | bool
+      when: enable_metrics | bool
       register: telegraf_restart
       retries: 3
       delay: 5

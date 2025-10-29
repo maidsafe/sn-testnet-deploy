@@ -359,7 +359,7 @@ pub fn build_node_extra_vars_doc(
         extra_vars.add_variable("network_id", &network_id.to_string());
     }
 
-    extra_vars.add_boolean_variable("enable_telegraf", options.enable_telegraf);
+    extra_vars.add_boolean_variable("enable_metrics", options.enable_metrics);
     extra_vars.add_boolean_variable("disable_nodes", options.disable_nodes);
 
     extra_vars.add_node_url_or_version(&options.name, &options.binary_option);
@@ -519,12 +519,12 @@ pub fn build_downloaders_extra_vars_doc(
     )?;
 
     extra_vars.add_boolean_variable("enable_delayed_verifier", options.enable_delayed_verifier);
+    extra_vars.add_boolean_variable("enable_metrics", options.enable_metrics);
     extra_vars.add_boolean_variable("enable_random_verifier", options.enable_random_verifier);
     extra_vars.add_boolean_variable(
         "enable_performance_verifier",
         options.enable_performance_verifier,
     );
-    extra_vars.add_boolean_variable("enable_telegraf", options.enable_telegraf);
 
     if let Some(file_address) = &options.file_address {
         extra_vars.add_variable("file_address", file_address);
@@ -623,7 +623,7 @@ pub fn build_clients_extra_vars_doc(
         extra_vars.add_env_variable_list("client_env_variables", client_env_variables.clone());
     }
 
-    extra_vars.add_variable("enable_telegraf", &options.enable_telegraf.to_string());
+    extra_vars.add_variable("enable_metrics", &options.enable_metrics.to_string());
     extra_vars.add_variable("enable_uploaders", &options.enable_uploaders.to_string());
 
     let mut serde_map = serde_json::Map::new();
@@ -699,14 +699,14 @@ pub fn build_node_telegraf_upgrade(name: &str, node_type: &NodeType) -> Result<S
     let mut extra_vars: ExtraVarsDocBuilder = ExtraVarsDocBuilder::default();
     extra_vars.add_variable("testnet_name", name);
     extra_vars.add_variable("node_type", node_type.telegraf_role());
-    extra_vars.add_boolean_variable("enable_telegraf", true);
+    extra_vars.add_boolean_variable("enable_metrics", true);
     Ok(extra_vars.build())
 }
 
 pub fn build_client_telegraf_upgrade(name: &str) -> Result<String> {
     let mut extra_vars: ExtraVarsDocBuilder = ExtraVarsDocBuilder::default();
     extra_vars.add_variable("testnet_name", name);
-    extra_vars.add_boolean_variable("enable_telegraf", true);
+    extra_vars.add_boolean_variable("enable_metrics", true);
     Ok(extra_vars.build())
 }
 
