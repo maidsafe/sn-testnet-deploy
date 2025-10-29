@@ -37,4 +37,4 @@
         name: telegraf
         state: restarted
         enabled: yes
-      when: enable_telegraf | bool
+      when: enable_metrics | bool

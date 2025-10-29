@@ -103,7 +103,7 @@
   retries: 3
   delay: 5
   until: telegraf_start is not failed
-  when: enable_telegraf | bool
+  when: enable_metrics | bool
 
 - name: start telegraf service
   systemd:
@@ -114,4 +114,4 @@
   retries: 3
   delay: 5
   until: telegraf_start is not failed
-  when: enable_telegraf | bool
+  when: enable_metrics | bool

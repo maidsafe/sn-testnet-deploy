@@ -194,9 +194,9 @@ impl TestnetDeployer {
             delayed_verifier_quorum_value: None,
             disable_nodes: false,
             enable_delayed_verifier: options.enable_delayed_verifier,
+            enable_metrics: true,
             enable_performance_verifier: options.enable_performance_verifier,
             enable_random_verifier: options.enable_random_verifier,
-            enable_telegraf: true,
             enable_uploaders: true,
             evm_data_payments_address: options
                 .current_inventory
@@ -529,9 +529,9 @@ impl TestnetDeployer {
             delayed_verifier_quorum_value: None,
             disable_nodes: false,
             enable_delayed_verifier: options.enable_delayed_verifier,
+            enable_metrics: true,
             enable_random_verifier: options.enable_random_verifier,
             enable_performance_verifier: options.enable_performance_verifier,
-            enable_telegraf: true,
             enable_uploaders: true,
             evm_data_payments_address: options
                 .current_inventory
