@@ -241,6 +241,8 @@ generate_random_data_file_and_upload() {
     $LOG_OUTPUT_ARG \
     file upload \
     $SINGLE_NODE_PAYMENT_ARG \
+    --no-archive \
+    --public \
     "$tmpfile" 2>&1 | tee "$temp_output_file"
   exit_code=${PIPESTATUS[0]}
   end_time=$(date +%s%N)
@@ -258,7 +260,7 @@ generate_random_data_file_and_upload() {
   error_enum=$(get_error_enum $exit_code)
 
   if [[ $exit_code -eq 0 ]]; then
-    echo "Successfully uploaded $tmpfile using ANT CLI"
+    echo "Uploaded $tmpfile"
     success_file="$UPLOAD_METRIC_DIR/metrics_success.csv"
 
     uploaded_address=$(echo "$stdout" | grep -oP 'At address: \K\S+')
@@ -274,7 +276,6 @@ generate_random_data_file_and_upload() {
   else
     echo "Failed to upload $tmpfile using ANT CLI"
     failure_file="$UPLOAD_METRIC_DIR/metrics_failure.csv"
-
 
     if [ ! -f "$failure_file" ]; then
       echo "TIMESTAMP_START,TIMESTAMP_FINISH,DATA_ADDRESS,DURATION,RETRIES,RECORDS_UPLOADED,RECORDS_ALREADY_PAID,TOTAL_RECORDS,EXIT_STATUS,SERVICE_TYPE,ANT_USER,SERVICE_NUMBER,STORE_COST,EXPECTED_TOTAL_SIZE,ACTUAL_TOTAL_SIZE,SHA256_HASH,ANT_PACKAGE_VERSION,ANT_PACKAGE_BUILD_DATE" > "$failure_file"
