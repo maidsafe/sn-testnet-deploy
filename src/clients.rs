@@ -31,6 +31,8 @@ const ANSIBLE_DEFAULT_FORKS: usize = 50;
 pub struct ClientsDeployOptions {
     pub binary_option: BinaryOption,
     pub chunk_size: Option<u64>,
+    pub chunk_tracker_data_addresses: Vec<String>,
+    pub chunk_tracker_services: u16,
     pub client_env_variables: Option<Vec<(String, String)>>,
     pub client_vm_count: Option<u16>,
     pub client_vm_size: Option<String>,
@@ -64,6 +66,7 @@ pub struct ClientsDeployOptions {
     pub upload_size: Option<u16>,
     pub upload_interval: u16,
     pub sleep_duration: Option<u16>,
+    pub start_chunk_trackers: bool,
     pub upload_batch_size: Option<u16>,
     pub wallet_secret_keys: Option<Vec<String>>,
 }
@@ -400,6 +403,20 @@ impl ClientsDeployer {
             .await
             .map_err(|err| {
                 println!("Failed to provision downloaders {err:?}");
+                err
+            })?;
+
+        self.ansible_provisioner
+            .print_ansible_run_banner("Provision Chunk Trackers");
+        self.ansible_provisioner
+            .provision_chunk_trackers(
+                &provision_options,
+                options.peer.clone(),
+                options.network_contacts_url.clone(),
+            )
+            .await
+            .map_err(|err| {
+                println!("Failed to provision chunk trackers {err:?}");
                 err
             })?;
 

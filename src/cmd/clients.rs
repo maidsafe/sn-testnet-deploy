@@ -57,6 +57,12 @@ pub enum ClientsCommands {
         /// This option only applies if the --branch and --repo-owner arguments are used.
         #[clap(long, value_parser = parse_chunk_size)]
         chunk_size: Option<u64>,
+        /// Comma-separated list of data addresses to track with chunk trackers.
+        #[arg(long, value_delimiter = ',')]
+        chunk_tracker_data_addresses: Vec<String>,
+        /// The number of chunk tracker services to run per client VM.
+        #[clap(long, default_value_t = 1)]
+        chunk_tracker_services: u16,
         /// Provide environment variables for the antnode RPC client.
         ///
         /// This is useful to set the client's log levels. Each variable should be comma
@@ -206,6 +212,9 @@ pub enum ClientsCommands {
         /// This is useful to re-run any failed deployments without rebuilding the binaries.
         #[arg(long, default_value_t = false)]
         skip_binary_build: bool,
+        /// Set to start chunk tracker services immediately after provisioning.
+        #[clap(long)]
+        start_chunk_trackers: bool,
         /// The desired number of uploaders per client VM.
         #[clap(long, default_value_t = 1)]
         uploaders_count: u16,
@@ -666,6 +675,8 @@ pub async fn handle_clients_command(cmd: ClientsCommands) -> Result<()> {
             ant_version,
             branch,
             chunk_size,
+            chunk_tracker_data_addresses,
+            chunk_tracker_services,
             client_env_variables,
             client_vm_count,
             client_vm_size,
@@ -679,6 +690,9 @@ pub async fn handle_clients_command(cmd: ClientsCommands) -> Result<()> {
             evm_network_type,
             evm_payment_token_address,
             evm_rpc_url,
+            expected_hash,
+            expected_size,
+            file_address,
             forks,
             funding_wallet_secret_key,
             initial_gas,
@@ -691,14 +705,12 @@ pub async fn handle_clients_command(cmd: ClientsCommands) -> Result<()> {
             provider,
             region,
             repo_owner,
-            uploaders_count,
-            wallet_secret_key,
-            file_address,
-            expected_hash,
-            expected_size,
-            upload_size,
-            upload_interval,
             skip_binary_build,
+            start_chunk_trackers,
+            uploaders_count,
+            upload_interval,
+            upload_size,
+            wallet_secret_key,
         } => {
             if (branch.is_some() && repo_owner.is_none())
                 || (branch.is_none() && repo_owner.is_some())
@@ -728,7 +740,8 @@ pub async fn handle_clients_command(cmd: ClientsCommands) -> Result<()> {
                 }
             }
 
-            if funding_wallet_secret_key.is_none()
+            if !disable_uploaders
+                && funding_wallet_secret_key.is_none()
                 && evm_network_type != EvmNetwork::Anvil
                 && wallet_secret_key.is_empty()
             {
@@ -794,6 +807,8 @@ pub async fn handle_clients_command(cmd: ClientsCommands) -> Result<()> {
             let options = ClientsDeployOptions {
                 binary_option,
                 chunk_size,
+                chunk_tracker_data_addresses,
+                chunk_tracker_services,
                 client_env_variables,
                 client_vm_count,
                 client_vm_size,
@@ -826,6 +841,7 @@ pub async fn handle_clients_command(cmd: ClientsCommands) -> Result<()> {
                 upload_interval,
                 upload_size: Some(upload_size),
                 sleep_duration: None,
+                start_chunk_trackers,
                 uploaders_count,
                 upload_batch_size: None,
                 wallet_secret_keys: if wallet_secret_key.is_empty() {
@@ -945,6 +961,8 @@ pub async fn handle_clients_command(cmd: ClientsCommands) -> Result<()> {
             let options = ClientsDeployOptions {
                 binary_option,
                 chunk_size,
+                chunk_tracker_data_addresses: Vec::new(),
+                chunk_tracker_services: 1,
                 client_env_variables,
                 client_vm_count,
                 client_vm_size: client_vm_size
@@ -978,6 +996,7 @@ pub async fn handle_clients_command(cmd: ClientsCommands) -> Result<()> {
                 upload_interval: 10,
                 upload_size: None,
                 sleep_duration,
+                start_chunk_trackers: false,
                 uploaders_count: 0,
                 upload_batch_size: None,
                 wallet_secret_keys: None,
@@ -1077,6 +1096,8 @@ pub async fn handle_clients_command(cmd: ClientsCommands) -> Result<()> {
             let options = ClientsDeployOptions {
                 binary_option,
                 chunk_size,
+                chunk_tracker_data_addresses: Vec::new(),
+                chunk_tracker_services: 1,
                 client_env_variables,
                 client_vm_count,
                 client_vm_size,
@@ -1109,6 +1130,7 @@ pub async fn handle_clients_command(cmd: ClientsCommands) -> Result<()> {
                 upload_interval: 10,
                 upload_size: None,
                 sleep_duration: None,
+                start_chunk_trackers: false,
                 uploaders_count: 1,
                 upload_batch_size,
                 wallet_secret_keys: Some(vec![wallet_secret_key]),

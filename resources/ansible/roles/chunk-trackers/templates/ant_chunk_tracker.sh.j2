@@ -1,0 +1,188 @@
+#!/usr/bin/env bash
+
+# Usage: ./ant_chunk_tracker.sh --service-number <number> [OPTIONS]
+#
+# Required arguments:
+#   --service-number <number>  Service instance number
+#
+# Optional arguments:
+#   --data-address <address>   Data address to track. If not provided, a random
+#                              address will be selected from metrics_success.csv files.
+#   --peer <multiaddr>         Optional contact peer
+#   --network-contacts-url <url> Optional network contacts URL
+#   --network-id <id>          Optional network ID (also enables testnet mode)
+
+SERVICE_NUMBER=""
+CHUNK_TRACKER_INTERVAL="{{ chunk_tracker_interval }}"
+CHUNK_TRACKER_LOG_PATH=""
+DATA_ADDRESS=""
+LOG_OUTPUT_PATH="{{ log_output_path }}"
+METRICS_CSV_PATH="{{ metrics_csv_path }}"
+CONTACT_PEER=""
+NETWORK_CONTACTS_URL=""
+NETWORK_ID=""
+
+parse_arguments() {
+  while [[ $# -gt 0 ]]; do
+    case $1 in
+      --service-number)
+        SERVICE_NUMBER="$2"
+        shift 2
+        ;;
+      --data-address)
+        DATA_ADDRESS="$2"
+        shift 2
+        ;;
+      --peer)
+        CONTACT_PEER="$2"
+        shift 2
+        ;;
+      --network-contacts-url)
+        NETWORK_CONTACTS_URL="$2"
+        shift 2
+        ;;
+      --network-id)
+        NETWORK_ID="$2"
+        shift 2
+        ;;
+      *)
+        echo "Unknown option: $1"
+        echo "Usage: $0 --service-number <number> [--data-address <address>] [--peer <multiaddr>] [--network-contacts-url <url>] [--network-id <id>]"
+        exit 1
+        ;;
+    esac
+  done
+}
+
+validate_arguments() {
+  if [[ -z "$SERVICE_NUMBER" ]]; then
+    echo "Error: --service-number is required"
+    echo "Usage: $0 --service-number <number> [--data-address <address>] [--peer <multiaddr>] [--network-contacts-url <url>] [--network-id <id>]"
+    exit 1
+  fi
+}
+
+setup_directories() {
+  CHUNK_TRACKER_LOG_PATH="/mnt/client-logs/log/chunk-tracker-${SERVICE_NUMBER}"
+  mkdir -p "${LOG_OUTPUT_PATH}"
+  mkdir -p "${CHUNK_TRACKER_LOG_PATH}"
+}
+
+check_dependencies() {
+  if ! command -v ant &> /dev/null; then
+    echo "Error: 'ant' not found in PATH."
+    exit 1
+  fi
+}
+
+build_network_args() {
+  CONTACT_PEER_ARG=""
+  NETWORK_CONTACTS_URL_ARG=""
+  NETWORK_ID_ARG=""
+
+  if [[ -n "$CONTACT_PEER" ]]; then
+    echo "Setting contact peer arg to $CONTACT_PEER"
+    CONTACT_PEER_ARG="--peer $CONTACT_PEER"
+  fi
+  if [[ -n "$NETWORK_CONTACTS_URL" ]]; then
+    echo "Setting network contacts URL arg to $NETWORK_CONTACTS_URL"
+    NETWORK_CONTACTS_URL_ARG="--network-contacts-url $NETWORK_CONTACTS_URL"
+  fi
+  if [[ -n "$NETWORK_ID" ]]; then
+    echo "Setting network ID arg to $NETWORK_ID"
+    NETWORK_ID_ARG="--network-id $NETWORK_ID"
+  fi
+}
+
+get_random_address_from_csv() {
+  # Find all metrics_success.csv files across all uploader instances
+  local csv_files=$(find "${METRICS_CSV_PATH}" -name "metrics_success.csv" 2>/dev/null)
+
+  if [[ -z "$csv_files" ]]; then
+    echo "Error: No metrics_success.csv files found in ${METRICS_CSV_PATH}"
+    return 1
+  fi
+
+  # Combine all CSV files (skip headers except first), extract DATA_ADDRESS column (3rd column)
+  # Filter out header rows and empty addresses
+  local addresses=$(awk -F',' 'NR==1 || FNR>1 {print $3}' $csv_files | grep -v "^DATA_ADDRESS$" | grep -v "^$" | grep -v "^0$")
+
+  if [[ -z "$addresses" ]]; then
+    echo "Error: No valid data addresses found in CSV files"
+    return 1
+  fi
+
+  local random_address=$(echo "$addresses" | shuf -n 1)
+  echo "$random_address"
+  return 0
+}
+
+analyze_chunk() {
+  local data_address=$1
+
+  echo "================================"
+  echo "$(date +'%Y-%m-%d %H:%M:%S')"
+  echo "================================"
+
+  start_time=$(date +%s%N)
+
+  ant \
+    $CONTACT_PEER_ARG \
+    $NETWORK_CONTACTS_URL_ARG \
+    $NETWORK_ID_ARG \
+    analyze \
+    -v \
+    --closest-nodes \
+    --holders \
+    --recursive \
+    --json \
+    "${CHUNK_TRACKER_LOG_PATH}/chunk_tracker_transformed.json" \
+    "$DATA_ADDRESS" 2>&1
+
+  local exit_code=$?
+  end_time=$(date +%s%N)
+
+  elapsed=$(echo "scale=2; ($end_time - $start_time) / 1000000000" | bc)
+  echo "Analysis completed in $elapsed seconds with exit code: $exit_code"
+}
+
+determine_data_address() {
+  if [[ -n "$DATA_ADDRESS" ]]; then
+    echo "Using data address: $DATA_ADDRESS"
+  else
+    echo "No data address provided, selecting random address from CSV files..."
+    DATA_ADDRESS=$(get_random_address_from_csv)
+    if [[ $? -ne 0 ]] || [[ -z "$DATA_ADDRESS" ]]; then
+      echo "Error: Failed to get data address from CSV files"
+      exit 1
+    fi
+    echo "Using data address: $DATA_ADDRESS"
+  fi
+}
+
+run_tracker_loop() {
+  local analysis_count=0
+  while true; do
+    analysis_count=$((analysis_count + 1))
+    analyze_chunk "$DATA_ADDRESS"
+
+    if [[ $? -ne 0 ]]; then
+      echo "❌Analysis FAILED"
+    fi
+
+    echo "Sleeping for ${CHUNK_TRACKER_INTERVAL} seconds..."
+    sleep "${CHUNK_TRACKER_INTERVAL}"
+  done
+}
+
+main() {
+  parse_arguments "$@"
+  validate_arguments
+  setup_directories
+  check_dependencies
+  build_network_args
+  determine_data_address
+  run_tracker_loop
+}
+
+main "$@"

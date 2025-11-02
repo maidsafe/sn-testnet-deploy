@@ -242,7 +242,7 @@ pub async fn handle_provision_clients(name: String) -> Result<()> {
             .ok_or_else(|| Error::GenesisListenAddress)?;
     let genesis_network_contacts = get_bootstrap_cache_url(&genesis_ip);
 
-    provisioner.print_ansible_run_banner("Provision Clients");
+    provisioner.print_ansible_run_banner("Provision Uploaders");
     provisioner
         .provision_uploaders(
             &provision_options,
@@ -265,6 +265,19 @@ pub async fn handle_provision_clients(name: String) -> Result<()> {
         .await
         .map_err(|err| {
             println!("Failed to provision downloaders: {err:?}");
+            err
+        })?;
+
+    provisioner.print_ansible_run_banner("Provision Chunk Trackers");
+    provisioner
+        .provision_chunk_trackers(
+            &provision_options,
+            Some(genesis_multiaddr.clone()),
+            Some(genesis_network_contacts.clone()),
+        )
+        .await
+        .map_err(|err| {
+            println!("Failed to provision chunk trackers {err:?}");
             err
         })?;
 

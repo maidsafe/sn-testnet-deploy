@@ -1,4 +1,6 @@
 ---
+chunk_tracker_json_output_filename: chunk_tracker_transformed_transformed.json
+log_output_path: /mnt/client-logs/log
 network_dashboard_branch: main
 network_dashboard_github_url: git@github.com:maidsafe/network-dashboard.git
 network_dashboard_repo_path: /root/network-dashboard
