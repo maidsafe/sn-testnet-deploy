@@ -22,6 +22,8 @@ use std::{path::PathBuf, time::Duration};
 pub struct DeployOptions {
     pub binary_option: BinaryOption,
     pub chunk_size: Option<u64>,
+    pub chunk_tracker_data_addresses: Vec<String>,
+    pub chunk_tracker_services: u16,
     pub client_env_variables: Option<Vec<(String, String)>>,
     pub client_vm_count: Option<u16>,
     pub client_vm_size: Option<String>,
@@ -66,6 +68,8 @@ pub struct DeployOptions {
     pub port_restricted_cone_private_node_count: u16,
     pub port_restricted_cone_private_node_vm_count: u16,
     pub port_restricted_cone_private_node_volume_size: Option<u16>,
+    pub single_node_payment: bool,
+    pub start_chunk_trackers: bool,
     pub symmetric_nat_gateway_vm_size: Option<String>,
     pub symmetric_private_node_count: u16,
     pub symmetric_private_node_vm_count: Option<u16>,
@@ -76,7 +80,6 @@ pub struct DeployOptions {
     pub uploaders_count: u16,
     pub upload_interval: u16,
     pub upload_size: u16,
-    pub single_node_payment: bool,
     pub upnp_vm_size: Option<String>,
     pub upnp_private_node_count: u16,
     pub upnp_private_node_vm_count: Option<u16>,
@@ -407,6 +410,19 @@ impl TestnetDeployer {
             .await
             .map_err(|err| {
                 println!("Failed to provision downloaders {err:?}");
+                err
+            })?;
+        self.ansible_provisioner
+            .print_ansible_run_banner("Provision Chunk Trackers");
+        self.ansible_provisioner
+            .provision_chunk_trackers(
+                &provision_options,
+                Some(genesis_multiaddr.clone()),
+                Some(genesis_network_contacts.clone()),
+            )
+            .await
+            .map_err(|err| {
+                println!("Failed to provision chunk trackers {err:?}");
                 err
             })?;
 

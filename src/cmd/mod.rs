@@ -359,6 +359,12 @@ pub enum Commands {
         /// This option only applies if the --branch and --repo-owner arguments are used.
         #[clap(long, value_parser = parse_chunk_size)]
         chunk_size: Option<u64>,
+        /// Comma-separated list of data addresses to track with chunk trackers.
+        #[arg(long, value_delimiter = ',')]
+        chunk_tracker_data_addresses: Vec<String>,
+        /// The number of chunk tracker services to run per client VM.
+        #[clap(long, default_value_t = 1)]
+        chunk_tracker_services: u16,
         /// Provide environment variables for the ant binary.
         ///
         /// This is useful to set the client's log levels. Each variable should be comma
@@ -635,6 +641,9 @@ pub enum Commands {
         /// When enabled, uploads will use the --single-node-payment flag.
         #[clap(long, default_value_t = false)]
         single_node_payment: bool,
+        /// Set to start chunk tracker services immediately after provisioning.
+        #[clap(long)]
+        start_chunk_trackers: bool,
         /// Override the size of the symmetric NAT gateway VM.
         #[clap(long)]
         symmetric_nat_gateway_vm_size: Option<String>,

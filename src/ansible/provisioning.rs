@@ -54,6 +54,8 @@ pub struct ProvisionOptions {
     pub ant_version: Option<String>,
     pub binary_option: BinaryOption,
     pub chunk_size: Option<u64>,
+    pub chunk_tracker_data_addresses: Option<Vec<String>>,
+    pub chunk_tracker_services: Option<u16>,
     pub client_env_variables: Option<Vec<(String, String)>>,
     pub delayed_verifier_batch_size: Option<u16>,
     pub disable_nodes: bool,
@@ -93,6 +95,7 @@ pub struct ProvisionOptions {
     pub rewards_address: Option<String>,
     pub sleep_duration: Option<u16>,
     pub single_node_payment: bool,
+    pub start_chunk_trackers: bool,
     pub symmetric_private_node_count: u16,
     pub token_amount: Option<U256>,
     pub upload_batch_size: Option<u16>,
@@ -313,6 +316,8 @@ impl From<BootstrapOptions> for ProvisionOptions {
             ant_version: None,
             binary_option: bootstrap_options.binary_option,
             chunk_size: bootstrap_options.chunk_size,
+            chunk_tracker_data_addresses: None,
+            chunk_tracker_services: None,
             client_env_variables: None,
             delayed_verifier_batch_size: None,
             disable_nodes: false,
@@ -351,6 +356,7 @@ impl From<BootstrapOptions> for ProvisionOptions {
             rewards_address: Some(bootstrap_options.rewards_address),
             sleep_duration: None,
             single_node_payment: false,
+            start_chunk_trackers: false,
             symmetric_private_node_count: bootstrap_options.symmetric_private_node_count,
             token_amount: None,
             upload_batch_size: None,
@@ -370,6 +376,13 @@ impl From<DeployOptions> for ProvisionOptions {
             ant_version: None,
             binary_option: deploy_options.binary_option,
             chunk_size: deploy_options.chunk_size,
+            chunk_tracker_data_addresses: if deploy_options.chunk_tracker_data_addresses.is_empty()
+            {
+                None
+            } else {
+                Some(deploy_options.chunk_tracker_data_addresses)
+            },
+            chunk_tracker_services: Some(deploy_options.chunk_tracker_services),
             client_env_variables: deploy_options.client_env_variables,
             delayed_verifier_batch_size: None,
             disable_nodes: false,
@@ -403,11 +416,14 @@ impl From<DeployOptions> for ProvisionOptions {
             output_inventory_dir_path: deploy_options.output_inventory_dir_path,
             peer_cache_node_count: deploy_options.peer_cache_node_count,
             performance_verifier_batch_size: None,
+            port_restricted_cone_private_node_count: deploy_options
+                .port_restricted_cone_private_node_count,
             public_rpc: deploy_options.public_rpc,
             random_verifier_batch_size: None,
             rewards_address: Some(deploy_options.rewards_address),
             sleep_duration: None,
             single_node_payment: deploy_options.single_node_payment,
+            start_chunk_trackers: deploy_options.start_chunk_trackers,
             symmetric_private_node_count: deploy_options.symmetric_private_node_count,
             token_amount: deploy_options.initial_tokens,
             upload_batch_size: None,
@@ -415,8 +431,6 @@ impl From<DeployOptions> for ProvisionOptions {
             upload_interval: Some(deploy_options.upload_interval),
             uploaders_count: Some(deploy_options.uploaders_count),
             upnp_private_node_count: deploy_options.upnp_private_node_count,
-            port_restricted_cone_private_node_count: deploy_options
-                .port_restricted_cone_private_node_count,
             wallet_secret_keys: None,
         }
     }
@@ -475,6 +489,14 @@ impl From<ClientsDeployOptions> for ProvisionOptions {
             upnp_private_node_count: 0,
             port_restricted_cone_private_node_count: 0,
             wallet_secret_keys: client_options.wallet_secret_keys,
+            chunk_tracker_data_addresses: if client_options.chunk_tracker_data_addresses.is_empty()
+            {
+                None
+            } else {
+                Some(client_options.chunk_tracker_data_addresses)
+            },
+            chunk_tracker_services: Some(client_options.chunk_tracker_services),
+            start_chunk_trackers: client_options.start_chunk_trackers,
         }
     }
 }
@@ -1423,6 +1445,7 @@ impl AnsibleProvisioner {
             .await?
         };
 
+        let client_vms: Vec<_> = sk_map.keys().cloned().collect();
         self.ansible_runner.run_playbook(
             AnsiblePlaybook::StaticUploader,
             AnsibleInventoryType::Clients,
@@ -1432,6 +1455,7 @@ impl AnsibleProvisioner {
                 genesis_multiaddr,
                 genesis_network_contacts_url,
                 &sk_map,
+                &client_vms,
             )?),
         )?;
         print_duration(start.elapsed());
@@ -1462,6 +1486,7 @@ impl AnsibleProvisioner {
             .await?
         };
 
+        let client_vms: Vec<_> = sk_map.keys().cloned().collect();
         self.ansible_runner.run_playbook(
             AnsiblePlaybook::Uploaders,
             AnsibleInventoryType::Clients,
@@ -1471,6 +1496,35 @@ impl AnsibleProvisioner {
                 genesis_multiaddr,
                 genesis_network_contacts_url,
                 &sk_map,
+                &client_vms,
+            )?),
+        )?;
+        print_duration(start.elapsed());
+        Ok(())
+    }
+
+    pub async fn provision_chunk_trackers(
+        &self,
+        options: &ProvisionOptions,
+        genesis_multiaddr: Option<String>,
+        genesis_network_contacts_url: Option<String>,
+    ) -> Result<()> {
+        let start = Instant::now();
+
+        let client_vms = self
+            .ansible_runner
+            .get_inventory(AnsibleInventoryType::Clients, true)?;
+
+        self.ansible_runner.run_playbook(
+            AnsiblePlaybook::ChunkTrackers,
+            AnsibleInventoryType::Clients,
+            Some(extra_vars::build_clients_extra_vars_doc(
+                &self.cloud_provider.to_string(),
+                options,
+                genesis_multiaddr,
+                genesis_network_contacts_url,
+                &HashMap::new(), // Empty map since chunk-trackers don't need wallets
+                &client_vms,
             )?),
         )?;
         print_duration(start.elapsed());

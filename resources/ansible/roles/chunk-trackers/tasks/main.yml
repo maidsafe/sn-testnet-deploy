@@ -1,0 +1,154 @@
+---
+- name: check if ant binary exists
+  ansible.builtin.stat:
+    path: "{{ binary_dir }}/ant"
+  register: ant_binary
+
+- name: download the ant binary
+  ansible.builtin.get_url:
+    url: "{{ ant_archive_url }}"
+    dest: "/tmp/{{ ant_archive_filename }}"
+  when: not ant_binary.stat.exists
+
+- name: extract the ant binary to /usr/local/bin
+  ansible.builtin.unarchive:
+    src: "/tmp/{{ ant_archive_filename }}"
+    dest: "{{ binary_dir }}"
+    remote_src: true
+  become: true
+  when: not ant_binary.stat.exists
+
+- name: check if ant group exists
+  ansible.builtin.getent:
+    database: group
+    key: ant
+  register: ant_group
+  failed_when: false
+
+- name: create ant group if it doesn't exist
+  ansible.builtin.group:
+    name: ant
+    state: present
+  become: true
+  when: ant_group.ansible_facts.getent_group is not defined or ant_group.ansible_facts.getent_group.ant is not defined
+
+- name: check if ant1 user exists
+  ansible.builtin.getent:
+    database: passwd
+    key: ant1
+  register: ant1_user
+  failed_when: false
+
+- name: create ant1 user if it doesn't exist
+  ansible.builtin.user:
+    name: ant1
+    shell: /bin/bash
+    group: ant
+    state: present
+  become: true
+  when: ant1_user.ansible_facts.getent_passwd is not defined or ant1_user.ansible_facts.getent_passwd.ant1 is not defined
+
+- name: ensure the ant users can write to the log output destination
+  ansible.builtin.file:
+    path: "{{ log_output_path }}"
+    state: directory
+    mode: '0775'
+    owner: root
+    group: ant
+  become: true
+
+- name: ensure chunk-tracker log directories exist for each instance
+  ansible.builtin.file:
+    path: "/mnt/client-logs/log/chunk-tracker-{{ item }}"
+    state: directory
+    mode: '0775'
+    owner: ant1
+    group: ant
+    recurse: yes
+  become: true
+  loop: "{{ range(1, chunk_tracker_instances | int + 1) | list }}"
+
+- name: ensure ant users can read metrics CSV files
+  ansible.builtin.file:
+    path: "{{ metrics_csv_path }}"
+    state: directory
+    mode: '0775'
+    owner: root
+    group: ant
+    recurse: yes
+  become: true
+
+- name: copy ant_chunk_tracker.sh to remote
+  ansible.builtin.template:
+    src: ant_chunk_tracker.sh.j2
+    dest: "/home/ant1/ant_chunk_tracker.sh"
+    owner: ant1
+    group: ant
+    mode: '0744'
+  become: true
+  become_user: ant1
+
+- name: Check if systemd service file exists
+  ansible.builtin.stat:
+    path: "/etc/systemd/system/ant_chunk_tracker_{{ item }}.service"
+  register: service_file_stat
+  loop: "{{ range(1, chunk_tracker_instances | int + 1) | list }}"
+
+# The scenario for running chunk trackers against production
+- name: create ant_chunk_tracker service file with data addresses supplied in advance
+  ansible.builtin.template:
+    src: ant_chunk_tracker.service.j2
+    dest: "/etc/systemd/system/ant_chunk_tracker_{{ item.0 }}.service"
+    owner: root
+    group: root
+    mode: '0644'
+  become: true
+  when:
+    - not service_file_stat.results[item.0 - 1].stat.exists
+    - chunk_tracker_data_address_map is defined
+    - chunk_tracker_data_address_map[inventory_hostname] is defined
+    - chunk_tracker_data_address_map[inventory_hostname] | length > 0
+  loop: "{{ range(1, chunk_tracker_instances | int + 1) | zip(chunk_tracker_data_address_map.get(inventory_hostname, [])) }}"
+  vars:
+    count: "{{ item.0 }}"
+    chunk_tracker_data_address: "{{ item.1 }}"
+
+# The scenario for running chunk trackers against a testnet
+- name: create ant_chunk_tracker service file without data addressess supplied in advance
+  ansible.builtin.template:
+    src: ant_chunk_tracker.service.j2
+    dest: "/etc/systemd/system/ant_chunk_tracker_{{ item }}.service"
+    owner: root
+    group: root
+    mode: '0644'
+  become: true
+  when:
+    - not service_file_stat.results[item - 1].stat.exists
+    - >-
+      chunk_tracker_data_address_map is not defined or
+      chunk_tracker_data_address_map[inventory_hostname] is not defined or
+      chunk_tracker_data_address_map[inventory_hostname] | length == 0
+  loop: "{{ range(1, chunk_tracker_instances | int + 1) | list }}"
+  vars:
+    count: "{{ item }}"
+    chunk_tracker_data_address: ""
+
+- name: reload systemd daemon
+  ansible.builtin.systemd:
+    daemon_reload: yes
+  become: true
+
+- name: enable ant_chunk_tracker service for each tracker
+  ansible.builtin.systemd:
+    name: "ant_chunk_tracker_{{ item }}"
+    enabled: yes
+  become: true
+  loop: "{{ range(1, chunk_tracker_instances | int + 1) | list }}"
+
+- name: start ant_chunk_tracker service for each tracker if requested
+  ansible.builtin.systemd:
+    name: "ant_chunk_tracker_{{ item }}"
+    state: started
+  become: true
+  loop: "{{ range(1, chunk_tracker_instances | int + 1) | list }}"
+  when: start_chunk_trackers | default(false) | bool

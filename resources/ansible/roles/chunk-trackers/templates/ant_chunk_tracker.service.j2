@@ -1,0 +1,30 @@
+[Unit]
+Description=Ant Network Chunk Tracker {{ count }}
+After=network.target
+
+[Service]
+{% if evm_network_type == "evm-custom" %}
+Environment="RPC_URL={{ evm_rpc_url }}"
+Environment="PAYMENT_TOKEN_ADDRESS={{ evm_payment_token_address }}"
+Environment="DATA_PAYMENTS_ADDRESS={{ evm_data_payments_address }}"
+{% elif evm_network_type == "evm-arbitrum-sepolia" %}
+Environment="EVM_NETWORK=arbitrum-sepolia"
+{% elif evm_network_type == "evm-arbitrum-one" %}
+Environment="EVM_NETWORK=arbitrum-one"
+{% endif %}
+{% if client_env_variables is defined %}
+Environment="{{ client_env_variables }}"
+{% endif %}
+User=ant1
+{% if network_id == "1" %}
+ExecStart=/home/ant1/ant_chunk_tracker.sh --service-number {{ count }}{% if chunk_tracker_data_address is defined and chunk_tracker_data_address %} --data-address {{ chunk_tracker_data_address }}{% endif %}
+
+{% else %}
+ExecStart=/home/ant1/ant_chunk_tracker.sh --service-number {{ count }}{% if chunk_tracker_data_address is defined and chunk_tracker_data_address %} --data-address {{ chunk_tracker_data_address }}{% endif %} --network-id "{{ network_id }}"{% if peer is defined %} --peer "{{ peer }}"{% endif %}{% if network_contacts_url is defined %} --network-contacts-url "{{ network_contacts_url }}"{% endif %}
+
+{% endif %}
+Restart=always
+WorkingDirectory=/home/ant1
+
+[Install]
+WantedBy=multi-user.target

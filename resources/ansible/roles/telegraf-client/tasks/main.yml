@@ -73,6 +73,18 @@
     regexp: "ANT_CLIENT_BRANCH_COMMIT=UNDEFINED"
     replace: "ANT_CLIENT_BRANCH_COMMIT=UNDEFINED"
 
+- name: replace ANT_CLIENT_ROOT_DIR_CHUNK_TRACKER_JSON value
+  replace:
+    path: "/etc/default/telegraf"
+    regexp: 'ANT_CLIENT_ROOT_DIR_CHUNK_TRACKER_JSON=/mnt/client-logs/log'
+    replace: 'ANT_CLIENT_ROOT_DIR_CHUNK_TRACKER_JSON={{ log_output_path }}'
+
+- name: replace ANT_CLIENT_FILENAME_CHUNK_TRACKER value
+  replace:
+    path: "/etc/default/telegraf"
+    regexp: 'ANT_CLIENT_FILENAME_CHUNK_TRACKER=chunk_tracker_transformed_transformed.json'
+    replace: 'ANT_CLIENT_FILENAME_CHUNK_TRACKER={{ chunk_tracker_json_output_filename }}'
+
 - name: copy telegraf.conf
   copy:
     src: "{{ network_dashboard_repo_path }}/telegraf/ConfigurationFile/ant_clients/telegraf.conf"
@@ -107,6 +119,12 @@
   copy:
     src: "{{ network_dashboard_repo_path }}/telegraf/ConfigurationFile/ant_clients/telegraf_ant_random_verifier.conf"
     dest: /etc/telegraf/telegraf.d/telegraf_ant_random_verifier.conf
+    remote_src: yes
+
+- name: copy telegraf_ant_chunk_tracker.conf
+  copy:
+    src: "{{ network_dashboard_repo_path }}/telegraf/ConfigurationFile/ant_clients/telegraf_ant_chunk_tracker.conf"
+    dest: /etc/telegraf/telegraf.d/telegraf_ant_chunk_tracker.conf
     remote_src: yes
 
 - name: add telegraf user to sudoers for safe command

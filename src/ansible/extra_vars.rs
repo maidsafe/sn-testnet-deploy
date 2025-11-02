@@ -587,6 +587,7 @@ pub fn build_clients_extra_vars_doc(
     peer: Option<String>,
     network_contacts_url: Option<String>,
     sk_map: &HashMap<VirtualMachine, Vec<PrivateKeySigner>>,
+    client_vms: &[VirtualMachine],
 ) -> Result<String> {
     let mut extra_vars = ExtraVarsDocBuilder::default();
     extra_vars.add_variable("provider", cloud_provider);
@@ -667,6 +668,35 @@ pub fn build_clients_extra_vars_doc(
         &options.upload_interval.unwrap_or(10).to_string(),
     );
     extra_vars.add_boolean_variable("single_node_payments", options.single_node_payment);
+
+    extra_vars.add_variable(
+        "chunk_tracker_instances",
+        &options.chunk_tracker_services.unwrap_or(1).to_string(),
+    );
+    extra_vars.add_variable(
+        "start_chunk_trackers",
+        &options.start_chunk_trackers.to_string(),
+    );
+
+    // Create a map of chunk tracker addresses similar to the secret key map for uploaders.
+    let mut chunk_tracker_address_map = serde_json::Map::new();
+    if let Some(addresses) = &options.chunk_tracker_data_addresses {
+        if !addresses.is_empty() {
+            // Each VM gets the same list of addresses (similar to how uploaders work)
+            // The number of addresses should match chunk_tracker_instances
+            for vm in client_vms {
+                let addresses_array = Value::Array(
+                    addresses
+                        .iter()
+                        .map(|addr| Value::String(addr.clone()))
+                        .collect(),
+                );
+                chunk_tracker_address_map.insert(vm.name.clone(), addresses_array);
+            }
+        }
+    }
+    let chunk_tracker_address_map = Value::Object(chunk_tracker_address_map);
+    extra_vars.add_serde_value("chunk_tracker_data_address_map", chunk_tracker_address_map);
 
     Ok(extra_vars.build())
 }
