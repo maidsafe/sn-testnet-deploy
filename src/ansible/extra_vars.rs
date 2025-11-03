@@ -599,6 +599,10 @@ pub fn build_clients_extra_vars_doc(
         extra_vars.add_variable("network_contacts_url", &network_contacts_url);
     }
 
+    if let Some(branch) = &options.network_dashboard_branch {
+        extra_vars.add_variable("network_dashboard_branch", branch);
+    }
+
     extra_vars.add_ant_url_or_version(
         &options.name,
         &options.binary_option,
