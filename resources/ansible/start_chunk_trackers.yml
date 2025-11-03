@@ -1,0 +1,26 @@
+---
+- name: ensure the ant chunk tracker services are started
+  hosts: all
+  become: True
+  tasks:
+    - name: find all chunk tracker service files
+      ansible.builtin.find:
+        paths: /etc/systemd/system
+        patterns: 'ant_chunk_tracker_*.service'
+      register: chunk_tracker_services
+
+    - name: extract service numbers
+      ansible.builtin.set_fact:
+        chunk_tracker_numbers: "{{ chunk_tracker_services.files | map(attribute='path') | map('regex_replace', '.*/ant_chunk_tracker_(\\d+)\\.service', '\\1') | list }}"
+
+    - name: start all chunk tracker services
+      ansible.builtin.systemd:
+        name: "ant_chunk_tracker_{{ item }}"
+        state: started
+        enabled: yes
+      register: chunk_tracker_start
+      retries: 3
+      delay: 5
+      until: chunk_tracker_start is not failed
+      become: true
+      loop: "{{ chunk_tracker_numbers }}"
