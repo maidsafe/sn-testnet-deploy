@@ -150,6 +150,10 @@ pub enum AnsiblePlaybook {
     ///
     /// Useful to determine the state of all the nodes in a deployment.
     Status,
+    /// This playbook will start the chunk trackers on each machine.
+    ///
+    /// Use in combination with `AnsibleInventoryType::Clients`.
+    StartChunkTrackers,
     /// This playbook will start the downloaders on each machine.
     ///
     /// Use in combination with `AnsibleInventoryType::Clients`.
@@ -173,6 +177,10 @@ pub enum AnsiblePlaybook {
     ///
     /// Use in combination with `AnsibleInventoryType::Clients`.
     StartUploaders,
+    /// This playbook will stop the chunk trackers on each machine.
+    ///
+    /// Use in combination with `AnsibleInventoryType::Clients`.
+    StopChunkTrackers,
     /// This playbook will stop the downloaders on each machine.
     ///
     /// Use in combination with `AnsibleInventoryType::Clients`.
@@ -255,6 +263,7 @@ impl AnsiblePlaybook {
             AnsiblePlaybook::PrivateNodeConfig => "private_node_config.yml".to_string(),
             AnsiblePlaybook::RpcClient => "safenode_rpc_client.yml".to_string(),
             AnsiblePlaybook::ResetToNNodes => "reset_to_n_nodes.yml".to_string(),
+            AnsiblePlaybook::StartChunkTrackers => "start_chunk_trackers.yml".to_string(),
             AnsiblePlaybook::StartDownloaders => "start_downloaders.yml".to_string(),
             AnsiblePlaybook::StartFaucet => "start_faucet.yml".to_string(),
             AnsiblePlaybook::StartNodes => "start_nodes.yml".to_string(),
@@ -266,6 +275,7 @@ impl AnsiblePlaybook {
             AnsiblePlaybook::StaticDownloaders => "static_downloaders.yml".to_string(),
             AnsiblePlaybook::StaticUploader => "static_uploader.yml".to_string(),
             AnsiblePlaybook::Status => "node_status.yml".to_string(),
+            AnsiblePlaybook::StopChunkTrackers => "stop_chunk_trackers.yml".to_string(),
             AnsiblePlaybook::StopDownloaders => "stop_downloaders.yml".to_string(),
             AnsiblePlaybook::StopFaucet => "stop_faucet.yml".to_string(),
             AnsiblePlaybook::StopNodes => "stop_nodes.yml".to_string(),

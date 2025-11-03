@@ -529,6 +529,15 @@ pub enum ClientsCommands {
         #[clap(long, default_value_t = CloudProvider::DigitalOcean, value_parser = parse_provider, verbatim_doc_comment)]
         provider: CloudProvider,
     },
+    /// Start all chunk trackers on all client VMs in an environment.
+    StartChunkTrackers {
+        /// The name of the environment
+        #[arg(long)]
+        name: String,
+        /// The cloud provider that was used.
+        #[clap(long, default_value_t = CloudProvider::DigitalOcean, value_parser = parse_provider, verbatim_doc_comment)]
+        provider: CloudProvider,
+    },
     /// Start all downloaders on all client VMs in an environment.
     StartDownloaders {
         /// The name of the environment
@@ -540,6 +549,15 @@ pub enum ClientsCommands {
     },
     /// Start all uploaders on all client VMs in an environment.
     StartUploaders {
+        /// The name of the environment
+        #[arg(long)]
+        name: String,
+        /// The cloud provider that was used.
+        #[clap(long, default_value_t = CloudProvider::DigitalOcean, value_parser = parse_provider, verbatim_doc_comment)]
+        provider: CloudProvider,
+    },
+    /// Stop all chunk trackers on all client VMs in an environment.
+    StopChunkTrackers {
         /// The name of the environment
         #[arg(long)]
         name: String,
@@ -1141,6 +1159,24 @@ pub async fn handle_clients_command(cmd: ClientsCommands) -> Result<()> {
             println!("Static uploader deployment for '{name}' completed successfully");
             Ok(())
         }
+        ClientsCommands::StartChunkTrackers { name, provider } => {
+            let testnet_deployer = TestnetDeployBuilder::default()
+                .environment_name(&name)
+                .provider(provider)
+                .build()?;
+            let inventory_service = DeploymentInventoryService::from(&testnet_deployer);
+            inventory_service
+                .generate_or_retrieve_inventory(&name, true, None)
+                .await?;
+
+            let ansible_runner = testnet_deployer.ansible_provisioner.ansible_runner;
+            ansible_runner.run_playbook(
+                AnsiblePlaybook::StartChunkTrackers,
+                AnsibleInventoryType::Clients,
+                None,
+            )?;
+            Ok(())
+        }
         ClientsCommands::StartDownloaders { name, provider } => {
             let testnet_deployer = TestnetDeployBuilder::default()
                 .environment_name(&name)
@@ -1172,6 +1208,24 @@ pub async fn handle_clients_command(cmd: ClientsCommands) -> Result<()> {
             let ansible_runner = testnet_deployer.ansible_provisioner.ansible_runner;
             ansible_runner.run_playbook(
                 AnsiblePlaybook::StartUploaders,
+                AnsibleInventoryType::Clients,
+                None,
+            )?;
+            Ok(())
+        }
+        ClientsCommands::StopChunkTrackers { name, provider } => {
+            let testnet_deployer = TestnetDeployBuilder::default()
+                .environment_name(&name)
+                .provider(provider)
+                .build()?;
+            let inventory_service = DeploymentInventoryService::from(&testnet_deployer);
+            inventory_service
+                .generate_or_retrieve_inventory(&name, true, None)
+                .await?;
+
+            let ansible_runner = testnet_deployer.ansible_provisioner.ansible_runner;
+            ansible_runner.run_playbook(
+                AnsiblePlaybook::StopChunkTrackers,
                 AnsibleInventoryType::Clients,
                 None,
             )?;
