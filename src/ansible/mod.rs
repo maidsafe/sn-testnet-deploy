@@ -130,6 +130,11 @@ pub enum AnsiblePlaybook {
     ///
     /// See the `reset-to-n-nodes` role for more details.
     ResetToNNodes,
+    /// The reset nodes playbook will use antctl to reset all node services on any
+    /// machines it runs against, clearing out all node data.
+    ///
+    /// Use in combination with `AnsibleInventoryType::Genesis` or `AnsibleInventoryType::Nodes`.
+    ResetNodes,
     /// The rpc client playbook will setup the `safenode_rpc_client` binary on the genesis node.
     ///
     /// Use in combination with `AnsibleInventoryType::Genesis`.
@@ -263,6 +268,7 @@ impl AnsiblePlaybook {
             AnsiblePlaybook::PrivateNodeConfig => "private_node_config.yml".to_string(),
             AnsiblePlaybook::RpcClient => "safenode_rpc_client.yml".to_string(),
             AnsiblePlaybook::ResetToNNodes => "reset_to_n_nodes.yml".to_string(),
+            AnsiblePlaybook::ResetNodes => "reset_nodes.yml".to_string(),
             AnsiblePlaybook::StartChunkTrackers => "start_chunk_trackers.yml".to_string(),
             AnsiblePlaybook::StartDownloaders => "start_downloaders.yml".to_string(),
             AnsiblePlaybook::StartFaucet => "start_faucet.yml".to_string(),

@@ -802,6 +802,32 @@ pub enum Commands {
     /// Run Ansible provisions for existing infrastructure
     #[clap(name = "provision", subcommand)]
     Provision(ProvisionCommands),
+    /// Reset all nodes in an environment by running the antctl reset command.
+    ///
+    /// Should likely be used with the --custom-inventory or --node-type argument.
+    #[clap(name = "reset")]
+    Reset {
+        /// Provide a list of VM names to use as a custom inventory.
+        ///
+        /// This will reset nodes on a particular subset of VMs.
+        #[clap(name = "custom-inventory", long, use_value_delimiter = true)]
+        custom_inventory: Option<Vec<String>>,
+        /// Maximum number of forks Ansible will use to execute tasks on target hosts.
+        #[clap(long, default_value_t = 50)]
+        forks: usize,
+        /// The name of the environment.
+        #[arg(short = 'n', long)]
+        name: String,
+        /// Specify the type of node VM to reset the nodes on. If not provided, the nodes on
+        /// all the node VMs will be reset. This is mutually exclusive with the '--custom-inventory' argument.
+        ///
+        /// Valid values are "peer-cache", "genesis", "generic" and "private".
+        #[arg(long, conflicts_with = "custom-inventory")]
+        node_type: Option<NodeType>,
+        /// The cloud provider for the environment.
+        #[clap(long, value_parser = parse_provider, verbatim_doc_comment, default_value_t = CloudProvider::DigitalOcean)]
+        provider: CloudProvider,
+    },
     /// Reset nodes to a specified count.
     ///
     /// This will stop all nodes, clear their data, and start the specified number of nodes.

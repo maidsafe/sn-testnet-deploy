@@ -405,6 +405,16 @@ async fn main() -> Result<()> {
             setup_dotenv_file()?;
             Ok(())
         }
+        Commands::Reset {
+            custom_inventory,
+            forks,
+            name,
+            node_type,
+            provider,
+        } => {
+            nodes::handle_reset_command(custom_inventory, forks, name, node_type, provider).await?;
+            Ok(())
+        }
         Commands::Start {
             custom_inventory,
             forks,

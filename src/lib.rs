@@ -776,6 +776,19 @@ impl TestnetDeployer {
         Ok(())
     }
 
+    pub fn reset(
+        &self,
+        node_type: Option<NodeType>,
+        custom_inventory: Option<Vec<VirtualMachine>>,
+    ) -> Result<()> {
+        self.ansible_provisioner.reset_nodes(
+            &self.environment_name,
+            node_type,
+            custom_inventory,
+        )?;
+        Ok(())
+    }
+
     /// Get the status of all nodes in a network.
     ///
     /// First, a playbook runs `safenode-manager status` against all the machines, to get the
