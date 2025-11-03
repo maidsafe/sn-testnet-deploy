@@ -1577,6 +1577,45 @@ impl AnsibleProvisioner {
         Ok(())
     }
 
+    pub fn reset_nodes(
+        &self,
+        environment_name: &str,
+        node_type: Option<NodeType>,
+        custom_inventory: Option<Vec<VirtualMachine>>,
+    ) -> Result<()> {
+        if let Some(node_type) = node_type {
+            println!("Running the reset nodes playbook for {node_type:?} nodes");
+            self.ansible_runner.run_playbook(
+                AnsiblePlaybook::ResetNodes,
+                node_type.to_ansible_inventory_type(),
+                None,
+            )?;
+            return Ok(());
+        }
+
+        if let Some(custom_inventory) = custom_inventory {
+            println!("Running the reset nodes playbook with a custom inventory");
+            generate_custom_environment_inventory(
+                &custom_inventory,
+                environment_name,
+                &self.ansible_runner.working_directory_path.join("inventory"),
+            )?;
+            self.ansible_runner.run_playbook(
+                AnsiblePlaybook::ResetNodes,
+                AnsibleInventoryType::Custom,
+                None,
+            )?;
+            return Ok(());
+        }
+
+        println!("Running the reset nodes playbook for all node types");
+        for node_inv_type in AnsibleInventoryType::iter_node_type() {
+            self.ansible_runner
+                .run_playbook(AnsiblePlaybook::ResetNodes, node_inv_type, None)?;
+        }
+        Ok(())
+    }
+
     pub fn status(&self) -> Result<()> {
         for node_inv_type in AnsibleInventoryType::iter_node_type() {
             self.ansible_runner

@@ -1,0 +1,7 @@
+---
+- name: reset all nodes using the node manager
+  hosts: all
+  become: True
+  tasks:
+    - name: reset
+      ansible.builtin.command: "antctl reset --force"
