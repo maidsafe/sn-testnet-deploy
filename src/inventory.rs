@@ -441,17 +441,17 @@ impl DeploymentInventoryService {
                     random_vm = genesis_vm.clone()
                 };
 
-                let Some(random_vm) = random_vm else {
-                    return Err(eyre!("Unable to obtain a VM to retrieve versions"));
-                };
-
-                let antnode_version = self.get_antnode_version(&random_vm.vm)?;
-                let antctl_version = self.get_bin_version(
-                    &random_vm.vm,
-                    "antctl --version",
-                    "Autonomi Node Manager v",
-                )?;
-                (Some(antnode_version), Some(antctl_version))
+                if let Some(random_vm) = random_vm {
+                    let antnode_version = self.get_antnode_version(&random_vm.vm)?;
+                    let antctl_version = self.get_bin_version(
+                        &random_vm.vm,
+                        "antctl --version",
+                        "Autonomi Node Manager v",
+                    )?;
+                    (Some(antnode_version), Some(antctl_version))
+                } else {
+                    (None, None)
+                }
             };
 
             let ant_version = if !client_vms.is_empty()
