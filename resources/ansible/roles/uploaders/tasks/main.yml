@@ -104,11 +104,17 @@
     count: "{{ item.0 }}"
     secret_key: "{{ item.1 }}"
 
-- name: start and enable ant_random_uploader service for each uploader
+- name: enable ant_random_uploader service for each uploader
   ansible.builtin.systemd:
     name: "ant_random_uploader_{{ item }}"
-    state: started
     enabled: yes
   become: true
   loop: "{{ range(1, ant_uploader_instances | int + 1) | list }}"
-  when: enable_uploaders | default(true) | bool
+
+- name: start ant_random_uploader service for each uploader
+  ansible.builtin.systemd:
+    name: "ant_random_uploader_{{ item }}"
+    state: started
+  become: true
+  loop: "{{ range(1, ant_uploader_instances | int + 1) | list }}"
+  when: start_uploaders | default(false) | bool

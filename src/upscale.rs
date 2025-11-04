@@ -33,9 +33,6 @@ pub struct UpscaleOptions {
     pub desired_symmetric_private_node_count: Option<u16>,
     pub desired_symmetric_private_node_vm_count: Option<u16>,
     pub desired_uploaders_count: Option<u16>,
-    pub enable_delayed_verifier: bool,
-    pub enable_random_verifier: bool,
-    pub enable_performance_verifier: bool,
     pub funding_wallet_secret_key: Option<String>,
     pub gas_amount: Option<U256>,
     pub interval: Duration,
@@ -47,6 +44,9 @@ pub struct UpscaleOptions {
     pub plan: bool,
     pub public_rpc: bool,
     pub provision_only: bool,
+    pub start_delayed_verifier: bool,
+    pub start_random_verifier: bool,
+    pub start_performance_verifier: bool,
     pub token_amount: Option<U256>,
 }
 
@@ -195,12 +195,8 @@ impl TestnetDeployer {
             delayed_verifier_batch_size: None,
             delayed_verifier_quorum_value: None,
             disable_nodes: false,
-            enable_delayed_verifier: options.enable_delayed_verifier,
             enable_logging: true,
             enable_metrics: true,
-            enable_performance_verifier: options.enable_performance_verifier,
-            enable_random_verifier: options.enable_random_verifier,
-            enable_uploaders: true,
             evm_data_payments_address: options
                 .current_inventory
                 .environment_details
@@ -258,6 +254,10 @@ impl TestnetDeployer {
             single_node_payment: false,
             sleep_duration: None,
             start_chunk_trackers: false,
+            start_delayed_verifier: options.start_delayed_verifier,
+            start_performance_verifier: options.start_performance_verifier,
+            start_random_verifier: options.start_random_verifier,
+            start_uploaders: false,
             symmetric_private_node_count: desired_symmetric_private_node_count,
             token_amount: None,
             upload_batch_size: None,
@@ -534,12 +534,8 @@ impl TestnetDeployer {
             delayed_verifier_batch_size: None,
             delayed_verifier_quorum_value: None,
             disable_nodes: false,
-            enable_delayed_verifier: options.enable_delayed_verifier,
             enable_logging: true,
             enable_metrics: true,
-            enable_random_verifier: options.enable_random_verifier,
-            enable_performance_verifier: options.enable_performance_verifier,
-            enable_uploaders: true,
             evm_data_payments_address: options
                 .current_inventory
                 .environment_details
@@ -596,6 +592,10 @@ impl TestnetDeployer {
             single_node_payment: false,
             sleep_duration: None,
             start_chunk_trackers: false,
+            start_delayed_verifier: options.start_delayed_verifier,
+            start_random_verifier: options.start_random_verifier,
+            start_performance_verifier: options.start_performance_verifier,
+            start_uploaders: false,
             symmetric_private_node_count: 0,
             token_amount: options.token_amount,
             uploaders_count: options.desired_uploaders_count,

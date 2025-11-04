@@ -80,21 +80,9 @@ pub enum ClientsCommands {
         /// Override the size of the client VMs.
         #[clap(long)]
         client_vm_size: Option<String>,
-        /// Set to disable the download-verifier downloader on the VMs.
-        #[clap(long)]
-        disable_download_verifier: bool,
-        /// Set to disable the performance-verifier downloader on the VMs.
-        #[clap(long)]
-        disable_performance_verifier: bool,
-        /// Set to disable the random-verifier downloader on the VMs.
-        #[clap(long)]
-        disable_random_verifier: bool,
         /// Set to disable metrics collection on all nodes.
         #[clap(long)]
         disable_metrics: bool,
-        /// Set to disable uploaders on the VMs. Use this when you only want to run downloader services.
-        #[clap(long)]
-        disable_uploaders: bool,
         /// The type of deployment.
         ///
         /// Possible values are 'development', 'production' or 'staging'. The value used will
@@ -215,6 +203,18 @@ pub enum ClientsCommands {
         /// Set to start chunk tracker services immediately after provisioning.
         #[clap(long)]
         start_chunk_trackers: bool,
+        /// Set to start the download-verifier downloader on the VMs.
+        #[clap(long)]
+        start_download_verifier: bool,
+        /// Set to start the performance-verifier downloader on the VMs.
+        #[clap(long)]
+        start_performance_verifier: bool,
+        /// Set to start the random-verifier downloader on the VMs.
+        #[clap(long)]
+        start_random_verifier: bool,
+        /// Set to start uploaders on the VMs immediately after provisioning.
+        #[clap(long)]
+        start_uploaders: bool,
         /// The desired number of uploaders per client VM.
         #[clap(long, default_value_t = 1)]
         uploaders_count: u16,
@@ -289,15 +289,6 @@ pub enum ClientsCommands {
         /// Can be "majority", "all", or a custom number.
         #[clap(long)]
         delayed_verifier_quorum_value: Option<String>,
-        /// Set to disable the delayed-verifier downloader on the VMs.
-        #[clap(long)]
-        disable_delayed_verifier: bool,
-        /// Set to disable the performance-verifier downloader on the VMs.
-        #[clap(long)]
-        disable_performance_verifier: bool,
-        /// Set to disable the random-verifier downloader on the VMs.
-        #[clap(long)]
-        disable_random_verifier: bool,
         /// Set to disable metrics collection on all nodes.
         #[clap(long)]
         disable_metrics: bool,
@@ -395,6 +386,15 @@ pub enum ClientsCommands {
         /// Sleep duration in seconds for downloader services.
         #[arg(long)]
         sleep_duration: Option<u16>,
+        /// Set to start the delayed-verifier downloader on the VMs.
+        #[clap(long)]
+        start_delayed_verifier: bool,
+        /// Set to start the performance-verifier downloader on the VMs.
+        #[clap(long)]
+        start_performance_verifier: bool,
+        /// Set to start the random-verifier downloader on the VMs.
+        #[clap(long)]
+        start_random_verifier: bool,
     },
     /// Deploy a new static uploader environment.
     DeployStaticUploader {
@@ -617,15 +617,15 @@ pub enum ClientsCommands {
         /// If you want each Client VM to run multiple uploader services, specify the total desired count.
         #[clap(long, verbatim_doc_comment)]
         desired_uploaders_count: Option<u16>,
-        /// Set to disable the download-verifier downloader on the VMs.
+        /// Set to start the download-verifier downloader on the VMs.
         #[clap(long)]
-        disable_download_verifier: bool,
-        /// Set to disable the performance-verifier downloader on the VMs.
+        start_download_verifier: bool,
+        /// Set to start the performance-verifier downloader on the VMs.
         #[clap(long)]
-        disable_performance_verifier: bool,
-        /// Set to disable the random-verifier downloader on the VMs.
+        start_performance_verifier: bool,
+        /// Set to start the random-verifier downloader on the VMs.
         #[clap(long)]
-        disable_random_verifier: bool,
+        start_random_verifier: bool,
         /// The secret key for the wallet that will fund all the ANT instances.
         ///
         /// This argument only applies when Arbitrum or Sepolia networks are used.
@@ -699,10 +699,6 @@ pub async fn handle_clients_command(cmd: ClientsCommands) -> Result<()> {
             client_vm_count,
             client_vm_size,
             disable_metrics,
-            disable_download_verifier,
-            disable_random_verifier,
-            disable_performance_verifier,
-            disable_uploaders,
             environment_type,
             evm_data_payments_address,
             evm_network_type,
@@ -725,6 +721,10 @@ pub async fn handle_clients_command(cmd: ClientsCommands) -> Result<()> {
             repo_owner,
             skip_binary_build,
             start_chunk_trackers,
+            start_download_verifier,
+            start_random_verifier,
+            start_performance_verifier,
+            start_uploaders,
             uploaders_count,
             upload_interval,
             upload_size,
@@ -758,7 +758,7 @@ pub async fn handle_clients_command(cmd: ClientsCommands) -> Result<()> {
                 }
             }
 
-            if !disable_uploaders
+            if start_uploaders
                 && funding_wallet_secret_key.is_none()
                 && evm_network_type != EvmNetwork::Anvil
                 && wallet_secret_key.is_empty()
@@ -833,11 +833,7 @@ pub async fn handle_clients_command(cmd: ClientsCommands) -> Result<()> {
                 current_inventory: inventory,
                 delayed_verifier_batch_size: None,
                 delayed_verifier_quorum_value: None,
-                enable_delayed_verifier: !disable_download_verifier,
                 enable_metrics: !disable_metrics,
-                enable_performance_verifier: !disable_performance_verifier,
-                enable_random_verifier: !disable_random_verifier,
-                enable_uploaders: !disable_uploaders,
                 environment_type,
                 evm_details,
                 expected_hash,
@@ -860,6 +856,10 @@ pub async fn handle_clients_command(cmd: ClientsCommands) -> Result<()> {
                 upload_size: Some(upload_size),
                 sleep_duration: None,
                 start_chunk_trackers,
+                start_delayed_verifier: start_download_verifier,
+                start_performance_verifier,
+                start_random_verifier,
+                start_uploaders,
                 uploaders_count,
                 upload_batch_size: None,
                 wallet_secret_keys: if wallet_secret_key.is_empty() {
@@ -884,9 +884,6 @@ pub async fn handle_clients_command(cmd: ClientsCommands) -> Result<()> {
             client_vm_size,
             delayed_verifier_batch_size,
             delayed_verifier_quorum_value,
-            disable_delayed_verifier,
-            disable_performance_verifier,
-            disable_random_verifier,
             disable_metrics,
             environment_type,
             evm_data_payments_address,
@@ -906,6 +903,9 @@ pub async fn handle_clients_command(cmd: ClientsCommands) -> Result<()> {
             repo_owner,
             skip_binary_build,
             sleep_duration,
+            start_delayed_verifier,
+            start_performance_verifier,
+            start_random_verifier,
         } => {
             if (branch.is_some() && repo_owner.is_none())
                 || (branch.is_none() && repo_owner.is_some())
@@ -988,11 +988,7 @@ pub async fn handle_clients_command(cmd: ClientsCommands) -> Result<()> {
                 current_inventory: inventory,
                 delayed_verifier_batch_size,
                 delayed_verifier_quorum_value,
-                enable_delayed_verifier: !disable_delayed_verifier,
                 enable_metrics: !disable_metrics,
-                enable_performance_verifier: !disable_performance_verifier,
-                enable_random_verifier: !disable_random_verifier,
-                enable_uploaders: false,
                 environment_type,
                 evm_details,
                 expected_hash: None,
@@ -1015,6 +1011,10 @@ pub async fn handle_clients_command(cmd: ClientsCommands) -> Result<()> {
                 upload_size: None,
                 sleep_duration,
                 start_chunk_trackers: false,
+                start_delayed_verifier,
+                start_performance_verifier,
+                start_random_verifier,
+                start_uploaders: false,
                 uploaders_count: 0,
                 upload_batch_size: None,
                 wallet_secret_keys: None,
@@ -1122,11 +1122,7 @@ pub async fn handle_clients_command(cmd: ClientsCommands) -> Result<()> {
                 current_inventory: inventory,
                 delayed_verifier_batch_size: None,
                 delayed_verifier_quorum_value: None,
-                enable_delayed_verifier: false,
                 enable_metrics: !disable_metrics,
-                enable_performance_verifier: false,
-                enable_random_verifier: false,
-                enable_uploaders: true,
                 environment_type,
                 evm_details,
                 expected_hash: None,
@@ -1149,6 +1145,10 @@ pub async fn handle_clients_command(cmd: ClientsCommands) -> Result<()> {
                 upload_size: None,
                 sleep_duration: None,
                 start_chunk_trackers: false,
+                start_delayed_verifier: false,
+                start_performance_verifier: false,
+                start_random_verifier: false,
+                start_uploaders: false,
                 uploaders_count: 1,
                 upload_batch_size,
                 wallet_secret_keys: Some(vec![wallet_secret_key]),
@@ -1303,9 +1303,6 @@ pub async fn handle_clients_command(cmd: ClientsCommands) -> Result<()> {
             autonomi_version,
             desired_client_vm_count,
             desired_uploaders_count,
-            disable_download_verifier,
-            disable_random_verifier,
-            disable_performance_verifier,
             funding_wallet_secret_key,
             gas_amount,
             infra_only,
@@ -1313,6 +1310,9 @@ pub async fn handle_clients_command(cmd: ClientsCommands) -> Result<()> {
             plan,
             provision_only,
             provider,
+            start_download_verifier,
+            start_random_verifier,
+            start_performance_verifier,
         } => {
             let gas_amount = if let Some(amount) = gas_amount {
                 let amount: f64 = amount.parse().map_err(|_| {
@@ -1343,6 +1343,7 @@ pub async fn handle_clients_command(cmd: ClientsCommands) -> Result<()> {
             testnet_deployer
                 .upscale_clients(&UpscaleOptions {
                     ansible_verbose: false,
+                    ant_version: Some(autonomi_version),
                     current_inventory: inventory,
                     desired_client_vm_count,
                     desired_full_cone_private_node_count: None,
@@ -1354,9 +1355,6 @@ pub async fn handle_clients_command(cmd: ClientsCommands) -> Result<()> {
                     desired_symmetric_private_node_count: None,
                     desired_symmetric_private_node_vm_count: None,
                     desired_uploaders_count,
-                    enable_delayed_verifier: !disable_download_verifier,
-                    enable_random_verifier: !disable_random_verifier,
-                    enable_performance_verifier: !disable_performance_verifier,
                     funding_wallet_secret_key,
                     gas_amount,
                     max_archived_log_files: 1,
@@ -1368,7 +1366,9 @@ pub async fn handle_clients_command(cmd: ClientsCommands) -> Result<()> {
                     plan,
                     provision_only,
                     public_rpc: false,
-                    ant_version: Some(autonomi_version),
+                    start_delayed_verifier: start_download_verifier,
+                    start_random_verifier,
+                    start_performance_verifier,
                     token_amount: None,
                 })
                 .await?;

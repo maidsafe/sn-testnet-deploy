@@ -51,7 +51,6 @@
     group: ant
     recurse: yes
   become: true
-  when: enable_random_verifier | bool
 
 - name: ensure the ant users can write to the download_verifier metrics directory
   ansible.builtin.file:
@@ -62,7 +61,6 @@
     group: ant
     recurse: yes
   become: true
-  when: enable_delayed_verifier | bool
 
 - name: ensure the ant users can write to the performance_verifier metrics directory
   ansible.builtin.file:
@@ -73,7 +71,6 @@
     group: ant
     recurse: yes
   become: true
-  when: enable_performance_verifier | bool
 
 - name: ensure the ant users can write to the download directory
   ansible.builtin.file:
@@ -135,7 +132,7 @@
     group: ant
     mode: '0644'
   become: true
-  when: not ant_random_verifier_stat.stat.exists and enable_random_verifier | bool
+  when: not ant_random_verifier_stat.stat.exists
 
 - name: create ant_download_verifier systemd service file
   ansible.builtin.template:
@@ -145,7 +142,7 @@
     group: ant
     mode: '0644'
   become: true
-  when: not ant_delayed_verifier_stat.stat.exists and enable_delayed_verifier | bool
+  when: not ant_delayed_verifier_stat.stat.exists
 
 - name: create ant_performance_verifier systemd service file
   ansible.builtin.template:
@@ -155,28 +152,43 @@
     group: ant
     mode: '0644'
   become: true
-  when: not ant_performance_verifier_stat.stat.exists and enable_performance_verifier | bool
+  when: not ant_performance_verifier_stat.stat.exists
 
-- name: start and enable ant_random_verifier services
+- name: enable ant_random_verifier service
+  ansible.builtin.systemd:
+    name: ant_random_verifier
+    enabled: yes
+  become: true
+
+- name: start ant_random_verifier service
   ansible.builtin.systemd:
     name: ant_random_verifier
     state: started
+  become: true
+  when: start_random_verifier | default(false) | bool
+
+- name: enable ant_delayed_verifier service
+  ansible.builtin.systemd:
+    name: ant_delayed_verifier
     enabled: yes
   become: true
-  when: enable_random_verifier | bool
 
-- name: start and enable ant_delayed_verifier services
+- name: start ant_delayed_verifier service
   ansible.builtin.systemd:
     name: ant_delayed_verifier
     state: started
+  become: true
+  when: start_delayed_verifier | default(false) | bool
+
+- name: enable ant_performance_verifier service
+  ansible.builtin.systemd:
+    name: ant_performance_verifier
     enabled: yes
   become: true
-  when: enable_delayed_verifier | bool
 
-- name: start and enable ant_performance_verifier services
+- name: start ant_performance_verifier service
   ansible.builtin.systemd:
     name: ant_performance_verifier
     state: started
-    enabled: yes
   become: true
-  when: enable_performance_verifier | bool
+  when: start_performance_verifier | default(false) | bool
