@@ -28,6 +28,10 @@
     key_file: "{{ network_dashboard_sk_path }}"
     accept_hostkey: yes
   when: not repo_stat.stat.exists
+  register: git_clone
+  retries: 3
+  delay: 5
+  until: git_clone is success
 
 - name: ensure GeoIP directory exists
   file:
