@@ -394,8 +394,8 @@ pub fn build_node_extra_vars_doc(
     }
 
     extra_vars.add_boolean_variable(
-        "enable_performance_verifier",
-        options.enable_performance_verifier,
+        "start_performance_verifier",
+        options.start_performance_verifier,
     );
 
     extra_vars.add_variable(
@@ -519,12 +519,12 @@ pub fn build_downloaders_extra_vars_doc(
         options.ant_version.clone(),
     )?;
 
-    extra_vars.add_boolean_variable("enable_delayed_verifier", options.enable_delayed_verifier);
+    extra_vars.add_boolean_variable("start_delayed_verifier", options.start_delayed_verifier);
     extra_vars.add_boolean_variable("enable_metrics", options.enable_metrics);
-    extra_vars.add_boolean_variable("enable_random_verifier", options.enable_random_verifier);
+    extra_vars.add_boolean_variable("start_random_verifier", options.start_random_verifier);
     extra_vars.add_boolean_variable(
-        "enable_performance_verifier",
-        options.enable_performance_verifier,
+        "start_performance_verifier",
+        options.start_performance_verifier,
     );
 
     if let Some(file_address) = &options.file_address {
@@ -629,8 +629,8 @@ pub fn build_clients_extra_vars_doc(
         extra_vars.add_env_variable_list("client_env_variables", client_env_variables.clone());
     }
 
-    extra_vars.add_variable("enable_metrics", &options.enable_metrics.to_string());
-    extra_vars.add_variable("enable_uploaders", &options.enable_uploaders.to_string());
+    extra_vars.add_boolean_variable("enable_metrics", options.enable_metrics);
+    extra_vars.add_boolean_variable("start_uploaders", options.start_uploaders);
 
     let mut serde_map = serde_json::Map::new();
     for (k, v) in sk_map {

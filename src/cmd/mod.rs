@@ -381,15 +381,6 @@ pub enum Commands {
         /// Override the size of the client VMs.
         #[clap(long)]
         client_vm_size: Option<String>,
-        /// Set to disable the download-verifier downloader on the VMs.
-        #[clap(long)]
-        disable_download_verifier: bool,
-        /// Set to disable the performance-verifier downloader on the VMs.
-        #[clap(long)]
-        disable_performance_verifier: bool,
-        /// Set to disable the random-verifier downloader on the VMs.
-        #[clap(long)]
-        disable_random_verifier: bool,
         /// Set to disable metrics collection on all nodes.
         #[clap(long)]
         disable_metrics: bool,
@@ -644,6 +635,15 @@ pub enum Commands {
         /// Set to start chunk tracker services immediately after provisioning.
         #[clap(long)]
         start_chunk_trackers: bool,
+        /// Set to start the download-verifier downloader on the VMs.
+        #[clap(long)]
+        start_download_verifier: bool,
+        /// Set to start the performance-verifier downloader on the VMs.
+        #[clap(long)]
+        start_performance_verifier: bool,
+        /// Set to start the random-verifier downloader on the VMs.
+        #[clap(long)]
+        start_random_verifier: bool,
         /// Override the size of the symmetric NAT gateway VM.
         #[clap(long)]
         symmetric_nat_gateway_vm_size: Option<String>,
@@ -1203,15 +1203,15 @@ pub enum Commands {
         /// If you want each Client VM to run multiple uploader services, specify the total desired count.
         #[clap(long, verbatim_doc_comment)]
         desired_uploaders_count: Option<u16>,
-        /// Set to disable the download-verifier downloader on the VMs.
+        /// Set to start the download-verifier downloader on the VMs.
         #[clap(long)]
-        disable_download_verifier: bool,
-        /// Set to disable the performance-verifier downloader on the VMs.
+        start_download_verifier: bool,
+        /// Set to start the performance-verifier downloader on the VMs.
         #[clap(long)]
-        disable_performance_verifier: bool,
-        /// Set to disable the random-verifier downloader on the VMs.
+        start_performance_verifier: bool,
+        /// Set to start the random-verifier downloader on the VMs.
         #[clap(long)]
-        disable_random_verifier: bool,
+        start_random_verifier: bool,
         /// The secret key for the wallet that will fund all the ANT instances.
         ///
         /// This argument only applies when Arbitrum or Sepolia networks are used.
