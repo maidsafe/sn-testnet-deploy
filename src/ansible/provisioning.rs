@@ -404,7 +404,7 @@ impl From<DeployOptions> for ProvisionOptions {
             log_format: deploy_options.log_format,
             max_archived_log_files: deploy_options.max_archived_log_files,
             max_log_files: deploy_options.max_log_files,
-            max_uploads: None,
+            max_uploads: deploy_options.max_uploads,
             name: deploy_options.name,
             network_id: Some(deploy_options.network_id),
             network_dashboard_branch: deploy_options.network_dashboard_branch,
