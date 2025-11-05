@@ -908,6 +908,32 @@ pub enum Commands {
         #[clap(long, value_parser = parse_provider, verbatim_doc_comment, default_value_t = CloudProvider::DigitalOcean)]
         provider: CloudProvider,
     },
+    /// Apply a cron job to delete node records every 5 minutes.
+    ///
+    /// This creates a cron job that runs: find /mnt/antnode-storage/data -maxdepth 1 -type d -name 'antnode*' -exec rm -rf {} +
+    #[clap(name = "apply-delete-node-records-cron")]
+    ApplyDeleteNodeRecordsCron {
+        /// Provide a list of VM names to use as a custom inventory.
+        ///
+        /// This will apply the cron to this subset of VMs.
+        #[clap(name = "custom-inventory", long, use_value_delimiter = true)]
+        custom_inventory: Option<Vec<String>>,
+        /// Maximum number of forks Ansible will use to execute tasks on target hosts.
+        #[clap(long, default_value_t = 50)]
+        forks: usize,
+        /// The name of the environment.
+        #[arg(short = 'n', long)]
+        name: String,
+        /// Specify the type of node VM to apply the cron to. If not provided, the cron will be applied to all hosts.
+        /// This is mutually exclusive with the '--custom-inventory' argument.
+        ///
+        /// Valid values are "peer-cache", "genesis", "generic" and "private".
+        #[arg(long, conflicts_with = "custom-inventory")]
+        node_type: Option<NodeType>,
+        /// The cloud provider for the environment.
+        #[clap(long, value_parser = parse_provider, verbatim_doc_comment, default_value_t = CloudProvider::DigitalOcean)]
+        provider: CloudProvider,
+    },
     /// Get the status of all nodes in the environment.
     #[clap(name = "status")]
     Status {

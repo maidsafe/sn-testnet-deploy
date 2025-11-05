@@ -1,0 +1,11 @@
+---
+- name: apply cron job to delete node records
+  hosts: all
+  become: True
+  tasks:
+    - name: create cron job to delete node records every 5 minutes
+      ansible.builtin.cron:
+        name: "delete node records"
+        minute: "*/5"
+        job: "find /mnt/antnode-storage/data -maxdepth 1 -type d -name 'antnode*' -exec rm -rf {} +"
+        user: root

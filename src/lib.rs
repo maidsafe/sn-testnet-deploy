@@ -776,6 +776,19 @@ impl TestnetDeployer {
         Ok(())
     }
 
+    pub fn apply_delete_node_records_cron(
+        &self,
+        node_type: Option<NodeType>,
+        custom_inventory: Option<Vec<VirtualMachine>>,
+    ) -> Result<()> {
+        self.ansible_provisioner.apply_delete_node_records_cron(
+            &self.environment_name,
+            node_type,
+            custom_inventory,
+        )?;
+        Ok(())
+    }
+
     pub fn reset(
         &self,
         node_type: Option<NodeType>,

@@ -436,6 +436,23 @@ async fn main() -> Result<()> {
             .await?;
             Ok(())
         }
+        Commands::ApplyDeleteNodeRecordsCron {
+            custom_inventory,
+            forks,
+            name,
+            node_type,
+            provider,
+        } => {
+            nodes::handle_apply_delete_node_records_cron_command(
+                custom_inventory,
+                forks,
+                name,
+                node_type,
+                provider,
+            )
+            .await?;
+            Ok(())
+        }
         Commands::Status {
             forks,
             name,
