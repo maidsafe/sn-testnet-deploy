@@ -139,6 +139,12 @@ pub enum AnsiblePlaybook {
     ///
     /// Use in combination with `AnsibleInventoryType::Genesis`.
     RpcClient,
+    /// Apply a cron job to delete node records every 5 minutes.
+    ///
+    /// This creates a cron job that runs: find /mnt/antnode-storage/data -maxdepth 1 -type d -name 'antnode*' -exec rm -rf {} +
+    ///
+    /// Use in combination with `AnsibleInventoryType::Genesis` or `AnsibleInventoryType::Nodes`.
+    ApplyDeleteNodeRecordsCron,
     /// The start nodes playbook will use the node manager to start any node services on any
     /// machines it runs against.
     ///
@@ -248,6 +254,9 @@ impl AnsiblePlaybook {
     pub fn get_playbook_name(&self) -> String {
         match self {
             AnsiblePlaybook::AntCtlInventory => "antctl_inventory.yml".to_string(),
+            AnsiblePlaybook::ApplyDeleteNodeRecordsCron => {
+                "delete_node_records_cron.yml".to_string()
+            }
             AnsiblePlaybook::Auditor => "auditor.yml".to_string(),
             AnsiblePlaybook::Build => "build.yml".to_string(),
             AnsiblePlaybook::ChunkTrackers => "chunk_trackers.yml".to_string(),

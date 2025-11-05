@@ -57,6 +57,39 @@ pub async fn handle_start_command(
     Ok(())
 }
 
+pub async fn handle_apply_delete_node_records_cron_command(
+    custom_inventory: Option<Vec<String>>,
+    forks: usize,
+    name: String,
+    node_type: Option<NodeType>,
+    provider: CloudProvider,
+) -> Result<()> {
+    let testnet_deployer = TestnetDeployBuilder::default()
+        .ansible_forks(forks)
+        .environment_name(&name)
+        .provider(provider)
+        .build()?;
+
+    let inventory_service = DeploymentInventoryService::from(&testnet_deployer);
+    let inventory = inventory_service
+        .generate_or_retrieve_inventory(&name, true, None)
+        .await?;
+    if inventory.is_empty() {
+        return Err(eyre!("The {name} environment does not exist"));
+    }
+
+    let custom_inventory = if let Some(custom_inventory) = custom_inventory {
+        let custom_vms = get_custom_inventory(&inventory, &custom_inventory)?;
+        Some(custom_vms)
+    } else {
+        None
+    };
+
+    testnet_deployer.apply_delete_node_records_cron(node_type, custom_inventory)?;
+
+    Ok(())
+}
+
 #[allow(clippy::too_many_arguments)]
 pub async fn handle_reset_command(
     custom_inventory: Option<Vec<String>>,
