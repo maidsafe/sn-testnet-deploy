@@ -58,6 +58,9 @@ pub struct ClientsDeployOptions {
     pub peer: Option<String>,
     pub performance_verifier_batch_size: Option<u16>,
     pub random_verifier_batch_size: Option<u16>,
+    pub run_chunk_trackers_provision: bool,
+    pub run_downloaders_provision: bool,
+    pub run_uploaders_provision: bool,
     pub sleep_duration: Option<u16>,
     pub start_chunk_trackers: bool,
     pub start_delayed_verifier: bool,
@@ -364,9 +367,7 @@ impl ClientsDeployer {
         )
         .await?;
 
-        println!("Provisioning Client with Ansible...");
         let provision_options = ProvisionOptions::from(options.clone());
-
         if build_custom_binaries {
             self.ansible_provisioner
                 .print_ansible_run_banner("Build Custom Binaries");
@@ -378,47 +379,53 @@ impl ClientsDeployer {
                 })?;
         }
 
-        self.ansible_provisioner
-            .print_ansible_run_banner("Provision Clients");
-        self.ansible_provisioner
-            .provision_uploaders(
-                &provision_options,
-                options.peer.clone(),
-                options.network_contacts_url.clone(),
-            )
-            .await
-            .map_err(|err| {
-                println!("Failed to provision Clients {err:?}");
-                err
-            })?;
+        if options.run_uploaders_provision {
+            self.ansible_provisioner
+                .print_ansible_run_banner("Provision Uploaders");
+            self.ansible_provisioner
+                .provision_uploaders(
+                    &provision_options,
+                    options.peer.clone(),
+                    options.network_contacts_url.clone(),
+                )
+                .await
+                .map_err(|err| {
+                    println!("Failed to provision Clients {err:?}");
+                    err
+                })?;
+        }
 
-        self.ansible_provisioner
-            .print_ansible_run_banner("Provision Downloaders");
-        self.ansible_provisioner
-            .provision_downloaders(
-                &provision_options,
-                options.peer.clone(),
-                options.network_contacts_url.clone(),
-            )
-            .await
-            .map_err(|err| {
-                println!("Failed to provision downloaders {err:?}");
-                err
-            })?;
+        if options.run_downloaders_provision {
+            self.ansible_provisioner
+                .print_ansible_run_banner("Provision Downloaders");
+            self.ansible_provisioner
+                .provision_downloaders(
+                    &provision_options,
+                    options.peer.clone(),
+                    options.network_contacts_url.clone(),
+                )
+                .await
+                .map_err(|err| {
+                    println!("Failed to provision downloaders {err:?}");
+                    err
+                })?;
+        }
 
-        self.ansible_provisioner
-            .print_ansible_run_banner("Provision Chunk Trackers");
-        self.ansible_provisioner
-            .provision_chunk_trackers(
-                &provision_options,
-                options.peer.clone(),
-                options.network_contacts_url.clone(),
-            )
-            .await
-            .map_err(|err| {
-                println!("Failed to provision chunk trackers {err:?}");
-                err
-            })?;
+        if options.run_chunk_trackers_provision {
+            self.ansible_provisioner
+                .print_ansible_run_banner("Provision Chunk Trackers");
+            self.ansible_provisioner
+                .provision_chunk_trackers(
+                    &provision_options,
+                    options.peer.clone(),
+                    options.network_contacts_url.clone(),
+                )
+                .await
+                .map_err(|err| {
+                    println!("Failed to provision chunk trackers {err:?}");
+                    err
+                })?;
+        }
 
         println!("Deployment completed successfully in {:?}", start.elapsed());
         Ok(())
