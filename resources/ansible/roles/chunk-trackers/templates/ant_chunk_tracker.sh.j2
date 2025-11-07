@@ -95,25 +95,21 @@ build_network_args() {
 }
 
 get_random_address_from_csv() {
-  # Find all metrics_success.csv files across all uploader instances
-  local csv_files=$(find "${METRICS_CSV_PATH}" -name "metrics_success.csv" 2>/dev/null)
-
-  if [[ -z "$csv_files" ]]; then
-    echo "Error: No metrics_success.csv files found in ${METRICS_CSV_PATH}"
+  local csv_file=$(find "${METRICS_CSV_PATH}" -name "metrics_success.csv" 2>/dev/null | head -n 1)
+  if [[ -z "$csv_file" ]]; then
+    echo "Error: No metrics_success.csv file found in ${METRICS_CSV_PATH}"
     return 1
   fi
 
-  # Combine all CSV files (skip headers except first), extract DATA_ADDRESS column (3rd column)
-  # Filter out header rows and empty addresses
-  local addresses=$(awk -F',' 'NR==1 || FNR>1 {print $3}' $csv_files | grep -v "^DATA_ADDRESS$" | grep -v "^$" | grep -v "^0$")
-
-  if [[ -z "$addresses" ]]; then
-    echo "Error: No valid data addresses found in CSV files"
+  # Using the service number as the row means each running service will select a unique address
+  local row_number=$((SERVICE_NUMBER + 1))
+  local address=$(awk -F',' -v row="$row_number" 'NR==row {print $3}' "$csv_file")
+  if [[ -z "$address" ]] || [[ "$address" == "DATA_ADDRESS" ]] || [[ "$address" == "0" ]]; then
+    echo "Error: No valid data address found at row $row_number in $csv_file"
     return 1
   fi
 
-  local random_address=$(echo "$addresses" | shuf -n 1)
-  echo "$random_address"
+  echo "$address"
   return 0
 }
 
@@ -150,7 +146,7 @@ determine_data_address() {
   if [[ -n "$DATA_ADDRESS" ]]; then
     echo "Using data address: $DATA_ADDRESS"
   else
-    echo "No data address provided, selecting random address from CSV files..."
+    echo "No data address provided, selecting random address from uploads..."
     DATA_ADDRESS=$(get_random_address_from_csv)
     if [[ $? -ne 0 ]] || [[ -z "$DATA_ADDRESS" ]]; then
       echo "Error: Failed to get data address from CSV files"
