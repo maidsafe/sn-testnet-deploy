@@ -661,6 +661,350 @@ pub enum ClientsCommands {
         #[clap(long)]
         start_chunk_trackers: bool,
     },
+    /// Deploy data retrieval service on client VMs.
+    DeployDataRetrieval {
+        /// Set to run Ansible with more verbose output.
+        #[arg(long)]
+        ansible_verbose: bool,
+        /// Supply a version number for the ant binary.
+        ///
+        /// There should be no 'v' prefix.
+        ///
+        /// The version arguments are mutually exclusive with the --branch and --repo-owner
+        /// arguments. You can only supply version numbers or a custom branch, not both.
+        #[arg(long, verbatim_doc_comment)]
+        ant_version: Option<String>,
+        /// The branch of the Github repository to build from.
+        ///
+        /// If used, the ant binary will be built from this branch. It is typically used for testing
+        /// changes on a fork.
+        ///
+        /// This argument must be used in conjunction with the --repo-owner argument.
+        ///
+        /// The --branch and --repo-owner arguments are mutually exclusive with the binary version
+        /// arguments. You can only supply version numbers or a custom branch, not both.
+        #[arg(long, verbatim_doc_comment)]
+        branch: Option<String>,
+        /// Specify the chunk size for the custom binaries using a 64-bit integer.
+        ///
+        /// This option only applies if the --branch and --repo-owner arguments are used.
+        #[clap(long, value_parser = parse_chunk_size)]
+        chunk_size: Option<u64>,
+        /// Provide environment variables for the ant client.
+        ///
+        /// This is useful to set the client's log levels. Each variable should be comma
+        /// separated without any space.
+        ///
+        /// Example: --client-env CLIENT_LOG=all,RUST_LOG=debug
+        #[clap(name = "client-env", long, use_value_delimiter = true, value_parser = parse_environment_variables, verbatim_doc_comment)]
+        client_env_variables: Option<Vec<(String, String)>>,
+        /// The number of client VMs to create.
+        ///
+        /// If the argument is not used, the value will be determined by the 'environment-type'
+        /// argument.
+        #[clap(long)]
+        client_vm_count: Option<u16>,
+        /// Override the size of the client VMs.
+        #[clap(long)]
+        client_vm_size: Option<String>,
+        /// Set to disable metrics collection on all nodes.
+        #[clap(long)]
+        disable_metrics: bool,
+        /// The type of deployment.
+        ///
+        /// Possible values are 'development', 'production' or 'staging'. The value used will
+        /// determine the sizes of VMs, the number of VMs, and the number of nodes deployed on
+        /// them. The specification will increase in size from development, to staging, to
+        /// production.
+        ///
+        /// The default is 'development'.
+        #[clap(long, default_value_t = EnvironmentType::Development, value_parser = parse_deployment_type, verbatim_doc_comment)]
+        environment_type: EnvironmentType,
+        /// The address of the data payments contract.
+        #[arg(long)]
+        evm_data_payments_address: Option<String>,
+        /// The EVM network type to use for the deployment.
+        ///
+        /// Possible values are 'arbitrum-one' or 'custom'.
+        ///
+        /// If not used, the default is 'arbitrum-one'.
+        #[clap(long, default_value = "arbitrum-one", value_parser = parse_evm_network)]
+        evm_network_type: EvmNetwork,
+        /// The address of the payment token contract.
+        #[arg(long)]
+        evm_payment_token_address: Option<String>,
+        /// The RPC URL for the EVM network.
+        ///
+        /// This argument only applies if the EVM network type is 'custom'.
+        #[arg(long)]
+        evm_rpc_url: Option<String>,
+        /// Override the maximum number of forks Ansible will use to execute tasks on target hosts.
+        ///
+        /// The default value from ansible.cfg is 50.
+        #[clap(long)]
+        forks: Option<usize>,
+        /// The name of the environment
+        #[arg(short = 'n', long)]
+        name: String,
+        /// Specify the network ID for the ant binary.
+        ///
+        /// This is used to ensure the client connects to the correct network.
+        ///
+        /// For a production deployment, use 1.
+        ///
+        /// For an alpha deployment, use 2.
+        ///
+        /// For a testnet deployment, use anything between 3 and 255.
+        #[clap(long, verbatim_doc_comment)]
+        network_id: u8,
+        /// The networks contacts URL from an existing network.
+        #[arg(long)]
+        network_contacts_url: Option<String>,
+        /// The cloud provider to deploy to.
+        ///
+        /// Valid values are "aws" or "digital-ocean".
+        #[clap(long, default_value_t = CloudProvider::DigitalOcean, value_parser = parse_provider, verbatim_doc_comment)]
+        provider: CloudProvider,
+        /// The region to deploy to.
+        ///
+        /// Defaults to "lon1" for Digital Ocean.
+        #[clap(long, default_value = "lon1")]
+        region: String,
+        /// The owner/org of the Github repository to build from.
+        ///
+        /// If used, all binaries will be built from this repository. It is typically used for
+        /// testing changes on a fork.
+        ///
+        /// This argument must be used in conjunction with the --repo-owner argument.
+        ///
+        /// The --branch and --repo-owner arguments are mutually exclusive with the binary version
+        /// arguments. You can only supply version numbers or a custom branch, not both.
+        #[arg(long, verbatim_doc_comment)]
+        repo_owner: Option<String>,
+        /// Skip building the autonomi binaries if they were built during a previous run of the deployer using the same
+        /// --branch, --repo-owner and --name arguments.
+        ///
+        /// This is useful to re-run any failed deployments without rebuilding the binaries.
+        #[arg(long, default_value_t = false)]
+        skip_binary_build: bool,
+        /// Set to start data retrieval service immediately after provisioning.
+        #[clap(long)]
+        start_data_retrieval: bool,
+    },
+    /// Deploy repair files service on client VMs.
+    DeployRepairFiles {
+        /// Set to run Ansible with more verbose output.
+        #[arg(long)]
+        ansible_verbose: bool,
+        /// Supply a version number for the ant binary.
+        ///
+        /// There should be no 'v' prefix.
+        ///
+        /// The version arguments are mutually exclusive with the --branch and --repo-owner
+        /// arguments. You can only supply version numbers or a custom branch, not both.
+        #[arg(long, verbatim_doc_comment)]
+        ant_version: Option<String>,
+        /// The branch of the Github repository to build from.
+        ///
+        /// If used, the ant binary will be built from this branch. It is typically used for testing
+        /// changes on a fork.
+        ///
+        /// This argument must be used in conjunction with the --repo-owner argument.
+        ///
+        /// The --branch and --repo-owner arguments are mutually exclusive with the binary version
+        /// arguments. You can only supply version numbers or a custom branch, not both.
+        #[arg(long, verbatim_doc_comment)]
+        branch: Option<String>,
+        /// Specify the chunk size for the custom binaries using a 64-bit integer.
+        ///
+        /// This option only applies if the --branch and --repo-owner arguments are used.
+        #[clap(long, value_parser = parse_chunk_size)]
+        chunk_size: Option<u64>,
+        /// Provide environment variables for the antnode RPC client.
+        ///
+        /// This is useful to set the client's log levels. Each variable should be comma
+        /// separated without any space.
+        ///
+        /// Example: --client-env CLIENT_LOG=all,RUST_LOG=debug
+        #[clap(name = "client-env", long, use_value_delimiter = true, value_parser = parse_environment_variables, verbatim_doc_comment)]
+        client_env_variables: Option<Vec<(String, String)>>,
+        /// The number of client VMs to create.
+        ///
+        /// If the argument is not used, the value will be determined by the 'environment-type'
+        /// argument.
+        #[clap(long)]
+        client_vm_count: Option<u16>,
+        /// Override the size of the client VMs.
+        #[clap(long)]
+        client_vm_size: Option<String>,
+        /// Set to disable metrics collection on all nodes.
+        #[clap(long)]
+        disable_metrics: bool,
+        /// The type of deployment.
+        ///
+        /// Possible values are 'development', 'production' or 'staging'. The value used will
+        /// determine the sizes of VMs, the number of VMs, and the number of nodes deployed on
+        /// them. The specification will increase in size from development, to staging, to
+        /// production.
+        ///
+        /// The default is 'development'.
+        #[clap(long, default_value_t = EnvironmentType::Development, value_parser = parse_deployment_type, verbatim_doc_comment)]
+        environment_type: EnvironmentType,
+        /// Override the maximum number of forks Ansible will use to execute tasks on target hosts.
+        ///
+        /// The default value from ansible.cfg is 50.
+        #[clap(long)]
+        forks: Option<usize>,
+        /// The name of the environment
+        #[arg(short = 'n', long)]
+        name: String,
+        /// The cloud provider to deploy to.
+        ///
+        /// Valid values are "aws" or "digital-ocean".
+        #[clap(long, default_value_t = CloudProvider::DigitalOcean, value_parser = parse_provider, verbatim_doc_comment)]
+        provider: CloudProvider,
+        /// The region to deploy to.
+        ///
+        /// Defaults to "lon1" for Digital Ocean.
+        #[clap(long, default_value = "lon1")]
+        region: String,
+        /// The owner/org of the Github repository to build from.
+        ///
+        /// If used, all binaries will be built from this repository. It is typically used for
+        /// testing changes on a fork.
+        ///
+        /// This argument must be used in conjunction with the --repo-owner argument.
+        ///
+        /// The --branch and --repo-owner arguments are mutually exclusive with the binary version
+        /// arguments. You can only supply version numbers or a custom branch, not both.
+        #[arg(long, verbatim_doc_comment)]
+        repo_owner: Option<String>,
+        /// The number of repair services to deploy.
+        ///
+        /// Default is 1.
+        #[clap(long)]
+        service_count: Option<u16>,
+        /// Skip building the autonomi binaries if they were built during a previous run of the deployer using the same
+        /// --branch, --repo-owner and --name arguments.
+        ///
+        /// This is useful to re-run any failed deployments without rebuilding the binaries.
+        #[arg(long, default_value_t = false)]
+        skip_binary_build: bool,
+        /// Set to start the repair service immediately after provisioning.
+        #[clap(long)]
+        start_repair_service: bool,
+        /// The secret key for the wallet that will fund chunks that get uploaded for repaired
+        /// addresses.
+        #[clap(long)]
+        wallet_secret_key: String,
+    },
+    DeployScanRepair {
+        /// Set to run Ansible with more verbose output.
+        #[arg(long)]
+        ansible_verbose: bool,
+        /// Supply a version number for the ant binary.
+        ///
+        /// There should be no 'v' prefix.
+        ///
+        /// The version arguments are mutually exclusive with the --branch and --repo-owner
+        /// arguments. You can only supply version numbers or a custom branch, not both.
+        #[arg(long, verbatim_doc_comment)]
+        ant_version: Option<String>,
+        /// The branch of the Github repository to build from.
+        ///
+        /// If used, the ant binary will be built from this branch. It is typically used for testing
+        /// changes on a fork.
+        ///
+        /// This argument must be used in conjunction with the --repo-owner argument.
+        ///
+        /// The --branch and --repo-owner arguments are mutually exclusive with the binary version
+        /// arguments. You can only supply version numbers or a custom branch, not both.
+        #[arg(long, verbatim_doc_comment)]
+        branch: Option<String>,
+        /// Specify the chunk size for the custom binaries using a 64-bit integer.
+        ///
+        /// This option only applies if the --branch and --repo-owner arguments are used.
+        #[clap(long, value_parser = parse_chunk_size)]
+        chunk_size: Option<u64>,
+        /// Provide environment variables for the antnode RPC client.
+        ///
+        /// This is useful to set the client's log levels. Each variable should be comma
+        /// separated without any space.
+        ///
+        /// Example: --client-env CLIENT_LOG=all,RUST_LOG=debug
+        #[clap(name = "client-env", long, use_value_delimiter = true, value_parser = parse_environment_variables, verbatim_doc_comment)]
+        client_env_variables: Option<Vec<(String, String)>>,
+        /// The number of client VMs to create.
+        ///
+        /// If the argument is not used, the value will be determined by the 'environment-type'
+        /// argument.
+        #[clap(long)]
+        client_vm_count: Option<u16>,
+        /// Override the size of the client VMs.
+        #[clap(long)]
+        client_vm_size: Option<String>,
+        /// Set to disable metrics collection on all nodes.
+        #[clap(long)]
+        disable_metrics: bool,
+        /// The type of deployment.
+        ///
+        /// Possible values are 'development', 'production' or 'staging'. The value used will
+        /// determine the sizes of VMs, the number of VMs, and the number of nodes deployed on
+        /// them. The specification will increase in size from development, to staging, to
+        /// production.
+        ///
+        /// The default is 'development'.
+        #[clap(long, default_value_t = EnvironmentType::Development, value_parser = parse_deployment_type, verbatim_doc_comment)]
+        environment_type: EnvironmentType,
+        /// Override the maximum number of forks Ansible will use to execute tasks on target hosts.
+        ///
+        /// The default value from ansible.cfg is 50.
+        #[clap(long)]
+        forks: Option<usize>,
+        /// The name of the environment
+        #[arg(short = 'n', long)]
+        name: String,
+        /// The cloud provider to deploy to.
+        ///
+        /// Valid values are "aws" or "digital-ocean".
+        #[clap(long, default_value_t = CloudProvider::DigitalOcean, value_parser = parse_provider, verbatim_doc_comment)]
+        provider: CloudProvider,
+        /// The region to deploy to.
+        ///
+        /// Defaults to "lon1" for Digital Ocean.
+        #[clap(long, default_value = "lon1")]
+        region: String,
+        /// The owner/org of the Github repository to build from.
+        ///
+        /// If used, all binaries will be built from this repository. It is typically used for
+        /// testing changes on a fork.
+        ///
+        /// This argument must be used in conjunction with the --repo-owner argument.
+        ///
+        /// The --branch and --repo-owner arguments are mutually exclusive with the binary version
+        /// arguments. You can only supply version numbers or a custom branch, not both.
+        #[arg(long, verbatim_doc_comment)]
+        repo_owner: Option<String>,
+        /// The scanning frequency for the repair command.
+        #[clap(long)]
+        scan_frequency: Option<u64>,
+        /// Skip building the autonomi binaries if they were built during a previous run of the deployer using the same
+        /// --branch, --repo-owner and --name arguments.
+        ///
+        /// This is useful to re-run any failed deployments without rebuilding the binaries.
+        #[arg(long, default_value_t = false)]
+        skip_binary_build: bool,
+        /// The interval between repair commands.
+        #[clap(long)]
+        sleep_interval: Option<u64>,
+        /// Set to start the repair service immediately after provisioning.
+        #[clap(long)]
+        start_service: bool,
+        /// The secret key for the wallet that will fund chunks that get uploaded for repaired
+        /// addresses.
+        #[clap(long)]
+        wallet_secret_key: String,
+    },
     /// Enable downloaders on all client VMs in an environment.
     EnableDownloaders {
         /// The name of the environment
@@ -993,14 +1337,22 @@ pub async fn handle_clients_command(cmd: ClientsCommands) -> Result<()> {
                 peer,
                 performance_verifier_batch_size: None,
                 random_verifier_batch_size: None,
+                repair_service_count: 0,
                 run_chunk_trackers_provision: true,
+                run_data_retrieval_provision: false,
                 run_downloaders_provision: true,
+                run_repair_files_provision: false,
+                run_scan_repair_provision: false,
                 run_uploaders_provision: true,
+                scan_frequency: None,
                 sleep_duration: None,
+                sleep_interval: None,
                 start_chunk_trackers,
+                start_data_retrieval: false,
                 start_delayed_verifier: start_download_verifier,
                 start_performance_verifier,
                 start_random_verifier,
+                start_repair_service: false,
                 start_uploaders,
                 upload_batch_size: None,
                 uploaders_count,
@@ -1142,14 +1494,22 @@ pub async fn handle_clients_command(cmd: ClientsCommands) -> Result<()> {
                 peer,
                 performance_verifier_batch_size: None,
                 random_verifier_batch_size: None,
+                repair_service_count: 0,
                 run_chunk_trackers_provision: true,
+                run_data_retrieval_provision: false,
                 run_downloaders_provision: false,
+                run_repair_files_provision: false,
+                run_scan_repair_provision: false,
                 run_uploaders_provision: false,
+                scan_frequency: None,
                 sleep_duration: None,
+                sleep_interval: None,
                 start_chunk_trackers,
+                start_data_retrieval: false,
                 start_delayed_verifier: false,
                 start_performance_verifier: false,
                 start_random_verifier: false,
+                start_repair_service: false,
                 start_uploaders: false,
                 upload_batch_size: None,
                 uploaders_count: 0,
@@ -1161,6 +1521,425 @@ pub async fn handle_clients_command(cmd: ClientsCommands) -> Result<()> {
             client_deployer.deploy(options).await?;
 
             println!("Chunk tracker deployment for '{name}' completed successfully");
+            Ok(())
+        }
+        ClientsCommands::DeployDataRetrieval {
+            ansible_verbose,
+            ant_version,
+            branch,
+            chunk_size,
+            client_env_variables,
+            client_vm_count,
+            client_vm_size,
+            disable_metrics,
+            environment_type,
+            evm_data_payments_address,
+            evm_network_type,
+            evm_payment_token_address,
+            evm_rpc_url,
+            forks,
+            name,
+            network_id,
+            network_contacts_url,
+            provider,
+            region,
+            repo_owner,
+            skip_binary_build,
+            start_data_retrieval,
+        } => {
+            if (branch.is_some() && repo_owner.is_none())
+                || (branch.is_none() && repo_owner.is_some())
+            {
+                return Err(eyre!(
+                    "Both --branch and --repo-owner must be provided together"
+                ));
+            }
+
+            if ant_version.is_some() && (branch.is_some() || repo_owner.is_some()) {
+                return Err(eyre!("Cannot specify both version and branch/repo-owner"));
+            }
+
+            if evm_network_type == EvmNetwork::Custom {
+                if evm_data_payments_address.is_none() {
+                    return Err(eyre!(
+                        "Data payments address must be provided for custom EVM network"
+                    ));
+                }
+                if evm_payment_token_address.is_none() {
+                    return Err(eyre!(
+                        "Payment token address must be provided for custom EVM network"
+                    ));
+                }
+                if evm_rpc_url.is_none() {
+                    return Err(eyre!("RPC URL must be provided for custom EVM network"));
+                }
+            }
+
+            let binary_option = get_binary_option(
+                branch,
+                repo_owner,
+                ant_version,
+                None,
+                None,
+                None,
+                skip_binary_build,
+            )
+            .await?;
+
+            let mut builder = ClientsDeployBuilder::new();
+            builder
+                .ansible_verbose_mode(ansible_verbose)
+                .deployment_type(environment_type.clone())
+                .environment_name(&name)
+                .provider(provider);
+            if let Some(forks_value) = forks {
+                builder.ansible_forks(forks_value);
+            }
+            let client_deployer = builder.build()?;
+            client_deployer.init().await?;
+
+            let inventory_service = DeploymentInventoryService::from(&client_deployer);
+            let inventory = inventory_service
+                .generate_or_retrieve_client_inventory(
+                    &name,
+                    &region,
+                    true,
+                    Some(binary_option.clone()),
+                )
+                .await?;
+            let evm_details = EvmDetails {
+                network: evm_network_type,
+                data_payments_address: evm_data_payments_address,
+                payment_token_address: evm_payment_token_address,
+                rpc_url: evm_rpc_url,
+            };
+
+            let options = ClientsDeployOptions {
+                binary_option,
+                chunk_size,
+                chunk_tracker_data_addresses: vec![],
+                chunk_tracker_services: 0,
+                client_env_variables,
+                client_vm_count,
+                client_vm_size,
+                current_inventory: inventory,
+                delayed_verifier_batch_size: None,
+                delayed_verifier_quorum_value: None,
+                enable_metrics: !disable_metrics,
+                environment_type,
+                evm_details,
+                expected_hash: None,
+                expected_size: None,
+                file_address: None,
+                funding_wallet_secret_key: None,
+                initial_gas: None,
+                initial_tokens: None,
+                max_archived_log_files: 1,
+                max_log_files: 1,
+                max_uploads: None,
+                name: name.clone(),
+                network_contacts_url,
+                network_id: Some(network_id),
+                output_inventory_dir_path: client_deployer.working_directory_path.join("inventory"),
+                peer: None,
+                performance_verifier_batch_size: None,
+                random_verifier_batch_size: None,
+                repair_service_count: 0,
+                run_chunk_trackers_provision: false,
+                run_data_retrieval_provision: true,
+                run_downloaders_provision: false,
+                run_repair_files_provision: false,
+                run_scan_repair_provision: false,
+                run_uploaders_provision: false,
+                scan_frequency: None,
+                sleep_duration: None,
+                sleep_interval: None,
+                start_chunk_trackers: false,
+                start_data_retrieval,
+                start_delayed_verifier: false,
+                start_performance_verifier: false,
+                start_random_verifier: false,
+                start_repair_service: false,
+                start_uploaders: false,
+                upload_batch_size: None,
+                uploaders_count: 0,
+                upload_interval: 0,
+                upload_size: None,
+                wallet_secret_keys: None,
+            };
+
+            client_deployer.deploy(options).await?;
+
+            println!("Data retrieval deployment for '{name}' completed successfully");
+            Ok(())
+        }
+        ClientsCommands::DeployRepairFiles {
+            ansible_verbose,
+            ant_version,
+            branch,
+            chunk_size,
+            client_env_variables,
+            client_vm_count,
+            client_vm_size,
+            disable_metrics,
+            environment_type,
+            forks,
+            name,
+            provider,
+            region,
+            repo_owner,
+            service_count,
+            skip_binary_build,
+            start_repair_service,
+            wallet_secret_key,
+        } => {
+            if (branch.is_some() && repo_owner.is_none())
+                || (branch.is_none() && repo_owner.is_some())
+            {
+                return Err(eyre!(
+                    "Both --branch and --repo-owner must be provided together"
+                ));
+            }
+
+            if ant_version.is_some() && (branch.is_some() || repo_owner.is_some()) {
+                return Err(eyre!("Cannot specify both version and branch/repo-owner"));
+            }
+
+            let binary_option = get_binary_option(
+                branch,
+                repo_owner,
+                ant_version,
+                None,
+                None,
+                None,
+                skip_binary_build,
+            )
+            .await?;
+
+            let mut builder = ClientsDeployBuilder::new();
+            builder
+                .ansible_verbose_mode(ansible_verbose)
+                .deployment_type(environment_type.clone())
+                .environment_name(&name)
+                .provider(provider);
+            if let Some(forks_value) = forks {
+                builder.ansible_forks(forks_value);
+            }
+            let client_deployer = builder.build()?;
+            client_deployer.init().await?;
+
+            let inventory_service = DeploymentInventoryService::from(&client_deployer);
+            let inventory = inventory_service
+                .generate_or_retrieve_client_inventory(
+                    &name,
+                    &region,
+                    true,
+                    Some(binary_option.clone()),
+                )
+                .await?;
+
+            let evm_details = EvmDetails {
+                network: EvmNetwork::ArbitrumOne,
+                data_payments_address: None,
+                payment_token_address: None,
+                rpc_url: None,
+            };
+
+            let options = ClientsDeployOptions {
+                binary_option,
+                chunk_size,
+                chunk_tracker_data_addresses: Vec::new(),
+                chunk_tracker_services: 0,
+                client_env_variables,
+                client_vm_count,
+                client_vm_size,
+                current_inventory: inventory,
+                delayed_verifier_batch_size: None,
+                delayed_verifier_quorum_value: None,
+                enable_metrics: !disable_metrics,
+                environment_type,
+                evm_details,
+                expected_hash: None,
+                expected_size: None,
+                file_address: None,
+                funding_wallet_secret_key: None,
+                initial_gas: None,
+                initial_tokens: None,
+                max_archived_log_files: 1,
+                max_log_files: 1,
+                max_uploads: None,
+                name: name.clone(),
+                network_contacts_url: None,
+                network_id: None,
+                output_inventory_dir_path: client_deployer.working_directory_path.join("inventory"),
+                peer: None,
+                performance_verifier_batch_size: None,
+                random_verifier_batch_size: None,
+                repair_service_count: service_count.unwrap_or(1),
+                run_chunk_trackers_provision: false,
+                run_data_retrieval_provision: false,
+                run_downloaders_provision: false,
+                run_repair_files_provision: true,
+                run_scan_repair_provision: false,
+                run_uploaders_provision: false,
+                scan_frequency: None,
+                sleep_duration: None,
+                sleep_interval: None,
+                start_chunk_trackers: false,
+                start_data_retrieval: false,
+                start_delayed_verifier: false,
+                start_performance_verifier: false,
+                start_random_verifier: false,
+                start_repair_service,
+                start_uploaders: false,
+                upload_batch_size: None,
+                uploaders_count: 0,
+                upload_interval: 0,
+                upload_size: None,
+                wallet_secret_keys: Some(vec![
+                    wallet_secret_key;
+                    client_vm_count.unwrap_or(1) as usize
+                ]),
+            };
+
+            client_deployer.deploy(options).await?;
+
+            println!("Repair files deployment for '{name}' completed successfully");
+            Ok(())
+        }
+        ClientsCommands::DeployScanRepair {
+            ansible_verbose,
+            ant_version,
+            branch,
+            chunk_size,
+            client_env_variables,
+            client_vm_count,
+            client_vm_size,
+            disable_metrics,
+            environment_type,
+            forks,
+            name,
+            provider,
+            region,
+            repo_owner,
+            scan_frequency,
+            skip_binary_build,
+            sleep_interval,
+            start_service,
+            wallet_secret_key,
+        } => {
+            if (branch.is_some() && repo_owner.is_none())
+                || (branch.is_none() && repo_owner.is_some())
+            {
+                return Err(eyre!(
+                    "Both --branch and --repo-owner must be provided together"
+                ));
+            }
+
+            if ant_version.is_some() && (branch.is_some() || repo_owner.is_some()) {
+                return Err(eyre!("Cannot specify both version and branch/repo-owner"));
+            }
+
+            let binary_option = get_binary_option(
+                branch,
+                repo_owner,
+                ant_version,
+                None,
+                None,
+                None,
+                skip_binary_build,
+            )
+            .await?;
+
+            let mut builder = ClientsDeployBuilder::new();
+            builder
+                .ansible_verbose_mode(ansible_verbose)
+                .deployment_type(environment_type.clone())
+                .environment_name(&name)
+                .provider(provider);
+            if let Some(forks_value) = forks {
+                builder.ansible_forks(forks_value);
+            }
+            let client_deployer = builder.build()?;
+            client_deployer.init().await?;
+
+            let inventory_service = DeploymentInventoryService::from(&client_deployer);
+            let inventory = inventory_service
+                .generate_or_retrieve_client_inventory(
+                    &name,
+                    &region,
+                    true,
+                    Some(binary_option.clone()),
+                )
+                .await?;
+
+            let evm_details = EvmDetails {
+                network: EvmNetwork::ArbitrumOne,
+                data_payments_address: None,
+                payment_token_address: None,
+                rpc_url: None,
+            };
+
+            let options = ClientsDeployOptions {
+                binary_option,
+                chunk_size,
+                chunk_tracker_data_addresses: Vec::new(),
+                chunk_tracker_services: 0,
+                client_env_variables,
+                client_vm_count,
+                client_vm_size,
+                current_inventory: inventory,
+                delayed_verifier_batch_size: None,
+                delayed_verifier_quorum_value: None,
+                enable_metrics: !disable_metrics,
+                environment_type,
+                evm_details,
+                expected_hash: None,
+                expected_size: None,
+                file_address: None,
+                funding_wallet_secret_key: None,
+                initial_gas: None,
+                initial_tokens: None,
+                max_archived_log_files: 1,
+                max_log_files: 1,
+                max_uploads: None,
+                name: name.clone(),
+                network_contacts_url: None,
+                network_id: None,
+                output_inventory_dir_path: client_deployer.working_directory_path.join("inventory"),
+                peer: None,
+                performance_verifier_batch_size: None,
+                random_verifier_batch_size: None,
+                repair_service_count: 0,
+                run_chunk_trackers_provision: false,
+                run_data_retrieval_provision: false,
+                run_downloaders_provision: false,
+                run_repair_files_provision: false,
+                run_scan_repair_provision: true,
+                run_uploaders_provision: false,
+                scan_frequency,
+                sleep_duration: None,
+                sleep_interval,
+                start_chunk_trackers: false,
+                start_data_retrieval: false,
+                start_delayed_verifier: false,
+                start_performance_verifier: false,
+                start_random_verifier: false,
+                start_repair_service: start_service,
+                start_uploaders: false,
+                upload_batch_size: None,
+                uploaders_count: 0,
+                upload_interval: 0,
+                upload_size: None,
+                wallet_secret_keys: Some(vec![
+                    wallet_secret_key;
+                    client_vm_count.unwrap_or(1) as usize
+                ]),
+            };
+
+            client_deployer.deploy(options).await?;
+
+            println!("Scan repair deployment for '{name}' completed successfully");
             Ok(())
         }
         ClientsCommands::DeployStaticDownloaders {
@@ -1263,8 +2042,6 @@ pub async fn handle_clients_command(cmd: ClientsCommands) -> Result<()> {
                 rpc_url: evm_rpc_url,
             };
 
-            // Until we have streaming implemented in the client, large file downloads require a
-            // large amount of memory.
             let options = ClientsDeployOptions {
                 binary_option,
                 chunk_size,
@@ -1296,14 +2073,22 @@ pub async fn handle_clients_command(cmd: ClientsCommands) -> Result<()> {
                 peer,
                 performance_verifier_batch_size,
                 random_verifier_batch_size,
+                repair_service_count: 0,
                 run_chunk_trackers_provision: false,
+                run_data_retrieval_provision: false,
                 run_downloaders_provision: true,
+                run_repair_files_provision: false,
+                run_scan_repair_provision: false,
                 run_uploaders_provision: false,
+                scan_frequency: None,
                 sleep_duration,
+                sleep_interval: None,
                 start_chunk_trackers: false,
+                start_data_retrieval: false,
                 start_delayed_verifier,
                 start_performance_verifier,
                 start_random_verifier,
+                start_repair_service: false,
                 start_uploaders: false,
                 upload_batch_size: None,
                 uploaders_count: 0,
@@ -1433,14 +2218,22 @@ pub async fn handle_clients_command(cmd: ClientsCommands) -> Result<()> {
                 peer,
                 performance_verifier_batch_size: None,
                 random_verifier_batch_size: None,
+                repair_service_count: 0,
                 run_chunk_trackers_provision: false,
+                run_data_retrieval_provision: false,
                 run_downloaders_provision: false,
+                run_repair_files_provision: false,
+                run_scan_repair_provision: false,
                 run_uploaders_provision: true,
+                scan_frequency: None,
                 sleep_duration: None,
+                sleep_interval: None,
                 start_chunk_trackers: false,
+                start_data_retrieval: false,
                 start_delayed_verifier: false,
                 start_performance_verifier: false,
                 start_random_verifier: false,
+                start_repair_service: false,
                 start_uploaders: false,
                 upload_batch_size,
                 uploaders_count: 1,

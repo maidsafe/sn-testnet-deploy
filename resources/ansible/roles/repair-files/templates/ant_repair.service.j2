@@ -1,0 +1,17 @@
+[Unit]
+Description=Ant Repair Service {{ service_number }}
+After=network.target
+
+[Service]
+Environment="SECRET_KEY={{ secret_key }}"
+Environment="EVM_NETWORK=arbitrum-one"
+Environment="CHUNK_DOWNLOAD_BATCH_SIZE=50"
+{% if client_env_variables is defined %}
+Environment="{{ client_env_variables }}"
+{% endif %}
+User=ant1
+ExecStart=/home/ant1/ant_repair.sh {{ service_number }}
+WorkingDirectory=/home/ant1
+
+[Install]
+WantedBy=multi-user.target

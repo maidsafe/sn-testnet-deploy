@@ -81,6 +81,10 @@ pub enum AnsiblePlaybook {
     ///
     /// Use in combination with `AnsibleInventoryType::Genesis` or `AnsibleInventoryType::Nodes`.
     CopyLogs,
+    /// The data retrieval playbook will setup the data retrieval service on client VMs.
+    ///
+    /// Use in combination with `AnsibleInventoryType::Clients`.
+    DataRetrieval,
     /// The Downloaders playbook will setup the downloader scripts on the Client VMs.
     ///
     /// Use in combination with `AnsibleInventoryType::Clients`.
@@ -135,6 +139,14 @@ pub enum AnsiblePlaybook {
     ///
     /// Use in combination with `AnsibleInventoryType::Genesis` or `AnsibleInventoryType::Nodes`.
     ResetNodes,
+    /// The repair files playbook will setup the repair service on the Client VMs.
+    ///
+    /// Use in combination with `AnsibleInventoryType::Clients`.
+    RepairFiles,
+    /// The scan repair playbook will setup the scan repair service on the Client VMs.
+    ///
+    /// Use in combination with `AnsibleInventoryType::Clients`.
+    ScanRepair,
     /// The rpc client playbook will setup the `safenode_rpc_client` binary on the genesis node.
     ///
     /// Use in combination with `AnsibleInventoryType::Genesis`.
@@ -263,6 +275,7 @@ impl AnsiblePlaybook {
             AnsiblePlaybook::CleanupLogs => "cleanup_logs.yml".to_string(),
             AnsiblePlaybook::ConfigureSwapfile => "configure_swapfile.yml".to_string(),
             AnsiblePlaybook::CopyLogs => "copy_logs.yml".to_string(),
+            AnsiblePlaybook::DataRetrieval => "data_retrieval.yml".to_string(),
             AnsiblePlaybook::Downloaders => "downloaders.yml".to_string(),
             AnsiblePlaybook::EvmNodes => "evm_nodes.yml".to_string(),
             AnsiblePlaybook::ExtendVolumeSize => "extend_volume_size.yml".to_string(),
@@ -278,6 +291,8 @@ impl AnsiblePlaybook {
             AnsiblePlaybook::RpcClient => "safenode_rpc_client.yml".to_string(),
             AnsiblePlaybook::ResetToNNodes => "reset_to_n_nodes.yml".to_string(),
             AnsiblePlaybook::ResetNodes => "reset_nodes.yml".to_string(),
+            AnsiblePlaybook::RepairFiles => "repair_files.yml".to_string(),
+            AnsiblePlaybook::ScanRepair => "scan_repair.yml".to_string(),
             AnsiblePlaybook::StartChunkTrackers => "start_chunk_trackers.yml".to_string(),
             AnsiblePlaybook::StartDownloaders => "start_downloaders.yml".to_string(),
             AnsiblePlaybook::StartFaucet => "start_faucet.yml".to_string(),

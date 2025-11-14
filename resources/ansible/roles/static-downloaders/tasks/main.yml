@@ -42,16 +42,6 @@
   become: true
   become_user: ant1
 
-- name: copy ant_data_retrieval.py to remote
-  ansible.builtin.template:
-    src: ant_data_retrieval.py.j2
-    dest: /home/ant1/ant_data_retrieval.py
-    owner: ant1
-    group: ant
-    mode: '0775'
-  become: true
-  become_user: ant1
-
 - name: ensure the ant users can write to the random_verifier metrics directory
   ansible.builtin.file:
     path: "/mnt/ant-storage/logs/download_files/random_verifier/ant1/"
@@ -75,16 +65,6 @@
 - name: ensure the ant users can write to the performance_verifier metrics directory
   ansible.builtin.file:
     path: "/mnt/ant-storage/logs/download_files/performance_verifier/ant1/"
-    state: directory
-    mode: '0775'
-    owner: ant1
-    group: ant
-    recurse: yes
-  become: true
-
-- name: ensure the ant users can write to the data_loss_tester metrics directory
-  ansible.builtin.file:
-    path: "/mnt/ant-storage/logs/download_files/data_loss_tester/ant1/"
     state: directory
     mode: '0775'
     owner: ant1
@@ -144,11 +124,6 @@
     path: "/etc/systemd/system/ant_performance_verifier.service"
   register: ant_performance_verifier_stat
 
-- name: Check if systemd ant_data_retrieval service file exists
-  ansible.builtin.stat:
-    path: "/etc/systemd/system/ant_data_retrieval.service"
-  register: ant_data_retrieval_stat
-
 - name: create ant_random_verifier systemd service file
   ansible.builtin.template:
     src: ant_random_verifier.service.j2
@@ -178,16 +153,6 @@
     mode: '0644'
   become: true
   when: not ant_performance_verifier_stat.stat.exists
-
-- name: create ant_data_retrieval systemd service file
-  ansible.builtin.template:
-    src: ant_data_retrieval.service.j2
-    dest: "/etc/systemd/system/ant_data_retrieval.service"
-    owner: ant1
-    group: ant
-    mode: '0644'
-  become: true
-  when: not ant_data_retrieval_stat.stat.exists
 
 - name: enable ant_random_verifier service
   ansible.builtin.systemd:
@@ -228,9 +193,3 @@
   become: true
   when: start_performance_verifier | default(false) | bool
 
-- name: enable ant_data_retrieval service
-  ansible.builtin.systemd:
-    name: ant_data_retrieval
-    enabled: no
-    daemon_reload: yes
-  become: true

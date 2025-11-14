@@ -1,0 +1,61 @@
+#!/usr/bin/env bash
+
+repair_address() {
+  local data_address=$1
+  start_time=$(date +%s%N)
+
+  ant analyze \
+    -v \
+    --closest-nodes \
+    --repair \
+    --recursive \
+    $data_address 2>&1
+
+  local exit_code=$?
+  end_time=$(date +%s%N)
+
+  elapsed=$(echo "scale=2; ($end_time - $start_time) / 1000000000" | bc)
+  echo "Completed in $elapsed seconds with exit code: $exit_code"
+}
+
+run_repair_loop() {
+  local service_number=$1
+  if [[ -z "$service_number" ]]; then
+    echo "Error: Service number argument is required"
+    exit 1
+  fi
+
+  local repair_list_file="/home/ant1/repair_list_${service_number}"
+
+  if [[ ! -f "$repair_list_file" ]]; then
+    echo "Error: Repair list file not found at $repair_list_file"
+    exit 1
+  fi
+
+  if [[ ! -s "$repair_list_file" ]]; then
+    echo "Warning: Repair list file is empty at $repair_list_file"
+    exit 0
+  fi
+
+  echo "Reading addresses from: $repair_list_file"
+
+  local total_lines=$(wc -l < "$repair_list_file")
+  local current_line=0
+
+  while IFS= read -r data_address || [[ -n "$data_address" ]]; do
+    [[ -z "$data_address" ]] && continue
+
+    current_line=$((current_line + 1))
+    echo "================================"
+    echo "$(date +'%Y-%m-%d %H:%M:%S')"
+    echo "================================"
+    echo "Processing address $current_line/$total_lines: $data_address"
+    repair_address "$data_address"
+  done < "$repair_list_file"
+}
+
+main() {
+  run_repair_loop "$1"
+}
+
+main "$@"

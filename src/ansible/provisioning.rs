@@ -92,10 +92,13 @@ pub struct ProvisionOptions {
     pub port_restricted_cone_private_node_count: u16,
     pub public_rpc: bool,
     pub random_verifier_batch_size: Option<u16>,
+    pub repair_service_count: u16,
     pub rewards_address: Option<String>,
+    pub scan_frequency: Option<u64>,
     pub sleep_duration: Option<u16>,
     pub single_node_payment: bool,
     pub start_chunk_trackers: bool,
+    pub start_data_retrieval: bool,
     pub symmetric_private_node_count: u16,
     pub token_amount: Option<U256>,
     pub upload_batch_size: Option<u16>,
@@ -349,10 +352,13 @@ impl From<BootstrapOptions> for ProvisionOptions {
             performance_verifier_batch_size: None,
             public_rpc: false,
             random_verifier_batch_size: None,
+            repair_service_count: 0,
             rewards_address: Some(bootstrap_options.rewards_address),
+            scan_frequency: None,
             sleep_duration: None,
             single_node_payment: false,
             start_chunk_trackers: false,
+            start_data_retrieval: false,
             start_delayed_verifier: false,
             start_random_verifier: false,
             start_performance_verifier: false,
@@ -416,10 +422,13 @@ impl From<DeployOptions> for ProvisionOptions {
                 .port_restricted_cone_private_node_count,
             public_rpc: deploy_options.public_rpc,
             random_verifier_batch_size: None,
+            repair_service_count: 0,
             rewards_address: Some(deploy_options.rewards_address),
+            scan_frequency: None,
             sleep_duration: None,
             single_node_payment: deploy_options.single_node_payment,
             start_chunk_trackers: deploy_options.start_chunk_trackers,
+            start_data_retrieval: false,
             start_delayed_verifier: deploy_options.start_delayed_verifier,
             start_performance_verifier: deploy_options.start_performance_verifier,
             start_random_verifier: deploy_options.start_random_verifier,
@@ -442,11 +451,17 @@ impl From<ClientsDeployOptions> for ProvisionOptions {
             ant_version: None,
             binary_option: client_options.binary_option,
             chunk_size: client_options.chunk_size,
+            chunk_tracker_data_addresses: if client_options.chunk_tracker_data_addresses.is_empty()
+            {
+                None
+            } else {
+                Some(client_options.chunk_tracker_data_addresses)
+            },
+            chunk_tracker_services: Some(client_options.chunk_tracker_services),
             client_env_variables: client_options.client_env_variables,
             delayed_verifier_batch_size: client_options.delayed_verifier_batch_size,
             disable_nodes: false,
             delayed_verifier_quorum_value: client_options.delayed_verifier_quorum_value,
-            start_delayed_verifier: client_options.start_delayed_verifier,
             enable_logging: false,
             enable_metrics: client_options.enable_metrics,
             start_random_verifier: client_options.start_random_verifier,
@@ -477,9 +492,14 @@ impl From<ClientsDeployOptions> for ProvisionOptions {
             performance_verifier_batch_size: client_options.performance_verifier_batch_size,
             public_rpc: false,
             random_verifier_batch_size: client_options.random_verifier_batch_size,
+            repair_service_count: client_options.repair_service_count,
             rewards_address: None,
+            scan_frequency: client_options.scan_frequency,
             sleep_duration: client_options.sleep_duration,
             single_node_payment: false,
+            start_chunk_trackers: client_options.start_chunk_trackers,
+            start_data_retrieval: client_options.start_data_retrieval,
+            start_delayed_verifier: client_options.start_delayed_verifier,
             symmetric_private_node_count: 0,
             token_amount: client_options.initial_tokens,
             upload_batch_size: client_options.upload_batch_size,
@@ -489,14 +509,6 @@ impl From<ClientsDeployOptions> for ProvisionOptions {
             upnp_private_node_count: 0,
             port_restricted_cone_private_node_count: 0,
             wallet_secret_keys: client_options.wallet_secret_keys,
-            chunk_tracker_data_addresses: if client_options.chunk_tracker_data_addresses.is_empty()
-            {
-                None
-            } else {
-                Some(client_options.chunk_tracker_data_addresses)
-            },
-            chunk_tracker_services: Some(client_options.chunk_tracker_services),
-            start_chunk_trackers: client_options.start_chunk_trackers,
         }
     }
 }
@@ -1524,6 +1536,88 @@ impl AnsibleProvisioner {
                 genesis_multiaddr,
                 genesis_network_contacts_url,
                 &HashMap::new(), // Empty map since chunk-trackers don't need wallets
+                &client_vms,
+            )?),
+        )?;
+        print_duration(start.elapsed());
+        Ok(())
+    }
+
+    pub async fn provision_data_retrieval(
+        &self,
+        options: &ProvisionOptions,
+        genesis_network_contacts_url: Option<String>,
+    ) -> Result<()> {
+        let start = Instant::now();
+
+        self.ansible_runner.run_playbook(
+            AnsiblePlaybook::DataRetrieval,
+            AnsibleInventoryType::Clients,
+            Some(extra_vars::build_data_retrieval_extra_vars_doc(
+                &self.cloud_provider.to_string(),
+                options,
+                genesis_network_contacts_url,
+            )?),
+        )?;
+        print_duration(start.elapsed());
+        Ok(())
+    }
+
+    pub async fn provision_repair_files(&self, options: &ProvisionOptions) -> Result<()> {
+        let start = Instant::now();
+
+        let client_vms = self
+            .ansible_runner
+            .get_inventory(AnsibleInventoryType::Clients, true)?;
+        let sk_map = self
+            .prepare_pre_funded_wallets(
+                &options
+                    .wallet_secret_keys
+                    .clone()
+                    .ok_or_else(|| Error::RepairWalletAddressNotProvided)?,
+            )
+            .await?;
+
+        self.ansible_runner.run_playbook(
+            AnsiblePlaybook::RepairFiles,
+            AnsibleInventoryType::Clients,
+            Some(extra_vars::build_clients_extra_vars_doc(
+                &self.cloud_provider.to_string(),
+                options,
+                None,
+                None,
+                &sk_map,
+                &client_vms,
+            )?),
+        )?;
+        print_duration(start.elapsed());
+        Ok(())
+    }
+
+    pub async fn provision_scan_repair(&self, options: &ProvisionOptions) -> Result<()> {
+        let start = Instant::now();
+
+        let client_vms = self
+            .ansible_runner
+            .get_inventory(AnsibleInventoryType::Clients, true)?;
+        let sk_map = self
+            .prepare_pre_funded_wallets(
+                &options
+                    .wallet_secret_keys
+                    .clone()
+                    .ok_or_else(|| Error::RepairWalletAddressNotProvided)?,
+            )
+            .await?;
+
+        self.ansible_runner.run_playbook(
+            AnsiblePlaybook::ScanRepair,
+            AnsibleInventoryType::Clients,
+            Some(extra_vars::build_clients_extra_vars_doc(
+                &self.cloud_provider.to_string(),
+                options,
+                None,
+                None,
+                &sk_map,
                 &client_vms,
             )?),
         )?;

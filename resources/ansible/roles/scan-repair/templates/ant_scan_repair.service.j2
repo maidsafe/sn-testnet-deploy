@@ -1,0 +1,17 @@
+[Unit]
+Description=Ant Scan Repair Service
+After=network.target
+
+[Service]
+Environment="SECRET_KEY={{ secret_key }}"
+Environment="EVM_NETWORK=arbitrum-one"
+Environment="CHUNK_DOWNLOAD_BATCH_SIZE=50"
+{% if client_env_variables is defined %}
+Environment="{{ client_env_variables }}"
+{% endif %}
+User=ant1
+ExecStart=/home/ant1/ant_scan_repair.sh --frequency {{ scan_frequency }} --sleep-interval {{ sleep_interval }}
+WorkingDirectory=/home/ant1
+
+[Install]
+WantedBy=multi-user.target

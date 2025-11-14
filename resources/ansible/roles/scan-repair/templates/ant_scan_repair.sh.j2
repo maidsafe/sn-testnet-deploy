@@ -1,0 +1,42 @@
+#!/usr/bin/env bash
+
+FREQUENCY=200
+SLEEP_INTERVAL=60
+
+parse_arguments() {
+  while [[ $# -gt 0 ]]; do
+    case $1 in
+      --frequency)
+        FREQUENCY="$2"
+        shift 2
+        ;;
+      --sleep-interval)
+        SLEEP_INTERVAL="$2"
+        shift 2
+        ;;
+      *)
+        echo "Unknown option: $1"
+        echo "Usage: $0 [--frequency <number>] [--sleep-interval <number>]"
+        exit 1
+        ;;
+    esac
+  done
+}
+
+run_repair_loop() {
+  while true; do
+    echo "================================"
+    echo "$(date +'%Y-%m-%d %H:%M:%S') Scan Repair"
+    echo "================================"
+    ant analyze -v --nodes-health --repair $FREQUENCY
+    echo "Sleeping for $SLEEP_INTERVAL seconds..."
+    sleep $SLEEP_INTERVAL
+  done
+}
+
+main() {
+  parse_arguments "$@"
+  run_repair_loop
+}
+
+main "$@"
