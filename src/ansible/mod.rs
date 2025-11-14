@@ -103,6 +103,10 @@ pub enum AnsiblePlaybook {
     ///
     /// Use in combination with `AnsibleInventoryType::Genesis`.
     Faucet,
+    /// Fetch scan repair results from client VMs.
+    ///
+    /// Use in combination with `AnsibleInventoryType::Clients`.
+    FetchScanRepairResults,
     /// This playbook will fund the uploaders using the faucet.
     FundUploaders,
     /// The genesis playbook will use the node manager to setup the genesis node, which the other
@@ -280,6 +284,9 @@ impl AnsiblePlaybook {
             AnsiblePlaybook::EvmNodes => "evm_nodes.yml".to_string(),
             AnsiblePlaybook::ExtendVolumeSize => "extend_volume_size.yml".to_string(),
             AnsiblePlaybook::Faucet => "faucet.yml".to_string(),
+            AnsiblePlaybook::FetchScanRepairResults => {
+                "fetch_scan_repair_results.yml".to_string()
+            }
             AnsiblePlaybook::FundUploaders => "fund_uploaders.yml".to_string(),
             AnsiblePlaybook::Genesis => "genesis_node.yml".to_string(),
             AnsiblePlaybook::Nodes => "nodes.yml".to_string(),

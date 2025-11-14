@@ -1,0 +1,24 @@
+---
+- name: fetch scan repair results from client VMs
+  hosts: all
+  ignore_unreachable: yes
+  max_fail_percentage: 10
+  tasks:
+    - name: find all scan repair CSV files
+      find:
+        paths: "/home/ant1/"
+        patterns:
+          - "chunk_badlist.csv"
+          - "chunk_whitelist.csv"
+          - "network_scan_repair_*.csv"
+          - "initial_repair_*.csv"
+      register: scan_repair_files
+
+    - name: fetch scan repair CSV files
+      fetch:
+        src: "{{ item.path }}"
+        dest: "../../scan-repair-results/{{env_name}}/{{ inventory_hostname }}/"
+        flat: yes
+      with_items: "{{ scan_repair_files.files }}"
+      when: scan_repair_files.files | length > 0
+      ignore_errors: yes
