@@ -236,6 +236,492 @@ pub enum ClientsCommands {
         #[clap(long, value_name = "SECRET_KEY", number_of_values = 1)]
         wallet_secret_key: Vec<String>,
     },
+    /// Deploy chunk tracker services on client VMs.
+    DeployChunkTrackers {
+        /// Set to run Ansible with more verbose output.
+        #[arg(long)]
+        ansible_verbose: bool,
+        /// Supply a version number for the ant binary.
+        ///
+        /// There should be no 'v' prefix.
+        ///
+        /// The version arguments are mutually exclusive with the --branch and --repo-owner
+        /// arguments. You can only supply version numbers or a custom branch, not both.
+        #[arg(long, verbatim_doc_comment)]
+        ant_version: Option<String>,
+        /// The branch of the Github repository to build from.
+        ///
+        /// If used, the ant binary will be built from this branch. It is typically used for testing
+        /// changes on a fork.
+        ///
+        /// This argument must be used in conjunction with the --repo-owner argument.
+        ///
+        /// The --branch and --repo-owner arguments are mutually exclusive with the binary version
+        /// arguments. You can only supply version numbers or a custom branch, not both.
+        #[arg(long, verbatim_doc_comment)]
+        branch: Option<String>,
+        /// Specify the chunk size for the custom binaries using a 64-bit integer.
+        ///
+        /// This option only applies if the --branch and --repo-owner arguments are used.
+        #[clap(long, value_parser = parse_chunk_size)]
+        chunk_size: Option<u64>,
+        /// Comma-separated list of data addresses to track with chunk trackers.
+        #[arg(long, value_delimiter = ',')]
+        chunk_tracker_data_addresses: Vec<String>,
+        /// The number of chunk tracker services to run per client VM.
+        #[clap(long, default_value_t = 1)]
+        chunk_tracker_services: u16,
+        /// Provide environment variables for the antnode RPC client.
+        ///
+        /// This is useful to set the client's log levels. Each variable should be comma
+        /// separated without any space.
+        ///
+        /// Example: --client-env CLIENT_LOG=all,RUST_LOG=debug
+        #[clap(name = "client-env", long, use_value_delimiter = true, value_parser = parse_environment_variables, verbatim_doc_comment)]
+        client_env_variables: Option<Vec<(String, String)>>,
+        /// The number of client VMs to create.
+        ///
+        /// If the argument is not used, the value will be determined by the 'environment-type'
+        /// argument.
+        #[clap(long)]
+        client_vm_count: Option<u16>,
+        /// Override the size of the client VMs.
+        #[clap(long)]
+        client_vm_size: Option<String>,
+        /// Set to disable metrics collection on all nodes.
+        #[clap(long)]
+        disable_metrics: bool,
+        /// The type of deployment.
+        ///
+        /// Possible values are 'development', 'production' or 'staging'. The value used will
+        /// determine the sizes of VMs, the number of VMs, and the number of nodes deployed on
+        /// them. The specification will increase in size from development, to staging, to
+        /// production.
+        ///
+        /// The default is 'development'.
+        #[clap(long, default_value_t = EnvironmentType::Development, value_parser = parse_deployment_type, verbatim_doc_comment)]
+        environment_type: EnvironmentType,
+        /// The address of the data payments contract.
+        #[arg(long)]
+        evm_data_payments_address: Option<String>,
+        /// The EVM network type to use for the deployment.
+        ///
+        /// Possible values are 'arbitrum-one' or 'custom'.
+        ///
+        /// If not used, the default is 'arbitrum-one'.
+        #[clap(long, default_value = "arbitrum-one", value_parser = parse_evm_network)]
+        evm_network_type: EvmNetwork,
+        /// The address of the payment token contract.
+        #[arg(long)]
+        evm_payment_token_address: Option<String>,
+        /// The RPC URL for the EVM network.
+        ///
+        /// This argument only applies if the EVM network type is 'custom'.
+        #[arg(long)]
+        evm_rpc_url: Option<String>,
+        /// Override the maximum number of forks Ansible will use to execute tasks on target hosts.
+        ///
+        /// The default value from ansible.cfg is 50.
+        #[clap(long)]
+        forks: Option<usize>,
+        /// The name of the environment
+        #[arg(short = 'n', long)]
+        name: String,
+        /// Specify the network ID for the ant binary.
+        ///
+        /// This is used to ensure the client connects to the correct network.
+        ///
+        /// For a production deployment, use 1.
+        ///
+        /// For an alpha deployment, use 2.
+        ///
+        /// For a testnet deployment, use anything between 3 and 255.
+        #[clap(long, verbatim_doc_comment)]
+        network_id: u8,
+        /// The networks contacts URL from an existing network.
+        #[arg(long)]
+        network_contacts_url: Option<String>,
+        /// A peer from an existing network that the Ant client can connect to.
+        ///
+        /// Should be in the form of a multiaddr.
+        #[arg(long)]
+        peer: Option<String>,
+        /// The cloud provider to deploy to.
+        ///
+        /// Valid values are "aws" or "digital-ocean".
+        #[clap(long, default_value_t = CloudProvider::DigitalOcean, value_parser = parse_provider, verbatim_doc_comment)]
+        provider: CloudProvider,
+        /// The region to deploy to.
+        ///
+        /// Defaults to "lon1" for Digital Ocean.
+        #[clap(long, default_value = "lon1")]
+        region: String,
+        /// The owner/org of the Github repository to build from.
+        ///
+        /// If used, all binaries will be built from this repository. It is typically used for
+        /// testing changes on a fork.
+        ///
+        /// This argument must be used in conjunction with the --repo-owner argument.
+        ///
+        /// The --branch and --repo-owner arguments are mutually exclusive with the binary version
+        /// arguments. You can only supply version numbers or a custom branch, not both.
+        #[arg(long, verbatim_doc_comment)]
+        repo_owner: Option<String>,
+        /// Skip building the autonomi binaries if they were built during a previous run of the deployer using the same
+        /// --branch, --repo-owner and --name arguments.
+        ///
+        /// This is useful to re-run any failed deployments without rebuilding the binaries.
+        #[arg(long, default_value_t = false)]
+        skip_binary_build: bool,
+        /// Set to start chunk tracker services immediately after provisioning.
+        #[clap(long)]
+        start_chunk_trackers: bool,
+    },
+    /// Deploy data retrieval service on client VMs.
+    DeployDataRetrieval {
+        /// Set to run Ansible with more verbose output.
+        #[arg(long)]
+        ansible_verbose: bool,
+        /// Supply a version number for the ant binary.
+        ///
+        /// There should be no 'v' prefix.
+        ///
+        /// The version arguments are mutually exclusive with the --branch and --repo-owner
+        /// arguments. You can only supply version numbers or a custom branch, not both.
+        #[arg(long, verbatim_doc_comment)]
+        ant_version: Option<String>,
+        /// The branch of the Github repository to build from.
+        ///
+        /// If used, the ant binary will be built from this branch. It is typically used for testing
+        /// changes on a fork.
+        ///
+        /// This argument must be used in conjunction with the --repo-owner argument.
+        ///
+        /// The --branch and --repo-owner arguments are mutually exclusive with the binary version
+        /// arguments. You can only supply version numbers or a custom branch, not both.
+        #[arg(long, verbatim_doc_comment)]
+        branch: Option<String>,
+        /// Specify the chunk size for the custom binaries using a 64-bit integer.
+        ///
+        /// This option only applies if the --branch and --repo-owner arguments are used.
+        #[clap(long, value_parser = parse_chunk_size)]
+        chunk_size: Option<u64>,
+        /// Provide environment variables for the ant client.
+        ///
+        /// This is useful to set the client's log levels. Each variable should be comma
+        /// separated without any space.
+        ///
+        /// Example: --client-env CLIENT_LOG=all,RUST_LOG=debug
+        #[clap(name = "client-env", long, use_value_delimiter = true, value_parser = parse_environment_variables, verbatim_doc_comment)]
+        client_env_variables: Option<Vec<(String, String)>>,
+        /// The number of client VMs to create.
+        ///
+        /// If the argument is not used, the value will be determined by the 'environment-type'
+        /// argument.
+        #[clap(long)]
+        client_vm_count: Option<u16>,
+        /// Override the size of the client VMs.
+        #[clap(long)]
+        client_vm_size: Option<String>,
+        /// Set to disable metrics collection on all nodes.
+        #[clap(long)]
+        disable_metrics: bool,
+        /// The type of deployment.
+        ///
+        /// Possible values are 'development', 'production' or 'staging'. The value used will
+        /// determine the sizes of VMs, the number of VMs, and the number of nodes deployed on
+        /// them. The specification will increase in size from development, to staging, to
+        /// production.
+        ///
+        /// The default is 'development'.
+        #[clap(long, default_value_t = EnvironmentType::Development, value_parser = parse_deployment_type, verbatim_doc_comment)]
+        environment_type: EnvironmentType,
+        /// The address of the data payments contract.
+        #[arg(long)]
+        evm_data_payments_address: Option<String>,
+        /// The EVM network type to use for the deployment.
+        ///
+        /// Possible values are 'arbitrum-one' or 'custom'.
+        ///
+        /// If not used, the default is 'arbitrum-one'.
+        #[clap(long, default_value = "arbitrum-one", value_parser = parse_evm_network)]
+        evm_network_type: EvmNetwork,
+        /// The address of the payment token contract.
+        #[arg(long)]
+        evm_payment_token_address: Option<String>,
+        /// The RPC URL for the EVM network.
+        ///
+        /// This argument only applies if the EVM network type is 'custom'.
+        #[arg(long)]
+        evm_rpc_url: Option<String>,
+        /// Override the maximum number of forks Ansible will use to execute tasks on target hosts.
+        ///
+        /// The default value from ansible.cfg is 50.
+        #[clap(long)]
+        forks: Option<usize>,
+        /// The name of the environment
+        #[arg(short = 'n', long)]
+        name: String,
+        /// Specify the network ID for the ant binary.
+        ///
+        /// This is used to ensure the client connects to the correct network.
+        ///
+        /// For a production deployment, use 1.
+        ///
+        /// For an alpha deployment, use 2.
+        ///
+        /// For a testnet deployment, use anything between 3 and 255.
+        #[clap(long, verbatim_doc_comment)]
+        network_id: u8,
+        /// The networks contacts URL from an existing network.
+        #[arg(long)]
+        network_contacts_url: Option<String>,
+        /// The cloud provider to deploy to.
+        ///
+        /// Valid values are "aws" or "digital-ocean".
+        #[clap(long, default_value_t = CloudProvider::DigitalOcean, value_parser = parse_provider, verbatim_doc_comment)]
+        provider: CloudProvider,
+        /// The region to deploy to.
+        ///
+        /// Defaults to "lon1" for Digital Ocean.
+        #[clap(long, default_value = "lon1")]
+        region: String,
+        /// The owner/org of the Github repository to build from.
+        ///
+        /// If used, all binaries will be built from this repository. It is typically used for
+        /// testing changes on a fork.
+        ///
+        /// This argument must be used in conjunction with the --repo-owner argument.
+        ///
+        /// The --branch and --repo-owner arguments are mutually exclusive with the binary version
+        /// arguments. You can only supply version numbers or a custom branch, not both.
+        #[arg(long, verbatim_doc_comment)]
+        repo_owner: Option<String>,
+        /// Skip building the autonomi binaries if they were built during a previous run of the deployer using the same
+        /// --branch, --repo-owner and --name arguments.
+        ///
+        /// This is useful to re-run any failed deployments without rebuilding the binaries.
+        #[arg(long, default_value_t = false)]
+        skip_binary_build: bool,
+        /// Set to start data retrieval service immediately after provisioning.
+        #[clap(long)]
+        start_data_retrieval: bool,
+    },
+    /// Deploy service(s) for repairing individual file addresses on client VMs
+    DeployRepairFiles {
+        /// Set to run Ansible with more verbose output.
+        #[arg(long)]
+        ansible_verbose: bool,
+        /// Supply a version number for the ant binary.
+        ///
+        /// There should be no 'v' prefix.
+        ///
+        /// The version arguments are mutually exclusive with the --branch and --repo-owner
+        /// arguments. You can only supply version numbers or a custom branch, not both.
+        #[arg(long, verbatim_doc_comment)]
+        ant_version: Option<String>,
+        /// The branch of the Github repository to build from.
+        ///
+        /// If used, the ant binary will be built from this branch. It is typically used for testing
+        /// changes on a fork.
+        ///
+        /// This argument must be used in conjunction with the --repo-owner argument.
+        ///
+        /// The --branch and --repo-owner arguments are mutually exclusive with the binary version
+        /// arguments. You can only supply version numbers or a custom branch, not both.
+        #[arg(long, verbatim_doc_comment)]
+        branch: Option<String>,
+        /// Specify the chunk size for the custom binaries using a 64-bit integer.
+        ///
+        /// This option only applies if the --branch and --repo-owner arguments are used.
+        #[clap(long, value_parser = parse_chunk_size)]
+        chunk_size: Option<u64>,
+        /// Provide environment variables for the antnode RPC client.
+        ///
+        /// This is useful to set the client's log levels. Each variable should be comma
+        /// separated without any space.
+        ///
+        /// Example: --client-env CLIENT_LOG=all,RUST_LOG=debug
+        #[clap(name = "client-env", long, use_value_delimiter = true, value_parser = parse_environment_variables, verbatim_doc_comment)]
+        client_env_variables: Option<Vec<(String, String)>>,
+        /// The number of client VMs to create.
+        ///
+        /// If the argument is not used, the value will be determined by the 'environment-type'
+        /// argument.
+        #[clap(long)]
+        client_vm_count: Option<u16>,
+        /// Override the size of the client VMs.
+        #[clap(long)]
+        client_vm_size: Option<String>,
+        /// Set to disable metrics collection on all nodes.
+        #[clap(long)]
+        disable_metrics: bool,
+        /// The type of deployment.
+        ///
+        /// Possible values are 'development', 'production' or 'staging'. The value used will
+        /// determine the sizes of VMs, the number of VMs, and the number of nodes deployed on
+        /// them. The specification will increase in size from development, to staging, to
+        /// production.
+        ///
+        /// The default is 'development'.
+        #[clap(long, default_value_t = EnvironmentType::Development, value_parser = parse_deployment_type, verbatim_doc_comment)]
+        environment_type: EnvironmentType,
+        /// Override the maximum number of forks Ansible will use to execute tasks on target hosts.
+        ///
+        /// The default value from ansible.cfg is 50.
+        #[clap(long)]
+        forks: Option<usize>,
+        /// The name of the environment
+        #[arg(short = 'n', long)]
+        name: String,
+        /// The cloud provider to deploy to.
+        ///
+        /// Valid values are "aws" or "digital-ocean".
+        #[clap(long, default_value_t = CloudProvider::DigitalOcean, value_parser = parse_provider, verbatim_doc_comment)]
+        provider: CloudProvider,
+        /// The region to deploy to.
+        ///
+        /// Defaults to "lon1" for Digital Ocean.
+        #[clap(long, default_value = "lon1")]
+        region: String,
+        /// The owner/org of the Github repository to build from.
+        ///
+        /// If used, all binaries will be built from this repository. It is typically used for
+        /// testing changes on a fork.
+        ///
+        /// This argument must be used in conjunction with the --repo-owner argument.
+        ///
+        /// The --branch and --repo-owner arguments are mutually exclusive with the binary version
+        /// arguments. You can only supply version numbers or a custom branch, not both.
+        #[arg(long, verbatim_doc_comment)]
+        repo_owner: Option<String>,
+        /// The number of repair services to deploy.
+        ///
+        /// Default is 1.
+        #[clap(long)]
+        service_count: Option<u16>,
+        /// Skip building the autonomi binaries if they were built during a previous run of the deployer using the same
+        /// --branch, --repo-owner and --name arguments.
+        ///
+        /// This is useful to re-run any failed deployments without rebuilding the binaries.
+        #[arg(long, default_value_t = false)]
+        skip_binary_build: bool,
+        /// Set to start the repair service immediately after provisioning.
+        #[clap(long)]
+        start_repair_service: bool,
+        /// The secret key for the wallet that will fund chunks that get uploaded for repaired
+        /// addresses.
+        #[clap(long)]
+        wallet_secret_key: String,
+    },
+    /// Deploy a scan repairing service on client VMs
+    DeployScanRepair {
+        /// Set to run Ansible with more verbose output.
+        #[arg(long)]
+        ansible_verbose: bool,
+        /// Supply a version number for the ant binary.
+        ///
+        /// There should be no 'v' prefix.
+        ///
+        /// The version arguments are mutually exclusive with the --branch and --repo-owner
+        /// arguments. You can only supply version numbers or a custom branch, not both.
+        #[arg(long, verbatim_doc_comment)]
+        ant_version: Option<String>,
+        /// The branch of the Github repository to build from.
+        ///
+        /// If used, the ant binary will be built from this branch. It is typically used for testing
+        /// changes on a fork.
+        ///
+        /// This argument must be used in conjunction with the --repo-owner argument.
+        ///
+        /// The --branch and --repo-owner arguments are mutually exclusive with the binary version
+        /// arguments. You can only supply version numbers or a custom branch, not both.
+        #[arg(long, verbatim_doc_comment)]
+        branch: Option<String>,
+        /// Specify the chunk size for the custom binaries using a 64-bit integer.
+        ///
+        /// This option only applies if the --branch and --repo-owner arguments are used.
+        #[clap(long, value_parser = parse_chunk_size)]
+        chunk_size: Option<u64>,
+        /// Provide environment variables for the antnode RPC client.
+        ///
+        /// This is useful to set the client's log levels. Each variable should be comma
+        /// separated without any space.
+        ///
+        /// Example: --client-env CLIENT_LOG=all,RUST_LOG=debug
+        #[clap(name = "client-env", long, use_value_delimiter = true, value_parser = parse_environment_variables, verbatim_doc_comment)]
+        client_env_variables: Option<Vec<(String, String)>>,
+        /// The number of client VMs to create.
+        ///
+        /// If the argument is not used, the value will be determined by the 'environment-type'
+        /// argument.
+        #[clap(long)]
+        client_vm_count: Option<u16>,
+        /// Override the size of the client VMs.
+        #[clap(long)]
+        client_vm_size: Option<String>,
+        /// Set to disable metrics collection on all nodes.
+        #[clap(long)]
+        disable_metrics: bool,
+        /// The type of deployment.
+        ///
+        /// Possible values are 'development', 'production' or 'staging'. The value used will
+        /// determine the sizes of VMs, the number of VMs, and the number of nodes deployed on
+        /// them. The specification will increase in size from development, to staging, to
+        /// production.
+        ///
+        /// The default is 'development'.
+        #[clap(long, default_value_t = EnvironmentType::Development, value_parser = parse_deployment_type, verbatim_doc_comment)]
+        environment_type: EnvironmentType,
+        /// Override the maximum number of forks Ansible will use to execute tasks on target hosts.
+        ///
+        /// The default value from ansible.cfg is 50.
+        #[clap(long)]
+        forks: Option<usize>,
+        /// The name of the environment
+        #[arg(short = 'n', long)]
+        name: String,
+        /// The cloud provider to deploy to.
+        ///
+        /// Valid values are "aws" or "digital-ocean".
+        #[clap(long, default_value_t = CloudProvider::DigitalOcean, value_parser = parse_provider, verbatim_doc_comment)]
+        provider: CloudProvider,
+        /// The region to deploy to.
+        ///
+        /// Defaults to "lon1" for Digital Ocean.
+        #[clap(long, default_value = "lon1")]
+        region: String,
+        /// The owner/org of the Github repository to build from.
+        ///
+        /// If used, all binaries will be built from this repository. It is typically used for
+        /// testing changes on a fork.
+        ///
+        /// This argument must be used in conjunction with the --repo-owner argument.
+        ///
+        /// The --branch and --repo-owner arguments are mutually exclusive with the binary version
+        /// arguments. You can only supply version numbers or a custom branch, not both.
+        #[arg(long, verbatim_doc_comment)]
+        repo_owner: Option<String>,
+        /// The scanning frequency for the repair command.
+        #[clap(long)]
+        scan_frequency: Option<u64>,
+        /// Skip building the autonomi binaries if they were built during a previous run of the deployer using the same
+        /// --branch, --repo-owner and --name arguments.
+        ///
+        /// This is useful to re-run any failed deployments without rebuilding the binaries.
+        #[arg(long, default_value_t = false)]
+        skip_binary_build: bool,
+        /// The interval between repair commands.
+        #[clap(long)]
+        sleep_interval: Option<u64>,
+        /// Set to start the repair service immediately after provisioning.
+        #[clap(long)]
+        start_service: bool,
+        /// The secret key for the wallet that will fund chunks that get uploaded for repaired
+        /// addresses.
+        #[clap(long)]
+        wallet_secret_key: String,
+    },
     /// Deploy a new static downloader environment.
     DeployStaticDownloaders {
         /// Set to run Ansible with more verbose output.
@@ -518,491 +1004,6 @@ pub enum ClientsCommands {
         upload_batch_size: Option<u16>,
         /// The secret key for the wallet with the funds for uploading.
         #[arg(long, verbatim_doc_comment)]
-        wallet_secret_key: String,
-    },
-    /// Deploy chunk tracker services on client VMs.
-    DeployChunkTrackers {
-        /// Set to run Ansible with more verbose output.
-        #[arg(long)]
-        ansible_verbose: bool,
-        /// Supply a version number for the ant binary.
-        ///
-        /// There should be no 'v' prefix.
-        ///
-        /// The version arguments are mutually exclusive with the --branch and --repo-owner
-        /// arguments. You can only supply version numbers or a custom branch, not both.
-        #[arg(long, verbatim_doc_comment)]
-        ant_version: Option<String>,
-        /// The branch of the Github repository to build from.
-        ///
-        /// If used, the ant binary will be built from this branch. It is typically used for testing
-        /// changes on a fork.
-        ///
-        /// This argument must be used in conjunction with the --repo-owner argument.
-        ///
-        /// The --branch and --repo-owner arguments are mutually exclusive with the binary version
-        /// arguments. You can only supply version numbers or a custom branch, not both.
-        #[arg(long, verbatim_doc_comment)]
-        branch: Option<String>,
-        /// Specify the chunk size for the custom binaries using a 64-bit integer.
-        ///
-        /// This option only applies if the --branch and --repo-owner arguments are used.
-        #[clap(long, value_parser = parse_chunk_size)]
-        chunk_size: Option<u64>,
-        /// Comma-separated list of data addresses to track with chunk trackers.
-        #[arg(long, value_delimiter = ',')]
-        chunk_tracker_data_addresses: Vec<String>,
-        /// The number of chunk tracker services to run per client VM.
-        #[clap(long, default_value_t = 1)]
-        chunk_tracker_services: u16,
-        /// Provide environment variables for the antnode RPC client.
-        ///
-        /// This is useful to set the client's log levels. Each variable should be comma
-        /// separated without any space.
-        ///
-        /// Example: --client-env CLIENT_LOG=all,RUST_LOG=debug
-        #[clap(name = "client-env", long, use_value_delimiter = true, value_parser = parse_environment_variables, verbatim_doc_comment)]
-        client_env_variables: Option<Vec<(String, String)>>,
-        /// The number of client VMs to create.
-        ///
-        /// If the argument is not used, the value will be determined by the 'environment-type'
-        /// argument.
-        #[clap(long)]
-        client_vm_count: Option<u16>,
-        /// Override the size of the client VMs.
-        #[clap(long)]
-        client_vm_size: Option<String>,
-        /// Set to disable metrics collection on all nodes.
-        #[clap(long)]
-        disable_metrics: bool,
-        /// The type of deployment.
-        ///
-        /// Possible values are 'development', 'production' or 'staging'. The value used will
-        /// determine the sizes of VMs, the number of VMs, and the number of nodes deployed on
-        /// them. The specification will increase in size from development, to staging, to
-        /// production.
-        ///
-        /// The default is 'development'.
-        #[clap(long, default_value_t = EnvironmentType::Development, value_parser = parse_deployment_type, verbatim_doc_comment)]
-        environment_type: EnvironmentType,
-        /// The address of the data payments contract.
-        #[arg(long)]
-        evm_data_payments_address: Option<String>,
-        /// The EVM network type to use for the deployment.
-        ///
-        /// Possible values are 'arbitrum-one' or 'custom'.
-        ///
-        /// If not used, the default is 'arbitrum-one'.
-        #[clap(long, default_value = "arbitrum-one", value_parser = parse_evm_network)]
-        evm_network_type: EvmNetwork,
-        /// The address of the payment token contract.
-        #[arg(long)]
-        evm_payment_token_address: Option<String>,
-        /// The RPC URL for the EVM network.
-        ///
-        /// This argument only applies if the EVM network type is 'custom'.
-        #[arg(long)]
-        evm_rpc_url: Option<String>,
-        /// Override the maximum number of forks Ansible will use to execute tasks on target hosts.
-        ///
-        /// The default value from ansible.cfg is 50.
-        #[clap(long)]
-        forks: Option<usize>,
-        /// The name of the environment
-        #[arg(short = 'n', long)]
-        name: String,
-        /// Specify the network ID for the ant binary.
-        ///
-        /// This is used to ensure the client connects to the correct network.
-        ///
-        /// For a production deployment, use 1.
-        ///
-        /// For an alpha deployment, use 2.
-        ///
-        /// For a testnet deployment, use anything between 3 and 255.
-        #[clap(long, verbatim_doc_comment)]
-        network_id: u8,
-        /// The networks contacts URL from an existing network.
-        #[arg(long)]
-        network_contacts_url: Option<String>,
-        /// A peer from an existing network that the Ant client can connect to.
-        ///
-        /// Should be in the form of a multiaddr.
-        #[arg(long)]
-        peer: Option<String>,
-        /// The cloud provider to deploy to.
-        ///
-        /// Valid values are "aws" or "digital-ocean".
-        #[clap(long, default_value_t = CloudProvider::DigitalOcean, value_parser = parse_provider, verbatim_doc_comment)]
-        provider: CloudProvider,
-        /// The region to deploy to.
-        ///
-        /// Defaults to "lon1" for Digital Ocean.
-        #[clap(long, default_value = "lon1")]
-        region: String,
-        /// The owner/org of the Github repository to build from.
-        ///
-        /// If used, all binaries will be built from this repository. It is typically used for
-        /// testing changes on a fork.
-        ///
-        /// This argument must be used in conjunction with the --repo-owner argument.
-        ///
-        /// The --branch and --repo-owner arguments are mutually exclusive with the binary version
-        /// arguments. You can only supply version numbers or a custom branch, not both.
-        #[arg(long, verbatim_doc_comment)]
-        repo_owner: Option<String>,
-        /// Skip building the autonomi binaries if they were built during a previous run of the deployer using the same
-        /// --branch, --repo-owner and --name arguments.
-        ///
-        /// This is useful to re-run any failed deployments without rebuilding the binaries.
-        #[arg(long, default_value_t = false)]
-        skip_binary_build: bool,
-        /// Set to start chunk tracker services immediately after provisioning.
-        #[clap(long)]
-        start_chunk_trackers: bool,
-    },
-    /// Deploy data retrieval service on client VMs.
-    DeployDataRetrieval {
-        /// Set to run Ansible with more verbose output.
-        #[arg(long)]
-        ansible_verbose: bool,
-        /// Supply a version number for the ant binary.
-        ///
-        /// There should be no 'v' prefix.
-        ///
-        /// The version arguments are mutually exclusive with the --branch and --repo-owner
-        /// arguments. You can only supply version numbers or a custom branch, not both.
-        #[arg(long, verbatim_doc_comment)]
-        ant_version: Option<String>,
-        /// The branch of the Github repository to build from.
-        ///
-        /// If used, the ant binary will be built from this branch. It is typically used for testing
-        /// changes on a fork.
-        ///
-        /// This argument must be used in conjunction with the --repo-owner argument.
-        ///
-        /// The --branch and --repo-owner arguments are mutually exclusive with the binary version
-        /// arguments. You can only supply version numbers or a custom branch, not both.
-        #[arg(long, verbatim_doc_comment)]
-        branch: Option<String>,
-        /// Specify the chunk size for the custom binaries using a 64-bit integer.
-        ///
-        /// This option only applies if the --branch and --repo-owner arguments are used.
-        #[clap(long, value_parser = parse_chunk_size)]
-        chunk_size: Option<u64>,
-        /// Provide environment variables for the ant client.
-        ///
-        /// This is useful to set the client's log levels. Each variable should be comma
-        /// separated without any space.
-        ///
-        /// Example: --client-env CLIENT_LOG=all,RUST_LOG=debug
-        #[clap(name = "client-env", long, use_value_delimiter = true, value_parser = parse_environment_variables, verbatim_doc_comment)]
-        client_env_variables: Option<Vec<(String, String)>>,
-        /// The number of client VMs to create.
-        ///
-        /// If the argument is not used, the value will be determined by the 'environment-type'
-        /// argument.
-        #[clap(long)]
-        client_vm_count: Option<u16>,
-        /// Override the size of the client VMs.
-        #[clap(long)]
-        client_vm_size: Option<String>,
-        /// Set to disable metrics collection on all nodes.
-        #[clap(long)]
-        disable_metrics: bool,
-        /// The type of deployment.
-        ///
-        /// Possible values are 'development', 'production' or 'staging'. The value used will
-        /// determine the sizes of VMs, the number of VMs, and the number of nodes deployed on
-        /// them. The specification will increase in size from development, to staging, to
-        /// production.
-        ///
-        /// The default is 'development'.
-        #[clap(long, default_value_t = EnvironmentType::Development, value_parser = parse_deployment_type, verbatim_doc_comment)]
-        environment_type: EnvironmentType,
-        /// The address of the data payments contract.
-        #[arg(long)]
-        evm_data_payments_address: Option<String>,
-        /// The EVM network type to use for the deployment.
-        ///
-        /// Possible values are 'arbitrum-one' or 'custom'.
-        ///
-        /// If not used, the default is 'arbitrum-one'.
-        #[clap(long, default_value = "arbitrum-one", value_parser = parse_evm_network)]
-        evm_network_type: EvmNetwork,
-        /// The address of the payment token contract.
-        #[arg(long)]
-        evm_payment_token_address: Option<String>,
-        /// The RPC URL for the EVM network.
-        ///
-        /// This argument only applies if the EVM network type is 'custom'.
-        #[arg(long)]
-        evm_rpc_url: Option<String>,
-        /// Override the maximum number of forks Ansible will use to execute tasks on target hosts.
-        ///
-        /// The default value from ansible.cfg is 50.
-        #[clap(long)]
-        forks: Option<usize>,
-        /// The name of the environment
-        #[arg(short = 'n', long)]
-        name: String,
-        /// Specify the network ID for the ant binary.
-        ///
-        /// This is used to ensure the client connects to the correct network.
-        ///
-        /// For a production deployment, use 1.
-        ///
-        /// For an alpha deployment, use 2.
-        ///
-        /// For a testnet deployment, use anything between 3 and 255.
-        #[clap(long, verbatim_doc_comment)]
-        network_id: u8,
-        /// The networks contacts URL from an existing network.
-        #[arg(long)]
-        network_contacts_url: Option<String>,
-        /// The cloud provider to deploy to.
-        ///
-        /// Valid values are "aws" or "digital-ocean".
-        #[clap(long, default_value_t = CloudProvider::DigitalOcean, value_parser = parse_provider, verbatim_doc_comment)]
-        provider: CloudProvider,
-        /// The region to deploy to.
-        ///
-        /// Defaults to "lon1" for Digital Ocean.
-        #[clap(long, default_value = "lon1")]
-        region: String,
-        /// The owner/org of the Github repository to build from.
-        ///
-        /// If used, all binaries will be built from this repository. It is typically used for
-        /// testing changes on a fork.
-        ///
-        /// This argument must be used in conjunction with the --repo-owner argument.
-        ///
-        /// The --branch and --repo-owner arguments are mutually exclusive with the binary version
-        /// arguments. You can only supply version numbers or a custom branch, not both.
-        #[arg(long, verbatim_doc_comment)]
-        repo_owner: Option<String>,
-        /// Skip building the autonomi binaries if they were built during a previous run of the deployer using the same
-        /// --branch, --repo-owner and --name arguments.
-        ///
-        /// This is useful to re-run any failed deployments without rebuilding the binaries.
-        #[arg(long, default_value_t = false)]
-        skip_binary_build: bool,
-        /// Set to start data retrieval service immediately after provisioning.
-        #[clap(long)]
-        start_data_retrieval: bool,
-    },
-    /// Deploy repair files service on client VMs.
-    DeployRepairFiles {
-        /// Set to run Ansible with more verbose output.
-        #[arg(long)]
-        ansible_verbose: bool,
-        /// Supply a version number for the ant binary.
-        ///
-        /// There should be no 'v' prefix.
-        ///
-        /// The version arguments are mutually exclusive with the --branch and --repo-owner
-        /// arguments. You can only supply version numbers or a custom branch, not both.
-        #[arg(long, verbatim_doc_comment)]
-        ant_version: Option<String>,
-        /// The branch of the Github repository to build from.
-        ///
-        /// If used, the ant binary will be built from this branch. It is typically used for testing
-        /// changes on a fork.
-        ///
-        /// This argument must be used in conjunction with the --repo-owner argument.
-        ///
-        /// The --branch and --repo-owner arguments are mutually exclusive with the binary version
-        /// arguments. You can only supply version numbers or a custom branch, not both.
-        #[arg(long, verbatim_doc_comment)]
-        branch: Option<String>,
-        /// Specify the chunk size for the custom binaries using a 64-bit integer.
-        ///
-        /// This option only applies if the --branch and --repo-owner arguments are used.
-        #[clap(long, value_parser = parse_chunk_size)]
-        chunk_size: Option<u64>,
-        /// Provide environment variables for the antnode RPC client.
-        ///
-        /// This is useful to set the client's log levels. Each variable should be comma
-        /// separated without any space.
-        ///
-        /// Example: --client-env CLIENT_LOG=all,RUST_LOG=debug
-        #[clap(name = "client-env", long, use_value_delimiter = true, value_parser = parse_environment_variables, verbatim_doc_comment)]
-        client_env_variables: Option<Vec<(String, String)>>,
-        /// The number of client VMs to create.
-        ///
-        /// If the argument is not used, the value will be determined by the 'environment-type'
-        /// argument.
-        #[clap(long)]
-        client_vm_count: Option<u16>,
-        /// Override the size of the client VMs.
-        #[clap(long)]
-        client_vm_size: Option<String>,
-        /// Set to disable metrics collection on all nodes.
-        #[clap(long)]
-        disable_metrics: bool,
-        /// The type of deployment.
-        ///
-        /// Possible values are 'development', 'production' or 'staging'. The value used will
-        /// determine the sizes of VMs, the number of VMs, and the number of nodes deployed on
-        /// them. The specification will increase in size from development, to staging, to
-        /// production.
-        ///
-        /// The default is 'development'.
-        #[clap(long, default_value_t = EnvironmentType::Development, value_parser = parse_deployment_type, verbatim_doc_comment)]
-        environment_type: EnvironmentType,
-        /// Override the maximum number of forks Ansible will use to execute tasks on target hosts.
-        ///
-        /// The default value from ansible.cfg is 50.
-        #[clap(long)]
-        forks: Option<usize>,
-        /// The name of the environment
-        #[arg(short = 'n', long)]
-        name: String,
-        /// The cloud provider to deploy to.
-        ///
-        /// Valid values are "aws" or "digital-ocean".
-        #[clap(long, default_value_t = CloudProvider::DigitalOcean, value_parser = parse_provider, verbatim_doc_comment)]
-        provider: CloudProvider,
-        /// The region to deploy to.
-        ///
-        /// Defaults to "lon1" for Digital Ocean.
-        #[clap(long, default_value = "lon1")]
-        region: String,
-        /// The owner/org of the Github repository to build from.
-        ///
-        /// If used, all binaries will be built from this repository. It is typically used for
-        /// testing changes on a fork.
-        ///
-        /// This argument must be used in conjunction with the --repo-owner argument.
-        ///
-        /// The --branch and --repo-owner arguments are mutually exclusive with the binary version
-        /// arguments. You can only supply version numbers or a custom branch, not both.
-        #[arg(long, verbatim_doc_comment)]
-        repo_owner: Option<String>,
-        /// The number of repair services to deploy.
-        ///
-        /// Default is 1.
-        #[clap(long)]
-        service_count: Option<u16>,
-        /// Skip building the autonomi binaries if they were built during a previous run of the deployer using the same
-        /// --branch, --repo-owner and --name arguments.
-        ///
-        /// This is useful to re-run any failed deployments without rebuilding the binaries.
-        #[arg(long, default_value_t = false)]
-        skip_binary_build: bool,
-        /// Set to start the repair service immediately after provisioning.
-        #[clap(long)]
-        start_repair_service: bool,
-        /// The secret key for the wallet that will fund chunks that get uploaded for repaired
-        /// addresses.
-        #[clap(long)]
-        wallet_secret_key: String,
-    },
-    DeployScanRepair {
-        /// Set to run Ansible with more verbose output.
-        #[arg(long)]
-        ansible_verbose: bool,
-        /// Supply a version number for the ant binary.
-        ///
-        /// There should be no 'v' prefix.
-        ///
-        /// The version arguments are mutually exclusive with the --branch and --repo-owner
-        /// arguments. You can only supply version numbers or a custom branch, not both.
-        #[arg(long, verbatim_doc_comment)]
-        ant_version: Option<String>,
-        /// The branch of the Github repository to build from.
-        ///
-        /// If used, the ant binary will be built from this branch. It is typically used for testing
-        /// changes on a fork.
-        ///
-        /// This argument must be used in conjunction with the --repo-owner argument.
-        ///
-        /// The --branch and --repo-owner arguments are mutually exclusive with the binary version
-        /// arguments. You can only supply version numbers or a custom branch, not both.
-        #[arg(long, verbatim_doc_comment)]
-        branch: Option<String>,
-        /// Specify the chunk size for the custom binaries using a 64-bit integer.
-        ///
-        /// This option only applies if the --branch and --repo-owner arguments are used.
-        #[clap(long, value_parser = parse_chunk_size)]
-        chunk_size: Option<u64>,
-        /// Provide environment variables for the antnode RPC client.
-        ///
-        /// This is useful to set the client's log levels. Each variable should be comma
-        /// separated without any space.
-        ///
-        /// Example: --client-env CLIENT_LOG=all,RUST_LOG=debug
-        #[clap(name = "client-env", long, use_value_delimiter = true, value_parser = parse_environment_variables, verbatim_doc_comment)]
-        client_env_variables: Option<Vec<(String, String)>>,
-        /// The number of client VMs to create.
-        ///
-        /// If the argument is not used, the value will be determined by the 'environment-type'
-        /// argument.
-        #[clap(long)]
-        client_vm_count: Option<u16>,
-        /// Override the size of the client VMs.
-        #[clap(long)]
-        client_vm_size: Option<String>,
-        /// Set to disable metrics collection on all nodes.
-        #[clap(long)]
-        disable_metrics: bool,
-        /// The type of deployment.
-        ///
-        /// Possible values are 'development', 'production' or 'staging'. The value used will
-        /// determine the sizes of VMs, the number of VMs, and the number of nodes deployed on
-        /// them. The specification will increase in size from development, to staging, to
-        /// production.
-        ///
-        /// The default is 'development'.
-        #[clap(long, default_value_t = EnvironmentType::Development, value_parser = parse_deployment_type, verbatim_doc_comment)]
-        environment_type: EnvironmentType,
-        /// Override the maximum number of forks Ansible will use to execute tasks on target hosts.
-        ///
-        /// The default value from ansible.cfg is 50.
-        #[clap(long)]
-        forks: Option<usize>,
-        /// The name of the environment
-        #[arg(short = 'n', long)]
-        name: String,
-        /// The cloud provider to deploy to.
-        ///
-        /// Valid values are "aws" or "digital-ocean".
-        #[clap(long, default_value_t = CloudProvider::DigitalOcean, value_parser = parse_provider, verbatim_doc_comment)]
-        provider: CloudProvider,
-        /// The region to deploy to.
-        ///
-        /// Defaults to "lon1" for Digital Ocean.
-        #[clap(long, default_value = "lon1")]
-        region: String,
-        /// The owner/org of the Github repository to build from.
-        ///
-        /// If used, all binaries will be built from this repository. It is typically used for
-        /// testing changes on a fork.
-        ///
-        /// This argument must be used in conjunction with the --repo-owner argument.
-        ///
-        /// The --branch and --repo-owner arguments are mutually exclusive with the binary version
-        /// arguments. You can only supply version numbers or a custom branch, not both.
-        #[arg(long, verbatim_doc_comment)]
-        repo_owner: Option<String>,
-        /// The scanning frequency for the repair command.
-        #[clap(long)]
-        scan_frequency: Option<u64>,
-        /// Skip building the autonomi binaries if they were built during a previous run of the deployer using the same
-        /// --branch, --repo-owner and --name arguments.
-        ///
-        /// This is useful to re-run any failed deployments without rebuilding the binaries.
-        #[arg(long, default_value_t = false)]
-        skip_binary_build: bool,
-        /// The interval between repair commands.
-        #[clap(long)]
-        sleep_interval: Option<u64>,
-        /// Set to start the repair service immediately after provisioning.
-        #[clap(long)]
-        start_service: bool,
-        /// The secret key for the wallet that will fund chunks that get uploaded for repaired
-        /// addresses.
-        #[clap(long)]
         wallet_secret_key: String,
     },
     /// Enable downloaders on all client VMs in an environment.
