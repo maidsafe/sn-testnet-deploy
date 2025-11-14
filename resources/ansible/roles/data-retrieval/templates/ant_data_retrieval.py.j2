@@ -70,7 +70,7 @@ def attempt_download(file_ref: str, file_name: str, file_type: FileType, file_ha
                      manifest_dir_path: Path, log_output_dest_path: str) -> bool:
     """Attempt to download and validate a file/directory. Returns True if successful."""
     download_subdir = str(uuid.uuid4())
-    download_path = Path("/mnt/ant-storage/downloaded_files") / download_subdir
+    download_path = Path("{{ downloads_dir_path }}") / download_subdir
     download_path.mkdir(parents=True, exist_ok=True)
 
     timestamp_str = datetime.now().strftime("%Y%m%d_%H%M%S")
@@ -81,7 +81,7 @@ def attempt_download(file_ref: str, file_name: str, file_type: FileType, file_ha
         cmd.append(str(download_path / file_name))
     else:
         cmd.append(str(download_path))
-    cmd.extend(["--quorum", "one", "--retries", "20"])
+    cmd.extend(["--quorum", "one"])
 
     print(f"Running {''.join(cmd)}")
 
@@ -153,8 +153,8 @@ def main():
         print("Error: 'ant' not found in PATH.")
         sys.exit(1)
 
-    log_output_dest_path = "{{ log_output_dest }}"
-    manifest_dir_path = Path("{{ manifest_dir }}")
+    log_output_dir_path = "{{ log_output_dir_path }}"
+    manifest_dir_path = Path("{{ manifest_dir_path }}")
     output_dir_path = Path(f"/home/ant1")
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
     progress_log_path = output_dir_path / f"data_loss_test_{timestamp}.log"
@@ -190,7 +190,7 @@ def main():
             print(f"[{total_count}] Testing: {file_name}")
 
             if test_file(file_ref, file_name, file_type, file_hash, manifest_dir_path,
-                        log_output_dest_path, max_retries, progress_log_path):
+                        log_output_dir_path, max_retries, progress_log_path):
                 successful_count += 1
                 print(f"  ✅ SUCCESS")
             else:

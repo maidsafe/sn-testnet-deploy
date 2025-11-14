@@ -153,6 +153,8 @@ pub enum Error {
     ReqwestError(#[from] reqwest::Error),
     #[error("The rewards address must be supplied")]
     RewardsAddressNotSet,
+    #[error("A wallet secret key must be provided for the repair run")]
+    RepairWalletAddressNotProvided,
     #[error("Routed VM for IP {0} not found")]
     RoutedVmNotFound(IpAddr),
     #[error("Safe client command failed: {0}")]

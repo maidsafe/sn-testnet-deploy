@@ -246,14 +246,17 @@ impl TestnetDeployer {
             port_restricted_cone_private_node_count: 0,
             public_rpc: options.public_rpc,
             random_verifier_batch_size: None,
+            repair_service_count: 0,
             rewards_address: options
                 .current_inventory
                 .environment_details
                 .rewards_address
                 .clone(),
+            scan_frequency: None,
             single_node_payment: false,
             sleep_duration: None,
             start_chunk_trackers: false,
+            start_data_retrieval: false,
             start_delayed_verifier: options.start_delayed_verifier,
             start_performance_verifier: options.start_performance_verifier,
             start_random_verifier: options.start_random_verifier,
@@ -584,14 +587,17 @@ impl TestnetDeployer {
             performance_verifier_batch_size: None,
             public_rpc: options.public_rpc,
             random_verifier_batch_size: None,
+            repair_service_count: 0,
             rewards_address: options
                 .current_inventory
                 .environment_details
                 .rewards_address
                 .clone(),
+            scan_frequency: None,
             single_node_payment: false,
             sleep_duration: None,
             start_chunk_trackers: false,
+            start_data_retrieval: false,
             start_delayed_verifier: options.start_delayed_verifier,
             start_random_verifier: options.start_random_verifier,
             start_performance_verifier: options.start_performance_verifier,

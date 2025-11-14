@@ -1,0 +1,108 @@
+---
+- name: check if ant binary exists
+  ansible.builtin.stat:
+    path: "{{ binary_dir }}/ant"
+  register: ant_binary
+
+- name: download the ant binary
+  ansible.builtin.get_url:
+    url: "{{ ant_archive_url }}"
+    dest: "/tmp/{{ ant_archive_filename }}"
+  when: not ant_binary.stat.exists
+
+- name: extract the ant binary to /usr/local/bin
+  ansible.builtin.unarchive:
+    src: "/tmp/{{ ant_archive_filename }}"
+    dest: "{{ binary_dir }}"
+    remote_src: true
+  become: true
+  when: not ant_binary.stat.exists
+
+- name: check if ant group exists
+  ansible.builtin.getent:
+    database: group
+    key: ant
+  register: ant_group
+  failed_when: false
+
+- name: create ant group if it doesn't exist
+  ansible.builtin.group:
+    name: ant
+    state: present
+  become: true
+  when: ant_group.ansible_facts.getent_group is not defined or ant_group.ansible_facts.getent_group.ant is not defined
+
+- name: check if ant1 user exists
+  ansible.builtin.getent:
+    database: passwd
+    key: ant1
+  register: ant1_user
+  failed_when: false
+
+- name: create ant1 user if it doesn't exist
+  ansible.builtin.user:
+    name: ant1
+    shell: /bin/bash
+    group: ant
+    state: present
+  become: true
+  when: ant1_user.ansible_facts.getent_passwd is not defined or ant1_user.ansible_facts.getent_passwd.ant1 is not defined
+
+- name: copy repair files to remote
+  ansible.builtin.copy:
+    src: repair_lists
+    dest: "/home/ant1/repair_lists"
+    owner: ant1
+    group: ant
+    mode: '0644'
+  become: true
+  become_user: ant1
+
+- name: copy ant_repair.sh to remote
+  ansible.builtin.template:
+    src: ant_repair.sh.j2
+    dest: "/home/ant1/ant_repair.sh"
+    owner: ant1
+    group: ant
+    mode: '0744'
+  become: true
+  become_user: ant1
+
+- name: Check if systemd service files exist
+  ansible.builtin.stat:
+    path: "/etc/systemd/system/ant_repair_{{ item }}.service"
+  register: service_files_stat
+  loop: "{{ range(1, (repair_service_count | int) + 1) | list }}"
+
+- name: copy ant_repair service files
+  ansible.builtin.template:
+    src: ant_repair.service.j2
+    dest: "/etc/systemd/system/ant_repair_{{ item.item }}.service"
+    owner: root
+    group: root
+    mode: '0644'
+  become: true
+  loop: "{{ service_files_stat.results }}"
+  when: not item.stat.exists
+  vars:
+    service_number: "{{ item.item }}"
+
+- name: reload systemd daemon
+  ansible.builtin.systemd:
+    daemon_reload: yes
+  become: true
+
+- name: enable ant_repair services
+  ansible.builtin.systemd:
+    name: "ant_repair_{{ item }}"
+    enabled: yes
+  become: true
+  loop: "{{ range(1, (repair_service_count | int) + 1) | list }}"
+
+- name: start ant_repair services if requested
+  ansible.builtin.systemd:
+    name: "ant_repair_{{ item }}"
+    state: started
+  become: true
+  loop: "{{ range(1, (repair_service_count | int) + 1) | list }}"
+  when: start_repair_service | default(false) | bool

@@ -581,6 +581,47 @@ pub fn build_downloaders_extra_vars_doc(
     Ok(extra_vars.build())
 }
 
+pub fn build_data_retrieval_extra_vars_doc(
+    cloud_provider: &str,
+    options: &ProvisionOptions,
+    network_contacts_url: Option<String>,
+) -> Result<String> {
+    let mut extra_vars: ExtraVarsDocBuilder = ExtraVarsDocBuilder::default();
+    extra_vars.add_variable("provider", cloud_provider);
+    extra_vars.add_variable("testnet_name", &options.name);
+    if let Some(network_contacts_url) = network_contacts_url {
+        extra_vars.add_variable("network_contacts_url", &network_contacts_url);
+    }
+
+    extra_vars.add_ant_url_or_version(
+        &options.name,
+        &options.binary_option,
+        options.ant_version.clone(),
+    )?;
+
+    extra_vars.add_boolean_variable("start_data_retrieval", options.start_data_retrieval);
+    extra_vars.add_boolean_variable("enable_metrics", options.enable_metrics);
+
+    extra_vars.add_variable("evm_network_type", &options.evm_network.to_string());
+    if let Some(evm_data_payment_token_address) = &options.evm_data_payments_address {
+        extra_vars.add_variable("evm_data_payments_address", evm_data_payment_token_address);
+    }
+    if let Some(evm_payment_token_address) = &options.evm_payment_token_address {
+        extra_vars.add_variable("evm_payment_token_address", evm_payment_token_address);
+    }
+    if let Some(evm_rpc_url) = &options.evm_rpc_url {
+        extra_vars.add_variable("evm_rpc_url", evm_rpc_url);
+    }
+    if let Some(network_id) = options.network_id {
+        extra_vars.add_variable("network_id", &network_id.to_string());
+    }
+    if let Some(client_env_variables) = &options.client_env_variables {
+        extra_vars.add_env_variable_list("client_env_variables", client_env_variables.clone());
+    }
+
+    Ok(extra_vars.build())
+}
+
 pub fn build_clients_extra_vars_doc(
     cloud_provider: &str,
     options: &ProvisionOptions,
@@ -644,9 +685,10 @@ pub fn build_clients_extra_vars_doc(
     let serde_map = Value::Object(serde_map);
     extra_vars.add_serde_value("ant_secret_key_map", serde_map);
 
-    // If there's only one entry in the sk_map, add a secret_key variable for use with the static
-    // uploader.
-    if sk_map.len() == 1 {
+    // If the key map is not empty, also pass the first value in the map as the `secret_key`
+    // variable. This is useful for certain cases where there are many machines all using the same
+    // key, such as with a scan repair.
+    if !sk_map.is_empty() {
         if let Some((_, private_key_signers)) = sk_map.iter().next() {
             if let Some(first_signer) = private_key_signers.first() {
                 let secret_key_hex = first_signer.to_bytes().encode_hex_with_prefix();
@@ -681,6 +723,15 @@ pub fn build_clients_extra_vars_doc(
         "start_chunk_trackers",
         &options.start_chunk_trackers.to_string(),
     );
+
+    extra_vars.add_variable(
+        "repair_service_count",
+        &options.repair_service_count.to_string(),
+    );
+
+    if let Some(scan_frequency) = options.scan_frequency {
+        extra_vars.add_variable("scan_frequency", &scan_frequency.to_string());
+    }
 
     // Create a map of chunk tracker addresses similar to the secret key map for uploaders.
     let mut chunk_tracker_address_map = serde_json::Map::new();

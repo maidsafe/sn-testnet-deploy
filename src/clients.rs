@@ -58,14 +58,22 @@ pub struct ClientsDeployOptions {
     pub peer: Option<String>,
     pub performance_verifier_batch_size: Option<u16>,
     pub random_verifier_batch_size: Option<u16>,
+    pub repair_service_count: u16,
     pub run_chunk_trackers_provision: bool,
+    pub run_data_retrieval_provision: bool,
     pub run_downloaders_provision: bool,
+    pub run_repair_files_provision: bool,
+    pub run_scan_repair_provision: bool,
     pub run_uploaders_provision: bool,
+    pub scan_frequency: Option<u64>,
     pub sleep_duration: Option<u16>,
+    pub sleep_interval: Option<u64>,
     pub start_chunk_trackers: bool,
+    pub start_data_retrieval: bool,
     pub start_delayed_verifier: bool,
     pub start_performance_verifier: bool,
     pub start_random_verifier: bool,
+    pub start_repair_service: bool,
     pub start_uploaders: bool,
     pub uploaders_count: u16,
     pub upload_size: Option<u16>,
@@ -423,6 +431,45 @@ impl ClientsDeployer {
                 .await
                 .map_err(|err| {
                     println!("Failed to provision chunk trackers {err:?}");
+                    err
+                })?;
+        }
+
+        if options.run_data_retrieval_provision {
+            self.ansible_provisioner
+                .print_ansible_run_banner("Provision Data Retrieval Service");
+            self.ansible_provisioner
+                .provision_data_retrieval(
+                    &provision_options,
+                    options.network_contacts_url.clone(),
+                )
+                .await
+                .map_err(|err| {
+                    println!("Failed to provision data retrieval service {err:?}");
+                    err
+                })?;
+        }
+
+        if options.run_repair_files_provision {
+            self.ansible_provisioner
+                .print_ansible_run_banner("Provision Repair Service");
+            self.ansible_provisioner
+                .provision_repair_files(&provision_options)
+                .await
+                .map_err(|err| {
+                    println!("Failed to provision repair files service {err:?}");
+                    err
+                })?;
+        }
+
+        if options.run_scan_repair_provision {
+            self.ansible_provisioner
+                .print_ansible_run_banner("Provision Scan Repair Service");
+            self.ansible_provisioner
+                .provision_scan_repair(&provision_options)
+                .await
+                .map_err(|err| {
+                    println!("Failed to provision scan repair service {err:?}");
                     err
                 })?;
         }
