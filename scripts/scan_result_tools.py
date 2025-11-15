@@ -402,6 +402,83 @@ def combine_badlist(path, output_path):
         sys.exit(1)
 
 
+def print_repair_errors(path):
+    """
+    Print errors from failed repair operations, excluding serialization errors.
+
+    Processes all network_scan_repair_*.csv and initial_repair_*.csv files,
+    printing the error column value for any row with upload_status='failed'
+    that does not start with "Serialization error".
+
+    Args:
+        path: Path to the testnet directory containing host subdirectories
+
+    Returns:
+        Total count of non-serialization errors found
+    """
+    testnet_path = Path(path)
+
+    if not testnet_path.exists():
+        print(f"Error: Testnet directory '{testnet_path}' does not exist", file=sys.stderr)
+        sys.exit(1)
+
+    if not testnet_path.is_dir():
+        print(f"Error: '{testnet_path}' is not a directory", file=sys.stderr)
+        sys.exit(1)
+
+    total_errors = 0
+    files_processed = 0
+
+    # Process network_scan_repair_*.csv files (upload_status in column 3, error in column 5)
+    for csv_path in testnet_path.glob("*/network_scan_repair_*.csv"):
+        try:
+            with open(csv_path, 'r') as f:
+                reader = csv.reader(f)
+                for row in reader:
+                    if not row or len(row) <= 5:
+                        continue
+
+                    status = row[3].strip().lower()
+                    if status == 'failed':
+                        error_msg = row[5].strip()
+                        if not error_msg.startswith("Serialization error"):
+                            print(f"{csv_path.parent.name}/{csv_path.name}: {error_msg}")
+                            print()
+                            total_errors += 1
+
+            files_processed += 1
+        except Exception as e:
+            print(f"Warning: Could not read {csv_path}: {e}", file=sys.stderr)
+            continue
+
+    # Process initial_repair_*.csv files (upload_status in column 2, error in column 4)
+    for csv_path in testnet_path.glob("*/initial_repair_*.csv"):
+        try:
+            with open(csv_path, 'r') as f:
+                reader = csv.reader(f)
+                for row in reader:
+                    if not row or len(row) <= 4:
+                        continue
+
+                    status = row[2].strip().lower()
+                    if status == 'failed':
+                        error_msg = row[4].strip()
+                        if not error_msg.startswith("Serialization error"):
+                            print(f"{csv_path.parent.name}/{csv_path.name}: {error_msg}")
+                            print()
+                            total_errors += 1
+
+            files_processed += 1
+        except Exception as e:
+            print(f"Warning: Could not read {csv_path}: {e}", file=sys.stderr)
+            continue
+
+    if files_processed == 0:
+        print(f"Warning: No repair CSV files found in {testnet_path}", file=sys.stderr)
+
+    return total_errors
+
+
 def main():
     """Main entry point for the scan results analyzer."""
     parser = argparse.ArgumentParser(
@@ -475,6 +552,15 @@ def main():
         required=True,
         help="Output CSV file path"
     )
+
+    print_errors_parser = subparsers.add_parser(
+        "print-errors",
+        help="Print non-serialization errors from failed repair operations"
+    )
+    print_errors_parser.add_argument(
+        "--path",
+        required=True,
+        help="Path to the testnet directory containing host subdirectories"
     )
 
     args = parser.parse_args()
@@ -558,6 +644,12 @@ def main():
         print(f"Combining badlist files in {args.path}...")
         print()
         combine_badlist(args.path, args.output_path)
+    elif args.command == "print-errors":
+        print(f"Analyzing repair errors in {args.path}...")
+        print()
+        total_errors = print_repair_errors(args.path)
+        print()
+        print(f"Total non-serialization errors: {total_errors}")
 
 
 if __name__ == "__main__":
