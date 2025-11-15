@@ -22,3 +22,14 @@
       with_items: "{{ scan_repair_files.files }}"
       when: scan_repair_files.files | length > 0
       ignore_errors: yes
+
+    - name: export ant_scan_repair service logs
+      shell: journalctl -u ant_scan_repair --no-pager > /tmp/service_log
+      ignore_errors: yes
+
+    - name: fetch ant_scan_repair service log
+      fetch:
+        src: "/tmp/service_log"
+        dest: "../../scan-repair-results/{{env_name}}/{{ inventory_hostname }}/service_log"
+        flat: yes
+      ignore_errors: yes
