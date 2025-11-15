@@ -48,6 +48,13 @@
   become: true
   when: ant1_user.ansible_facts.getent_passwd is not defined or ant1_user.ansible_facts.getent_passwd.ant1 is not defined
 
+- name: check if chunk whitelist exists locally
+  ansible.builtin.stat:
+    path: "{{ role_path }}/files/chunk_whitelist.csv"
+  delegate_to: localhost
+  register: whitelist_file
+  become: false
+
 - name: copy chunk whitelist
   ansible.builtin.copy:
     src: chunk_whitelist.csv
@@ -57,6 +64,7 @@
     mode: '0644'
   become: true
   become_user: ant1
+  when: whitelist_file.stat.exists
 
 - name: copy ant_scan_repair.sh to remote
   ansible.builtin.template:
