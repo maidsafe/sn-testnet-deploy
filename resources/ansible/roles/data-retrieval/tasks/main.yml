@@ -60,15 +60,6 @@
     group: ant
   become: true
 
-- name: copy prod.csv file to remote server
-  ansible.builtin.copy:
-    src: prod.csv
-    dest: /home/ant1/prod.csv
-    owner: ant1
-    group: ant
-    mode: '0644'
-  become: true
-
 - name: copy manifests directory to remote server
   ansible.builtin.copy:
     src: manifests/
@@ -77,6 +68,60 @@
     group: ant
     mode: '0644'
     directory_mode: '0755'
+  become: true
+
+- name: copy all.csv file to remote server
+  ansible.builtin.copy:
+    src: all.csv
+    dest: /home/ant1/all.csv
+    owner: ant1
+    group: ant
+    mode: '0644'
+  become: true
+
+- name: copy dimitar_dave_uploads.csv file to remote server
+  ansible.builtin.copy:
+    src: dimitar_dave_uploads.csv
+    dest: /home/ant1/dimitar_dave_uploads.csv
+    owner: ant1
+    group: ant
+    mode: '0644'
+  become: true
+
+- name: copy dimitar_memes.csv file to remote server
+  ansible.builtin.copy:
+    src: dimitar_memes.csv
+    dest: /home/ant1/dimitar_memes.csv
+    owner: ant1
+    group: ant
+    mode: '0644'
+  become: true
+
+- name: copy large_files.csv file to remote server
+  ansible.builtin.copy:
+    src: large_files.csv
+    dest: /home/ant1/large_files.csv
+    owner: ant1
+    group: ant
+    mode: '0644'
+  become: true
+
+- name: copy small_files.csv file to remote server
+  ansible.builtin.copy:
+    src: small_files.csv
+    dest: /home/ant1/small_files.csv
+    owner: ant1
+    group: ant
+    mode: '0644'
+  become: true
+
+- name: copy directories.csv file to remote server
+  ansible.builtin.copy:
+    src: directories.csv
+    dest: /home/ant1/directories.csv
+    owner: ant1
+    group: ant
+    mode: '0644'
   become: true
 
 - name: Check if systemd ant_data_retrieval service file exists
