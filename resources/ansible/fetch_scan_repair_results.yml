@@ -4,6 +4,11 @@
   ignore_unreachable: yes
   max_fail_percentage: 10
   tasks:
+    - name: set timestamp fact
+      set_fact:
+        timestamp: "{{ lookup('pipe', 'date +%Y_%m_%d_%H_%M_%S') }}"
+      run_once: yes
+
     - name: find all scan repair CSV files
       find:
         paths: "/home/ant1/"
@@ -17,7 +22,7 @@
     - name: fetch scan repair CSV files
       fetch:
         src: "{{ item.path }}"
-        dest: "../../scan-repair-results/{{env_name}}/{{ inventory_hostname }}/"
+        dest: "../../scan-repair-results/{{ env_name | replace('-', '_') }}-{{ hostvars[groups['all'][0]]['timestamp'] }}/{{ inventory_hostname }}/"
         flat: yes
       with_items: "{{ scan_repair_files.files }}"
       when: scan_repair_files.files | length > 0
@@ -30,6 +35,6 @@
     - name: fetch ant_scan_repair service log
       fetch:
         src: "/tmp/service_log"
-        dest: "../../scan-repair-results/{{env_name}}/{{ inventory_hostname }}/service_log"
+        dest: "../../scan-repair-results/{{ env_name | replace('-', '_') }}-{{ hostvars[groups['all'][0]]['timestamp'] }}/{{ inventory_hostname }}/service_log"
         flat: yes
       ignore_errors: yes

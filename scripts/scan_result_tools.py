@@ -70,13 +70,12 @@ def count_repair_csv_by_status(csv_path, status_column_index, cost_column_index)
         return (None, None, None)
 
 
-def get_host_summary(testnet_name, base_dir="scan-repair-results"):
+def get_host_summary(path):
     """
     Get a summary of all metrics for each host in a testnet.
 
     Args:
-        testnet_name: Name of the testnet directory (e.g., "DEV-17")
-        base_dir: Base directory containing scan repair results
+        path: Path to the testnet directory containing host subdirectories
 
     Returns:
         Dictionary mapping host names to their metrics:
@@ -90,7 +89,7 @@ def get_host_summary(testnet_name, base_dir="scan-repair-results"):
             }
         }
     """
-    testnet_path = Path(base_dir) / testnet_name
+    testnet_path = Path(path)
 
     if not testnet_path.exists():
         print(f"Error: Testnet directory '{testnet_path}' does not exist", file=sys.stderr)
@@ -144,19 +143,18 @@ def get_host_summary(testnet_name, base_dir="scan-repair-results"):
     return host_summaries
 
 
-def count_csv_entries(testnet_name, csv_filename, base_dir="scan-repair-results"):
+def count_csv_entries(path, csv_filename):
     """
     Count total lines across all CSV files of a given type for a testnet.
 
     Args:
-        testnet_name: Name of the testnet directory (e.g., "DEV-17")
+        path: Path to the testnet directory containing host subdirectories
         csv_filename: Name of the CSV file to count (e.g., "chunk_whitelist.csv", "chunk_badlist.csv")
-        base_dir: Base directory containing scan repair results
 
     Returns:
         Total count of entries
     """
-    testnet_path = Path(base_dir) / testnet_name
+    testnet_path = Path(path)
 
     if not testnet_path.exists():
         print(f"Error: Testnet directory '{testnet_path}' does not exist", file=sys.stderr)
@@ -182,19 +180,18 @@ def count_csv_entries(testnet_name, csv_filename, base_dir="scan-repair-results"
     return total_count
 
 
-def count_repair_entries(testnet_name, base_dir="scan-repair-results"):
+def count_repair_entries(path):
     """
     Count total lines across all repair CSV files (network_scan_repair_*.csv and initial_repair_*.csv),
     broken down by upload_status (success/failed) and success with cost_paid != 0.
 
     Args:
-        testnet_name: Name of the testnet directory (e.g., "DEV-17")
-        base_dir: Base directory containing scan repair results
+        path: Path to the testnet directory containing host subdirectories
 
     Returns:
         Tuple of (total_success, total_failed, total_success_with_cost)
     """
-    testnet_path = Path(base_dir) / testnet_name
+    testnet_path = Path(path)
 
     if not testnet_path.exists():
         print(f"Error: Testnet directory '{testnet_path}' does not exist", file=sys.stderr)
@@ -281,20 +278,19 @@ def get_latest_file(file_list):
     return files_with_timestamps[0][0]
 
 
-def calculate_lost_chunks(testnet_name, base_dir="scan-repair-results"):
+def calculate_lost_chunks(path):
     """
     Calculate the number of lost chunks.
 
     Formula: total_badlist_rows - (total_last_initial_repair_rows + total_last_network_scan_repair_rows)
 
     Args:
-        testnet_name: Name of the testnet directory (e.g., "DEV-17")
-        base_dir: Base directory containing scan repair results
+        path: Path to the testnet directory containing host subdirectories
 
     Returns:
         Tuple of (lost_chunks, total_badlist, total_initial_repair, total_network_scan_repair)
     """
-    testnet_path = Path(base_dir) / testnet_name
+    testnet_path = Path(path)
 
     if not testnet_path.exists():
         print(f"Error: Testnet directory '{testnet_path}' does not exist", file=sys.stderr)
@@ -347,19 +343,18 @@ def calculate_lost_chunks(testnet_name, base_dir="scan-repair-results"):
     return (lost_chunks, total_badlist, total_initial_repair, total_network_scan_repair)
 
 
-def combine_badlist(testnet_name, output_path, base_dir="scan-repair-results"):
+def combine_badlist(path, output_path):
     """
     Combine all chunk_badlist.csv files into a single CSV file.
 
     Args:
-        testnet_name: Name of the testnet directory (e.g., "DEV-17")
-        output_file: Path to the output CSV file
-        base_dir: Base directory containing scan repair results
+        path: Path to the testnet directory containing host subdirectories
+        output_path: Path to the output CSV file
 
     Returns:
         Number of total rows written (excluding header)
     """
-    testnet_path = Path(base_dir) / testnet_name
+    testnet_path = Path(path)
 
     if not testnet_path.exists():
         print(f"Error: Testnet directory '{testnet_path}' does not exist", file=sys.stderr)
@@ -421,14 +416,9 @@ def main():
         help="Count total entries across all chunk_whitelist.csv files"
     )
     whitelist_parser.add_argument(
-        "--name",
+        "--path",
         required=True,
-        help="Testnet name (e.g., DEV-17)"
-    )
-    whitelist_parser.add_argument(
-        "--base-dir",
-        default="scan-repair-results",
-        help="Base directory containing scan repair results (default: scan-repair-results)"
+        help="Path to the testnet directory containing host subdirectories"
     )
 
     badlist_parser = subparsers.add_parser(
@@ -436,14 +426,9 @@ def main():
         help="Count total entries across all chunk_badlist.csv files"
     )
     badlist_parser.add_argument(
-        "--name",
+        "--path",
         required=True,
-        help="Testnet name (e.g., DEV-17)"
-    )
-    badlist_parser.add_argument(
-        "--base-dir",
-        default="scan-repair-results",
-        help="Base directory containing scan repair results (default: scan-repair-results)"
+        help="Path to the testnet directory containing host subdirectories"
     )
 
     repair_parser = subparsers.add_parser(
@@ -451,14 +436,9 @@ def main():
         help="Count total entries across all network_scan_repair_*.csv and initial_repair_*.csv files"
     )
     repair_parser.add_argument(
-        "--name",
+        "--path",
         required=True,
-        help="Testnet name (e.g., DEV-17)"
-    )
-    repair_parser.add_argument(
-        "--base-dir",
-        default="scan-repair-results",
-        help="Base directory containing scan repair results (default: scan-repair-results)"
+        help="Path to the testnet directory containing host subdirectories"
     )
 
     summary_parser = subparsers.add_parser(
@@ -466,14 +446,9 @@ def main():
         help="Display summary of all metrics (whitelist, badlist, repair) per host with totals"
     )
     summary_parser.add_argument(
-        "--name",
+        "--path",
         required=True,
-        help="Testnet name (e.g., DEV-17)"
-    )
-    summary_parser.add_argument(
-        "--base-dir",
-        default="scan-repair-results",
-        help="Base directory containing scan repair results (default: scan-repair-results)"
+        help="Path to the testnet directory containing host subdirectories"
     )
 
     lost_chunks_parser = subparsers.add_parser(
@@ -481,14 +456,9 @@ def main():
         help="Calculate the number of lost chunks (badlist - last initial_repair - last network_scan_repair)"
     )
     lost_chunks_parser.add_argument(
-        "--name",
+        "--path",
         required=True,
-        help="Testnet name (e.g., DEV-17)"
-    )
-    lost_chunks_parser.add_argument(
-        "--base-dir",
-        default="scan-repair-results",
-        help="Base directory containing scan repair results (default: scan-repair-results)"
+        help="Path to the testnet directory containing host subdirectories"
     )
 
     combine_badlist_parser = subparsers.add_parser(
@@ -496,19 +466,15 @@ def main():
         help="Combine all chunk_badlist.csv files into a single CSV file"
     )
     combine_badlist_parser.add_argument(
-        "--name",
+        "--path",
         required=True,
-        help="Testnet name (e.g., DEV-17)"
+        help="Path to the testnet directory containing host subdirectories"
     )
     combine_badlist_parser.add_argument(
         "--output-path",
         required=True,
         help="Output CSV file path"
     )
-    combine_badlist_parser.add_argument(
-        "--base-dir",
-        default="scan-repair-results",
-        help="Base directory containing scan repair results (default: scan-repair-results)"
     )
 
     args = parser.parse_args()
@@ -518,21 +484,21 @@ def main():
         sys.exit(1)
 
     if args.command == "whitelist-count":
-        print(f"Analyzing whitelist entries for {args.name}...")
+        print(f"Analyzing whitelist entries in {args.path}...")
         print()
-        total = count_csv_entries(args.name, "chunk_whitelist.csv", args.base_dir)
+        total = count_csv_entries(args.path, "chunk_whitelist.csv")
         print()
         print(f"Total whitelist entries: {total}")
     elif args.command == "badlist-count":
-        print(f"Analyzing badlist entries for {args.name}...")
+        print(f"Analyzing badlist entries in {args.path}...")
         print()
-        total = count_csv_entries(args.name, "chunk_badlist.csv", args.base_dir)
+        total = count_csv_entries(args.path, "chunk_badlist.csv")
         print()
         print(f"Total badlist entries: {total}")
     elif args.command == "repair-count":
-        print(f"Analyzing repair entries for {args.name}...")
+        print(f"Analyzing repair entries in {args.path}...")
         print()
-        total_success, total_failed, total_paid = count_repair_entries(args.name, args.base_dir)
+        total_success, total_failed, total_paid = count_repair_entries(args.path)
         print()
         total = total_success + total_failed
         print(f"Total repair entries: {total}")
@@ -540,7 +506,7 @@ def main():
         print(f"  Failed: {total_failed}")
         print(f"  Paid: {total_paid}")
     elif args.command == "summary":
-        host_summaries = get_host_summary(args.name, args.base_dir)
+        host_summaries = get_host_summary(args.path)
         if not host_summaries:
             print("No hosts found")
             sys.exit(0)
@@ -577,9 +543,9 @@ def main():
         print(f"  repair paid: {totals['repair_paid']}")
         print(f"  total repair entries: {totals['repair_total']}")
     elif args.command == "lost-chunks":
-        print(f"Calculating lost chunks for {args.name}...")
+        print(f"Calculating lost chunks in {args.path}...")
         print()
-        lost_chunks, total_badlist, total_initial_repair, total_network_scan_repair = calculate_lost_chunks(args.name, args.base_dir)
+        lost_chunks, total_badlist, total_initial_repair, total_network_scan_repair = calculate_lost_chunks(args.path)
         print()
         print("=" * 50)
         print("CALCULATION:")
@@ -589,9 +555,9 @@ def main():
         print()
         print(f"Lost chunks: {total_badlist} - ({total_initial_repair} + {total_network_scan_repair}) = {lost_chunks}")
     elif args.command == "combine-badlist":
-        print(f"Combining badlist files for {args.name}...")
+        print(f"Combining badlist files in {args.path}...")
         print()
-        combine_badlist(args.name, args.output_path, args.base_dir)
+        combine_badlist(args.path, args.output_path)
 
 
 if __name__ == "__main__":
