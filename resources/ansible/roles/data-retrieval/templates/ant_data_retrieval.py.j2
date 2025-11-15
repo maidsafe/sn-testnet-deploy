@@ -83,7 +83,7 @@ def attempt_download(file_ref: str, file_name: str, file_type: FileType, file_ha
         cmd.append(str(download_path))
     cmd.extend(["--quorum", "one"])
 
-    print(f"Running {''.join(cmd)}")
+    print(f"Running {' '.join(cmd)}")
 
     process = subprocess.Popen(
         cmd,
