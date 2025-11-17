@@ -439,10 +439,7 @@ impl ClientsDeployer {
             self.ansible_provisioner
                 .print_ansible_run_banner("Provision Data Retrieval Service");
             self.ansible_provisioner
-                .provision_data_retrieval(
-                    &provision_options,
-                    options.network_contacts_url.clone(),
-                )
+                .provision_data_retrieval(&provision_options, options.network_contacts_url.clone())
                 .await
                 .map_err(|err| {
                     println!("Failed to provision data retrieval service {err:?}");
