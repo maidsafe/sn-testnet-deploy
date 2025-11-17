@@ -284,9 +284,7 @@ impl AnsiblePlaybook {
             AnsiblePlaybook::EvmNodes => "evm_nodes.yml".to_string(),
             AnsiblePlaybook::ExtendVolumeSize => "extend_volume_size.yml".to_string(),
             AnsiblePlaybook::Faucet => "faucet.yml".to_string(),
-            AnsiblePlaybook::FetchScanRepairResults => {
-                "fetch_scan_repair_results.yml".to_string()
-            }
+            AnsiblePlaybook::FetchScanRepairResults => "fetch_scan_repair_results.yml".to_string(),
             AnsiblePlaybook::FundUploaders => "fund_uploaders.yml".to_string(),
             AnsiblePlaybook::Genesis => "genesis_node.yml".to_string(),
             AnsiblePlaybook::Nodes => "nodes.yml".to_string(),
