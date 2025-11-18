@@ -128,7 +128,7 @@
   ansible.builtin.stat:
     path: "/etc/systemd/system/ant_data_retrieval_{{ item }}.service"
   register: service_files_stat
-  loop: "{{ range(1, (service_count | int) + 1) | list }}"
+  loop: "{{ range(1, (data_retrieval_service_count | int) + 1) | list }}"
 
 - name: create ant_data_retrieval systemd service files
   ansible.builtin.template:
