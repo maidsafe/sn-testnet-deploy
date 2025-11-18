@@ -247,6 +247,7 @@ impl TestnetDeployer {
             public_rpc: options.public_rpc,
             random_verifier_batch_size: None,
             repair_service_count: 0,
+            data_retrieval_service_count: 0,
             rewards_address: options
                 .current_inventory
                 .environment_details
@@ -588,6 +589,7 @@ impl TestnetDeployer {
             public_rpc: options.public_rpc,
             random_verifier_batch_size: None,
             repair_service_count: 0,
+            data_retrieval_service_count: 0,
             rewards_address: options
                 .current_inventory
                 .environment_details

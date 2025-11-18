@@ -124,31 +124,41 @@
     mode: '0644'
   become: true
 
-- name: Check if systemd ant_data_retrieval service file exists
+- name: Check if systemd ant_data_retrieval service files exist
   ansible.builtin.stat:
-    path: "/etc/systemd/system/ant_data_retrieval.service"
-  register: ant_data_retrieval_stat
+    path: "/etc/systemd/system/ant_data_retrieval_{{ item }}.service"
+  register: service_files_stat
+  loop: "{{ range(1, (service_count | int) + 1) | list }}"
 
-- name: create ant_data_retrieval systemd service file
+- name: create ant_data_retrieval systemd service files
   ansible.builtin.template:
     src: ant_data_retrieval.service.j2
-    dest: "/etc/systemd/system/ant_data_retrieval.service"
-    owner: ant1
-    group: ant
+    dest: "/etc/systemd/system/ant_data_retrieval_{{ item.item }}.service"
+    owner: root
+    group: root
     mode: '0644'
   become: true
-  when: not ant_data_retrieval_stat.stat.exists
+  loop: "{{ service_files_stat.results }}"
+  when: not item.stat.exists
+  vars:
+    service_number: "{{ item.item }}"
 
-- name: enable ant_data_retrieval service
+- name: reload systemd daemon
   ansible.builtin.systemd:
-    name: ant_data_retrieval
-    enabled: "{{ start_data_retrieval | default(false) | bool }}"
     daemon_reload: yes
   become: true
 
-- name: start ant_data_retrieval service
+- name: enable ant_data_retrieval services
   ansible.builtin.systemd:
-    name: ant_data_retrieval
+    name: "ant_data_retrieval_{{ item }}"
+    enabled: yes
+  become: true
+  loop: "{{ range(1, (data_retrieval_service_count | int) + 1) | list }}"
+
+- name: start ant_data_retrieval services if requested
+  ansible.builtin.systemd:
+    name: "ant_data_retrieval_{{ item }}"
     state: started
   become: true
+  loop: "{{ range(1, (data_retrieval_service_count | int) + 1) | list }}"
   when: start_data_retrieval | default(false) | bool

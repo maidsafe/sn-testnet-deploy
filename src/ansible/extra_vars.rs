@@ -601,6 +601,10 @@ pub fn build_data_retrieval_extra_vars_doc(
 
     extra_vars.add_boolean_variable("start_data_retrieval", options.start_data_retrieval);
     extra_vars.add_boolean_variable("enable_metrics", options.enable_metrics);
+    extra_vars.add_variable(
+        "data_retrieval_service_count",
+        &options.data_retrieval_service_count.to_string(),
+    );
 
     extra_vars.add_variable("evm_network_type", &options.evm_network.to_string());
     if let Some(evm_data_payment_token_address) = &options.evm_data_payments_address {

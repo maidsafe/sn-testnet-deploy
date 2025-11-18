@@ -1,13 +1,16 @@
 [Unit]
-Description=Ant Data Loss Tester
+Description=Ant Data Retrieval Service {{ service_number }}
 After=network.target
 
 [Service]
 Environment="CHUNK_DOWNLOAD_BATCH_SIZE=16"
 Environment="EVM_NETWORK=arbitrum-one"
 Environment="PYTHONUNBUFFERED=1"
+{% if client_env_variables is defined %}
+Environment="{{ client_env_variables }}"
+{% endif %}
 User=ant1
-ExecStart=/home/ant1/ant_data_retrieval.py --csv-path /home/ant1/prod.csv --max-retries {{ max_retries }}
+ExecStart=/home/ant1/ant_data_retrieval.py {{ service_number }} --csv-path /home/ant1/prod.csv --max-retries {{ max_retries }}
 Restart=on-failure
 WorkingDirectory=/home/ant1
 

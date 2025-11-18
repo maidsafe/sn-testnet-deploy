@@ -132,10 +132,12 @@ def main():
     parser = argparse.ArgumentParser(
         description="Data loss testing script - verifies all files can be downloaded from production network"
     )
+    parser.add_argument("service_number", type=int, help="Service number for this instance")
     parser.add_argument("-c", "--csv-path", required=True, help="Path to CSV file with file addresses")
     parser.add_argument("-r", "--max-retries", type=int, default=20, help="Max retry attempts per file (default: 20)")
     args = parser.parse_args()
 
+    service_number = args.service_number
     csv_path = Path(args.csv_path)
     max_retries = args.max_retries
 
@@ -157,14 +159,16 @@ def main():
     manifest_dir_path = Path("{{ manifest_dir_path }}")
     output_dir_path = Path(f"/home/ant1")
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    progress_log_path = output_dir_path / f"data_loss_test_{timestamp}.log"
+    progress_log_path = output_dir_path / f"data_loss_test_service{service_number}_{timestamp}.log"
 
     with open(progress_log_path, "w") as f:
         f.write("=" * 80 + "\n\n")
         f.write(f"Data loss test started: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n")
+        f.write(f"Service number: {service_number}\n")
         f.write(f"Max retries per file: {max_retries}\n")
         f.write("=" * 80 + "\n\n")
 
+    print(f"Service number: {service_number}")
     print(f"CSV path: {csv_path}")
     print(f"Max retries per file: {max_retries}")
     print(f"Progress log: {progress_log_path}")
