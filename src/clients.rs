@@ -59,6 +59,7 @@ pub struct ClientsDeployOptions {
     pub performance_verifier_batch_size: Option<u16>,
     pub random_verifier_batch_size: Option<u16>,
     pub repair_service_count: u16,
+    pub data_retrieval_service_count: u16,
     pub run_chunk_trackers_provision: bool,
     pub run_data_retrieval_provision: bool,
     pub run_downloaders_provision: bool,

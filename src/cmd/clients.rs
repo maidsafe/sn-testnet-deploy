@@ -503,6 +503,11 @@ pub enum ClientsCommands {
         /// This is useful to re-run any failed deployments without rebuilding the binaries.
         #[arg(long, default_value_t = false)]
         skip_binary_build: bool,
+        /// The number of data retrieval services to deploy.
+        ///
+        /// Default is 1.
+        #[clap(long, verbatim_doc_comment)]
+        service_count: Option<u16>,
         /// Set to start data retrieval service immediately after provisioning.
         #[clap(long)]
         start_data_retrieval: bool,
@@ -1369,6 +1374,7 @@ pub async fn handle_clients_command(cmd: ClientsCommands) -> Result<()> {
                 performance_verifier_batch_size: None,
                 random_verifier_batch_size: None,
                 repair_service_count: 0,
+                data_retrieval_service_count: 0,
                 run_chunk_trackers_provision: true,
                 run_data_retrieval_provision: false,
                 run_downloaders_provision: true,
@@ -1526,6 +1532,7 @@ pub async fn handle_clients_command(cmd: ClientsCommands) -> Result<()> {
                 performance_verifier_batch_size: None,
                 random_verifier_batch_size: None,
                 repair_service_count: 0,
+                data_retrieval_service_count: 0,
                 run_chunk_trackers_provision: true,
                 run_data_retrieval_provision: false,
                 run_downloaders_provision: false,
@@ -1575,6 +1582,7 @@ pub async fn handle_clients_command(cmd: ClientsCommands) -> Result<()> {
             provider,
             region,
             repo_owner,
+            service_count,
             skip_binary_build,
             start_data_retrieval,
         } => {
@@ -1676,6 +1684,7 @@ pub async fn handle_clients_command(cmd: ClientsCommands) -> Result<()> {
                 performance_verifier_batch_size: None,
                 random_verifier_batch_size: None,
                 repair_service_count: 0,
+                data_retrieval_service_count: service_count.unwrap_or(1),
                 run_chunk_trackers_provision: false,
                 run_data_retrieval_provision: true,
                 run_downloaders_provision: false,
@@ -1807,6 +1816,7 @@ pub async fn handle_clients_command(cmd: ClientsCommands) -> Result<()> {
                 performance_verifier_batch_size: None,
                 random_verifier_batch_size: None,
                 repair_service_count: service_count.unwrap_or(1),
+                data_retrieval_service_count: 0,
                 run_chunk_trackers_provision: false,
                 run_data_retrieval_provision: false,
                 run_downloaders_provision: false,
@@ -1942,6 +1952,7 @@ pub async fn handle_clients_command(cmd: ClientsCommands) -> Result<()> {
                 performance_verifier_batch_size: None,
                 random_verifier_batch_size: None,
                 repair_service_count: 0,
+                data_retrieval_service_count: 0,
                 run_chunk_trackers_provision: false,
                 run_data_retrieval_provision: false,
                 run_downloaders_provision: false,
@@ -2105,6 +2116,7 @@ pub async fn handle_clients_command(cmd: ClientsCommands) -> Result<()> {
                 performance_verifier_batch_size,
                 random_verifier_batch_size,
                 repair_service_count: 0,
+                data_retrieval_service_count: 0,
                 run_chunk_trackers_provision: false,
                 run_data_retrieval_provision: false,
                 run_downloaders_provision: true,
@@ -2250,6 +2262,7 @@ pub async fn handle_clients_command(cmd: ClientsCommands) -> Result<()> {
                 performance_verifier_batch_size: None,
                 random_verifier_batch_size: None,
                 repair_service_count: 0,
+                data_retrieval_service_count: 0,
                 run_chunk_trackers_provision: false,
                 run_data_retrieval_provision: false,
                 run_downloaders_provision: false,
