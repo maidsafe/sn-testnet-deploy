@@ -160,6 +160,7 @@ def main():
     progress_log_path = output_dir_path / f"data_loss_test_{timestamp}.log"
 
     with open(progress_log_path, "w") as f:
+        f.write("=" * 80 + "\n\n")
         f.write(f"Data loss test started: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n")
         f.write(f"Max retries per file: {max_retries}\n")
         f.write("=" * 80 + "\n\n")
@@ -216,7 +217,11 @@ def main():
     else:
         print(f"❌ POSSIBLE DATA LOSS DETECTED: {failed_count} file(s) failed")
 
-    sys.exit(0 if failed_count == 0 else 1)
+    # Even if data loss was detected, just exit with success.
+    # This is so we can have the service terminate but still have an 'on-failure' restart policy,
+    # because the service does seem to crash a few times before things settle on the droplet. We
+    # haven't been able to establish the reason for these crashes.
+    sys.exit(0)
 
 
 if __name__ == "__main__":
