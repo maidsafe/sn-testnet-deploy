@@ -197,7 +197,7 @@ def upload_content(content_path, contact_peer="", network_contacts_url="", netwo
         with open(success_file, "a", newline="") as csvfile:
             if write_header:
                 csvfile.write("TIMESTAMP_START,TIMESTAMP_FINISH,DATA_ADDRESS,DURATION,RETRIES,RECORDS_UPLOADED,RECORDS_ALREADY_PAID,TOTAL_RECORDS,EXIT_STATUS,SERVICE_TYPE,ANT_USER,SERVICE_NUMBER,STORE_COST,EXPECTED_TOTAL_SIZE,ACTUAL_TOTAL_SIZE,SHA256_HASH,ANT_PACKAGE_VERSION,ANT_PACKAGE_BUILD_DATE\n")
-            csvfile.write(f"{start_time},{end_time},{uploaded_address},{elapsed:.2f},0,{number_of_chunks},{chunks_already_uploaded},0,{exit_status},STATIC_UPLOADER,{os.environ.get('USER', '')},1,{store_cost},0,{file_size_kb},{file_hash},{package_version},{build_date}\n")
+            csvfile.write(f"{start_time},{end_time},{uploaded_address},{elapsed:.2f},0,{number_of_chunks},{chunks_already_uploaded},0,{exit_status},UPLOADER,{os.environ.get('USER', '')},1,{store_cost},0,{file_size_kb},{file_hash},{package_version},{build_date}\n")
     else:
         print(f"Failed to upload {content_path}")
         failure_file = f"{UPLOAD_METRIC_DIR}/metrics_failure.csv"
@@ -205,7 +205,7 @@ def upload_content(content_path, contact_peer="", network_contacts_url="", netwo
         with open(failure_file, "a", newline="") as csvfile:
             if write_header:
                 csvfile.write("TIMESTAMP_START,TIMESTAMP_FINISH,DATA_ADDRESS,DURATION,RETRIES,RECORDS_UPLOADED,RECORDS_ALREADY_PAID,TOTAL_RECORDS,EXIT_STATUS,SERVICE_TYPE,ANT_USER,SERVICE_NUMBER,STORE_COST,EXPECTED_TOTAL_SIZE,ACTUAL_TOTAL_SIZE,SHA256_HASH,ANT_PACKAGE_VERSION,ANT_PACKAGE_BUILD_DATE\n")
-            csvfile.write(f"{start_time},{end_time},0,{elapsed:.2f},0,0,0,0,{exit_status},STATIC_UPLOADER,{os.environ.get('USER', '')},1,0,0,{file_size_kb},{file_hash},{package_version},{build_date}\n")
+            csvfile.write(f"{start_time},{end_time},0,{elapsed:.2f},0,0,0,0,{exit_status},UPLOADER,{os.environ.get('USER', '')},1,0,0,{file_size_kb},{file_hash},{package_version},{build_date}\n")
     return exit_code
 
 def main():
