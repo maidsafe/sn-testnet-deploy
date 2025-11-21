@@ -3,6 +3,7 @@ Description=Ant Network Chunk Tracker {{ count }}
 After=network.target
 
 [Service]
+Environment="CHUNK_DOWNLOAD_BATCH_SIZE=50"
 {% if evm_network_type == "evm-custom" %}
 Environment="RPC_URL={{ evm_rpc_url }}"
 Environment="PAYMENT_TOKEN_ADDRESS={{ evm_payment_token_address }}"
