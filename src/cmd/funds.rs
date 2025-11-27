@@ -11,8 +11,8 @@ use clap::Subcommand;
 use color_eyre::{eyre::eyre, Result};
 use evmlib::Network;
 use sn_testnet_deploy::{
-    funding::FundingOptions, get_environment_details, inventory::DeploymentInventoryService,
-    CloudProvider, EvmNetwork, TestnetDeployBuilder,
+    funding::FundingOptions, get_anvil_node_data_hardcoded, get_environment_details,
+    inventory::DeploymentInventoryService, CloudProvider, EvmNetwork, TestnetDeployBuilder,
 };
 use std::str::FromStr;
 
@@ -78,6 +78,18 @@ pub async fn handle_funds_command(cmd: FundsCommand) -> Result<()> {
 
             let environment_details =
                 get_environment_details(&name, &inventory_services.s3_repository).await?;
+
+            // For Anvil network, use the hardcoded deployer wallet key if not provided
+            let funding_wallet_secret_key = if funding_wallet_secret_key.is_none()
+                && environment_details.evm_details.network == EvmNetwork::Anvil
+            {
+                let anvil_node_data = get_anvil_node_data_hardcoded(
+                    &testnet_deployer.ansible_provisioner.ansible_runner,
+                )?;
+                Some(anvil_node_data.deployer_wallet_private_key)
+            } else {
+                funding_wallet_secret_key
+            };
 
             let options = FundingOptions {
                 evm_data_payments_address: environment_details.evm_details.data_payments_address,
