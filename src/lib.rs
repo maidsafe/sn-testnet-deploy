@@ -1158,7 +1158,7 @@ pub fn get_genesis_multiaddr(
     Ok(Some((multiaddr, genesis_ip)))
 }
 
-fn get_anvil_node_data_hardcoded(ansible_runner: &AnsibleRunner) -> Result<AnvilNodeData> {
+pub fn get_anvil_node_data_hardcoded(ansible_runner: &AnsibleRunner) -> Result<AnvilNodeData> {
     let evm_inventory = ansible_runner.get_inventory(AnsibleInventoryType::EvmNodes, true)?;
     if evm_inventory.is_empty() {
         return Err(Error::EvmNodeNotFound);
