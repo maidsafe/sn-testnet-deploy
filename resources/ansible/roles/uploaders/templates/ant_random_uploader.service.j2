@@ -3,7 +3,7 @@ Description=Ant Network Random File Uploader {{ count }}
 After=network.target
 
 [Service]
-Environment="SECRET_KEY={{ secret_key }}"
+Environment="SECRET_KEY={{ uploader_secret_key }}"
 {% if evm_network_type == "evm-custom" %}
 Environment="RPC_URL={{ evm_rpc_url }}"
 Environment="PAYMENT_TOKEN_ADDRESS={{ evm_payment_token_address }}"
