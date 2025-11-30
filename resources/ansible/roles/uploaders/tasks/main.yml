@@ -100,9 +100,9 @@
   become: true
   when: not service_file_stat.results[item.0 - 1].stat.exists
   loop: "{{ range(1, ant_uploader_instances | int + 1) | zip(ant_secret_key_map[inventory_hostname]) }}"
-  vars: 
+  vars:
     count: "{{ item.0 }}"
-    secret_key: "{{ item.1 }}"
+    uploader_secret_key: "{{ item.1 }}"
 
 - name: enable ant_random_uploader service for each uploader
   ansible.builtin.systemd:
