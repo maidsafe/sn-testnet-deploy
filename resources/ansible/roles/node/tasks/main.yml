@@ -74,7 +74,7 @@
     argv: "{{ command_args | reject('equalto', omit) | list }}"
   vars:
     command_args:
-      - "{{ binary_dir }}/antctl"
+      - "{{ binary_path }}/antctl"
       - -v
       - add
       - "{{ '--no-upnp' if not (enable_upnp | default(false)) else omit }}"

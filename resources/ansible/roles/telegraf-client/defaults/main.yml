@@ -1,6 +1,8 @@
 ---
 chunk_tracker_json_output_filename: chunk_tracker_transformed_transformed.json
-log_output_path: /mnt/client/log
+client_storage_path: /mnt/client
+log_path: "{{ client_storage_path }}/log"
+metrics_csv_path: "{{ client_storage_path }}/log"
 network_dashboard_branch: main
 network_dashboard_github_url: git@github.com:maidsafe/network-dashboard.git
 network_dashboard_repo_path: /root/network-dashboard

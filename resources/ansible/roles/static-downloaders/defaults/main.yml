@@ -1,9 +1,14 @@
 ant_archive_filename: ant-latest-x86_64-unknown-linux-musl.tar.gz
-binary_dir: /usr/local/bin
+binary_path: /usr/local/bin
+client_storage_base_path: /mnt/client
+data_path: "{{ client_storage_base_path }}/data"
+downloads_path: "{{ data_path }}/downloaded_files"
 delayed_verifier_batch_size: 16
 delayed_verifier_quorum_value: majority
-log_output_dest: /mnt/client-data/log/downloads
-manifest_dir: /mnt/client-data/manifests
+log_path: "{{ client_storage_base_path }}/log"
+manifest_path: "{{ data_path }}/manifests"
+metrics_csv_path: "{{ log_path }}/download_files"
 random_verifier_batch_size: 16
 performance_verifier_batch_size: 16
 sleep_duration: 900
+state_path: "{{ client_storage_base_path }}/state"

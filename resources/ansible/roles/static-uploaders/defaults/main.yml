@@ -1,6 +1,9 @@
 ant_archive_filename: ant-latest-x86_64-unknown-linux-musl.tar.gz
-binary_dir: /usr/local/bin
-log_output_dest: /mnt/client/log/uploads
-metrics_path: /mnt/client
-upload_src_path: /mnt/client/data
+client_storage_base_path: /mnt/client
+binary_path: /usr/local/bin
+log_path: "{{ client_storage_base_path }}/log/uploads"
+# This bizarre path is used so the metrics file can be picked up by the same Telegraf configuration
+# as the random uploader for the staging testnets
+metrics_path: "{{ client_storage_base_path }}/log/upload_files/random_uploader/ant1"
+upload_src_path: "{{ client_storage_base_path }}/data"
 upload_batch_size: 16

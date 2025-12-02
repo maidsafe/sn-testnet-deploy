@@ -1,7 +1,7 @@
 ---
 - name: check if ant binary exists
   ansible.builtin.stat:
-    path: "{{ binary_dir }}/ant"
+    path: "{{ binary_path }}/ant"
   register: ant_binary
 
 - name: download the ant binary
@@ -13,7 +13,7 @@
 - name: extract the ant binary to /usr/local/bin
   ansible.builtin.unarchive:
     src: "/tmp/{{ ant_archive_filename }}"
-    dest: "{{ binary_dir }}"
+    dest: "{{ binary_path }}"
     remote_src: true
   become: true
   when: not ant_binary.stat.exists
@@ -48,9 +48,9 @@
   become: true
   when: ant1_user.ansible_facts.getent_passwd is not defined or ant1_user.ansible_facts.getent_passwd.ant1 is not defined
 
-- name: ensure the ant users can write to the log output destination
+- name: ensure ant users can write to log destination
   ansible.builtin.file:
-    path: "{{ log_output_path }}"
+    path: "{{ log_path }}"
     state: directory
     mode: '0775'
     owner: root
@@ -59,7 +59,7 @@
 
 - name: ensure chunk-tracker log directories exist for each instance
   ansible.builtin.file:
-    path: "/mnt/client/log/chunk-tracker-{{ item }}"
+    path: "{{ log_path }}/chunk-tracker-{{ item }}"
     state: directory
     mode: '0775'
     owner: ant1
@@ -68,7 +68,7 @@
   become: true
   loop: "{{ range(1, chunk_tracker_instances | int + 1) | list }}"
 
-- name: ensure ant users can read metrics CSV files
+- name: ensure ant users can read metrics csv files
   ansible.builtin.file:
     path: "{{ metrics_csv_path }}"
     state: directory

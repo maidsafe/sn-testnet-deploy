@@ -2,7 +2,7 @@
 # This role assumes the existence of the node manager, which is setup using another role.
 - name: check if the faucet binary exists
   ansible.builtin.stat:
-    path: "{{ binary_dir}}/faucet"
+    path: "{{ binary_path}}/faucet"
   register: faucet_bin
 
 - name: add faucet service
@@ -15,7 +15,7 @@
     argv: "{{ command_args | reject('equalto', omit) | list }}"
   vars:
     command_args:
-      - "{{ binary_dir }}/safenode-manager"
+      - "{{ binary_path }}/safenode-manager"
       - -v
       - faucet
       - add

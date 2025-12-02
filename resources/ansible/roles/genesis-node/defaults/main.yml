@@ -2,7 +2,7 @@
 public_rpc: False
 relay: False
 node_rpc_ip: "127.0.0.1"
-binary_dir: /usr/local/bin
+binary_path: /usr/local/bin
 # If a custom branch / version is specified, this value must be overwritten.
 antnode_archive_url: https://antnode.s3.eu-west-2.amazonaws.com/antnode-latest-x86_64-unknown-linux-musl.tar.gz
 antnode_archive_filename: antnode-latest-x86_64-unknown-linux-musl.tar.gz

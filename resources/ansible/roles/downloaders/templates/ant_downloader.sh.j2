@@ -11,7 +11,7 @@
 #   -h, --expected-hash: Required if file-address is provided - expected SHA256 hash of the file
 #   -s, --expected-size: Required if file-address is provided - expected size of the file in KB
 
-LOG_OUTPUT_DEST="{{ log_output_dest }}"
+log_path="{{ download_log_path }}"
 MODE=""
 CONTACT_PEER=""
 NETWORK_CONTACTS_URL=""
@@ -94,8 +94,8 @@ if [[ "$MODE" != "performance" && "$MODE" != "verifier" && "$MODE" != "random" ]
   exit 1
 fi
 
-SUCCESSFUL_UPLOAD_METRIC_FILE="/mnt/ant-storage/logs/upload_files/random_uploader/${USER}/metrics_success.csv"
-DOWNLOAD_DIR="/home/${USER}/downloaded_files"
+UPLOAD_METRICS_CSV_PATH="{{ uploader_metrics_csv_path }}/${USER}/metrics_success.csv"
+DOWNLOADS_PATH="{{ downloads_path }}"
 SLEEP_INTERVAL=20
 FILE_REF_INDEX=3
 DOWNLOAD_FILE_HASH_INDEX=14
@@ -115,15 +115,15 @@ fi
 
 case "$MODE" in
   performance)
-    DOWNLOAD_METRICS_DIR="/mnt/ant-storage/logs/download_files/performance_verifier/${USER}"
+    DOWNLOAD_METRICS_PATH="{{ download_metrics_csv_path }}/performance_verifier/${USER}"
     SERVICE_TYPE="PERFORMANCE_VERIFIER"
     ;;
   verifier)
-    DOWNLOAD_METRICS_DIR="/mnt/ant-storage/logs/download_files/download_verifier/${USER}"
+    DOWNLOAD_METRICS_PATH="{{ download_metrics_csv_path }}/download_verifier/${USER}"
     SERVICE_TYPE="DOWNLOAD_VERIFIER"
     ;;
   random)
-    DOWNLOAD_METRICS_DIR="/mnt/ant-storage/logs/download_files/random_verifier/${USER}"
+    DOWNLOAD_METRICS_PATH="{{ download_metrics_csv_path }}/random_verifier/${USER}"
     SERVICE_TYPE="RANDOM_VERIFIER"
     ;;
   *)
@@ -132,8 +132,8 @@ case "$MODE" in
     ;;
 esac
 
-mkdir -p "${DOWNLOAD_DIR}"
-mkdir -p "${DOWNLOAD_METRICS_DIR}"
+mkdir -p "${DOWNLOADS_PATH}"
+mkdir -p "${DOWNLOAD_METRICS_PATH}"
 
 CONTACT_PEER_ARG=""
 NETWORK_CONTACTS_URL_ARG=""
@@ -268,7 +268,7 @@ download_file() {
   # to ensure a unique output file.
   local download_filename=$(uuidgen)
   (
-    download_path="$DOWNLOAD_DIR/$download_filename"
+    download_path="$DOWNLOADS_PATH/$download_filename"
     
     QUORUM_ARG=""
     if [[ "$MODE" == "verifier" ]]; then
@@ -276,17 +276,17 @@ download_file() {
     fi
 
     timestamp=$(date +"%Y%m%d_%H%M%S")
-    log_file_path="${LOG_OUTPUT_DEST}/${timestamp}"
+    log_file_path="${log_path}/${timestamp}"
     LOG_OUTPUT_ARG="--log-output-dest $log_file_path"
     
     start_time=$(date +%s%N)
     stdout=$(ant $CONTACT_PEER_ARG \
-        $NETWORK_CONTACTS_URL_ARG \
-        $NETWORK_ID_ARG \
-        $LOG_OUTPUT_ARG \
-        file download "$file_ref" "$download_path" \
-        $QUORUM_ARG \
-        --disable-cache 2>&1)
+      $NETWORK_CONTACTS_URL_ARG \
+      $NETWORK_ID_ARG \
+      $LOG_OUTPUT_ARG \
+      file download "$file_ref" "$download_path" \
+      $QUORUM_ARG \
+      --disable-cache 2>&1)
     exit_code=$?
     end_time=$(date +%s%N)
     echo "$stdout"
@@ -330,7 +330,7 @@ download_file() {
 
     if [[ $exit_code -eq 0 ]]; then
       echo "✅ File downloaded"
-      success_file="$DOWNLOAD_METRICS_DIR/metrics_success.csv"
+      success_file="$DOWNLOAD_METRICS_PATH/metrics_success.csv"
 
       if [[ ! -f "$success_file" ]]; then
         echo "TIMESTAMP_START,TIMESTAMP_FINISH,DATA_ADDRESS,DURATION,RETRIES,FETCHED_RECORDS,TOTAL_RECORDS,EXIT_STATUS,SERVICE_TYPE,ANT_USER,SERVICE_NUMBER,EXPECTED_TOTAL_SIZE,ACTUAL_TOTAL_SIZE,ACTUAL_SHA256_HASH,EXPECTED_SHA256_HASH,ANT_PACKAGE_VERSION,ANT_PACKAGE_BUILD_DATE" > "$success_file"
@@ -340,7 +340,7 @@ download_file() {
       echo "❌DOWNLOAD FAILED"
       echo "Error type: $error_enum"
       echo "Please check the logs above for more details."
-      failure_file="$DOWNLOAD_METRICS_DIR/metrics_failure.csv"
+      failure_file="$DOWNLOAD_METRICS_PATH/metrics_failure.csv"
 
       if [[ ! -f "$failure_file" ]]; then
         echo "TIMESTAMP_START,TIMESTAMP_FINISH,DATA_ADDRESS,DURATION,RETRIES,FETCHED_RECORDS,TOTAL_RECORDS,EXIT_STATUS,SERVICE_TYPE,ANT_USER,SERVICE_NUMBER,EXPECTED_TOTAL_SIZE,ACTUAL_TOTAL_SIZE,ACTUAL_SHA256_HASH,EXPECTED_SHA256_HASH,ANT_PACKAGE_VERSION,ANT_PACKAGE_BUILD_DATE" > "$failure_file"
@@ -357,17 +357,17 @@ download_file() {
 if [[ -n "$FILE_ADDRESS" ]]; then
   download_file "$FILE_ADDRESS" "$EXPECTED_HASH" "$EXPECTED_SIZE"
   
-  if [[ -f "$DOWNLOAD_METRICS_DIR/metrics_success.csv" ]]; then
-    first_file=$(head -n 2 "$DOWNLOAD_METRICS_DIR/metrics_success.csv" | tail -n 1)
+  if [[ -f "$DOWNLOAD_METRICS_PATH/metrics_success.csv" ]]; then
+    first_file=$(head -n 2 "$DOWNLOAD_METRICS_PATH/metrics_success.csv" | tail -n 1)
     file_hash=$(echo "$first_file" | cut -d ',' -f $DOWNLOAD_FILE_HASH_INDEX | head -n 1)
     file_size=$(echo "$first_file" | cut -d ',' -f $DOWNLOAD_FILE_SIZE_INDEX | head -n 1)
     version_stdout=$(ant --version 2>&1)
     package_version=$(echo "$version_stdout" | grep "Package version:" | awk '{print $3}')
     build_date=$(echo "$version_stdout" | grep "Git info:" | awk '{print $7}')
-    mkdir -p "$(dirname \"$SUCCESSFUL_UPLOAD_METRIC_FILE\")"
+    mkdir -p "$(dirname \"$UPLOAD_METRICS_CSV_PATH\")"
 
-    echo "TIMESTAMP_START,TIMESTAMP_FINISH,DATA_ADDRESS,DURATION,RETRIES,RECORDS_UPLOADED,RECORDS_ALREADY_PAID,TOTAL_RECORDS,EXIT_STATUS,SERVICE_TYPE,ANT_USER,SERVICE_NUMBER,STORE_COST,EXPECTED_TOTAL_SIZE,ACTUAL_TOTAL_SIZE,SHA256_HASH,ANT_PACKAGE_VERSION,ANT_PACKAGE_BUILD_DATE" > "$SUCCESSFUL_UPLOAD_METRIC_FILE"
-    echo "$(date +%s%N),$(date +%s%N),$FILE_ADDRESS,0,0,0,0,0,SUCCESS,UPLOADER,$USER,1,0,$EXPECTED_SIZE,$file_size,$file_hash,$package_version,$build_date" >> "$SUCCESSFUL_UPLOAD_METRIC_FILE"
+    echo "TIMESTAMP_START,TIMESTAMP_FINISH,DATA_ADDRESS,DURATION,RETRIES,RECORDS_UPLOADED,RECORDS_ALREADY_PAID,TOTAL_RECORDS,EXIT_STATUS,SERVICE_TYPE,ANT_USER,SERVICE_NUMBER,STORE_COST,EXPECTED_TOTAL_SIZE,ACTUAL_TOTAL_SIZE,SHA256_HASH,ANT_PACKAGE_VERSION,ANT_PACKAGE_BUILD_DATE" > "$UPLOAD_METRICS_CSV_PATH"
+    echo "$(date +%s%N),$(date +%s%N),$FILE_ADDRESS,0,0,0,0,0,SUCCESS,UPLOADER,$USER,1,0,$EXPECTED_SIZE,$file_size,$file_hash,$package_version,$build_date" >> "$UPLOAD_METRICS_CSV_PATH"
   else
     echo "Error: failed to download file at address $FILE_ADDRESS"
     exit 1
@@ -375,7 +375,7 @@ if [[ -n "$FILE_ADDRESS" ]]; then
 fi
 
 while true; do
-  if [[ -f "$SUCCESSFUL_UPLOAD_METRIC_FILE" && -s "$SUCCESSFUL_UPLOAD_METRIC_FILE" ]]; then
+  if [[ -f "$UPLOAD_METRICS_CSV_PATH" && -s "$UPLOAD_METRICS_CSV_PATH" ]]; then
     echo "================================"
     echo "Downloading file..."
     echo "================================"
@@ -384,21 +384,21 @@ while true; do
     case "$MODE" in
       performance)
         # downloads the same file repeatedly - second line of the file
-        first_file=$(head -n 2 "$SUCCESSFUL_UPLOAD_METRIC_FILE" | tail -n 1)
+        first_file=$(head -n 2 "$UPLOAD_METRICS_CSV_PATH" | tail -n 1)
         file_ref=$(echo "$first_file" | cut -d ',' -f $FILE_REF_INDEX | head -n 1)
         file_hash=$(echo "$first_file" | cut -d ',' -f $UPLOAD_FILE_HASH_INDEX | head -n 1 )
         file_size=$(echo "$first_file" | cut -d ',' -f $UPLOAD_FILE_SIZE_INDEX | head -n 1 )
         ;;
       verifier)
         # downloads the 10th latest file. Exclude line containing "TIMESTAMP_START" (i.e, header) if less than 10 lines
-        tenth_latest_file=$(grep -v "^TIMESTAMP_START" "$SUCCESSFUL_UPLOAD_METRIC_FILE" | tail -n 10 | head -n 1)
+        tenth_latest_file=$(grep -v "^TIMESTAMP_START" "$UPLOAD_METRICS_CSV_PATH" | tail -n 10 | head -n 1)
         file_ref=$(echo "$tenth_latest_file" | cut -d ',' -f $FILE_REF_INDEX | head -n 1)
         file_hash=$(echo "$tenth_latest_file" | cut -d ',' -f $UPLOAD_FILE_HASH_INDEX | head -n 1 )
         file_size=$(echo "$tenth_latest_file" | cut -d ',' -f $UPLOAD_FILE_SIZE_INDEX | head -n 1 )
         ;;
       random)
         # downloads a random line from the file, except the first line
-        random_line=$(tail -n +2 "$SUCCESSFUL_UPLOAD_METRIC_FILE" | sort -R | head -n 1)
+        random_line=$(tail -n +2 "$UPLOAD_METRICS_CSV_PATH" | sort -R | head -n 1)
         file_ref=$(echo "$random_line" | cut -d ',' -f $FILE_REF_INDEX | head -n 1)
         file_hash=$(echo "$random_line" | cut -d ',' -f $UPLOAD_FILE_HASH_INDEX | head -n 1 )
         file_size=$(echo "$random_line" | cut -d ',' -f $UPLOAD_FILE_SIZE_INDEX | head -n 1 )
@@ -413,7 +413,7 @@ while true; do
       sleep 5
     fi
   else
-    echo "Upload metric file '$SUCCESSFUL_UPLOAD_METRIC_FILE' does not exist or is empty. Retrying in 5 seconds..."
+    echo "Upload metric file '$UPLOAD_METRICS_CSV_PATH' does not exist or is empty. Retrying in 5 seconds..."
     sleep 5
   fi
 done
