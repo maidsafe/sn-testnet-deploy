@@ -4,7 +4,7 @@
   become: True
   vars:
     ant_archive_url: "https://autonomi-cli.s3.eu-west-2.amazonaws.com/ant-{{ ant_version }}-x86_64-unknown-linux-musl.tar.gz"
-    log_output_dest: /mnt/client-logs/log/uploads
+    log_output_dest: /mnt/client/log/uploads
   tasks:
     - name: get list of ant users
       ansible.builtin.shell: "getent passwd | grep '^ant[0-9]\\+:' | cut -d: -f1"

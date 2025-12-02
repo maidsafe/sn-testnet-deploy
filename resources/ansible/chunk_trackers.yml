@@ -7,7 +7,7 @@
     - role: setup_striped_storage
       become: True
       vars:
-        mount_base: /mnt/client-logs
+        mount_base: /mnt/client
     - role: telegraf-client
       become: True
     - role: chunk-trackers

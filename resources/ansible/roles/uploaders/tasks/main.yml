@@ -65,7 +65,7 @@
 
 - name: ensure the data directory exists for random file generation
   ansible.builtin.file:
-    path: "/mnt/client-logs/data"
+    path: "/mnt/client/data"
     state: directory
     mode: '0775'
     owner: root

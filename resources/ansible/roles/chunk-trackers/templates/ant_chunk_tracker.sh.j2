@@ -63,7 +63,7 @@ validate_arguments() {
 }
 
 setup_directories() {
-  CHUNK_TRACKER_LOG_PATH="/mnt/client-logs/log/chunk-tracker-${SERVICE_NUMBER}"
+  CHUNK_TRACKER_LOG_PATH="/mnt/client/log/chunk-tracker-${SERVICE_NUMBER}"
   mkdir -p "${LOG_OUTPUT_PATH}"
   mkdir -p "${CHUNK_TRACKER_LOG_PATH}"
 }

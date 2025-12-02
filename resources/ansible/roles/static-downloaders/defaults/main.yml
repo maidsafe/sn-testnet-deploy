@@ -2,8 +2,8 @@ ant_archive_filename: ant-latest-x86_64-unknown-linux-musl.tar.gz
 binary_dir: /usr/local/bin
 delayed_verifier_batch_size: 16
 delayed_verifier_quorum_value: majority
-log_output_dest: /mnt/client-logs/log/downloads
-manifest_dir: /mnt/client-logs/manifests
+log_output_dest: /mnt/client-data/log/downloads
+manifest_dir: /mnt/client-data/manifests
 random_verifier_batch_size: 16
 performance_verifier_batch_size: 16
 sleep_duration: 900
