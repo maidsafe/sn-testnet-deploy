@@ -67,14 +67,14 @@ def validate_directory_with_manifest(download_path: Path, file_name: str, manife
 
 
 def attempt_download(file_ref: str, file_name: str, file_type: FileType, file_hash: str,
-                     manifest_dir_path: Path, log_output_dest_path: str) -> bool:
+                     manifest_dir_path: Path, log_path_path: str) -> bool:
     """Attempt to download and validate a file/directory. Returns True if successful."""
     download_subdir = str(uuid.uuid4())
     download_path = Path("{{ downloads_dir_path }}") / download_subdir
     download_path.mkdir(parents=True, exist_ok=True)
 
     timestamp_str = datetime.now().strftime("%Y%m%d_%H%M%S")
-    log_file_path = f"{log_output_dest_path}/{timestamp_str}"
+    log_file_path = f"{log_path_path}/{timestamp_str}"
 
     cmd = ["ant", "--log-output-dest", log_file_path, "file", "download", file_ref]
     if file_type == FileType.FILE_NO_ARCHIVE:
@@ -110,7 +110,7 @@ def attempt_download(file_ref: str, file_name: str, file_type: FileType, file_ha
     return success
 
 def test_file(file_ref: str, file_name: str, file_type: FileType, file_hash: str,
-              manifest_dir: Path, log_output_dest: str, max_retries: int,
+              manifest_dir: Path, log_path: str, max_retries: int,
               output_file: Path) -> bool:
     """Test a single file with retry logic. Returns True if successful."""
     for attempt in range(1, max_retries + 1):
@@ -118,7 +118,7 @@ def test_file(file_ref: str, file_name: str, file_type: FileType, file_hash: str
         print(f"DOWNLOAD ATTEMPT {attempt}/{max_retries}: {file_name}")
         print("=" * 160 + "\n")
 
-        if attempt_download(file_ref, file_name, file_type, file_hash, manifest_dir, log_output_dest):
+        if attempt_download(file_ref, file_name, file_type, file_hash, manifest_dir, log_path):
             with open(output_file, "a") as f:
                 f.write(f"SUCCESS: {file_name} ({file_ref}) succeeded on attempt {attempt}/{max_retries}\n")
             return True

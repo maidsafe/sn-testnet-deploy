@@ -1,1 +1,7 @@
-log_output_dest: /mnt/client/log/downloads
+client_storage_base_path: /mnt/client
+download_log_path: "{{ log_path }}/downloads"
+download_metrics_csv_path: "{{ log_path }}/download_files"
+downloads_path: "{{ client_storage_base_path }}/data/downloaded_files"
+log_path: /mnt/client/log
+upload_log_path: "{{ log_path }}/uploads"
+uploader_metrics_csv_path: "{{ log_path }}/upload_files/random_uploader"

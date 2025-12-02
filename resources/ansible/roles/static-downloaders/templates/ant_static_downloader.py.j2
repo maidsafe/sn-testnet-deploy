@@ -114,7 +114,7 @@ class StateManager:
     def __init__(self, mode: str):
         self.mode = mode
         user = os.environ["USER"]
-        self.state_dir = Path("/mnt/ant-storage/state")
+        self.state_dir = Path("{{ state_path }}")
         self.state_dir.mkdir(parents=True, exist_ok=True)
         self.state_file_path = self.state_dir / f"downloader_state_{mode}_{user}.json"
     
@@ -172,8 +172,6 @@ class StateManager:
         state = self._load_state()
         in_progress = state.get("in_progress")
         if in_progress:
-            # Reconstruct FileRecord from saved state
-            from enum import Enum
             file_type = FileType(in_progress["file_type"])
             return FileRecord(
                 file_type=file_type,
@@ -247,8 +245,8 @@ class MetricsLogger:
 class FileValidator:
     """Handles file validation operations."""
     
-    def __init__(self, manifest_dir: str):
-        self.manifest_dir = Path(manifest_dir)
+    def __init__(self, manifest_path: str):
+        self.manifest_path = Path(manifest_path)
     
     def validate_file_hash(self, file_path: Path, expected_hash: str) -> Tuple[bool, str]:
         """Validate a single file's hash."""
@@ -267,7 +265,7 @@ class FileValidator:
         """Validate directory contents against manifest. Returns validation status, 
         actual hash of first file (for metrics), expected hash of first file (for metrics), 
         and total directory size in KB."""
-        manifest_file = self.manifest_dir / f"{file_name}_manifest.csv"
+        manifest_file = self.manifest_path / f"{file_name}_manifest.csv"
         
         if not manifest_file.exists():
             raise FileNotFoundError(f"Required manifest file not found: {manifest_file}")
@@ -329,25 +327,25 @@ class AntDownloader:
         self.network_id = config.get("network_id", "")
         self.file_address = config.get("file_address", "")
         
-        self.log_output_dest = "{{ log_output_dest }}"
-        self.manifest_dir = "{{ manifest_dir }}"
+        self.log_path = "{{ log_path }}"
+        self.manifest_path = "{{ manifest_path }}"
         self.delayed_verifier_quorum_value = "{{ delayed_verifier_quorum_value }}"
         self.sleep_duration = {{ sleep_duration }}
         
-        self.root_download_dir = Path("/mnt/ant-storage/downloaded_files")
+        self.root_download_dir = Path("{{ downloads_path }}")
         self.root_download_dir.mkdir(parents=True, exist_ok=True)
         
         mode_config = {
             DownloadMode.PERFORMANCE: {
-                "metrics_dir": f"/mnt/ant-storage/logs/download_files/performance_verifier/{os.environ['USER']}",
+                "metrics_dir": f"{{ metrics_csv_path }}/performance_verifier/{os.environ['USER']}",
                 "service_type": "PERFORMANCE_VERIFIER"
             },
             DownloadMode.DELAYED: {
-                "metrics_dir": f"/mnt/ant-storage/logs/download_files/download_verifier/{os.environ['USER']}",
+                "metrics_dir": f"{{ metrics_csv_path }}/download_verifier/{os.environ['USER']}",
                 "service_type": "DOWNLOAD_VERIFIER"
             },
             DownloadMode.RANDOM: {
-                "metrics_dir": f"/mnt/ant-storage/logs/download_files/random_verifier/{os.environ['USER']}",
+                "metrics_dir": f"{{ metrics_csv_path }}/random_verifier/{os.environ['USER']}",
                 "service_type": "RANDOM_VERIFIER"
             }
         }
@@ -357,7 +355,7 @@ class AntDownloader:
         
         self.state_manager = StateManager(self.mode.value)
         self.metrics_logger = MetricsLogger(self.metrics_dir, self.service_type)
-        self.file_validator = FileValidator(self.manifest_dir)
+        self.file_validator = FileValidator(self.manifest_path)
         
         self.addresses = self._load_addresses_from_csv()
         
@@ -513,7 +511,7 @@ class AntDownloader:
         download_path.mkdir(parents=True, exist_ok=True)
         
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        log_file_path = f"{self.log_output_dest}/{timestamp}"
+        log_file_path = f"{self.log_path}/{timestamp}"
         
         cmd = self._build_ant_command(file_record, download_path, log_file_path)
         print(f"Running command: {' '.join(cmd)}")

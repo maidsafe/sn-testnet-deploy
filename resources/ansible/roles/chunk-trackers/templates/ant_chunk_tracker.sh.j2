@@ -16,7 +16,7 @@ SERVICE_NUMBER=""
 CHUNK_TRACKER_INTERVAL="{{ chunk_tracker_interval }}"
 CHUNK_TRACKER_LOG_PATH=""
 DATA_ADDRESS=""
-LOG_OUTPUT_PATH="{{ log_output_path }}"
+log_path="{{ log_path }}"
 METRICS_CSV_PATH="{{ metrics_csv_path }}"
 CONTACT_PEER=""
 NETWORK_CONTACTS_URL=""
@@ -64,7 +64,7 @@ validate_arguments() {
 
 setup_directories() {
   CHUNK_TRACKER_LOG_PATH="/mnt/client/log/chunk-tracker-${SERVICE_NUMBER}"
-  mkdir -p "${LOG_OUTPUT_PATH}"
+  mkdir -p "${log_path}"
   mkdir -p "${CHUNK_TRACKER_LOG_PATH}"
 }
 

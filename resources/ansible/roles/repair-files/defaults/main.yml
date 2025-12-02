@@ -1,6 +1,6 @@
-binary_dir: /usr/local/bin
+binary_path: /usr/local/bin
 ant_archive_filename: ant-latest-x86_64-unknown-linux-musl.tar.gz
 ant_archive_url: https://autonomi-cli.s3.eu-west-2.amazonaws.com/{{ ant_archive_filename }}
-log_output_path: /mnt/client-data/log
+log_path: /mnt/client-data/log
 start_repair_service: false
 repair_service_count: 1

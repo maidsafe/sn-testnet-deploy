@@ -1,8 +1,8 @@
-binary_dir: /usr/local/bin
+binary_path: /usr/local/bin
 ant_archive_filename: ant-latest-x86_64-unknown-linux-musl.tar.gz
 ant_archive_url: https://autonomi-cli.s3.eu-west-2.amazonaws.com/{{ ant_archive_filename }}
-log_output_path: /mnt/client/log
-metrics_csv_path: /mnt/ant-storage/logs/upload_files/random_uploader
+log_path: /mnt/client/log
+metrics_csv_path: "{{ log_path }}/upload_files/random_uploader"
 chunk_tracker_json_output_filename: chunk_tracker_transformed_transformed.json
 chunk_tracker_instances: 1
 chunk_tracker_interval: 300  # seconds (5 minutes)

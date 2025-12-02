@@ -1,5 +1,5 @@
 ant_archive_filename: ant-latest-x86_64-unknown-linux-musl.tar.gz
-binary_dir: /usr/local/bin
+binary_path: /usr/local/bin
 log_output_dir_path: /mnt/client-data/log/downloads
 manifest_dir_path: /mnt/client-data/manifests
 downloads_dir_path: /mnt/client-data/downloaded_files

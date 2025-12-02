@@ -1,6 +1,9 @@
-binary_dir: /usr/local/bin
+binary_path: /usr/local/bin
 ant_archive_filename: ant-latest-x86_64-unknown-linux-musl.tar.gz
 ant_archive_url: https://autonomi-cli.s3.eu-west-2.amazonaws.com/{{ autonomi_archive_filename }}
-log_output_dest: /mnt/client/log/uploads
+client_storage_base_path: /mnt/client
+data_path: "{{ client_storage_base_path }}/data"
+log_path: "{{ client_storage_base_path }}/log"
+upload_log_path: "{{ log_path }}/uploads"
 upload_size: 100 # megabytes
 single_node_payments: false

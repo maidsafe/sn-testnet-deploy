@@ -51,6 +51,12 @@
     dest: /etc/default/telegraf
     remote_src: yes
 
+- name: replace ANT_CLIENT_ROOT_DIR_CSV
+  replace:
+    path: "/etc/default/telegraf"
+    regexp: 'ANT_CLIENT_ROOT_DIR_CSV=/mnt/ant-storage/logs'
+    replace: 'ANT_CLIENT_ROOT_DIR_CSV={{ metrics_csv_path }}'
+
 - name: replace ANT_CLIENT_TESTNET_NAME value
   replace:
     path: "/etc/default/telegraf"
@@ -81,7 +87,7 @@
   replace:
     path: "/etc/default/telegraf"
     regexp: 'ANT_CLIENT_ROOT_DIR_CHUNK_TRACKER_JSON=/mnt/client/log'
-    replace: 'ANT_CLIENT_ROOT_DIR_CHUNK_TRACKER_JSON={{ log_output_path }}'
+    replace: 'ANT_CLIENT_ROOT_DIR_CHUNK_TRACKER_JSON={{ log_path }}'
 
 - name: replace ANT_CLIENT_FILENAME_CHUNK_TRACKER value
   replace:

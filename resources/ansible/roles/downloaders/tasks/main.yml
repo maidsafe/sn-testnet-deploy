@@ -14,7 +14,7 @@
 
 - name: ensure the ant users can write to the random_verifier metrics directory
   ansible.builtin.file:
-    path: "/mnt/ant-storage/logs/download_files/random_verifier/ant1/"
+    path: "{{ log_path }}/download_files/random_verifier/ant1/"
     state: directory
     mode: '0775'
     owner: ant1
@@ -22,9 +22,9 @@
     recurse: yes
   become: true
 
-- name: ensure the ant users can write to the download_verifier metrics directory
+- name: ensure ant users can write to download_verifier metrics directory
   ansible.builtin.file:
-    path: "/mnt/ant-storage/logs/download_files/download_verifier/ant1/"
+    path: "{{ log_path }}/download_files/download_verifier/ant1/"
     state: directory
     mode: '0775'
     owner: ant1
@@ -32,9 +32,9 @@
     recurse: yes
   become: true
 
-- name: ensure the ant users can write to the performance_verifier metrics directory
+- name: ensure ant users can write to performance_verifier metrics path
   ansible.builtin.file:
-    path: "/mnt/ant-storage/logs/download_files/performance_verifier/ant1/"
+    path: "{{ log_path }}/download_files/performance_verifier/ant1/"
     state: directory
     mode: '0775'
     owner: ant1
@@ -42,9 +42,18 @@
     recurse: yes
   become: true
 
-- name: ensure the ant users can write to the log output destination
+- name: ensure ant users can write to log output path
   ansible.builtin.file:
-    path: "{{ log_output_dest }}"
+    path: "{{ log_path }}"
+    state: directory
+    mode: '0775'
+    owner: root
+    group: ant
+  become: true
+
+- name: ensure ant users can write to downloads path
+  ansible.builtin.file:
+    path: "{{ downloads_path }}"
     state: directory
     mode: '0775'
     owner: root

@@ -7,10 +7,10 @@
 #   -n, --network-id: Optional network ID (also enables testnet mode)
 #   -s, --single-node-payment: Optional flag to enable single node payment mode
 
-LOG_OUTPUT_DEST="{{ log_output_dest }}"
-UPLOAD_METRIC_DIR="/mnt/ant-storage/logs/upload_files/random_uploader/${USER}"
+log_path="{{ upload_log_path }}"
+METRICS_CSV_DIR_PATH="{{ log_path }}/upload_files/random_uploader/${USER}"
 
-mkdir -p "${UPLOAD_METRIC_DIR}"
+mkdir -p "${METRICS_CSV_DIR_PATH}"
 
 if [[ -n "${SECRET_KEY}" ]] && ! grep -q "export SECRET_KEY=" ~/.profile; then
   echo "export SECRET_KEY=${SECRET_KEY}" >> ~/.profile
@@ -229,7 +229,7 @@ generate_random_data_file_and_upload() {
   echo "Generated random data file at $tmpfile with size $file_size_kb KB and SHA-256 hash $file_hash"
 
   timestamp=$(date +"%Y%m%d_%H%M%S")
-  log_file_path="${LOG_OUTPUT_DEST}/${timestamp}"
+  log_file_path="${log_path}/${timestamp}"
   LOG_OUTPUT_ARG="--log-output-dest $log_file_path"
   
   start_time=$(date +%s%N)
@@ -261,7 +261,7 @@ generate_random_data_file_and_upload() {
 
   if [[ $exit_code -eq 0 ]]; then
     echo "Uploaded $tmpfile"
-    success_file="$UPLOAD_METRIC_DIR/metrics_success.csv"
+    success_file="$METRICS_CSV_DIR_PATH/metrics_success.csv"
 
     uploaded_address=$(echo "$stdout" | grep -oP 'At address: \K\S+')
     number_of_chunks=$(echo "$stdout" | rg -o 'Number of chunks uploaded: [0-9]+' | rg -o '[0-9]+')
@@ -275,7 +275,7 @@ generate_random_data_file_and_upload() {
 
   else
     echo "Failed to upload $tmpfile using ANT CLI"
-    failure_file="$UPLOAD_METRIC_DIR/metrics_failure.csv"
+    failure_file="$METRICS_CSV_DIR_PATH/metrics_failure.csv"
 
     if [ ! -f "$failure_file" ]; then
       echo "TIMESTAMP_START,TIMESTAMP_FINISH,DATA_ADDRESS,DURATION,RETRIES,RECORDS_UPLOADED,RECORDS_ALREADY_PAID,TOTAL_RECORDS,EXIT_STATUS,SERVICE_TYPE,ANT_USER,SERVICE_NUMBER,STORE_COST,EXPECTED_TOTAL_SIZE,ACTUAL_TOTAL_SIZE,SHA256_HASH,ANT_PACKAGE_VERSION,ANT_PACKAGE_BUILD_DATE" > "$failure_file"

@@ -1,7 +1,7 @@
 ---
 - name: check if antctl binary exists
   ansible.builtin.stat:
-    path: "{{ binary_dir}}/antctl"
+    path: "{{ binary_path}}/antctl"
   register: antctl_binary
 
 - name: get the private IP for the instance
@@ -24,6 +24,6 @@
   become: True
   ansible.builtin.unarchive:
     src: "/tmp/{{ antctl_archive_filename }}"
-    dest: "{{ binary_dir }}"
+    dest: "{{ binary_path }}"
     remote_src: True
   when: not antctl_binary.stat.exists

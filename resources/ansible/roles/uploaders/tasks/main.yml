@@ -1,7 +1,7 @@
 ---
 - name: check if ant binary exists
   ansible.builtin.stat:
-    path: "{{ binary_dir }}/ant"
+    path: "{{ binary_path }}/ant"
   register: ant_binary
 
 - name: download the ant binary
@@ -13,7 +13,7 @@
 - name: extract the ant binary to /usr/local/bin
   ansible.builtin.unarchive:
     src: "/tmp/{{ ant_archive_filename }}"
-    dest: "{{ binary_dir }}"
+    dest: "{{ binary_path }}"
     remote_src: true
   become: true
   when: not ant_binary.stat.exists
@@ -35,7 +35,7 @@
 
 - name: ensure the ant users can write to the log output destination
   ansible.builtin.file:
-    path: "{{ log_output_dest }}"
+    path: "{{ upload_log_path }}"
     state: directory
     mode: '0775'
     owner: root
@@ -44,7 +44,7 @@
 
 - name: ensure the ant users can write to the upload metrics directory
   ansible.builtin.file:
-    path: "/mnt/ant-storage/logs/upload_files/random_uploader"
+    path: "{{ log_path }}/upload_files/random_uploader"
     state: directory
     mode: '0775'
     owner: root
@@ -54,7 +54,7 @@
 
 - name: ensure individual ant user upload directories exist
   ansible.builtin.file:
-    path: "/mnt/ant-storage/logs/upload_files/random_uploader/ant{{ item }}"
+    path: "{{ log_path }}/upload_files/random_uploader/ant{{ item }}"
     state: directory
     mode: '0775'
     owner: "ant{{ item }}"
@@ -65,7 +65,7 @@
 
 - name: ensure the data directory exists for random file generation
   ansible.builtin.file:
-    path: "/mnt/client/data"
+    path: "{{ data_path }}"
     state: directory
     mode: '0775'
     owner: root

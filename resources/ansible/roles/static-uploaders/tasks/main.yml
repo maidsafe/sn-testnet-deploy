@@ -1,7 +1,7 @@
 ---
 - name: check if ant binary exists
   ansible.builtin.stat:
-    path: "{{ binary_dir }}/ant"
+    path: "{{ binary_path }}/ant"
   register: ant_binary
 
 - name: download the ant binary
@@ -13,7 +13,7 @@
 - name: extract the ant binary to binary directory
   ansible.builtin.unarchive:
     src: "/tmp/{{ ant_archive_filename }}"
-    dest: "{{ binary_dir }}"
+    dest: "{{ binary_path }}"
     remote_src: true
   become: true
   when: not ant_binary.stat.exists
@@ -44,7 +44,7 @@
 
 - name: ensure ant users can write to the log output destination
   ansible.builtin.file:
-    path: "{{ log_output_dest }}"
+    path: "{{ log_path }}"
     state: directory
     mode: '0775'
     owner: root
