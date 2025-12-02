@@ -12,6 +12,8 @@
       become: True
     - role: static-uploaders
       become: True
+    - role: static-downloaders
+      become: True
 
   tasks:
     # Something is wrong with the journal service on Ubuntu that causes no
