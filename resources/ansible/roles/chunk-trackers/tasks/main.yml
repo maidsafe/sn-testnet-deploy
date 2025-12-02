@@ -59,7 +59,7 @@
 
 - name: ensure chunk-tracker log directories exist for each instance
   ansible.builtin.file:
-    path: "/mnt/client-logs/log/chunk-tracker-{{ item }}"
+    path: "/mnt/client/log/chunk-tracker-{{ item }}"
     state: directory
     mode: '0775'
     owner: ant1

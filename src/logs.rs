@@ -154,7 +154,7 @@ impl TestnetDeployer {
                     .to_string_lossy()
                     .as_ref()
             ),
-            format!("root@{}:/mnt/client-logs/log/", vm.public_ip_addr),
+            format!("root@{}:/mnt/client/log/", vm.public_ip_addr),
             vm_path.to_string_lossy().to_string(),
         ]);
 

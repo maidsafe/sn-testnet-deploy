@@ -80,7 +80,7 @@
 - name: replace ANT_CLIENT_ROOT_DIR_CHUNK_TRACKER_JSON value
   replace:
     path: "/etc/default/telegraf"
-    regexp: 'ANT_CLIENT_ROOT_DIR_CHUNK_TRACKER_JSON=/mnt/client-logs/log'
+    regexp: 'ANT_CLIENT_ROOT_DIR_CHUNK_TRACKER_JSON=/mnt/client/log'
     replace: 'ANT_CLIENT_ROOT_DIR_CHUNK_TRACKER_JSON={{ log_output_path }}'
 
 - name: replace ANT_CLIENT_FILENAME_CHUNK_TRACKER value
