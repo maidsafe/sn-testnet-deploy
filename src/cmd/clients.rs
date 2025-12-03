@@ -1029,6 +1029,15 @@ pub enum ClientsCommands {
         #[clap(long, default_value_t = CloudProvider::DigitalOcean, value_parser = parse_provider, verbatim_doc_comment)]
         provider: CloudProvider,
     },
+    /// Fetch static upload results from all client VMs in an environment.
+    FetchStaticUploadResults {
+        /// The name of the environment
+        #[arg(long)]
+        name: String,
+        /// The cloud provider that was used.
+        #[clap(long, default_value_t = CloudProvider::DigitalOcean, value_parser = parse_provider, verbatim_doc_comment)]
+        provider: CloudProvider,
+    },
     /// Start all chunk trackers on all client VMs in an environment.
     StartChunkTrackers {
         /// The name of the environment
@@ -1197,6 +1206,27 @@ pub async fn handle_clients_command(cmd: ClientsCommands) -> Result<()> {
 
             println!("Scan repair results fetched successfully.");
             println!("Files saved to: scan-repair-results/{}/", name);
+            Ok(())
+        }
+        ClientsCommands::FetchStaticUploadResults { name, provider } => {
+            let testnet_deployer = TestnetDeployBuilder::default()
+                .environment_name(&name)
+                .provider(provider)
+                .build()?;
+            let inventory_service = DeploymentInventoryService::from(&testnet_deployer);
+            inventory_service
+                .generate_or_retrieve_inventory(&name, true, None)
+                .await?;
+
+            let ansible_runner = testnet_deployer.ansible_provisioner.ansible_runner;
+            ansible_runner.run_playbook(
+                AnsiblePlaybook::FetchStaticUploadResults,
+                AnsibleInventoryType::Clients,
+                Some(format!("{{ \"env_name\": \"{name}\" }}")),
+            )?;
+
+            println!("Static upload results fetched successfully.");
+            println!("Files saved to: static-upload-results/{}/", name);
             Ok(())
         }
         ClientsCommands::Clean { name, provider } => {
