@@ -16,4 +16,5 @@ resources/safe
 /artifacts/
 /deploy/
 /scan-repair-results/
+/static-upload-results/
 resources/ansible/roles/scan-repair/files/chunk_whitelist.csv
