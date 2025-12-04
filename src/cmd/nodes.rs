@@ -193,7 +193,7 @@ pub async fn handle_status_command(
         return Err(eyre!("The {name} environment does not exist"));
     }
 
-    testnet_deployer.status()?;
+    testnet_deployer.status().await?;
     Ok(())
 }
 
