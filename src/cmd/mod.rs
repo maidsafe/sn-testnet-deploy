@@ -1331,7 +1331,7 @@ pub async fn get_options_from_s3<T: serde::de::DeserializeOwned>(
     options_type: OptionsType,
 ) -> Result<T> {
     let s3_repo = S3Repository {};
-    let temp_dir = tempfile::tempdir()?.into_path();
+    let temp_dir = tempfile::tempdir()?.keep();
     let options_path = temp_dir.join(options_type.file_name(name));
 
     s3_repo

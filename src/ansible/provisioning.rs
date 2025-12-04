@@ -28,7 +28,7 @@ use crate::{
     print_duration, run_external_command, BinaryOption, CloudProvider, EvmNetwork, LogFormat,
     NodeType, SshClient, UpgradeOptions,
 };
-use ant_service_management::NodeRegistry;
+use ant_service_management::NodeRegistryManager;
 use evmlib::common::U256;
 use log::{debug, error, trace};
 use semver::Version;
@@ -649,12 +649,12 @@ impl AnsibleProvisioner {
             .get_inventory(AnsibleInventoryType::Clients, false)
     }
 
-    pub fn get_node_registries(
+    pub async fn get_node_registries(
         &self,
         inventory_type: &AnsibleInventoryType,
     ) -> Result<DeploymentNodeRegistries> {
         debug!("Fetching node manager inventory for {inventory_type:?}");
-        let temp_dir_path = tempfile::tempdir()?.into_path();
+        let temp_dir_path = tempfile::tempdir()?.keep();
         let temp_dir_json = serde_json::to_string(&temp_dir_path)?;
 
         self.ansible_runner.run_playbook(
@@ -690,7 +690,7 @@ impl AnsibleProvisioner {
         let mut node_registries = Vec::new();
         let mut failed_vms = Vec::new();
         for (vm_name, file_path) in node_registry_paths {
-            match NodeRegistry::load(&file_path) {
+            match NodeRegistryManager::load(&file_path).await {
                 Ok(node_registry) => node_registries.push((vm_name.clone(), node_registry)),
                 Err(_) => failed_vms.push(vm_name.clone()),
             }
