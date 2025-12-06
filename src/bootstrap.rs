@@ -27,6 +27,7 @@ pub struct BootstrapOptions {
     pub enable_logging: bool,
     pub environment_type: EnvironmentType,
     pub evm_data_payments_address: Option<String>,
+    pub evm_merkle_payments_address: Option<String>,
     pub evm_network: EvmNetwork,
     pub evm_payment_token_address: Option<String>,
     pub evm_rpc_url: Option<String>,
@@ -70,6 +71,7 @@ impl TestnetDeployer {
                 evm_details: EvmDetails {
                     network: options.evm_network.clone(),
                     data_payments_address: options.evm_data_payments_address.clone(),
+                    merkle_payments_address: options.evm_merkle_payments_address.clone(),
                     payment_token_address: options.evm_payment_token_address.clone(),
                     rpc_url: options.evm_rpc_url.clone(),
                 },

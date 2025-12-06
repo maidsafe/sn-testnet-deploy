@@ -98,6 +98,9 @@ pub enum Commands {
         /// This argument must match the same contract address used in the existing network.
         #[arg(long)]
         evm_data_payments_address: Option<String>,
+        /// The address of the merkle payments contract.
+        #[arg(long)]
+        evm_merkle_payments_address: Option<String>,
         /// The EVM network to use.
         ///
         /// Valid values are "arbitrum-one", "arbitrum-sepolia", or "custom".
@@ -473,6 +476,9 @@ pub enum Commands {
         /// The address of the data payments contract.
         #[arg(long)]
         evm_data_payments_address: Option<String>,
+        /// The address of the merkle payments contract.
+        #[arg(long)]
+        evm_merkle_payments_address: Option<String>,
         /// The EVM network type to use for the deployment.
         ///
         /// Possible values are 'arbitrum-one' or 'custom'.
@@ -559,6 +565,9 @@ pub enum Commands {
         /// The maximum number of log files to keep. After reaching this limit, the older files are archived.
         #[clap(long, default_value = "10")]
         max_log_files: u16,
+        /// Enable merkle mode for uploads.
+        #[clap(long, default_value_t = false)]
+        merkle: bool,
         /// The name of the environment
         #[arg(short = 'n', long)]
         name: String,

@@ -93,6 +93,9 @@ pub async fn handle_funds_command(cmd: FundsCommand) -> Result<()> {
 
             let options = FundingOptions {
                 evm_data_payments_address: environment_details.evm_details.data_payments_address,
+                evm_merkle_payments_address: environment_details
+                    .evm_details
+                    .merkle_payments_address,
                 evm_payment_token_address: environment_details.evm_details.payment_token_address,
                 evm_rpc_url: environment_details.evm_details.rpc_url,
                 evm_network: environment_details.evm_details.network,
@@ -147,17 +150,29 @@ pub async fn handle_funds_command(cmd: FundsCommand) -> Result<()> {
                 EvmNetwork::Custom => {
                     if let (
                         Some(emv_data_payments_address),
+                        Some(evm_merkle_payments_address),
                         Some(evm_payment_token_address),
                         Some(evm_rpc_url),
                     ) = (
-                        environment_details.evm_details.data_payments_address,
-                        environment_details.evm_details.payment_token_address,
-                        environment_details.evm_details.rpc_url,
+                        environment_details
+                            .evm_details
+                            .data_payments_address
+                            .as_ref(),
+                        environment_details
+                            .evm_details
+                            .merkle_payments_address
+                            .as_ref(),
+                        environment_details
+                            .evm_details
+                            .payment_token_address
+                            .as_ref(),
+                        environment_details.evm_details.rpc_url.as_ref(),
                     ) {
                         Network::new_custom(
-                            &evm_rpc_url,
-                            &evm_payment_token_address,
-                            &emv_data_payments_address,
+                            evm_rpc_url,
+                            evm_payment_token_address,
+                            emv_data_payments_address,
+                            Some(evm_merkle_payments_address),
                         )
                     } else {
                         return Err(eyre!(

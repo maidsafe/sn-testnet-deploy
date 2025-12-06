@@ -24,6 +24,10 @@ if [[ -n "${PAYMENT_TOKEN_ADDRESS}" ]] && ! grep -q "export PAYMENT_TOKEN_ADDRES
   echo "export PAYMENT_TOKEN_ADDRESS=${PAYMENT_TOKEN_ADDRESS}" >> ~/.profile
 fi
 
+if [[ -n "${MERKLE_PAYMENTS_ADDRESS}" ]] && ! grep -q "export MERKLE_PAYMENTS_ADDRESS=" ~/.profile; then
+  echo "export MERKLE_PAYMENTS_ADDRESS=${MERKLE_PAYMENTS_ADDRESS}" >> ~/.profile
+fi
+
 if [[ -n "${DATA_PAYMENTS_ADDRESS}" ]] && ! grep -q "export DATA_PAYMENTS_ADDRESS=" ~/.profile; then
   echo "export DATA_PAYMENTS_ADDRESS=${DATA_PAYMENTS_ADDRESS}" >> ~/.profile
 fi
@@ -35,18 +39,20 @@ fi
 CONTACT_PEER=""
 NETWORK_CONTACTS_URL=""
 NETWORK_ID=""
+MERKLE=false
 SINGLE_NODE_PAYMENT=false
 
 usage() {
-  echo "Usage: $0 [-p PEER] [-u URL] [-n ID] [-s]"
+  echo "Usage: $0 [-p PEER] [-u URL] [-n ID] [-m] [-s]"
   echo "  -p, --peer                    PEER: Optional contact peer"
   echo "  -u, --network-contacts-url    URL: Optional network contacts URL"
   echo "  -n, --network-id              ID: Optional network ID (also enables testnet mode)"
+  echo "  -m, --merkle                  Enable merkle mode"
   echo "  -s, --single-node-payment     Enable single node payment mode"
   exit 1
 }
 
-TEMP=$(getopt -o p:u:n:s --long peer:,network-contacts-url:,network-id:,single-node-payment -n 'ant_random_uploader.sh' -- "$@")
+TEMP=$(getopt -o p:u:n:ms --long peer:,network-contacts-url:,network-id:,merkle,single-node-payment -n 'ant_random_uploader.sh' -- "$@")
 
 if [[ $? != 0 ]]; then
   echo "Failed to parse arguments" >&2
@@ -70,6 +76,10 @@ while true; do
       NETWORK_ID="$2"
       shift 2
       ;;
+    -m|--merkle)
+      MERKLE=true
+      shift
+      ;;
     -s|--single-node-payment)
       SINGLE_NODE_PAYMENT=true
       shift
@@ -88,6 +98,7 @@ done
 CONTACT_PEER_ARG=""
 NETWORK_CONTACTS_URL_ARG=""
 NETWORK_ID_ARG=""
+MERKLE_ARG=""
 SINGLE_NODE_PAYMENT_ARG=""
 
 if [[ -n "$CONTACT_PEER" ]]; then
@@ -101,6 +112,10 @@ fi
 if [[ -n "$NETWORK_ID" ]]; then
   echo "Setting network ID arg to $NETWORK_ID"
   NETWORK_ID_ARG="--network-id $NETWORK_ID"
+fi
+if [[ "$MERKLE" == "true" ]]; then
+  echo "Enabling merkle mode"
+  MERKLE_ARG="--merkle"
 fi
 if [[ "$SINGLE_NODE_PAYMENT" == "true" ]]; then
   echo "Enabling single node payment mode"
@@ -240,6 +255,7 @@ generate_random_data_file_and_upload() {
     $NETWORK_ID_ARG \
     $LOG_OUTPUT_ARG \
     file upload \
+    $MERKLE_ARG \
     $SINGLE_NODE_PAYMENT_ARG \
     --no-archive \
     --public \

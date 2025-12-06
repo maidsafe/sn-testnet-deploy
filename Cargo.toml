@@ -26,7 +26,8 @@ colored = "2.0.4"
 dirs-next = "2.0.0"
 dotenv = "0.15.0"
 env_logger = "0.10.0"
-evmlib = { version = "0.4.5" }
+# evmlib = { version = "0.4.5" }
+evmlib = { git = "https://github.com/maidsafe/autonomi", branch = "merkle_payments_rebased" }
 flate2 = "1.0"
 futures = "~0.3.13"
 fs_extra = "1.2.0"
