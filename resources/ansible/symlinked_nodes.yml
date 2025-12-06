@@ -1,0 +1,27 @@
+---
+- name: deploy symlinked antnode instances
+  hosts: all
+  become: False
+  any_errors_fatal: false
+  ignore_unreachable: yes
+  roles:
+    - role: ant_user
+      become: True
+    - role: setup_striped_storage
+      become: True
+    - role: telegraf-node
+      become: True
+    - role: symlinked-nodes
+      become: False
+
+  tasks:
+    - name: restart systemd-journald
+      become: True
+      ansible.builtin.systemd:
+        name: systemd-journald
+        state: restarted
+        enabled: yes
+      register: journald_restart
+      retries: 3
+      delay: 5
+      until: journald_restart is success

@@ -20,8 +20,11 @@ pub mod s3;
 pub mod safe;
 pub mod setup;
 pub mod ssh;
+pub mod symlinked_antnode;
 pub mod terraform;
 pub mod upscale;
+
+pub use symlinked_antnode::SymlinkedAntnodeDeployer;
 
 const STORAGE_REQUIRED_PER_NODE: u16 = 7;
 

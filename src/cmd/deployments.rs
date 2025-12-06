@@ -10,8 +10,9 @@ use alloy::primitives::U256;
 use color_eyre::{eyre::eyre, Help, Result};
 use sn_testnet_deploy::{
     bootstrap::BootstrapOptions, calculate_size_per_attached_volume, deploy::DeployOptions,
-    error::Error, inventory::DeploymentInventoryService, upscale::UpscaleOptions, BinaryOption,
-    CloudProvider, EnvironmentType, EvmNetwork, LogFormat, TestnetDeployBuilder,
+    error::Error, inventory::DeploymentInventoryService, s3::S3Repository, upscale::UpscaleOptions,
+    BinaryOption, CloudProvider, EnvironmentType, EvmNetwork, LogFormat, SymlinkedAntnodeDeployer,
+    TestnetDeployBuilder,
 };
 use std::time::Duration;
 
@@ -199,6 +200,96 @@ pub async fn handle_bootstrap(
         .await?;
     new_inventory.print_report(false)?;
     new_inventory.save()?;
+    Ok(())
+}
+
+#[allow(clippy::too_many_arguments)]
+pub async fn handle_deploy_symlinked_antnode(
+    ansible_verbose: bool,
+    antnode_count: u16,
+    antnode_version: Option<String>,
+    branch: Option<String>,
+    evm_data_payments_address: Option<String>,
+    evm_payment_token_address: Option<String>,
+    evm_rpc_url: Option<String>,
+    name: String,
+    network_contacts_url: Option<String>,
+    network_id: Option<u8>,
+    peer: Option<String>,
+    provider: CloudProvider,
+    region: String,
+    repo_owner: Option<String>,
+    rewards_address: String,
+    vm_size: Option<String>,
+    volume_size: Option<u16>,
+) -> Result<()> {
+    if peer.is_some() && network_contacts_url.is_some() {
+        return Err(eyre!(
+            "Cannot specify both --peer and --network-contacts-url"
+        ));
+    }
+
+    let evm_network_type =
+        if peer.is_some() || network_contacts_url.is_some() || network_id.is_some() {
+            EvmNetwork::Custom
+        } else {
+            EvmNetwork::ArbitrumOne
+        };
+
+    if evm_network_type == EvmNetwork::Custom {
+        if evm_data_payments_address.is_none() {
+            return Err(eyre!(
+                "--evm-data-payments-address is required for custom networks"
+            ));
+        }
+        if evm_payment_token_address.is_none() {
+            return Err(eyre!(
+                "--evm-payment-token-address is required for custom networks"
+            ));
+        }
+        if evm_rpc_url.is_none() {
+            return Err(eyre!("--evm-rpc-url is required for custom networks"));
+        }
+    }
+
+    let binary_option =
+        get_binary_option(branch, repo_owner, None, antnode_version, None, None, false).await?;
+
+    let s3_repository = S3Repository {};
+
+    let deployer =
+        SymlinkedAntnodeDeployer::new(name.clone(), provider, s3_repository, ansible_verbose)?;
+
+    println!("Initializing Terraform...");
+    deployer.init()?;
+
+    println!("Creating infrastructure via Terraform...");
+    deployer
+        .create_infrastructure(&region, vm_size, volume_size)
+        .await?;
+
+    println!("Provisioning symlinked antnode instances...");
+    deployer
+        .provision(
+            &binary_option,
+            antnode_count,
+            &rewards_address,
+            evm_network_type,
+            evm_data_payments_address,
+            evm_payment_token_address,
+            evm_rpc_url,
+            peer,
+            network_contacts_url,
+            network_id,
+        )
+        .await?;
+
+    println!("Deployment complete!");
+    println!(
+        "Run nodes on the VM with: sudo /usr/local/bin/antnode-starter.sh {}",
+        antnode_count
+    );
+
     Ok(())
 }
 

@@ -1,0 +1,51 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+ID="$1"
+
+ROOT_PATH="{{ root_node_data_path }}/antnode${ID}"
+LOG_PATH="{{ root_node_log_path }}/antnode${ID}"
+REWARDS_ADDRESS="{{ rewards_address }}"
+EVM_NETWORK="{{ evm_network_type }}"
+NODE_PORT=$(({{ initial_node_start_port }} + ID - 1))
+METRICS_PORT=$(({{ initial_metrics_start_port }} + ID - 1))
+
+ARGS=(
+  --root-dir "${ROOT_PATH}"
+  --log-output-dest "${LOG_PATH}"
+  --log-format json
+  --no-upnp
+  --port "${NODE_PORT}"
+  --metrics-server-port "${METRICS_PORT}"
+  --max-archived-log-files 1
+  --max-log-files 1
+  --rewards-address "${REWARDS_ADDRESS}"
+)
+
+{% if peer != "" %}
+ARGS+=(--peer "{{ peer }}")
+{% endif %}
+
+{% if network_contacts_url != "" %}
+ARGS+=(--network-contacts-url "{{ network_contacts_url }}")
+{% endif %}
+
+{% if network_id != "" %}
+ARGS+=(--network-id "{{ network_id }}")
+{% endif %}
+
+{% if evm_network_type == "evm-custom" %}
+{% if evm_data_payments_address != "" %}
+ARGS+=(--evm-data-payments-address "{{ evm_data_payments_address }}")
+{% endif %}
+{% if evm_payment_token_address != "" %}
+ARGS+=(--evm-payment-token-address "{{ evm_payment_token_address }}")
+{% endif %}
+{% if evm_rpc_url != "" %}
+ARGS+=(--evm-rpc-url "{{ evm_rpc_url }}")
+{% endif %}
+{% endif %}
+
+ARGS+=("${EVM_NETWORK}")
+
+exec "${ROOT_PATH}/antnode" "${ARGS[@]}"

@@ -280,6 +280,75 @@ pub enum Commands {
         #[clap(long)]
         upnp_private_node_volume_size: Option<u16>,
     },
+    /// Deploy symlinked antnode instances on a single droplet.
+    DeploySymlinkedAntnode {
+        /// Set to run Ansible with more verbose output.
+        #[arg(long)]
+        ansible_verbose: bool,
+        /// The number of antnode instances to run on the droplet.
+        #[arg(long, default_value = "10")]
+        antnode_count: u16,
+        /// Supply a version number for the antnode binary.
+        ///
+        /// There should be no 'v' prefix.
+        ///
+        /// The version argument is mutually exclusive with the --branch and --repo-owner
+        /// arguments. You can only supply a version number or a custom branch, not both.
+        #[arg(long, verbatim_doc_comment)]
+        antnode_version: Option<String>,
+        /// The branch of the Github repository to build from.
+        ///
+        /// If used, the antnode binary will be built from this branch. It is typically used for
+        /// testing changes on a fork.
+        ///
+        /// This argument must be used in conjunction with the --repo-owner argument.
+        ///
+        /// The --branch and --repo-owner arguments are mutually exclusive with the --antnode-version
+        /// argument. You can only supply a version number or a custom branch, not both.
+        #[arg(long, verbatim_doc_comment)]
+        branch: Option<String>,
+        /// The address of the data payments contract (for custom EVM networks).
+        #[arg(long)]
+        evm_data_payments_address: Option<String>,
+        /// The payment token contract address (for custom EVM networks).
+        #[arg(long)]
+        evm_payment_token_address: Option<String>,
+        /// The EVM RPC URL (for custom EVM networks).
+        #[arg(long)]
+        evm_rpc_url: Option<String>,
+        /// The name of the deployment.
+        #[arg(short = 'n', long)]
+        name: String,
+        /// A network contacts URL to bootstrap from (for non-production networks).
+        #[arg(long)]
+        network_contacts_url: Option<String>,
+        /// Network ID for custom networks.
+        #[arg(long)]
+        network_id: Option<u8>,
+        /// A peer multiaddr to bootstrap from (for non-production networks).
+        #[arg(long)]
+        peer: Option<String>,
+        /// The cloud provider for the deployment.
+        #[clap(long, default_value = "digital-ocean", value_parser = parse_provider)]
+        provider: CloudProvider,
+        /// The region for the deployment.
+        #[clap(long, default_value = "lon1")]
+        region: String,
+        /// The owner/org of the Github repository to build from.
+        ///
+        /// This argument must be used in conjunction with the --branch argument.
+        #[arg(long, verbatim_doc_comment)]
+        repo_owner: Option<String>,
+        /// The rewards address for the nodes.
+        #[arg(long)]
+        rewards_address: String,
+        /// Override the default droplet size (default: s-2vcpu-4gb from dev.tfvars).
+        #[arg(long)]
+        vm_size: Option<String>,
+        /// Override the default volume size in GB (default: 100 from dev.tfvars).
+        #[arg(long)]
+        volume_size: Option<u16>,
+    },
     /// Clean a deployed testnet environment.
     Clean {
         /// The name of the environment.

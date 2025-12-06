@@ -122,6 +122,47 @@ async fn main() -> Result<()> {
             .await?;
             Ok(())
         }
+        Commands::DeploySymlinkedAntnode {
+            ansible_verbose,
+            antnode_count,
+            antnode_version,
+            branch,
+            evm_data_payments_address,
+            evm_payment_token_address,
+            evm_rpc_url,
+            name,
+            network_contacts_url,
+            network_id,
+            peer,
+            provider,
+            region,
+            repo_owner,
+            rewards_address,
+            vm_size,
+            volume_size,
+        } => {
+            cmd::deployments::handle_deploy_symlinked_antnode(
+                ansible_verbose,
+                antnode_count,
+                antnode_version,
+                branch,
+                evm_data_payments_address,
+                evm_payment_token_address,
+                evm_rpc_url,
+                name,
+                network_contacts_url,
+                network_id,
+                peer,
+                provider,
+                region,
+                repo_owner,
+                rewards_address,
+                vm_size,
+                volume_size,
+            )
+            .await?;
+            Ok(())
+        }
         Commands::Clean { name, provider } => {
             let testnet_deployer = TestnetDeployBuilder::default()
                 .environment_name(&name)

@@ -1,0 +1,115 @@
+---
+- name: check if antnode binary exists
+  ansible.builtin.stat:
+    path: "{{ binary_path }}/antnode"
+  register: antnode_binary
+
+- name: download the antnode binary archive
+  ansible.builtin.get_url:
+    url: "{{ antnode_archive_url }}"
+    dest: "/tmp/{{ antnode_archive_filename }}"
+    mode: '0644'
+  when: not antnode_binary.stat.exists
+
+- name: extract the antnode binary to /usr/local/bin
+  ansible.builtin.unarchive:
+    src: "/tmp/{{ antnode_archive_filename }}"
+    dest: "{{ binary_path }}"
+    remote_src: true
+    mode: '0755'
+  become: true
+  when: not antnode_binary.stat.exists
+
+- name: ensure antnode binary is executable
+  ansible.builtin.file:
+    path: "{{ binary_path }}/antnode"
+    mode: '0755'
+  become: true
+  when: not antnode_binary.stat.exists
+
+- name: ensure base data directory exists
+  ansible.builtin.file:
+    path: "{{ root_node_data_path }}"
+    state: directory
+    mode: '0775'
+    owner: root
+    group: ant
+  become: true
+
+- name: ensure base log directory exists
+  ansible.builtin.file:
+    path: "{{ root_node_log_path }}"
+    state: directory
+    mode: '0775'
+    owner: root
+    group: ant
+  become: true
+
+- name: create individual node data directories
+  ansible.builtin.file:
+    path: "{{ root_node_data_path }}/antnode{{ item }}"
+    state: directory
+    mode: '0775'
+    owner: ant
+    group: ant
+    recurse: yes
+  become: true
+  loop: "{{ range(1, node_instance_count | int + 1) | list }}"
+
+- name: create individual node log directories
+  ansible.builtin.file:
+    path: "{{ root_node_log_path }}/antnode{{ item }}"
+    state: directory
+    mode: '0775'
+    owner: ant
+    group: ant
+    recurse: yes
+  become: true
+  loop: "{{ range(1, node_instance_count | int + 1) | list }}"
+
+- name: create symlinks to antnode binary in each data directory
+  ansible.builtin.file:
+    src: "{{ binary_path }}/antnode"
+    dest: "{{ root_node_data_path }}/antnode{{ item }}/antnode"
+    state: link
+    owner: ant
+    group: ant
+    force: yes
+  become: true
+  loop: "{{ range(1, node_instance_count | int + 1) | list }}"
+
+- name: deploy antnode-wrapper.sh script to /usr/local/bin
+  ansible.builtin.template:
+    src: antnode-wrapper.sh.j2
+    dest: /usr/local/bin/antnode-wrapper.sh
+    mode: '0755'
+    owner: root
+    group: root
+  become: true
+
+- name: deploy antnode-starter.sh script to /usr/local/bin
+  ansible.builtin.template:
+    src: antnode-starter.sh.j2
+    dest: /usr/local/bin/antnode-starter.sh
+    mode: '0755'
+    owner: root
+    group: root
+  become: true
+
+- name: deploy antnode-stopper.sh script to /usr/local/bin
+  ansible.builtin.template:
+    src: antnode-stopper.sh.j2
+    dest: /usr/local/bin/antnode-stopper.sh
+    mode: '0755'
+    owner: root
+    group: root
+  become: true
+
+- name: create state directory for pid files
+  ansible.builtin.file:
+    path: /var/run/antnodes
+    state: directory
+    mode: '0775'
+    owner: ant
+    group: ant
+  become: true
