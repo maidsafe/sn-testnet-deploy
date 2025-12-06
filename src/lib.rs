@@ -213,6 +213,7 @@ impl std::str::FromStr for EvmNetwork {
 pub struct EvmDetails {
     pub network: EvmNetwork,
     pub data_payments_address: Option<String>,
+    pub merkle_payments_address: Option<String>,
     pub payment_token_address: Option<String>,
     pub rpc_url: Option<String>,
 }

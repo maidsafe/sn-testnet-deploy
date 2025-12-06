@@ -33,6 +33,7 @@ pub struct DeployOptions {
     pub enable_metrics: bool,
     pub environment_type: EnvironmentType,
     pub evm_data_payments_address: Option<String>,
+    pub evm_merkle_payments_address: Option<String>,
     pub evm_network: EvmNetwork,
     pub evm_node_vm_size: Option<String>,
     pub evm_payment_token_address: Option<String>,
@@ -50,6 +51,7 @@ pub struct DeployOptions {
     pub max_archived_log_files: u16,
     pub max_log_files: u16,
     pub max_uploads: Option<u32>,
+    pub merkle: bool,
     pub name: String,
     pub network_id: u8,
     pub network_dashboard_branch: Option<String>,
@@ -156,6 +158,7 @@ impl TestnetDeployer {
                 evm_details: EvmDetails {
                     network: options.evm_network.clone(),
                     data_payments_address: options.evm_data_payments_address.clone(),
+                    merkle_payments_address: options.evm_merkle_payments_address.clone(),
                     payment_token_address: options.evm_payment_token_address.clone(),
                     rpc_url: options.evm_rpc_url.clone(),
                 },
@@ -220,6 +223,7 @@ impl TestnetDeployer {
                 evm_details: EvmDetails {
                     network: options.evm_network.clone(),
                     data_payments_address: provision_options.evm_data_payments_address.clone(),
+                    merkle_payments_address: provision_options.evm_merkle_payments_address.clone(),
                     payment_token_address: provision_options.evm_payment_token_address.clone(),
                     rpc_url: provision_options.evm_rpc_url.clone(),
                 },

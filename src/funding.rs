@@ -28,6 +28,8 @@ pub struct FundingOptions {
     /// For custom network
     pub evm_data_payments_address: Option<String>,
     /// For custom network
+    pub evm_merkle_payments_address: Option<String>,
+    /// For custom network
     pub evm_payment_token_address: Option<String>,
     /// For custom network
     pub evm_rpc_url: Option<String>,
@@ -404,6 +406,7 @@ impl AnsibleProvisioner {
                         evm_rpc_url,
                         evm_payment_token_address,
                         evm_data_payments_address,
+                        options.evm_merkle_payments_address.as_deref(),
                     )
                 } else {
                     error!("Custom evm network data not provided");
@@ -506,6 +509,10 @@ pub async fn drain_funds(
                 .data_payments_address
                 .as_ref()
                 .unwrap(),
+            environment_details
+                .evm_details
+                .merkle_payments_address
+                .as_deref(),
         )),
         EvmNetwork::ArbitrumOne => Some(Network::ArbitrumOne),
         EvmNetwork::ArbitrumSepoliaTest => Some(Network::ArbitrumSepoliaTest),

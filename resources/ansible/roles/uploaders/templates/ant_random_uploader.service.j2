@@ -7,6 +7,7 @@ Environment="SECRET_KEY={{ uploader_secret_key }}"
 {% if evm_network_type == "evm-custom" %}
 Environment="RPC_URL={{ evm_rpc_url }}"
 Environment="PAYMENT_TOKEN_ADDRESS={{ evm_payment_token_address }}"
+Environment="MERKLE_PAYMENTS_ADDRESS={{ evm_merkle_payments_address }}"
 Environment="DATA_PAYMENTS_ADDRESS={{ evm_data_payments_address }}"
 {% elif evm_network_type == "evm-arbitrum-sepolia" %}
 Environment="EVM_NETWORK=arbitrum-sepolia"
@@ -18,10 +19,10 @@ Environment="{{ client_env_variables }}"
 {% endif %}
 User=ant{{ count }}
 {% if network_id == "1" %}
-ExecStart=/home/ant{{ count }}/ant_random_uploader.sh{% if single_node_payments|default(false) %} --single-node-payment{% endif %}
+ExecStart=/home/ant{{ count }}/ant_random_uploader.sh{% if merkle|default(false) %} --merkle{% endif %}{% if single_node_payments|default(false) %} --single-node-payment{% endif %}
 
 {% else %}
-ExecStart=/home/ant{{ count }}/ant_random_uploader.sh --network-id "{{network_id}}" {% if peer is defined %}--peer "{{ peer }}" {% endif %}{% if network_contacts_url is defined %} --network-contacts-url "{{network_contacts_url}}"{% endif %}{% if single_node_payments|default(false) %} --single-node-payment{% endif %}
+ExecStart=/home/ant{{ count }}/ant_random_uploader.sh --network-id "{{network_id}}" {% if peer is defined %}--peer "{{ peer }}" {% endif %}{% if network_contacts_url is defined %} --network-contacts-url "{{network_contacts_url}}"{% endif %}{% if merkle|default(false) %} --merkle{% endif %}{% if single_node_payments|default(false) %} --single-node-payment{% endif %}
 
 {% endif %}
 
