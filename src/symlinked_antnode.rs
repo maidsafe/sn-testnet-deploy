@@ -1,3 +1,8 @@
+// Copyright (c) 2023, MaidSafe.
+//
+// This SAFE Network Software is licensed under the BSD-3-Clause license.
+// Please see the LICENSE file for more details.
+
 use crate::{
     ansible::{
         extra_vars::build_symlinked_antnode_extra_vars,
