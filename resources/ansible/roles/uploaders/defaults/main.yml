@@ -6,4 +6,5 @@ data_path: "{{ client_storage_base_path }}/data"
 log_path: "{{ client_storage_base_path }}/log"
 upload_log_path: "{{ log_path }}/uploads"
 upload_size: 100 # megabytes
+merkle: false
 single_node_payments: false

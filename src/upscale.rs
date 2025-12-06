@@ -203,6 +203,12 @@ impl TestnetDeployer {
                 .evm_details
                 .data_payments_address
                 .clone(),
+            evm_merkle_payments_address: options
+                .current_inventory
+                .environment_details
+                .evm_details
+                .merkle_payments_address
+                .clone(),
             evm_network: options
                 .current_inventory
                 .environment_details
@@ -232,6 +238,7 @@ impl TestnetDeployer {
             max_archived_log_files: options.max_archived_log_files,
             max_log_files: options.max_log_files,
             max_uploads: None,
+            merkle: false,
             name: options.current_inventory.name.clone(),
             network_id: options.current_inventory.environment_details.network_id,
             network_dashboard_branch: None,
@@ -546,6 +553,12 @@ impl TestnetDeployer {
                 .evm_details
                 .data_payments_address
                 .clone(),
+            evm_merkle_payments_address: options
+                .current_inventory
+                .environment_details
+                .evm_details
+                .merkle_payments_address
+                .clone(),
             evm_network: options
                 .current_inventory
                 .environment_details
@@ -575,6 +588,7 @@ impl TestnetDeployer {
             max_archived_log_files: options.max_archived_log_files,
             max_log_files: options.max_log_files,
             max_uploads: None,
+            merkle: false,
             name: options.current_inventory.name.clone(),
             network_id: options.current_inventory.environment_details.network_id,
             network_dashboard_branch: None,

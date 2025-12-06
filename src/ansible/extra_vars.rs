@@ -386,6 +386,9 @@ pub fn build_node_extra_vars_doc(
     if let Some(evm_data_payment_token_address) = &options.evm_data_payments_address {
         extra_vars.add_variable("evm_data_payments_address", evm_data_payment_token_address);
     }
+    if let Some(evm_merkle_payments_address) = &options.evm_merkle_payments_address {
+        extra_vars.add_variable("evm_merkle_payments_address", evm_merkle_payments_address);
+    }
     if let Some(evm_payment_token_address) = &options.evm_payment_token_address {
         extra_vars.add_variable("evm_payment_token_address", evm_payment_token_address);
     }
@@ -541,6 +544,9 @@ pub fn build_downloaders_extra_vars_doc(
     if let Some(evm_data_payment_token_address) = &options.evm_data_payments_address {
         extra_vars.add_variable("evm_data_payments_address", evm_data_payment_token_address);
     }
+    if let Some(evm_merkle_payments_address) = &options.evm_merkle_payments_address {
+        extra_vars.add_variable("evm_merkle_payments_address", evm_merkle_payments_address);
+    }
     if let Some(evm_payment_token_address) = &options.evm_payment_token_address {
         extra_vars.add_variable("evm_payment_token_address", evm_payment_token_address);
     }
@@ -610,6 +616,9 @@ pub fn build_data_retrieval_extra_vars_doc(
     if let Some(evm_data_payment_token_address) = &options.evm_data_payments_address {
         extra_vars.add_variable("evm_data_payments_address", evm_data_payment_token_address);
     }
+    if let Some(evm_merkle_payments_address) = &options.evm_merkle_payments_address {
+        extra_vars.add_variable("evm_merkle_payments_address", evm_merkle_payments_address);
+    }
     if let Some(evm_payment_token_address) = &options.evm_payment_token_address {
         extra_vars.add_variable("evm_payment_token_address", evm_payment_token_address);
     }
@@ -661,6 +670,9 @@ pub fn build_clients_extra_vars_doc(
     if let Some(evm_data_payment_token_address) = &options.evm_data_payments_address {
         extra_vars.add_variable("evm_data_payments_address", evm_data_payment_token_address);
     }
+    if let Some(evm_merkle_payments_address) = &options.evm_merkle_payments_address {
+        extra_vars.add_variable("evm_merkle_payments_address", evm_merkle_payments_address);
+    }
     if let Some(evm_payment_token_address) = &options.evm_payment_token_address {
         extra_vars.add_variable("evm_payment_token_address", evm_payment_token_address);
     }
@@ -704,6 +716,8 @@ pub fn build_clients_extra_vars_doc(
     if let Some(max_uploads) = options.max_uploads {
         extra_vars.add_variable("max_uploads", &max_uploads.to_string());
     }
+
+    extra_vars.add_boolean_variable("merkle", options.merkle);
 
     extra_vars.add_variable(
         "upload_batch_size",

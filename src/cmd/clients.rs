@@ -103,6 +103,9 @@ pub enum ClientsCommands {
         /// If not used, the default is 'arbitrum-one'.
         #[clap(long, default_value = "arbitrum-one", value_parser = parse_evm_network)]
         evm_network_type: EvmNetwork,
+        /// The address of the merkle payments contract.
+        #[arg(long)]
+        evm_merkle_payments_address: Option<String>,
         /// The address of the payment token contract.
         #[arg(long)]
         evm_payment_token_address: Option<String>,
@@ -311,6 +314,9 @@ pub enum ClientsCommands {
         /// If not used, the default is 'arbitrum-one'.
         #[clap(long, default_value = "arbitrum-one", value_parser = parse_evm_network)]
         evm_network_type: EvmNetwork,
+        /// The address of the merkle payments contract.
+        #[arg(long)]
+        evm_merkle_payments_address: Option<String>,
         /// The address of the payment token contract.
         #[arg(long)]
         evm_payment_token_address: Option<String>,
@@ -446,6 +452,9 @@ pub enum ClientsCommands {
         /// If not used, the default is 'arbitrum-one'.
         #[clap(long, default_value = "arbitrum-one", value_parser = parse_evm_network)]
         evm_network_type: EvmNetwork,
+        /// The address of the merkle payments contract.
+        #[arg(long)]
+        evm_merkle_payments_address: Option<String>,
         /// The address of the payment token contract.
         #[arg(long)]
         evm_payment_token_address: Option<String>,
@@ -803,6 +812,9 @@ pub enum ClientsCommands {
         /// If not used, the default is 'arbitrum-one'.
         #[clap(long, default_value = "arbitrum-one", value_parser = parse_evm_network)]
         evm_network_type: EvmNetwork,
+        /// The address of the merkle payments contract.
+        #[arg(long)]
+        evm_merkle_payments_address: Option<String>,
         /// The address of the payment token contract.
         #[arg(long)]
         evm_payment_token_address: Option<String>,
@@ -953,6 +965,9 @@ pub enum ClientsCommands {
         /// If not used, the default is 'arbitrum-one'.
         #[clap(long, default_value = "arbitrum-one", value_parser = parse_evm_network)]
         evm_network_type: EvmNetwork,
+        /// The address of the merkle payments contract.
+        #[arg(long)]
+        evm_merkle_payments_address: Option<String>,
         /// The address of the payment token contract.
         #[arg(long)]
         evm_payment_token_address: Option<String>,
@@ -1252,6 +1267,7 @@ pub async fn handle_clients_command(cmd: ClientsCommands) -> Result<()> {
             disable_metrics,
             environment_type,
             evm_data_payments_address,
+            evm_merkle_payments_address,
             evm_network_type,
             evm_payment_token_address,
             evm_rpc_url,
@@ -1369,6 +1385,7 @@ pub async fn handle_clients_command(cmd: ClientsCommands) -> Result<()> {
             let evm_details = EvmDetails {
                 network: evm_network_type,
                 data_payments_address: evm_data_payments_address,
+                merkle_payments_address: evm_merkle_payments_address,
                 payment_token_address: evm_payment_token_address,
                 rpc_url: evm_rpc_url,
             };
@@ -1450,6 +1467,7 @@ pub async fn handle_clients_command(cmd: ClientsCommands) -> Result<()> {
             disable_metrics,
             environment_type,
             evm_data_payments_address,
+            evm_merkle_payments_address,
             evm_network_type,
             evm_payment_token_address,
             evm_rpc_url,
@@ -1527,6 +1545,7 @@ pub async fn handle_clients_command(cmd: ClientsCommands) -> Result<()> {
             let evm_details = EvmDetails {
                 network: evm_network_type,
                 data_payments_address: evm_data_payments_address,
+                merkle_payments_address: evm_merkle_payments_address,
                 payment_token_address: evm_payment_token_address,
                 rpc_url: evm_rpc_url,
             };
@@ -1602,6 +1621,7 @@ pub async fn handle_clients_command(cmd: ClientsCommands) -> Result<()> {
             disable_metrics,
             environment_type,
             evm_data_payments_address,
+            evm_merkle_payments_address,
             evm_network_type,
             evm_payment_token_address,
             evm_rpc_url,
@@ -1679,6 +1699,7 @@ pub async fn handle_clients_command(cmd: ClientsCommands) -> Result<()> {
             let evm_details = EvmDetails {
                 network: evm_network_type,
                 data_payments_address: evm_data_payments_address,
+                merkle_payments_address: evm_merkle_payments_address,
                 payment_token_address: evm_payment_token_address,
                 rpc_url: evm_rpc_url,
             };
@@ -1811,6 +1832,7 @@ pub async fn handle_clients_command(cmd: ClientsCommands) -> Result<()> {
             let evm_details = EvmDetails {
                 network: EvmNetwork::ArbitrumOne,
                 data_payments_address: None,
+                merkle_payments_address: None,
                 payment_token_address: None,
                 rpc_url: None,
             };
@@ -1947,6 +1969,7 @@ pub async fn handle_clients_command(cmd: ClientsCommands) -> Result<()> {
             let evm_details = EvmDetails {
                 network: EvmNetwork::ArbitrumOne,
                 data_payments_address: None,
+                merkle_payments_address: None,
                 payment_token_address: None,
                 rpc_url: None,
             };
@@ -2027,6 +2050,7 @@ pub async fn handle_clients_command(cmd: ClientsCommands) -> Result<()> {
             disable_metrics,
             environment_type,
             evm_data_payments_address,
+            evm_merkle_payments_address,
             evm_network_type,
             evm_payment_token_address,
             evm_rpc_url,
@@ -2110,6 +2134,7 @@ pub async fn handle_clients_command(cmd: ClientsCommands) -> Result<()> {
             let evm_details = EvmDetails {
                 network: evm_network_type,
                 data_payments_address: evm_data_payments_address,
+                merkle_payments_address: evm_merkle_payments_address,
                 payment_token_address: evm_payment_token_address,
                 rpc_url: evm_rpc_url,
             };
@@ -2185,6 +2210,7 @@ pub async fn handle_clients_command(cmd: ClientsCommands) -> Result<()> {
             disable_metrics,
             environment_type,
             evm_data_payments_address,
+            evm_merkle_payments_address,
             evm_network_type,
             evm_payment_token_address,
             evm_rpc_url,
@@ -2257,6 +2283,7 @@ pub async fn handle_clients_command(cmd: ClientsCommands) -> Result<()> {
             let evm_details = EvmDetails {
                 network: evm_network_type,
                 data_payments_address: evm_data_payments_address,
+                merkle_payments_address: evm_merkle_payments_address,
                 payment_token_address: evm_payment_token_address,
                 rpc_url: evm_rpc_url,
             };

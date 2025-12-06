@@ -365,6 +365,7 @@ impl ClientsDeployer {
                 evm_details: EvmDetails {
                     network: options.evm_details.network.clone(),
                     data_payments_address: options.evm_details.data_payments_address.clone(),
+                    merkle_payments_address: options.evm_details.merkle_payments_address.clone(),
                     payment_token_address: options.evm_details.payment_token_address.clone(),
                     rpc_url: options.evm_details.rpc_url.clone(),
                 },
@@ -507,6 +508,7 @@ impl ClientsDeployer {
                 evm_details: EvmDetails {
                     network: options.evm_details.network.clone(),
                     data_payments_address: options.evm_details.data_payments_address.clone(),
+                    merkle_payments_address: options.evm_details.merkle_payments_address.clone(),
                     payment_token_address: options.evm_details.payment_token_address.clone(),
                     rpc_url: options.evm_details.rpc_url.clone(),
                 },
@@ -584,6 +586,7 @@ impl ClientsDeployer {
                 evm_details: EvmDetails {
                     network: options.evm_details.network.clone(),
                     data_payments_address: options.evm_details.data_payments_address.clone(),
+                    merkle_payments_address: options.evm_details.merkle_payments_address.clone(),
                     payment_token_address: options.evm_details.payment_token_address.clone(),
                     rpc_url: options.evm_details.rpc_url.clone(),
                 },

@@ -7,6 +7,7 @@ Environment="CHUNK_DOWNLOAD_BATCH_SIZE=50"
 {% if evm_network_type == "evm-custom" %}
 Environment="RPC_URL={{ evm_rpc_url }}"
 Environment="PAYMENT_TOKEN_ADDRESS={{ evm_payment_token_address }}"
+Environment="MERKLE_PAYMENTS_ADDRESS={{ evm_merkle_payments_address }}"
 Environment="DATA_PAYMENTS_ADDRESS={{ evm_data_payments_address }}"
 {% elif evm_network_type == "evm-arbitrum-sepolia" %}
 Environment="EVM_NETWORK=arbitrum-sepolia"
