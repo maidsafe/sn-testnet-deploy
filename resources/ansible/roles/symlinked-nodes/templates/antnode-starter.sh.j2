@@ -1,0 +1,37 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+if [[ $# -ne 1 ]]; then
+  echo "Usage: $0 <count>" >&2
+  echo "  count: number of antnode processes to start" >&2
+  exit 1
+fi
+
+COUNT="$1"
+if ! [[ "$COUNT" =~ ^[0-9]+$ ]] || [[ "$COUNT" -lt 1 ]]; then
+  echo "Error: count must be a positive integer" >&2
+  exit 1
+fi
+
+STATE_PATH="/var/run/antnodes"
+
+mkdir -p "$STATE_PATH"
+
+for ((id=1; id<=COUNT; id++)); do
+  pidfile="$STATE_PATH/antnode$id.pid"
+  if [[ -f "$pidfile" ]]; then
+    existing_pid=$(<"$pidfile")
+    if [[ -d "/proc/$existing_pid" ]]; then
+      echo "⚠️  antnode$id already running (PID $existing_pid), skipping."
+      continue
+    else
+      rm -f "$pidfile"
+    fi
+  fi
+
+  setsid /usr/local/bin/antnode-wrapper.sh "$id" >/dev/null 2>&1 &
+  pid=$!
+
+  echo $pid > "$pidfile"
+  echo "✅ Started antnode$id (PID $pid)"
+done

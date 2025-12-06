@@ -817,3 +817,55 @@ pub fn build_evm_nodes_extra_vars_doc(
 
     extra_vars.build()
 }
+
+#[allow(clippy::too_many_arguments)]
+pub fn build_symlinked_antnode_extra_vars(
+    cloud_provider: &str,
+    binary_option: &BinaryOption,
+    antnode_count: u16,
+    rewards_address: &str,
+    evm_network_type: EvmNetwork,
+    evm_data_payments_address: Option<String>,
+    evm_payment_token_address: Option<String>,
+    evm_rpc_url: Option<String>,
+    peer: Option<String>,
+    network_contacts_url: Option<String>,
+    network_id: Option<u8>,
+    deployment_name: &str,
+) -> Result<String> {
+    let mut extra_vars = ExtraVarsDocBuilder::default();
+
+    extra_vars.add_node_url_or_version(deployment_name, binary_option);
+    extra_vars.add_variable("testnet_name", deployment_name);
+    extra_vars.add_variable("node_type", NodeType::Generic.telegraf_role());
+    extra_vars.add_boolean_variable("enable_logging", true);
+    extra_vars.add_boolean_variable("enable_metrics", true);
+    extra_vars.add_variable("provider", cloud_provider);
+    extra_vars.add_variable("node_instance_count", &antnode_count.to_string());
+    extra_vars.add_variable("rewards_address", rewards_address);
+    extra_vars.add_variable("evm_network_type", &evm_network_type.to_string());
+
+    if evm_network_type == EvmNetwork::Custom {
+        if let Some(addr) = evm_data_payments_address {
+            extra_vars.add_variable("evm_data_payments_address", &addr);
+        }
+        if let Some(addr) = evm_payment_token_address {
+            extra_vars.add_variable("evm_payment_token_address", &addr);
+        }
+        if let Some(url) = evm_rpc_url {
+            extra_vars.add_variable("evm_rpc_url", &url);
+        }
+    }
+
+    if let Some(peer_addr) = peer {
+        extra_vars.add_variable("peer", &peer_addr);
+    }
+    if let Some(contacts_url) = network_contacts_url {
+        extra_vars.add_variable("network_contacts_url", &contacts_url);
+    }
+    if let Some(id) = network_id {
+        extra_vars.add_variable("network_id", &id.to_string());
+    }
+
+    Ok(extra_vars.build())
+}

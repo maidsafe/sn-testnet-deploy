@@ -266,6 +266,11 @@ pub enum AnsiblePlaybook {
     Uploaders,
     /// The update peer playbook will update the peer multiaddr in all node service definitions.
     UpdatePeer,
+    /// The symlinked nodes playbook will deploy multiple antnode instances on a single VM using
+    /// symlinked binaries.
+    ///
+    /// Use in combination with `AnsibleInventoryType::Nodes`.
+    SymlinkedNodes,
     /// Provision nodes that use UPnP emulation.
     Upnp,
 }
@@ -323,6 +328,7 @@ impl AnsiblePlaybook {
             AnsiblePlaybook::StopNodes => "stop_nodes.yml".to_string(),
             AnsiblePlaybook::StopTelegraf => "stop_telegraf.yml".to_string(),
             AnsiblePlaybook::StopUploaders => "stop_uploaders.yml".to_string(),
+            AnsiblePlaybook::SymlinkedNodes => "symlinked_nodes.yml".to_string(),
             AnsiblePlaybook::SymmetricNatGateway => "symmetric_nat_gateway.yml".to_string(),
             AnsiblePlaybook::UpgradeAntctl => "upgrade_antctl.yml".to_string(),
             AnsiblePlaybook::UpgradeClients => "upgrade_clients.yml".to_string(),

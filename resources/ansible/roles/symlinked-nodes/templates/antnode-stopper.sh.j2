@@ -1,0 +1,83 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+INTERVAL=5
+
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --interval)
+      INTERVAL="$2"
+      shift 2
+      ;;
+    *)
+      echo "Usage: $0 [--interval SECONDS]" >&2
+      echo "  --interval: delay in seconds between stopping each node (default: 5)" >&2
+      exit 1
+      ;;
+  esac
+done
+
+if ! [[ "$INTERVAL" =~ ^[0-9]+$ ]] || [[ "$INTERVAL" -lt 0 ]]; then
+  echo "Error: interval must be a non-negative integer" >&2
+  exit 1
+fi
+
+STATE_PATH="/var/run/antnodes"
+
+if [[ ! -d "$STATE_PATH" ]]; then
+  echo "No antnode processes found (state directory doesn't exist)"
+  exit 0
+fi
+
+pidfiles=("$STATE_PATH"/antnode*.pid)
+if [[ ! -e "${pidfiles[0]}" ]]; then
+  echo "No antnode processes found (no PID files)"
+  exit 0
+fi
+
+stopped_count=0
+for pidfile in "${pidfiles[@]}"; do
+  if [[ ! -f "$pidfile" ]]; then
+    continue
+  fi
+
+  node_name=$(basename "$pidfile" .pid)
+  pid=$(<"$pidfile")
+
+  if [[ ! -d "/proc/$pid" ]]; then
+    echo "⚠️  $node_name not running (stale PID file), removing"
+    rm -f "$pidfile"
+    continue
+  fi
+
+  echo "🛑 Stopping $node_name (PID $pid)..."
+  kill "$pid" 2>/dev/null || true
+
+  timeout=10
+  elapsed=0
+  while [[ -d "/proc/$pid" ]] && [[ $elapsed -lt $timeout ]]; do
+    sleep 0.5
+    elapsed=$((elapsed + 1))
+  done
+
+  if [[ -d "/proc/$pid" ]]; then
+    echo "   Force killing $node_name (did not stop gracefully)"
+    kill -9 "$pid" 2>/dev/null || true
+  fi
+
+  rm -f "$pidfile"
+  echo "✅ Stopped $node_name"
+
+  stopped_count=$((stopped_count + 1))
+
+  if [[ $INTERVAL -gt 0 ]] && [[ -f $(echo "$STATE_PATH"/antnode*.pid | head -1) ]]; then
+    remaining=$(ls "$STATE_PATH"/antnode*.pid 2>/dev/null | wc -l)
+    if [[ $remaining -gt 0 ]]; then
+      echo "   Waiting ${INTERVAL}s before stopping next node..."
+      sleep "$INTERVAL"
+    fi
+  fi
+done
+
+echo ""
+echo "Stopped $stopped_count node(s)"
