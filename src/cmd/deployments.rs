@@ -254,9 +254,9 @@ pub async fn handle_deploy_symlinked_antnode(
 
     let binary_option =
         get_binary_option(branch, repo_owner, None, antnode_version, None, None, false).await?;
+    let use_custom_bin = binary_option.should_provision_build_machine();
 
     let s3_repository = S3Repository {};
-
     let deployer =
         SymlinkedAntnodeDeployer::new(name.clone(), provider, s3_repository, ansible_verbose)?;
 
@@ -265,7 +265,7 @@ pub async fn handle_deploy_symlinked_antnode(
 
     println!("Creating infrastructure via Terraform...");
     deployer
-        .create_infrastructure(&region, vm_size, volume_size)
+        .create_infrastructure(&region, vm_size, volume_size, use_custom_bin)
         .await?;
 
     println!("Provisioning symlinked antnode instances...");

@@ -1,7 +1,6 @@
 ---
 binary_path: /usr/local/bin
 antnode_archive_filename: antnode-{{ version }}-x86_64-unknown-linux-musl.tar.gz
-antnode_archive_url: https://antnode.s3.eu-west-2.amazonaws.com/{{ antnode_archive_filename }}
 evm_data_payments_address: ""
 evm_network_type: "evm-arbitrum-one"
 evm_payment_token_address: ""
@@ -10,6 +9,7 @@ initial_metrics_start_port: 14000
 initial_node_start_port: 15000
 network_contacts_url: ""
 network_id: ""
+node_archive_url: https://antnode.s3.eu-west-2.amazonaws.com/{{ antnode_archive_filename }}
 node_instance_count: 10
 peer: ""
 rewards_address: ""
