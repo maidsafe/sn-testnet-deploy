@@ -10,6 +10,16 @@ terraform {
   }
 }
 
+resource "digitalocean_droplet" "build" {
+  count    = var.use_custom_bin ? 1 : 0
+  image    = var.build_droplet_image_id
+  name     = "${terraform.workspace}-build"
+  region   = var.region
+  size     = var.build_machine_size
+  ssh_keys = var.droplet_ssh_keys
+  tags     = ["environment:${terraform.workspace}", "type:build"]
+}
+
 resource "digitalocean_droplet" "symlinked_antnode" {
   count    = var.vm_count
   image    = var.droplet_image_id

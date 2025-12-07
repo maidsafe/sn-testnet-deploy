@@ -50,3 +50,17 @@ variable "volume_size" {
   type        = number
   default     = 100
 }
+
+variable "use_custom_bin" {
+  type        = bool
+  default     = false
+  description = "A boolean to enable use of a custom bin"
+}
+
+variable "build_machine_size" {
+  default = "s-8vcpu-16gb"
+}
+
+variable "build_droplet_image_id" {
+  description = "The ID of the image for the build machine. Varies per region."
+}
