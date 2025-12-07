@@ -34,18 +34,18 @@ ARGS+=(--network-contacts-url "{{ network_contacts_url }}")
 ARGS+=(--network-id "{{ network_id }}")
 {% endif %}
 
+ARGS+=("${EVM_NETWORK}")
 {% if evm_network_type == "evm-custom" %}
 {% if evm_data_payments_address != "" %}
-ARGS+=(--evm-data-payments-address "{{ evm_data_payments_address }}")
+ARGS+=(--data-payments-address "{{ evm_data_payments_address }}")
 {% endif %}
 {% if evm_payment_token_address != "" %}
-ARGS+=(--evm-payment-token-address "{{ evm_payment_token_address }}")
+ARGS+=(--payment-token-address "{{ evm_payment_token_address }}")
 {% endif %}
 {% if evm_rpc_url != "" %}
-ARGS+=(--evm-rpc-url "{{ evm_rpc_url }}")
+ARGS+=(--rpc-url "{{ evm_rpc_url }}")
 {% endif %}
 {% endif %}
 
-ARGS+=("${EVM_NETWORK}")
-
+echo "Executing: ${ROOT_PATH}/antnode ${ARGS[*]}"
 exec "${ROOT_PATH}/antnode" "${ARGS[@]}"
