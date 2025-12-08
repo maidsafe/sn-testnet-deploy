@@ -1,4 +1,13 @@
 ---
+- name: ensure binary directory exists
+  ansible.builtin.file:
+    path: "{{ binary_path }}"
+    state: directory
+    mode: '0755'
+    owner: ant
+    group: ant
+  become: true
+
 - name: check if antnode binary exists
   ansible.builtin.stat:
     path: "{{ binary_path }}/antnode"

@@ -1,5 +1,5 @@
 ---
-binary_path: /usr/local/bin
+binary_path: /home/ant/.local/share/autonomi
 antnode_archive_filename: antnode-{{ version }}-x86_64-unknown-linux-musl.tar.gz
 evm_data_payments_address: ""
 evm_network_type: "evm-arbitrum-one"
