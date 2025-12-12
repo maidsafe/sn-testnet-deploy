@@ -5,7 +5,7 @@
 // Please see the LICENSE file for more details.
 
 use super::{get_options_from_s3, OptionsType};
-use clap::{arg, Subcommand};
+use clap::Subcommand;
 use color_eyre::Result;
 use sn_testnet_deploy::{
     ansible::provisioning::{PrivateNodeProvisionInventory, ProvisionOptions},
