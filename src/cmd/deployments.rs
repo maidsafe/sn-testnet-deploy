@@ -58,9 +58,10 @@ pub async fn handle_bootstrap(
     upnp_private_node_vm_count: Option<u16>,
     upnp_private_node_volume_size: Option<u16>,
 ) -> Result<()> {
-    if network_contacts_url.is_none() && peer.is_none() {
+    if network_contacts_url.is_none() && peer.is_none() && network_id != 1 {
         return Err(eyre!(
-            "Either bootstrap-peer or bootstrap-network-contacts-url must be provided"
+            "Either --bootstrap-peer or --bootstrap-network-contacts-url must be provided \
+            for networks other than production (network_id=1)."
         ));
     }
 

@@ -161,7 +161,7 @@ pub enum Commands {
         name: String,
         /// The network contacts URL to bootstrap from.
         ///
-        /// Either this or the `peer` argument must be provided.
+        /// Either this or the `peer` argument must be provided, unless bootstrapping to mainnet.
         #[arg(long)]
         network_contacts_url: Option<String>,
         /// Specify the network ID to use for the node services. This is used to partition the network and will not allow
@@ -204,7 +204,7 @@ pub enum Commands {
         node_volume_size: Option<u16>,
         /// The peer from an existing network that we can bootstrap from.
         ///
-        /// Either this or the `network-contacts-url` argument must be provided.
+        /// Either this or the `peer` argument must be provided, unless bootstrapping to mainnet.
         #[arg(long)]
         peer: Option<String>,
         /// The cloud provider to deploy to.
@@ -319,13 +319,17 @@ pub enum Commands {
         /// The name of the deployment.
         #[arg(short = 'n', long)]
         name: String,
-        /// A network contacts URL to bootstrap from (for non-production networks).
+        /// A network contacts URL to bootstrap from.
+        ///
+        /// Optional for production network (network_id=1), which has built-in bootstrap nodes.
         #[arg(long)]
         network_contacts_url: Option<String>,
         /// Network ID for custom networks.
         #[arg(long)]
         network_id: Option<u8>,
-        /// A peer multiaddr to bootstrap from (for non-production networks).
+        /// A peer multiaddr to bootstrap from.
+        ///
+        /// Optional for production network (network_id=1), which has built-in bootstrap nodes.
         #[arg(long)]
         peer: Option<String>,
         /// The cloud provider for the deployment.
