@@ -15,6 +15,11 @@ use crate::{
 use colored::Colorize;
 use log::error;
 
+/// Options for bootstrapping a network from an existing deployment.
+///
+/// For production (network_id=1), both `peer` and `network_contacts_url` can be None.
+///
+/// For any other networks, at least one of these must be provided.
 #[derive(Clone)]
 pub struct BootstrapOptions {
     pub binary_option: BinaryOption,
