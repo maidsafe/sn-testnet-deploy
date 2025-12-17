@@ -4,7 +4,7 @@ name = "sn-testnet-deploy"
 description = "Tool for creating Autonomi networks"
 readme = "README.md"
 repository = "https://github.com/maidsafe/sn-testnet-deploy"
-version = "0.6.14"
+version = "0.6.15"
 edition = "2021"
 license = "BSD-3-Clause"
 
@@ -26,8 +26,7 @@ colored = "2.0.4"
 dirs-next = "2.0.0"
 dotenv = "0.15.0"
 env_logger = "0.10.0"
-# evmlib = { version = "0.4.5" }
-evmlib = { git = "https://github.com/maidsafe/autonomi", branch = "merkle_payments_rebased" }
+evmlib = "0.4.6"
 flate2 = "1.0"
 futures = "~0.3.13"
 fs_extra = "1.2.0"
