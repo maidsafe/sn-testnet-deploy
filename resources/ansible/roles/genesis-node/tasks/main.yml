@@ -45,7 +45,7 @@
       - "{{ evm_network_type }}"
       - "{{ ('--rpc-url=' + evm_rpc_url) if evm_network_type == 'evm-custom' else omit }}"
       - "{{ ('--payment-token-address=' + evm_payment_token_address) if evm_network_type == 'evm-custom' else omit }}"
-      - "{{ ('--merkle-payments-address=' + evm_merkle_payments_address) if evm_network_type == 'evm-custom' else omit }}"
+      - "{{ ('--merkle-payments-address=' + evm_merkle_payments_address) if (evm_network_type == 'evm-custom' and evm_merkle_payments_address is defined) else omit }}"
       - "{{ ('--data-payments-address=' + evm_data_payments_address) if evm_network_type == 'evm-custom' else omit }}"
   when: not genesis_exists | default(false)
 
