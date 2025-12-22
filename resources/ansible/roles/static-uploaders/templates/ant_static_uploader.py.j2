@@ -8,6 +8,9 @@ import time
 import hashlib
 from datetime import datetime
 import shutil
+import json
+from pathlib import Path
+from typing import Optional
 
 log_path = "{{ log_path }}"
 METRICS_CSV_PATH = "{{ metrics_path }}"
@@ -55,6 +58,103 @@ class ExitStatusMapper:
     @classmethod
     def get_exit_status(cls, exit_code) -> str:
         return cls.EXIT_CODE_MAP.get(exit_code, "UNKNOWN_ERROR")
+
+
+class StateManager:
+    """Manages state persistence with crash detection support."""
+
+    def __init__(self):
+        user = os.environ.get("USER", "unknown")
+        self.state_dir = Path("{{ state_path }}")
+        self.state_dir.mkdir(parents=True, exist_ok=True)
+        self.state_file_path = self.state_dir / f"uploader_state_{user}.json"
+
+    def _load_state(self) -> dict:
+        """Load state from JSON file."""
+        if self.state_file_path.exists():
+            try:
+                with open(self.state_file_path, "r") as f:
+                    return json.load(f)
+            except (json.JSONDecodeError, OSError):
+                pass
+        return {"attempted_files": [], "in_progress": None, "successful_count": 0, "failed_count": 0, "crash_count": 0}
+
+    def _save_state(self, state: dict) -> None:
+        """Save state to JSON file."""
+        try:
+            with open(self.state_file_path, "w") as f:
+                json.dump(state, f, indent=2)
+        except OSError as e:
+            print(f"Warning: Failed to save state: {e}")
+
+    def mark_file_attempted(self, file_path: str) -> None:
+        """Mark file as attempted (completed or failed)."""
+        state = self._load_state()
+        if file_path not in state["attempted_files"]:
+            state["attempted_files"].append(file_path)
+        self._save_state(state)
+
+    def is_file_attempted(self, file_path: str) -> bool:
+        """Check if file has been attempted."""
+        state = self._load_state()
+        return file_path in state.get("attempted_files", [])
+
+    def mark_upload_in_progress(self, file_path: str, file_size_kb: int) -> None:
+        """Mark upload as in progress."""
+        state = self._load_state()
+        state["in_progress"] = {
+            "file_path": file_path,
+            "file_name": os.path.basename(file_path),
+            "file_size_kb": file_size_kb,
+            "start_time": time.time_ns()
+        }
+        self._save_state(state)
+
+    def clear_upload_in_progress(self) -> None:
+        """Clear in-progress upload marker."""
+        state = self._load_state()
+        state["in_progress"] = None
+        self._save_state(state)
+
+    def get_crashed_upload(self) -> Optional[dict]:
+        """Get in-progress upload if exists (indicating a crash)."""
+        state = self._load_state()
+        return state.get("in_progress")
+
+    def get_crashed_upload_duration(self) -> float:
+        """Get duration of crashed upload (for metrics)."""
+        state = self._load_state()
+        in_progress = state.get("in_progress")
+        if in_progress and "start_time" in in_progress:
+            return (time.time_ns() - in_progress["start_time"]) / 1e9
+        return 0.0
+
+    def get_counts(self) -> tuple:
+        """Get success, failure, and crash counts."""
+        state = self._load_state()
+        successful_count = state.get("successful_count", 0)
+        failed_count = state.get("failed_count", 0)
+        crash_count = state.get("crash_count", 0)
+        return successful_count, failed_count, crash_count
+
+    def increment_successful_count(self) -> None:
+        """Increment successful upload count."""
+        state = self._load_state()
+        state["successful_count"] = state.get("successful_count", 0) + 1
+        self._save_state(state)
+
+    def increment_failed_count(self) -> None:
+        """Increment failed upload count."""
+        state = self._load_state()
+        state["failed_count"] = state.get("failed_count", 0) + 1
+        self._save_state(state)
+
+    def increment_crash_count(self) -> None:
+        """Increment crash count."""
+        state = self._load_state()
+        state["crash_count"] = state.get("crash_count", 0) + 1
+        self._save_state(state)
+
 
 def get_file_hash(file_path):
     """Calculate SHA-256 hash of a file"""
@@ -104,9 +204,9 @@ def get_ant_version():
     except Exception:
         return "", ""
 
-def upload_content(content_path, contact_peer="", network_contacts_url="", network_id=""):
+def upload_content(content_path, file_size_kb, contact_peer="", network_contacts_url="", network_id=""):
     """Upload a file or directory using the ant binary"""
-    
+
     cmd = ["ant"]
     if contact_peer:
         cmd.extend(["--peer", contact_peer])
@@ -114,23 +214,24 @@ def upload_content(content_path, contact_peer="", network_contacts_url="", netwo
         cmd.extend(["--network-contacts-url", network_contacts_url])
     if network_id:
         cmd.extend(["--network-id", network_id])
-    
+
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
     log_file_path = f"{log_path}/{timestamp}"
     cmd.extend(["--log-output-dest", log_file_path])
-    
+
     if os.path.isfile(content_path):
         cmd.extend(["file", "upload", content_path, "--no-archive", "--public"])
-        file_size_kb = os.path.getsize(content_path) // 1024
         file_hash = get_file_hash(content_path)
     else:
         cmd.extend(["file", "upload", content_path, "--public"])
-        file_size_kb, file_hash = get_directory_info(content_path)
+        _, file_hash = get_directory_info(content_path)
     
     print("=" * 42)
     print(f"{datetime.now().strftime('%Y-%m-%d %H:%M:%S')} -- Uploading Content")
     print("=" * 42)
-    
+    print(f"File/Directory: {os.path.basename(content_path)}")
+    print(f"Size: {file_size_kb}KB")
+
     stdout = ""
     try:
         print(f"Running command: {' '.join(cmd)}")
@@ -219,14 +320,47 @@ def main():
     parser.add_argument("-n", "--network-id", help="Optional network ID (also enables testnet mode)")
     parser.add_argument("directory", help="Directory to inspect and upload contents from")
     args = parser.parse_args()
-    
+
     if not os.path.exists(args.directory):
         print(f"Error: Directory {args.directory} does not exist")
         return 1
     if not os.path.isdir(args.directory):
         print(f"Error: {args.directory} is not a directory")
         return 1
-    
+
+    state_manager = StateManager()
+    successful_upload_count, failed_upload_count, crash_count = state_manager.get_counts()
+
+    crashed_upload = state_manager.get_crashed_upload()
+    if crashed_upload:
+        print("=" * 60)
+        print("⚠️ CRASH DETECTED")
+        print(f"   File: {crashed_upload['file_name']}")
+        print(f"   Path: {crashed_upload['file_path']}")
+        print("   Logging as failed upload")
+        print("=" * 60)
+
+        crashed_duration = state_manager.get_crashed_upload_duration()
+        crash_time_ns = time.time_ns()
+        crash_start_time_ns = crash_time_ns - int(crashed_duration * 1e9)
+
+        package_version, build_date = get_ant_version()
+
+        failure_file = f"{METRICS_CSV_PATH}/metrics_failure.csv"
+        write_header = not os.path.exists(failure_file)
+        os.makedirs(METRICS_CSV_PATH, exist_ok=True)
+        with open(failure_file, "a", newline="") as csvfile:
+            if write_header:
+                csvfile.write("TIMESTAMP_START,TIMESTAMP_FINISH,DATA_ADDRESS,DURATION,RETRIES,RECORDS_UPLOADED,RECORDS_ALREADY_PAID,TOTAL_RECORDS,EXIT_STATUS,SERVICE_TYPE,ANT_USER,SERVICE_NUMBER,STORE_COST,EXPECTED_TOTAL_SIZE,ACTUAL_TOTAL_SIZE,SHA256_HASH,ANT_PACKAGE_VERSION,ANT_PACKAGE_BUILD_DATE\n")
+            csvfile.write(f"{crash_start_time_ns},{crash_time_ns},0,{crashed_duration:.2f},0,0,0,0,SERVICE_CRASH,UPLOADER,{os.environ.get('USER', '')},1,0,0,{crashed_upload['file_size_kb']},0x0,{package_version},{build_date}\n")
+
+        print("✅ Crash failure logged")
+        state_manager.increment_crash_count()
+        crash_count += 1
+        state_manager.clear_upload_in_progress()
+        print("Sleeping for 2 minutes before continuing...")
+        time.sleep(120)
+
     try:
         contents = os.listdir(args.directory)
     except PermissionError:
@@ -235,25 +369,54 @@ def main():
     if not contents:
         print(f"{args.directory} is empty")
         return 0
-    
+
+    contents.sort()
+
     print(f"Upload source directory: {args.directory}")
-    upload_count = 0
-    successful_upload_count = 0
-    
+    print(f"Total items: {len(contents)}")
+
+    remaining_contents = []
     for item in contents:
         item_path = os.path.join(args.directory, item)
+        if state_manager.is_file_attempted(item_path):
+            print(f"Skipping already attempted: {item}")
+        else:
+            remaining_contents.append(item)
+
+    print(f"Remaining items to upload: {len(remaining_contents)}")
+
+    for item in remaining_contents:
+        item_path = os.path.join(args.directory, item)
+
+        if os.path.isfile(item_path):
+            file_size_kb = os.path.getsize(item_path) // 1024
+        else:
+            file_size_kb, _ = get_directory_info(item_path)
+        state_manager.mark_upload_in_progress(item_path, file_size_kb)
+
         exit_code = upload_content(
             item_path,
+            file_size_kb,
             contact_peer=args.peer or "",
             network_contacts_url=args.network_contacts_url or "",
             network_id=args.network_id or ""
         )
-        
-        upload_count += 1
+
+        state_manager.mark_file_attempted(item_path)
+        state_manager.clear_upload_in_progress()
+
         if exit_code == 0:
+            state_manager.increment_successful_count()
             successful_upload_count += 1
-            print(f"{successful_upload_count} successful uploads so far")
-    print(f"Completed processing {upload_count} items with {successful_upload_count} successful uploads")
+        else:
+            state_manager.increment_failed_count()
+            failed_upload_count += 1
+
+        upload_count = successful_upload_count + failed_upload_count
+        print(f"Total attempts: {upload_count}; Successful: {successful_upload_count}; Failed: {failed_upload_count}; Crashes: {crash_count}")
+
+    upload_count = successful_upload_count + failed_upload_count
+    print(f"Completed processing {upload_count} items: {successful_upload_count} successful, {failed_upload_count} failed, {crash_count} crashes")
     return 0
 
 if __name__ == "__main__":
