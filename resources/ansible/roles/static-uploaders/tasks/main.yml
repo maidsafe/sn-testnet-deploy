@@ -71,6 +71,15 @@
     recurse: yes
   become: true
 
+- name: ensure ant users can write to the state directory
+  ansible.builtin.file:
+    path: "{{ state_path }}"
+    state: directory
+    mode: '0775'
+    owner: ant1
+    group: ant
+  become: true
+
 - name: Check if systemd ant_static_uploader service file exists
   ansible.builtin.stat:
     path: "/etc/systemd/system/ant_static_uploader.service"
