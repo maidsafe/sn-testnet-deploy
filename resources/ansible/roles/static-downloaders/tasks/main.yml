@@ -201,3 +201,16 @@
     state: started
   become: true
   when: start_performance_verifier | default(false) | bool
+
+- name: cron job to clean old log directories
+  ansible.builtin.cron:
+    name: "clean old log directories"
+    minute: "*/30"
+    hour: "*"
+    day: "*"
+    month: "*"
+    weekday: "*"
+    user: ant1
+    job: "find {{ log_path }} -mindepth 1 -type d -mtime +1 -exec rm -rf {} +"
+    state: present
+  become: true
