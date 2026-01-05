@@ -87,6 +87,7 @@ impl TestnetDeployer {
             client_image_id: None,
             client_vm_count: Some(0),
             client_vm_size: None,
+            client_volume_size: None,
             enable_build_vm: build_custom_binaries,
             evm_node_count: Some(0),
             evm_node_vm_size: None,

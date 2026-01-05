@@ -101,6 +101,7 @@ impl TestnetDeployer {
             client_image_id: None,
             client_vm_count: options.client_vm_count,
             client_vm_size: options.client_vm_size.clone(),
+            client_volume_size: None, // Uses terraform default for new deployments
             enable_build_vm: build_custom_binaries,
             evm_node_count: match options.evm_network {
                 EvmNetwork::Anvil => Some(1),

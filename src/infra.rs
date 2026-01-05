@@ -16,6 +16,7 @@ use std::time::Instant;
 
 const BUILD_VM: &str = "build";
 const CLIENT: &str = "ant_client";
+const CLIENT_ATTACHED_VOLUME: &str = "ant_client_attached_volume";
 const EVM_NODE: &str = "evm_node";
 const FULL_CONE_NAT_GATEWAY: &str = "full_cone_nat_gateway";
 const FULL_CONE_PRIVATE_NODE: &str = "full_cone_private_node";
@@ -45,6 +46,7 @@ pub struct InfraRunOptions {
     pub client_image_id: Option<String>,
     pub client_vm_count: Option<u16>,
     pub client_vm_size: Option<String>,
+    pub client_volume_size: Option<u16>,
     pub enable_build_vm: bool,
     pub evm_node_count: Option<u16>,
     pub evm_node_vm_size: Option<String>,
@@ -152,11 +154,8 @@ impl InfraRunOptions {
         debug!("Symmetric private node volume count: {symmetric_private_node_volume_count}");
 
         let symmetric_private_node_volume_size = if symmetric_private_node_volume_count > 0 {
-            let volume_size = get_value_for_resource(
-                &resources,
-                SYMMETRIC_PRIVATE_NODE_ATTACHED_VOLUME,
-                SIZE,
-            )?;
+            let volume_size =
+                get_value_for_resource(&resources, SYMMETRIC_PRIVATE_NODE_ATTACHED_VOLUME, SIZE)?;
             debug!("Symmetric private node volume size: {volume_size:?}");
             volume_size
         } else {
@@ -185,11 +184,8 @@ impl InfraRunOptions {
         debug!("Full cone private node volume count: {full_cone_private_node_volume_count}");
 
         let full_cone_private_node_volume_size = if full_cone_private_node_volume_count > 0 {
-            let volume_size = get_value_for_resource(
-                &resources,
-                FULL_CONE_PRIVATE_NODE_ATTACHED_VOLUME,
-                SIZE,
-            )?;
+            let volume_size =
+                get_value_for_resource(&resources, FULL_CONE_PRIVATE_NODE_ATTACHED_VOLUME, SIZE)?;
             debug!("Full cone private node volume size: {volume_size:?}");
             volume_size
         } else {
@@ -271,6 +267,17 @@ impl InfraRunOptions {
 
         let client_vm_count = resource_count(CLIENT);
         debug!("Client count: {client_vm_count}");
+        let client_volume_count = resource_count(CLIENT_ATTACHED_VOLUME);
+        debug!("Client volume count: {client_volume_count}");
+
+        let client_volume_size = if client_volume_count > 0 {
+            let volume_size = get_value_for_resource(&resources, CLIENT_ATTACHED_VOLUME, SIZE)?;
+            debug!("Client volume size: {volume_size:?}");
+            volume_size
+        } else {
+            None
+        };
+
         let (client_vm_size, client_image_id) = if client_vm_count > 0 {
             let vm_size = get_value_for_resource(&resources, CLIENT, SIZE)?;
             debug!("Client size: {vm_size:?}");
@@ -330,6 +337,7 @@ impl InfraRunOptions {
             client_image_id,
             client_vm_count: Some(client_vm_count),
             client_vm_size,
+            client_volume_size,
             enable_build_vm,
             evm_node_count: Some(evm_node_count),
             evm_node_vm_size,
@@ -496,6 +504,13 @@ pub fn build_terraform_args(options: &InfraRunOptions) -> Result<Vec<(String, St
         args.push((
             "ant_client_droplet_size".to_string(),
             client_vm_size.clone(),
+        ));
+    }
+
+    if let Some(client_volume_size) = options.client_volume_size {
+        args.push((
+            "ant_client_volume_size".to_string(),
+            client_volume_size.to_string(),
         ));
     }
 
