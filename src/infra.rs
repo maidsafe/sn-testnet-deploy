@@ -100,24 +100,33 @@ impl InfraRunOptions {
 
         let peer_cache_node_vm_count = resource_count(PEER_CACHE_NODE);
         debug!("Peer cache node count: {peer_cache_node_vm_count}");
-        let (peer_cache_node_volume_size, peer_cache_node_vm_size, peer_cache_image_id) =
-            if peer_cache_node_vm_count > 0 {
-                let volume_size =
-                    get_value_for_resource(&resources, PEER_CACHE_NODE_ATTACHED_VOLUME, SIZE)?;
-                debug!("Peer cache node volume size: {volume_size:?}");
-                let vm_size = get_value_for_resource(&resources, PEER_CACHE_NODE, SIZE)?;
-                debug!("Peer cache node size: {vm_size:?}");
-                let image_id = get_value_for_resource(&resources, PEER_CACHE_NODE, IMAGE)?;
-                debug!("Peer cache node image id: {image_id:?}");
+        let peer_cache_node_volume_count = resource_count(PEER_CACHE_NODE_ATTACHED_VOLUME);
+        debug!("Peer cache node volume count: {peer_cache_node_volume_count}");
 
-                (volume_size, vm_size, image_id)
-            } else {
-                (None, None, None)
-            };
+        let peer_cache_node_volume_size = if peer_cache_node_volume_count > 0 {
+            let volume_size =
+                get_value_for_resource(&resources, PEER_CACHE_NODE_ATTACHED_VOLUME, SIZE)?;
+            debug!("Peer cache node volume size: {volume_size:?}");
+            volume_size
+        } else {
+            None
+        };
+
+        let (peer_cache_node_vm_size, peer_cache_image_id) = if peer_cache_node_vm_count > 0 {
+            let vm_size = get_value_for_resource(&resources, PEER_CACHE_NODE, SIZE)?;
+            debug!("Peer cache node size: {vm_size:?}");
+            let image_id = get_value_for_resource(&resources, PEER_CACHE_NODE, IMAGE)?;
+            debug!("Peer cache node image id: {image_id:?}");
+            (vm_size, image_id)
+        } else {
+            (None, None)
+        };
 
         let genesis_node_vm_count = resource_count(GENESIS_NODE);
         debug!("Genesis node count: {genesis_node_vm_count}");
-        let genesis_node_volume_size = if genesis_node_vm_count > 0 {
+        let genesis_node_volume_count = resource_count(GENESIS_NODE_ATTACHED_VOLUME);
+        debug!("Genesis node volume count: {genesis_node_volume_count}");
+        let genesis_node_volume_size = if genesis_node_volume_count > 0 {
             get_value_for_resource(&resources, GENESIS_NODE_ATTACHED_VOLUME, SIZE)?
         } else {
             None
@@ -126,7 +135,9 @@ impl InfraRunOptions {
 
         let node_vm_count = resource_count(NODE);
         debug!("Node count: {node_vm_count}");
-        let node_volume_size = if node_vm_count > 0 {
+        let node_volume_count = resource_count(NODE_ATTACHED_VOLUME);
+        debug!("Node volume count: {node_volume_count}");
+        let node_volume_size = if node_volume_count > 0 {
             get_value_for_resource(&resources, NODE_ATTACHED_VOLUME, SIZE)?
         } else {
             None
@@ -136,101 +147,126 @@ impl InfraRunOptions {
         let mut nat_gateway_image_id: Option<String> = None;
         let symmetric_private_node_vm_count = resource_count(SYMMETRIC_PRIVATE_NODE);
         debug!("Symmetric private node count: {symmetric_private_node_vm_count}");
-        let (symmetric_private_node_volume_size, symmetric_nat_gateway_vm_size) =
-            if symmetric_private_node_vm_count > 0 {
-                let symmetric_private_node_volume_size = get_value_for_resource(
-                    &resources,
-                    SYMMETRIC_PRIVATE_NODE_ATTACHED_VOLUME,
-                    SIZE,
-                )?;
-                debug!(
-                    "Symmetric private node volume size: {symmetric_private_node_volume_size:?}"
-                );
-                // gateways should exists if private nodes exist
-                let symmetric_nat_gateway_vm_size =
-                    get_value_for_resource(&resources, SYMMETRIC_NAT_GATEWAY, SIZE)?;
+        let symmetric_private_node_volume_count =
+            resource_count(SYMMETRIC_PRIVATE_NODE_ATTACHED_VOLUME);
+        debug!("Symmetric private node volume count: {symmetric_private_node_volume_count}");
 
-                debug!("Symmetric nat gateway size: {symmetric_nat_gateway_vm_size:?}");
+        let symmetric_private_node_volume_size = if symmetric_private_node_volume_count > 0 {
+            let volume_size = get_value_for_resource(
+                &resources,
+                SYMMETRIC_PRIVATE_NODE_ATTACHED_VOLUME,
+                SIZE,
+            )?;
+            debug!("Symmetric private node volume size: {volume_size:?}");
+            volume_size
+        } else {
+            None
+        };
 
-                nat_gateway_image_id =
-                    get_value_for_resource(&resources, SYMMETRIC_NAT_GATEWAY, IMAGE)?;
-                debug!("Nat gateway image: {nat_gateway_image_id:?}");
+        let symmetric_nat_gateway_vm_size = if symmetric_private_node_vm_count > 0 {
+            // gateways should exist if private nodes exist
+            let symmetric_nat_gateway_vm_size =
+                get_value_for_resource(&resources, SYMMETRIC_NAT_GATEWAY, SIZE)?;
+            debug!("Symmetric nat gateway size: {symmetric_nat_gateway_vm_size:?}");
 
-                (
-                    symmetric_private_node_volume_size,
-                    symmetric_nat_gateway_vm_size,
-                )
-            } else {
-                (None, None)
-            };
+            nat_gateway_image_id =
+                get_value_for_resource(&resources, SYMMETRIC_NAT_GATEWAY, IMAGE)?;
+            debug!("Nat gateway image: {nat_gateway_image_id:?}");
+
+            symmetric_nat_gateway_vm_size
+        } else {
+            None
+        };
 
         let full_cone_private_node_vm_count = resource_count(FULL_CONE_PRIVATE_NODE);
         debug!("Full cone private node count: {full_cone_private_node_vm_count}");
-        let (full_cone_private_node_volume_size, full_cone_vm_size) =
-            if full_cone_private_node_vm_count > 0 {
-                let full_cone_private_node_volume_size = get_value_for_resource(
-                    &resources,
-                    FULL_CONE_PRIVATE_NODE_ATTACHED_VOLUME,
-                    SIZE,
-                )?;
-                debug!(
-                    "Full cone private node volume size: {full_cone_private_node_volume_size:?}"
-                );
-                // gateways should exists if private nodes exist
-                let full_cone_vm_size =
-                    get_value_for_resource(&resources, FULL_CONE_NAT_GATEWAY, SIZE)?;
-                debug!("Full cone nat gateway size: {full_cone_vm_size:?}");
+        let full_cone_private_node_volume_count =
+            resource_count(FULL_CONE_PRIVATE_NODE_ATTACHED_VOLUME);
+        debug!("Full cone private node volume count: {full_cone_private_node_volume_count}");
 
-                nat_gateway_image_id =
-                    get_value_for_resource(&resources, FULL_CONE_NAT_GATEWAY, IMAGE)?;
-                debug!("Nat gateway image: {nat_gateway_image_id:?}");
+        let full_cone_private_node_volume_size = if full_cone_private_node_volume_count > 0 {
+            let volume_size = get_value_for_resource(
+                &resources,
+                FULL_CONE_PRIVATE_NODE_ATTACHED_VOLUME,
+                SIZE,
+            )?;
+            debug!("Full cone private node volume size: {volume_size:?}");
+            volume_size
+        } else {
+            None
+        };
 
-                (full_cone_private_node_volume_size, full_cone_vm_size)
-            } else {
-                (None, None)
-            };
+        let full_cone_vm_size = if full_cone_private_node_vm_count > 0 {
+            // gateways should exist if private nodes exist
+            let full_cone_vm_size =
+                get_value_for_resource(&resources, FULL_CONE_NAT_GATEWAY, SIZE)?;
+            debug!("Full cone nat gateway size: {full_cone_vm_size:?}");
+
+            nat_gateway_image_id =
+                get_value_for_resource(&resources, FULL_CONE_NAT_GATEWAY, IMAGE)?;
+            debug!("Nat gateway image: {nat_gateway_image_id:?}");
+
+            full_cone_vm_size
+        } else {
+            None
+        };
 
         let port_restricted_private_node_vm_count = resource_count(PORT_RESTRICTED_PRIVATE_NODE);
         debug!("Port restricted cone private node count: {port_restricted_private_node_vm_count}");
-        let (port_restricted_private_node_volume_size, port_restricted_cone_vm_size) =
-            if port_restricted_private_node_vm_count > 0 {
-                let port_restricted_private_node_volume_size = get_value_for_resource(
+        let port_restricted_private_node_volume_count =
+            resource_count(PORT_RESTRICTED_PRIVATE_NODE_ATTACHED_VOLUME);
+        debug!(
+            "Port restricted private node volume count: {port_restricted_private_node_volume_count}"
+        );
+
+        let port_restricted_private_node_volume_size =
+            if port_restricted_private_node_volume_count > 0 {
+                let volume_size = get_value_for_resource(
                     &resources,
                     PORT_RESTRICTED_PRIVATE_NODE_ATTACHED_VOLUME,
                     SIZE,
                 )?;
-                debug!(
-                    "Port restricted cone private node volume size: {port_restricted_private_node_volume_size:?}"
-                );
-                // gateways should exists if private nodes exist
-                let port_restricted_cone_vm_size =
-                    get_value_for_resource(&resources, PORT_RESTRICTED_CONE_NAT_GATEWAY, SIZE)?;
-                debug!("Port restricted cone nat gateway size: {port_restricted_cone_vm_size:?}");
-
-                nat_gateway_image_id =
-                    get_value_for_resource(&resources, PORT_RESTRICTED_CONE_NAT_GATEWAY, IMAGE)?;
-                debug!("Nat gateway image: {nat_gateway_image_id:?}");
-
-                (
-                    port_restricted_private_node_volume_size,
-                    port_restricted_cone_vm_size,
-                )
+                debug!("Port restricted cone private node volume size: {volume_size:?}");
+                volume_size
             } else {
-                (None, None)
+                None
             };
+
+        let port_restricted_cone_vm_size = if port_restricted_private_node_vm_count > 0 {
+            // gateways should exist if private nodes exist
+            let port_restricted_cone_vm_size =
+                get_value_for_resource(&resources, PORT_RESTRICTED_CONE_NAT_GATEWAY, SIZE)?;
+            debug!("Port restricted cone nat gateway size: {port_restricted_cone_vm_size:?}");
+
+            nat_gateway_image_id =
+                get_value_for_resource(&resources, PORT_RESTRICTED_CONE_NAT_GATEWAY, IMAGE)?;
+            debug!("Nat gateway image: {nat_gateway_image_id:?}");
+
+            port_restricted_cone_vm_size
+        } else {
+            None
+        };
 
         let upnp_private_node_vm_count = resource_count(UPNP_PRIVATE_NODE);
         debug!("UPnP private node count: {upnp_private_node_vm_count}");
-        let (upnp_private_node_volume_size, upnp_vm_size) = if upnp_private_node_vm_count > 0 {
-            let upnp_private_node_volume_size =
+        let upnp_private_node_volume_count = resource_count(UPNP_PRIVATE_NODE_ATTACHED_VOLUME);
+        debug!("UPnP private node volume count: {upnp_private_node_volume_count}");
+
+        let upnp_private_node_volume_size = if upnp_private_node_volume_count > 0 {
+            let volume_size =
                 get_value_for_resource(&resources, UPNP_PRIVATE_NODE_ATTACHED_VOLUME, SIZE)?;
-            debug!("UPnP private node volume size: {upnp_private_node_volume_size:?}");
+            debug!("UPnP private node volume size: {volume_size:?}");
+            volume_size
+        } else {
+            None
+        };
+
+        let upnp_vm_size = if upnp_private_node_vm_count > 0 {
             let upnp_vm_size = get_value_for_resource(&resources, UPNP_PRIVATE_NODE, SIZE)?;
             debug!("UPnP VM size: {upnp_vm_size:?}");
-
-            (upnp_private_node_volume_size, upnp_vm_size)
+            upnp_vm_size
         } else {
-            (None, None)
+            None
         };
 
         let client_vm_count = resource_count(CLIENT);
