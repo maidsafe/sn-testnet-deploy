@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 
+import argparse
 import re
 import sys
 from pathlib import Path
@@ -15,14 +16,17 @@ class UploadAttempt:
     address: Optional[str]
     duration_seconds: float
     start_time: str
+    total_chunks: Optional[int] = None
+    successful_chunks: Optional[int] = None
 
 
-def parse_log_file(log_path: Path) -> List[UploadAttempt]:
+def parse_log_file(log_path: Path, payment_type: str) -> List[UploadAttempt]:
     """
     Parse the upload log file and extract upload attempts.
 
     Args:
         log_path: Path to the log file
+        payment_type: Payment type ('single-node' or 'merkle')
 
     Returns:
         List of UploadAttempt objects
@@ -38,7 +42,7 @@ def parse_log_file(log_path: Path) -> List[UploadAttempt]:
 
         if '==========================================' in line:
             if i + 1 < len(lines) and 'Uploading Content' in lines[i + 1]:
-                attempt = parse_upload_attempt(lines, i)
+                attempt = parse_upload_attempt(lines, i, payment_type)
                 if attempt:
                     attempts.append(attempt)
 
@@ -47,13 +51,14 @@ def parse_log_file(log_path: Path) -> List[UploadAttempt]:
     return attempts
 
 
-def parse_upload_attempt(lines: List[str], start_idx: int) -> Optional[UploadAttempt]:
+def parse_upload_attempt(lines: List[str], start_idx: int, payment_type: str) -> Optional[UploadAttempt]:
     """
     Parse a single upload attempt starting from the banner line.
 
     Args:
         lines: All lines from the log file
         start_idx: Index of the banner line
+        payment_type: Payment type ('single-node' or 'merkle')
 
     Returns:
         UploadAttempt object or None if parsing fails
@@ -64,6 +69,8 @@ def parse_upload_attempt(lines: List[str], start_idx: int) -> Optional[UploadAtt
     address = None
     duration_seconds = None
     start_time = None
+    total_chunks = None
+    successful_chunk_addresses = set()
 
     timestamp_match = re.match(r'^(\w{3}\s+\d{1,2}\s+\d{2}:\d{2}:\d{2})', lines[start_idx])
     if timestamp_match:
@@ -100,6 +107,17 @@ def parse_upload_attempt(lines: List[str], start_idx: int) -> Optional[UploadAtt
         if 'Failed to upload' in line and file_name and file_name in line:
             success = False
 
+        # Parse chunk statistics only for single-node payment type
+        if payment_type == 'single-node':
+            if total_chunks is None and 'Processing estimated total' in line:
+                match = re.search(r'Processing estimated total (\d+) chunks', line)
+                if match:
+                    total_chunks = int(match.group(1))
+
+            chunk_match = re.search(r'\(\d+/\d+\) Chunk stored at: ([a-f0-9]{64})', line)
+            if chunk_match:
+                successful_chunk_addresses.add(chunk_match.group(1))
+
         if duration_seconds is not None:
             break
 
@@ -107,13 +125,21 @@ def parse_upload_attempt(lines: List[str], start_idx: int) -> Optional[UploadAtt
             break
 
     if file_name and size_kb is not None and duration_seconds is not None and start_time:
+        # Set successful_chunks to count if we have total_chunks, even if count is 0
+        # Cap at total_chunks to handle cases where "already exists" chunks + new chunks > total
+        if total_chunks is not None:
+            successful_chunks = min(len(successful_chunk_addresses), total_chunks)
+        else:
+            successful_chunks = None
         return UploadAttempt(
             file_name=file_name,
             size_kb=size_kb,
             success=success,
             address=address,
             duration_seconds=duration_seconds,
-            start_time=start_time
+            start_time=start_time,
+            total_chunks=total_chunks,
+            successful_chunks=successful_chunks
         )
 
     return None
@@ -127,6 +153,16 @@ def format_size_mb(size_kb: int) -> str:
 def format_duration_minutes(duration_seconds: float) -> str:
     """Convert seconds to minutes and format as string."""
     return f"{duration_seconds / 60:.2f}"
+
+
+def format_chunks(attempt: UploadAttempt) -> str:
+    """Format chunk statistics as 'successful/total' or 'N/A'."""
+    if attempt.total_chunks is not None and attempt.successful_chunks is not None:
+        return f"{attempt.successful_chunks}/{attempt.total_chunks}"
+    elif attempt.successful_chunks is not None:
+        return f"{attempt.successful_chunks}/?"
+    else:
+        return "N/A"
 
 
 def print_successful_uploads_table(attempts: List[UploadAttempt]) -> None:
@@ -156,19 +192,19 @@ def print_all_attempts_table(attempts: List[UploadAttempt]) -> None:
     print("\n" + "=" * 100)
     print("UPLOAD ATTEMPTS")
     print("=" * 100)
-    print(f"{'Result':<8} {'Start Time':<20} {'File Name':<40} {'Size (MB)':<12} {'Duration (min)'}")
+    print(f"{'Result':<8} {'Start Time':<20} {'File Name':<40} {'Chunks':<12} {'Duration (min)'}")
     print("-" * 100)
 
     for attempt in attempts:
         file_name = Path(attempt.file_name).name if '/' in attempt.file_name else attempt.file_name
         result = "✓" if attempt.success else "✗"
-        size_mb = format_size_mb(attempt.size_kb)
+        chunks = format_chunks(attempt)
         duration_min = format_duration_minutes(attempt.duration_seconds)
 
         if len(file_name) > 40:
             file_name = file_name[:37] + "..."
 
-        print(f"{result:<8} {attempt.start_time:<20} {file_name:<40} {size_mb:<12} {duration_min}")
+        print(f"{result:<8} {attempt.start_time:<20} {file_name:<40} {chunks:<12} {duration_min}")
 
     print("-" * 100)
 
@@ -177,34 +213,61 @@ def print_all_attempts_table(attempts: List[UploadAttempt]) -> None:
     total_size_mb = sum(a.size_kb for a in attempts) / 1024
     total_duration_min = sum(a.duration_seconds for a in attempts) / 60
 
+    total_chunks_all = sum(a.total_chunks for a in attempts if a.total_chunks is not None)
+    successful_chunks_all = sum(a.successful_chunks for a in attempts if a.successful_chunks is not None)
+
     print(f"\nSummary:")
     print(f"  Total attempts: {len(attempts)}")
     print(f"  Successful: {successful_count} (✓)")
     print(f"  Failed: {failed_count} (✗)")
     print(f"  Total data processed: {total_size_mb:.2f} MB")
+    if total_chunks_all > 0:
+        chunk_success_rate = (successful_chunks_all / total_chunks_all) * 100
+        print(f"  Total chunks: {successful_chunks_all}/{total_chunks_all} ({chunk_success_rate:.1f}% success)")
     print(f"  Total time: {total_duration_min:.2f} minutes")
     if successful_count > 0:
         success_rate = (successful_count / len(attempts)) * 100
-        print(f"  Success rate: {success_rate:.1f}%")
+        print(f"  Upload success rate: {success_rate:.1f}%")
     print()
 
 
 def main():
     """Main entry point."""
-    if len(sys.argv) != 2:
-        print("Usage: upload_results.py <log_file_path>")
-        print("\nExample:")
-        print("  upload_results.py static-upload-results/DEV_01-2025_12_27_00_12_50/DEV-01-ant-client-1/service_log")
+    parser = argparse.ArgumentParser(
+        description='Parse upload log files and generate statistics',
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog="""
+Example:
+  upload_results.py static-upload-results/DEV_01-2025_12_27/DEV-01-ant-client-1/service_log --payment-type single-node
+        """
+    )
+    parser.add_argument('log_file_path', type=str, help='Path to the log file')
+    parser.add_argument(
+        '--payment-type',
+        type=str,
+        required=True,
+        choices=['single-node', 'merkle'],
+        help='Payment type used in the upload (single-node or merkle)'
+    )
+
+    args = parser.parse_args()
+
+    # Validate payment type (merkle not yet implemented)
+    if args.payment_type == 'merkle':
+        print("Error: Merkle payment type parsing is not yet implemented.")
+        print("Please use --payment-type single-node for now.")
         sys.exit(1)
 
-    log_path = Path(sys.argv[1])
+    log_path = Path(args.log_file_path)
 
     if not log_path.exists():
         print(f"Error: Log file not found: {log_path}")
         sys.exit(1)
 
     print(f"Parsing log file: {log_path}")
-    attempts = parse_log_file(log_path)
+    print(f"Payment type: {args.payment_type}")
+
+    attempts = parse_log_file(log_path, args.payment_type)
 
     if not attempts:
         print("No upload attempts found in log file.")
