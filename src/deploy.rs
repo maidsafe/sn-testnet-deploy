@@ -207,6 +207,8 @@ impl TestnetDeployer {
         if let Some(custom_evm) = anvil_node_data {
             provision_options.evm_data_payments_address =
                 Some(custom_evm.data_payments_address.clone());
+            provision_options.evm_merkle_payments_address =
+                Some(custom_evm.merkle_payments_address.clone());
             provision_options.evm_payment_token_address =
                 Some(custom_evm.payment_token_address.clone());
             provision_options.evm_rpc_url = Some(custom_evm.rpc_url.clone());

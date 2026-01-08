@@ -78,6 +78,7 @@ pub enum DeploymentType {
 pub struct AnvilNodeData {
     pub data_payments_address: String,
     pub deployer_wallet_private_key: String,
+    pub merkle_payments_address: String,
     pub payment_token_address: String,
     pub rpc_url: String,
 }
@@ -1179,6 +1180,7 @@ pub fn get_anvil_node_data_hardcoded(ansible_runner: &AnsibleRunner) -> Result<A
         data_payments_address: "0x8464135c8F25Da09e49BC8782676a84730C318bC".to_string(),
         deployer_wallet_private_key:
             "0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80".to_string(),
+        merkle_payments_address: "0x663F3ad617193148711d28f5334eE4Ed07016602".to_string(),
         payment_token_address: "0x5FbDB2315678afecb367f032d93F642f64180aa3".to_string(),
         rpc_url: format!("http://{evm_ip}:61611"),
     })
