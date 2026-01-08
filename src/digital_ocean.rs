@@ -5,12 +5,24 @@
 // Please see the LICENSE file for more details.
 
 use crate::error::{Error, Result};
-use log::debug;
+use log::{debug, error, warn};
+use rand::Rng;
 use reqwest::Client;
-use std::{net::Ipv4Addr, str::FromStr};
+use std::{net::Ipv4Addr, str::FromStr, time::Duration};
 
 pub const DIGITAL_OCEAN_API_BASE_URL: &str = "https://api.digitalocean.com";
 pub const DIGITAL_OCEAN_API_PAGE_SIZE: usize = 200;
+
+/// Initial delay in seconds before retrying after a rate limit (429) response
+const RATE_LIMIT_INITIAL_DELAY_SECS: u64 = 30;
+/// Maximum delay in seconds between retry attempts
+const RATE_LIMIT_MAX_DELAY_SECS: u64 = 300;
+/// Multiplier for exponential backoff
+const RATE_LIMIT_BACKOFF_MULTIPLIER: u64 = 2;
+/// Maximum number of retry attempts for rate limiting
+const RATE_LIMIT_MAX_RETRIES: u32 = 5;
+/// Jitter factor (0.2 = +/- 20%)
+const RATE_LIMIT_JITTER_FACTOR: f64 = 0.2;
 
 pub struct Droplet {
     pub id: usize,
@@ -24,7 +36,82 @@ pub struct DigitalOceanClient {
     pub page_size: usize,
 }
 
+/// Calculate the backoff delay with jitter for a given retry attempt
+fn calculate_backoff_delay(attempt: u32) -> Duration {
+    let base_delay = RATE_LIMIT_INITIAL_DELAY_SECS
+        .saturating_mul(RATE_LIMIT_BACKOFF_MULTIPLIER.saturating_pow(attempt));
+    let capped_delay = base_delay.min(RATE_LIMIT_MAX_DELAY_SECS);
+
+    // Add jitter: +/- RATE_LIMIT_JITTER_FACTOR
+    let mut rng = rand::thread_rng();
+    let jitter_multiplier =
+        1.0 + rng.gen_range(-RATE_LIMIT_JITTER_FACTOR..RATE_LIMIT_JITTER_FACTOR);
+    let delay_with_jitter = (capped_delay as f64 * jitter_multiplier) as u64;
+
+    Duration::from_secs(delay_with_jitter)
+}
+
+/// Parse the Retry-After header value if present
+/// Returns the delay in seconds, or None if not present/parseable
+fn parse_retry_after_header(response: &reqwest::Response) -> Option<u64> {
+    response
+        .headers()
+        .get("retry-after")
+        .and_then(|h| h.to_str().ok())
+        .and_then(|s| s.parse::<u64>().ok())
+}
+
 impl DigitalOceanClient {
+    /// Execute a request with retry logic for rate limiting (429) responses
+    async fn execute_request_with_retry(
+        &self,
+        client: &Client,
+        url: &str,
+    ) -> Result<reqwest::Response> {
+        let mut attempt = 0;
+
+        loop {
+            debug!("Executing droplet list request with {url}");
+            let response = client
+                .get(url)
+                .header("Authorization", format!("Bearer {}", self.access_token))
+                .send()
+                .await?;
+
+            let status_code = response.status().as_u16();
+
+            if status_code == 429 {
+                if attempt >= RATE_LIMIT_MAX_RETRIES {
+                    error!(
+                        "Rate limit exceeded after {} retry attempts for URL: {}",
+                        RATE_LIMIT_MAX_RETRIES, url
+                    );
+                    return Err(Error::DigitalOceanRateLimitExhausted(
+                        RATE_LIMIT_MAX_RETRIES,
+                    ));
+                }
+
+                // Check for Retry-After header, otherwise use exponential backoff
+                let delay = parse_retry_after_header(&response)
+                    .map(Duration::from_secs)
+                    .unwrap_or_else(|| calculate_backoff_delay(attempt));
+
+                warn!(
+                    "Digital Ocean API rate limit hit (429). Attempt {}/{}. Retrying in {:?}",
+                    attempt + 1,
+                    RATE_LIMIT_MAX_RETRIES,
+                    delay
+                );
+
+                tokio::time::sleep(delay).await;
+                attempt += 1;
+                continue;
+            }
+
+            return Ok(response);
+        }
+    }
+
     pub async fn list_droplets(&self, skip_if_no_ip: bool) -> Result<Vec<Droplet>> {
         let client = Client::new();
         let mut has_next_page = true;
@@ -35,12 +122,8 @@ impl DigitalOceanClient {
                 "{}/v2/droplets?page={}&per_page={}",
                 self.base_url, page, self.page_size
             );
-            debug!("Executing droplet list request with {url}");
-            let response = client
-                .get(url)
-                .header("Authorization", format!("Bearer {}", self.access_token))
-                .send()
-                .await?;
+            let response = self.execute_request_with_retry(&client, &url).await?;
+
             if response.status().as_u16() == 401 {
                 debug!("Error response body: {}", response.text().await?);
                 return Err(Error::DigitalOceanUnauthorized);
@@ -1461,6 +1544,91 @@ mod tests {
         );
 
         list_droplets_mock.assert();
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_calculate_backoff_delay() {
+        // Test that backoff delays are in expected ranges (accounting for jitter)
+        let delay_0 = calculate_backoff_delay(0);
+        // Base: 30s, with +/-20% jitter = 24-36s
+        assert!(
+            delay_0.as_secs() >= 24 && delay_0.as_secs() <= 36,
+            "Attempt 0 delay {} should be 24-36s",
+            delay_0.as_secs()
+        );
+
+        let delay_1 = calculate_backoff_delay(1);
+        // Base: 60s, with +/-20% jitter = 48-72s
+        assert!(
+            delay_1.as_secs() >= 48 && delay_1.as_secs() <= 72,
+            "Attempt 1 delay {} should be 48-72s",
+            delay_1.as_secs()
+        );
+
+        let delay_2 = calculate_backoff_delay(2);
+        // Base: 120s, with +/-20% jitter = 96-144s
+        assert!(
+            delay_2.as_secs() >= 96 && delay_2.as_secs() <= 144,
+            "Attempt 2 delay {} should be 96-144s",
+            delay_2.as_secs()
+        );
+
+        let delay_4 = calculate_backoff_delay(4);
+        // Base: 300s (capped), with +/-20% jitter = 240-360s
+        assert!(
+            delay_4.as_secs() >= 240 && delay_4.as_secs() <= 360,
+            "Attempt 4 delay {} should be 240-360s (capped at max)",
+            delay_4.as_secs()
+        );
+
+        // Test that very high attempts are also capped
+        let delay_10 = calculate_backoff_delay(10);
+        assert!(
+            delay_10.as_secs() >= 240 && delay_10.as_secs() <= 360,
+            "Attempt 10 delay {} should be capped at 240-360s",
+            delay_10.as_secs()
+        );
+    }
+
+    #[tokio::test]
+    async fn test_list_droplets_fails_after_max_retries() -> Result<()> {
+        // Pause time so sleep completes instantly in tests
+        tokio::time::pause();
+
+        let server = MockServer::start();
+
+        // All requests return 429
+        let rate_limit_mock = server.mock(|when, then| {
+            when.method(GET)
+                .path("/v2/droplets")
+                .query_param("page", "1")
+                .query_param("per_page", "1");
+            then.status(429)
+                .header("Content-Type", "application/json")
+                .body(r#"{"id": "too_many_requests", "message": "Rate limit exceeded"}"#);
+        });
+
+        let client = DigitalOceanClient {
+            base_url: server.base_url(),
+            access_token: String::from("fake_token"),
+            page_size: 1,
+        };
+
+        let result = client.list_droplets(false).await;
+        match result {
+            Ok(_) => return Err(eyre!("This test should return an error")),
+            Err(e) => {
+                assert_eq!(
+                    e.to_string(),
+                    "Digital Ocean API rate limit exceeded after 5 retry attempts"
+                );
+            }
+        }
+
+        // Should have been called RATE_LIMIT_MAX_RETRIES + 1 times (initial + retries)
+        rate_limit_mock.assert_hits(6);
 
         Ok(())
     }
