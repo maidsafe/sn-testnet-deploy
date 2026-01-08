@@ -1,5 +1,20 @@
 ---
 # This role assumes the existence of the node manager, which is setup using another role.
+
+#
+# Exclude antnode services from needrestart automatic restarts
+#
+- name: exclude antnode services from needrestart
+  become: True
+  ansible.builtin.blockinfile:
+    path: /etc/needrestart/needrestart.conf
+    marker: "# {mark} ANSIBLE MANAGED BLOCK - antnode blacklist"
+    block: |
+      $nrconf{blacklist_rc} = [
+          qr(^antnode\d*\.service$),
+      ];
+    create: no
+
 - name: get the private IP for the instance
   set_fact:
     node_rpc_ip: "{{ instance_facts.instances[0].network_interfaces[0].private_ip_address }}"
