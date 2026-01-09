@@ -51,6 +51,7 @@ pub struct ClientsDeployOptions {
     pub max_archived_log_files: u16,
     pub max_log_files: u16,
     pub max_uploads: Option<u32>,
+    pub merkle: bool,
     pub name: String,
     pub network_id: Option<u8>,
     pub network_contacts_url: Option<String>,

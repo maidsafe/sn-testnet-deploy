@@ -204,7 +204,7 @@ def get_ant_version():
     except Exception:
         return "", ""
 
-def upload_content(content_path, file_size_kb, contact_peer="", network_contacts_url="", network_id=""):
+def upload_content(content_path, file_size_kb, contact_peer="", network_contacts_url="", network_id="", merkle=False):
     """Upload a file or directory using the ant binary"""
 
     cmd = ["ant"]
@@ -218,6 +218,9 @@ def upload_content(content_path, file_size_kb, contact_peer="", network_contacts
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
     log_file_path = f"{log_path}/{timestamp}"
     cmd.extend(["--log-output-dest", log_file_path])
+
+    if merkle:
+        cmd.append("--merkle")
 
     if os.path.isfile(content_path):
         cmd.extend(["file", "upload", content_path, "--no-archive", "--public"])
@@ -318,6 +321,7 @@ def main():
     parser.add_argument("-p", "--peer", help="Optional contact peer")
     parser.add_argument("-u", "--network-contacts-url", help="Optional network contacts URL")
     parser.add_argument("-n", "--network-id", help="Optional network ID (also enables testnet mode)")
+    parser.add_argument("-m", "--merkle", action="store_true", help="Enable merkle mode for uploads")
     parser.add_argument("directory", help="Directory to inspect and upload contents from")
     args = parser.parse_args()
 
@@ -399,7 +403,8 @@ def main():
             file_size_kb,
             contact_peer=args.peer or "",
             network_contacts_url=args.network_contacts_url or "",
-            network_id=args.network_id or ""
+            network_id=args.network_id or "",
+            merkle=args.merkle
         )
 
         state_manager.mark_file_attempted(item_path)

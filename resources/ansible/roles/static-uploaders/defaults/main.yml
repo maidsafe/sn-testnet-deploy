@@ -8,3 +8,4 @@ metrics_path: "{{ client_storage_base_path }}/log/upload_files/random_uploader/a
 upload_src_path: "{{ client_storage_base_path }}/data"
 state_path: "{{ client_storage_base_path }}/state"
 upload_batch_size: 16
+merkle: false
