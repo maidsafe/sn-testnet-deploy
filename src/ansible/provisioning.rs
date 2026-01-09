@@ -492,7 +492,7 @@ impl From<ClientsDeployOptions> for ProvisionOptions {
             max_archived_log_files: client_options.max_archived_log_files,
             max_log_files: client_options.max_log_files,
             max_uploads: client_options.max_uploads,
-            merkle: false,
+            merkle: client_options.merkle,
             name: client_options.name,
             network_id: client_options.network_id,
             network_dashboard_branch: None,
