@@ -22,6 +22,7 @@ variable "droplet_ssh_keys" {
 
 variable "ant_client_droplet_size" {
   description = "The size of the droplet for ANT Client VMs"
+  default     = "s-2vcpu-4gb"
 }
 
 variable "build_machine_size" {
@@ -30,10 +31,12 @@ variable "build_machine_size" {
 
 variable "build_droplet_image_id" {
   description = "The ID of the image for the build machine. Varies per region."
+  default     = ""
 }
 
 variable "ant_client_droplet_image_id" {
   description = "The ID of the ANT Client droplet image. Varies per environment type."
+  default     = ""
 }
 
 variable "region" {
