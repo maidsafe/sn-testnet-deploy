@@ -219,15 +219,15 @@ def upload_content(content_path, file_size_kb, contact_peer="", network_contacts
     log_file_path = f"{log_path}/{timestamp}"
     cmd.extend(["--log-output-dest", log_file_path])
 
-    if merkle:
-        cmd.append("--merkle")
-
     if os.path.isfile(content_path):
         cmd.extend(["file", "upload", content_path, "--no-archive", "--public"])
         file_hash = get_file_hash(content_path)
     else:
         cmd.extend(["file", "upload", content_path, "--public"])
         _, file_hash = get_directory_info(content_path)
+
+    if merkle:
+        cmd.append("--merkle")
     
     print("=" * 42)
     print(f"{datetime.now().strftime('%Y-%m-%d %H:%M:%S')} -- Uploading Content")
