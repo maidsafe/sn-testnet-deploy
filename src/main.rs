@@ -78,6 +78,7 @@ async fn main() -> Result<()> {
             upnp_private_node_count,
             upnp_private_node_vm_count,
             upnp_private_node_volume_size,
+            network_dashboard_branch,
         } => {
             cmd::deployments::handle_bootstrap(
                 ansible_verbose,
@@ -120,6 +121,7 @@ async fn main() -> Result<()> {
                 upnp_private_node_count,
                 upnp_private_node_vm_count,
                 upnp_private_node_volume_size,
+                network_dashboard_branch,
             )
             .await?;
             Ok(())

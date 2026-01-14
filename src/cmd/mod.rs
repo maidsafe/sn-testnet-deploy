@@ -282,6 +282,11 @@ pub enum Commands {
         /// argument.
         #[clap(long)]
         upnp_private_node_volume_size: Option<u16>,
+        /// Specify the branch of the network dashboard to use.
+        ///
+        /// Used for testing different configurations for Telegraf.
+        #[clap(long, verbatim_doc_comment)]
+        network_dashboard_branch: Option<String>,
     },
     /// Deploy symlinked antnode instances on a single droplet.
     DeploySymlinkedAntnode {
