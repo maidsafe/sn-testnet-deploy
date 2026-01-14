@@ -68,9 +68,11 @@ def parse_upload_attempt(lines: List[str], start_idx: int, payment_type: str) ->
     success = False
     address = None
     duration_seconds = None
+    duration_found_at = None
     start_time = None
     total_chunks = None
     successful_chunk_addresses = set()
+    all_chunks_already_exist = False
 
     timestamp_match = re.match(r'^(\w{3}\s+\d{1,2}\s+\d{2}:\d{2}:\d{2})', lines[start_idx])
     if timestamp_match:
@@ -91,7 +93,8 @@ def parse_upload_attempt(lines: List[str], start_idx: int, payment_type: str) ->
             if match:
                 size_kb = int(match.group(1))
 
-        if 'Successfully uploaded:' in line:
+        # Handle both "Successfully uploaded:" and "Successfully uploaded /path"
+        if 'Successfully uploaded' in line and 'Failed' not in line:
             success = True
 
         if address is None and 'At address:' in line:
@@ -99,36 +102,74 @@ def parse_upload_attempt(lines: List[str], start_idx: int, payment_type: str) ->
             if match:
                 address = match.group(1).strip()
 
+        # For merkle "all chunks exist" case, parse address from: - "filename": "address"
+        if address is None and file_name:
+            # Match pattern like: - "VIDEO_TS.IFO": "633d180f..."
+            basename = Path(file_name).name if '/' in file_name else file_name
+            if f'"{basename}"' in line and '": "' in line:
+                match = re.search(r'": "([a-f0-9]{64})"', line)
+                if match:
+                    address = match.group(1)
+
         if duration_seconds is None and 'Elapsed time:' in line:
             match = re.search(r'Elapsed time:\s*([\d.]+)\s*seconds', line)
             if match:
                 duration_seconds = float(match.group(1))
+                duration_found_at = i
 
         if 'Failed to upload' in line and file_name and file_name in line:
             success = False
 
-        # Parse chunk statistics only for single-node payment type
+        # Parse chunk statistics based on payment type
         if payment_type == 'single-node':
             if total_chunks is None and 'Processing estimated total' in line:
                 match = re.search(r'Processing estimated total (\d+) chunks', line)
                 if match:
                     total_chunks = int(match.group(1))
+        elif payment_type == 'merkle':
+            # For merkle, get total chunks from "🚀 Starting upload of N chunks in M Merkle Tree(s)..."
+            # This is the authoritative source, so always use it (overwrite any earlier value)
+            if 'Starting upload of' in line and 'Merkle Tree' in line:
+                match = re.search(r'Starting upload of (\d+) chunks in \d+ Merkle Tree', line)
+                if match:
+                    total_chunks = int(match.group(1))
+            # Fallback: when all chunks already exist, get count from "Encrypted X/Y chunks"
+            # Only use this if we haven't found "Starting upload" yet
+            elif total_chunks is None and 'Encrypted' in line and 'chunks in' in line:
+                match = re.search(r'Encrypted (\d+)/(\d+) chunks in', line)
+                if match:
+                    total_chunks = int(match.group(2))
 
-            chunk_match = re.search(r'\(\d+/\d+\) Chunk stored at: ([a-f0-9]{64})', line)
-            if chunk_match:
-                successful_chunk_addresses.add(chunk_match.group(1))
+        # Chunk stored messages have the same format for both payment types
+        chunk_match = re.search(r'\(\d+/\d+\) Chunk stored at: ([a-f0-9]{64})', line)
+        if chunk_match:
+            successful_chunk_addresses.add(chunk_match.group(1))
 
-        if duration_seconds is not None:
+        # Also count chunks that succeeded on retry
+        retry_match = re.search(r'Retry succeeded for chunk: ([a-f0-9]{64})', line)
+        if retry_match:
+            successful_chunk_addresses.add(retry_match.group(1))
+
+        # Detect when all chunks already exist on network (nothing to upload)
+        if 'chunks already exist on the network' in line and 'nothing to upload' in line:
+            all_chunks_already_exist = True
+
+        # After finding duration, continue for a few more lines to catch success/failure status
+        if duration_found_at is not None and i > duration_found_at + 5:
             break
 
         if i > start_idx + 2 and '==========================================' in line:
             break
 
     if file_name and size_kb is not None and duration_seconds is not None and start_time:
-        # Set successful_chunks to count if we have total_chunks, even if count is 0
-        # Cap at total_chunks to handle cases where "already exists" chunks + new chunks > total
+        # Set successful_chunks based on what was stored or already existed
         if total_chunks is not None:
-            successful_chunks = min(len(successful_chunk_addresses), total_chunks)
+            if all_chunks_already_exist:
+                # All chunks were already on the network
+                successful_chunks = total_chunks
+            else:
+                # Cap at total_chunks to handle cases where "already exists" chunks + new chunks > total
+                successful_chunks = min(len(successful_chunk_addresses), total_chunks)
         else:
             successful_chunks = None
         return UploadAttempt(
@@ -151,8 +192,18 @@ def format_size_mb(size_kb: int) -> str:
 
 
 def format_duration_minutes(duration_seconds: float) -> str:
-    """Convert seconds to minutes and format as string."""
-    return f"{duration_seconds / 60:.2f}"
+    """Convert seconds to minutes and format as string.
+
+    If duration is less than 60 minutes, returns decimal minutes (e.g., "45.23").
+    If duration is 60 minutes or more, returns HHhMMm format (e.g., "1h30m").
+    """
+    total_minutes = duration_seconds / 60
+    if total_minutes < 60:
+        return f"{total_minutes:.2f}m"
+    else:
+        hours = int(total_minutes // 60)
+        minutes = int(total_minutes % 60)
+        return f"{hours}h{minutes:02d}m"
 
 
 def format_chunks(attempt: UploadAttempt) -> str:
@@ -192,7 +243,7 @@ def print_all_attempts_table(attempts: List[UploadAttempt]) -> None:
     print("\n" + "=" * 100)
     print("UPLOAD ATTEMPTS")
     print("=" * 100)
-    print(f"{'Result':<8} {'Start Time':<20} {'File Name':<40} {'Chunks':<12} {'Duration (min)'}")
+    print(f"{'Result':<8} {'Start Time':<20} {'File Name':<40} {'Chunks':<12} {'Duration'}")
     print("-" * 100)
 
     for attempt in attempts:
@@ -251,12 +302,6 @@ Example:
     )
 
     args = parser.parse_args()
-
-    # Validate payment type (merkle not yet implemented)
-    if args.payment_type == 'merkle':
-        print("Error: Merkle payment type parsing is not yet implemented.")
-        print("Please use --payment-type single-node for now.")
-        sys.exit(1)
 
     log_path = Path(args.log_file_path)
 
