@@ -1,5 +1,5 @@
 ant_client_droplet_image_id = 172724146
-build_droplet_image_id = 202716845
+build_droplet_image_id = 213464151
 evm_node_droplet_image_id = 192322493
 nat_gateway_droplet_image_id = 178052140
 node_droplet_image_id = 173265007
