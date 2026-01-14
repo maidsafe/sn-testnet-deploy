@@ -10,17 +10,31 @@
       - gnupg
     state: present
 
-- name: add influxdata gpg key
-  ansible.builtin.command: >
-    curl -fsSL https://repos.influxdata.com/influxdata-archive_compat.key
-    -o /etc/apt/keyrings/influxdata-archive_compat.key
-  args:
-    creates: /etc/apt/keyrings/influxdata-archive_compat.key
+- name: ensure keyrings directory exists
+  ansible.builtin.file:
+    path: /etc/apt/keyrings
+    state: directory
+    mode: '0755'
+
+- name: remove old influxdata gpg key if exists
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: absent
+  loop:
+    - /etc/apt/keyrings/influxdata-archive_compat.key
+    - /etc/apt/keyrings/influxdata-archive_compat.gpg
+    - /etc/apt/keyrings/influxdata.gpg
+
+- name: add influxdata gpg key from keyserver
+  ansible.builtin.shell: |
+    gpg --batch --yes --keyserver hkp://keyserver.ubuntu.com:80 --recv-keys DA61C26A0585BD3B
+    gpg --batch --yes --export DA61C26A0585BD3B > /etc/apt/keyrings/influxdata.gpg
+    chmod 644 /etc/apt/keyrings/influxdata.gpg
 
 - name: add influxdata repository
   ansible.builtin.copy:
     dest: /etc/apt/sources.list.d/influxdata.list
-    content: "deb [signed-by=/etc/apt/keyrings/influxdata-archive_compat.key] https://repos.influxdata.com/ubuntu stable main"
+    content: "deb [signed-by=/etc/apt/keyrings/influxdata.gpg] https://repos.influxdata.com/ubuntu stable main"
     owner: root
     group: root
     mode: '0644'
