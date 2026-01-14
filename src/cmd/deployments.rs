@@ -58,6 +58,7 @@ pub async fn handle_bootstrap(
     upnp_private_node_count: Option<u16>,
     upnp_private_node_vm_count: Option<u16>,
     upnp_private_node_volume_size: Option<u16>,
+    network_dashboard_branch: Option<String>,
 ) -> Result<()> {
     if network_contacts_url.is_none() && peer.is_none() && network_id != 1 {
         return Err(eyre!(
@@ -194,6 +195,7 @@ pub async fn handle_bootstrap(
             upnp_private_node_vm_count,
             upnp_private_node_volume_size: upnp_private_node_volume_size
                 .or_else(|| Some(calculate_size_per_attached_volume(upnp_private_node_count))),
+            network_dashboard_branch,
         })
         .await?;
 

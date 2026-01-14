@@ -56,6 +56,7 @@ pub struct BootstrapOptions {
     pub upnp_private_node_count: u16,
     pub upnp_private_node_vm_count: Option<u16>,
     pub upnp_private_node_volume_size: Option<u16>,
+    pub network_dashboard_branch: Option<String>,
 }
 
 impl TestnetDeployer {
