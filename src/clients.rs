@@ -644,20 +644,10 @@ impl ClientsDeployer {
         )
         .await?;
 
-        let mut args = Vec::new();
-        if let Some(vm_count) = options.client_vm_count {
-            args.push(("ant_client_vm_count".to_string(), vm_count.to_string()));
-        }
-        if let Some(vm_size) = &options.client_vm_size {
-            args.push(("ant_client_droplet_size".to_string(), vm_size.clone()));
-        }
-        args.push((
-            "use_custom_bin".to_string(),
-            options.enable_build_vm.to_string(),
-        ));
-
-        self.terraform_runner
-            .destroy(Some(args), Some(options.tfvars_filenames.clone()))?;
+        // Client teardowns don't require the tfvars file, even for production deployments.
+        // Use build_terraform_args() to include all necessary variables (including image ID).
+        let args = options.build_terraform_args()?;
+        self.terraform_runner.destroy(Some(args), None)?;
 
         crate::infra::delete_workspace(&self.terraform_runner, &self.environment_name)?;
 
