@@ -11,7 +11,7 @@ terraform {
 }
 
 resource "digitalocean_droplet" "peer_cache_node" {
-  count    = var.peer_cache_node_vm_count
+  count    = var.peer_cache_droplet_image_id != "" ? var.peer_cache_node_vm_count : 0
   image    = var.peer_cache_droplet_image_id
   name     = "${terraform.workspace}-peer-cache-node-${count.index + 1}"
   region   = var.region
@@ -27,7 +27,7 @@ resource "digitalocean_reserved_ip_assignment" "peer_cache_node_ip" {
 }
 
 resource "digitalocean_droplet" "build" {
-  count    = var.use_custom_bin ? 1 : 0
+  count    = var.use_custom_bin && var.build_droplet_image_id != "" ? 1 : 0
   image    = var.build_droplet_image_id
   name     = "${terraform.workspace}-build"
   region   = var.region
@@ -37,7 +37,7 @@ resource "digitalocean_droplet" "build" {
 }
 
 resource "digitalocean_droplet" "genesis_bootstrap" {
-  count    = var.genesis_vm_count
+  count    = var.peer_cache_droplet_image_id != "" ? var.genesis_vm_count : 0
   image    = var.peer_cache_droplet_image_id
   name     = "${terraform.workspace}-genesis-bootstrap"
   region   = var.region
@@ -47,7 +47,7 @@ resource "digitalocean_droplet" "genesis_bootstrap" {
 }
 
 resource "digitalocean_droplet" "full_cone_nat_gateway" {
-  count    = var.full_cone_private_node_vm_count
+  count    = var.nat_gateway_droplet_image_id != "" ? var.full_cone_private_node_vm_count : 0
   image    = var.nat_gateway_droplet_image_id
   name     = "${terraform.workspace}-full-cone-nat-gateway-${count.index + 1}"
   region   = var.region
@@ -57,7 +57,7 @@ resource "digitalocean_droplet" "full_cone_nat_gateway" {
 }
 
 resource "digitalocean_droplet" "port_restricted_cone_nat_gateway" {
-  count    = var.port_restricted_cone_node_vm_count
+  count    = var.nat_gateway_droplet_image_id != "" ? var.port_restricted_cone_node_vm_count : 0
   image    = var.nat_gateway_droplet_image_id
   name     = "${terraform.workspace}-port-restricted-cone-nat-gateway-${count.index + 1}"
   region   = var.region
@@ -67,7 +67,7 @@ resource "digitalocean_droplet" "port_restricted_cone_nat_gateway" {
 }
 
 resource "digitalocean_droplet" "symmetric_nat_gateway" {
-  count    = var.symmetric_private_node_vm_count
+  count    = var.nat_gateway_droplet_image_id != "" ? var.symmetric_private_node_vm_count : 0
   image    = var.nat_gateway_droplet_image_id
   name     = "${terraform.workspace}-symmetric-nat-gateway-${count.index + 1}"
   region   = var.region
@@ -77,7 +77,7 @@ resource "digitalocean_droplet" "symmetric_nat_gateway" {
 }
 
 resource "digitalocean_droplet" "node" {
-  count    = var.node_vm_count
+  count    = var.node_droplet_image_id != "" ? var.node_vm_count : 0
   image    = var.node_droplet_image_id
   name     = "${terraform.workspace}-node-${count.index + 1}"
   region   = var.region
@@ -87,7 +87,7 @@ resource "digitalocean_droplet" "node" {
 }
 
 resource "digitalocean_droplet" "full_cone_private_node" {
-  count   = var.full_cone_private_node_vm_count
+  count   = var.node_droplet_image_id != "" ? var.full_cone_private_node_vm_count : 0
   image    = var.node_droplet_image_id
   name     = "${terraform.workspace}-full-cone-private-node-${count.index + 1}"
   region   = var.region
@@ -97,7 +97,7 @@ resource "digitalocean_droplet" "full_cone_private_node" {
 }
 
 resource "digitalocean_droplet" "port_restricted_cone_private_node" {
-  count   = var.port_restricted_cone_node_vm_count
+  count   = var.node_droplet_image_id != "" ? var.port_restricted_cone_node_vm_count : 0
   image    = var.node_droplet_image_id
   name     = "${terraform.workspace}-port-restricted-cone-private-node-${count.index + 1}"
   region   = var.region
@@ -107,7 +107,7 @@ resource "digitalocean_droplet" "port_restricted_cone_private_node" {
 }
 
 resource "digitalocean_droplet" "symmetric_private_node" {
-  count   = var.symmetric_private_node_vm_count
+  count   = var.node_droplet_image_id != "" ? var.symmetric_private_node_vm_count : 0
   image    = var.node_droplet_image_id
   name     = "${terraform.workspace}-symmetric-private-node-${count.index + 1}"
   region   = var.region
@@ -117,7 +117,7 @@ resource "digitalocean_droplet" "symmetric_private_node" {
 }
 
 resource "digitalocean_droplet" "ant_client" {
-  count    = var.ant_client_vm_count
+  count    = var.ant_client_droplet_image_id != "" ? var.ant_client_vm_count : 0
   image    = var.ant_client_droplet_image_id
   name     = "${terraform.workspace}-ant-client-${count.index + 1}"
   region   = var.region
@@ -127,7 +127,7 @@ resource "digitalocean_droplet" "ant_client" {
 }
 
 resource "digitalocean_droplet" "evm_node" {
-  count    = var.evm_node_vm_count
+  count    = var.evm_node_droplet_image_id != "" ? var.evm_node_vm_count : 0
   image    = var.evm_node_droplet_image_id
   name     = "${terraform.workspace}-evm-node-${count.index + 1}"
   region   = var.region
@@ -137,7 +137,7 @@ resource "digitalocean_droplet" "evm_node" {
 }
 
 resource "digitalocean_droplet" "upnp_private_node" {
-  count   = var.upnp_private_node_vm_count
+  count   = var.upnp_droplet_image_id != "" ? var.upnp_private_node_vm_count : 0
   image    = var.upnp_droplet_image_id
   name     = "${terraform.workspace}-upnp-private-node-${count.index + 1}"
   region   = var.region
