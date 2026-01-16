@@ -11,7 +11,7 @@ terraform {
 }
 
 resource "digitalocean_droplet" "build" {
-  count    = var.use_custom_bin ? 1 : 0
+  count    = var.use_custom_bin && var.build_droplet_image_id != "" ? 1 : 0
   image    = var.build_droplet_image_id
   name     = "${terraform.workspace}-build"
   region   = var.region
