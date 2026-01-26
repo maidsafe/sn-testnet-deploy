@@ -258,6 +258,28 @@ impl EnvironmentType {
         }
     }
 
+    pub fn get_tfvars_filenames_with_fallback(
+        &self,
+        name: &str,
+        region: &str,
+        terraform_dir: &Path,
+    ) -> Vec<String> {
+        match self {
+            EnvironmentType::Development | EnvironmentType::Staging => {
+                self.get_tfvars_filenames(name, region)
+            }
+            EnvironmentType::Production => {
+                let named_tfvars = format!("{name}.tfvars");
+                let tfvars_file = if terraform_dir.join(&named_tfvars).exists() {
+                    named_tfvars
+                } else {
+                    "production.tfvars".to_string()
+                };
+                vec![tfvars_file, format!("production-images-{region}.tfvars")]
+            }
+        }
+    }
+
     pub fn get_default_peer_cache_node_count(&self) -> u16 {
         match self {
             EnvironmentType::Development => 5,
