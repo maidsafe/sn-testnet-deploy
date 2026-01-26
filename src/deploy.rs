@@ -135,11 +135,11 @@ impl TestnetDeployer {
             symmetric_nat_gateway_vm_size: options.symmetric_nat_gateway_vm_size.clone(),
             symmetric_private_node_vm_count: options.symmetric_private_node_vm_count,
             symmetric_private_node_volume_size: options.symmetric_private_node_volume_size,
-            tfvars_filenames: Some(
-                options
-                    .environment_type
-                    .get_tfvars_filenames(&options.name, &options.region),
-            ),
+            tfvars_filenames: Some(options.environment_type.get_tfvars_filenames_with_fallback(
+                &options.name,
+                &options.region,
+                &self.terraform_runner.working_directory_path,
+            )),
             upnp_vm_size: options.upnp_vm_size.clone(),
             upnp_private_node_vm_count: options.upnp_private_node_vm_count,
             upnp_private_node_volume_size: options.upnp_private_node_volume_size,
