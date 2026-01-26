@@ -228,6 +228,8 @@ def upload_content(content_path, file_size_kb, contact_peer="", network_contacts
 
     if merkle:
         cmd.append("--merkle")
+    else:
+        cmd.append("--regular")
     
     print("=" * 42)
     print(f"{datetime.now().strftime('%Y-%m-%d %H:%M:%S')} -- Uploading Content")
