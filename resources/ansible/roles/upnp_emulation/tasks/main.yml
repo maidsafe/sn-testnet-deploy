@@ -8,20 +8,6 @@
     sysctl_set: true
     sysctl_file: /etc/sysctl.conf
 
-- name: Install necessary packages for miniupnpd daemon
-  become: true
-  ansible.builtin.apt:
-    name:
-      - libxtables-dev
-      - libiptc-dev
-      - libssl-dev
-      - libmnl-dev
-      - libnftnl-dev
-      - net-tools
-      - build-essential
-    state: present
-    update_cache: true
-
 - name: Check if miniupnp repository already exists
   ansible.builtin.stat:
     path: "{{ miniupnpd_clone_dir }}"
