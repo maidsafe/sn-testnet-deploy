@@ -103,7 +103,7 @@ pub enum Commands {
         evm_merkle_payments_address: Option<String>,
         /// The EVM network to use.
         ///
-        /// Valid values are "arbitrum-one", "arbitrum-sepolia", or "custom".
+        /// Valid values are "anvil", "arbitrum-one", "arbitrum-sepolia-test", or "custom".
         #[clap(long, default_value_t = EvmNetwork::ArbitrumOne, value_parser = parse_evm_network)]
         evm_network_type: EvmNetwork,
         /// The address of the payment token contract.
@@ -486,7 +486,7 @@ pub enum Commands {
         evm_merkle_payments_address: Option<String>,
         /// The EVM network type to use for the deployment.
         ///
-        /// Possible values are 'arbitrum-one' or 'custom'.
+        /// Valid values are "anvil", "arbitrum-one", "arbitrum-sepolia-test", or "custom".
         ///
         /// If not used, the default is 'arbitrum-one'.
         #[clap(long, default_value = "arbitrum-one", value_parser = parse_evm_network)]
@@ -932,7 +932,7 @@ pub enum Commands {
         custom_inventory: Option<Vec<String>>,
         /// The EVM network to use.
         ///
-        /// Valid values are "arbitrum-one", "arbitrum-sepolia", or "custom".
+        /// Valid values are "anvil", "arbitrum-one", "arbitrum-sepolia-test", or "custom".
         #[clap(long, value_parser = parse_evm_network)]
         evm_network_type: EvmNetwork,
         /// Maximum number of forks Ansible will use to execute tasks on target hosts.
