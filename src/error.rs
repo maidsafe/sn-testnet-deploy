@@ -36,6 +36,8 @@ pub enum Error {
     DigitalOceanUnexpectedResponse(u16, String),
     #[error("The public IP address was not obtainable from the API response")]
     DigitalOceanPublicIpAddressNotFound,
+    #[error("Digital Ocean API rate limit exceeded after {0} retry attempts")]
+    DigitalOceanRateLimitExhausted(u32),
     #[error("The provided ansible inventory is empty or does not exists {0}")]
     EmptyInventory(AnsibleInventoryType),
     #[error("Could not retrieve environment details for '{0}'")]
