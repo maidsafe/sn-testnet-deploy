@@ -14,7 +14,6 @@ pub mod funding;
 pub mod infra;
 pub mod inventory;
 pub mod logs;
-pub mod reserved_ip;
 pub mod rpc_client;
 pub mod s3;
 pub mod safe;

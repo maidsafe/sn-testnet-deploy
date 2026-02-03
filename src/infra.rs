@@ -601,10 +601,6 @@ pub fn build_terraform_args(options: &InfraRunOptions) -> Result<Vec<(String, St
         ));
     }
 
-    if let Some(reserved_ips) = crate::reserved_ip::get_reserved_ips_args(&options.name) {
-        args.push(("peer_cache_reserved_ips".to_string(), reserved_ips));
-    }
-
     if let Some(peer_cache_node_volume_size) = options.peer_cache_node_volume_size {
         args.push((
             "peer_cache_node_volume_size".to_string(),

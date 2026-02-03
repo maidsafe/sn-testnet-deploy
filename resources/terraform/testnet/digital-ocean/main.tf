@@ -20,12 +20,6 @@ resource "digitalocean_droplet" "peer_cache_node" {
   tags     = ["environment:${terraform.workspace}", "type:peer_cache_node"]
 }
 
-resource "digitalocean_reserved_ip_assignment" "peer_cache_node_ip" {
-  count       = length(var.peer_cache_reserved_ips) > 0 ? var.peer_cache_node_vm_count : 0
-  ip_address  = var.peer_cache_reserved_ips[count.index]
-  droplet_id  = digitalocean_droplet.peer_cache_node[count.index].id
-}
-
 resource "digitalocean_droplet" "build" {
   count    = var.use_custom_bin && var.build_droplet_image_id != "" ? 1 : 0
   image    = var.build_droplet_image_id

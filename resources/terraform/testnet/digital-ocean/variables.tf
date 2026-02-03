@@ -196,12 +196,6 @@ variable "symmetric_private_node_volume_size" {
   default = 0
 }
 
-variable "peer_cache_reserved_ips" {
-  type = list(string)
-  description = "List of reserved IPs for the peer nodes"
-  default = []
-}
-
 variable "ant_client_volume_size" {
   description = "Size of each volume in GB for the ANT Client VMs"
   type        = number
