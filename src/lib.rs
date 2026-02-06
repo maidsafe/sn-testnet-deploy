@@ -1128,7 +1128,11 @@ impl TestnetDeployer {
         let tfvars_filenames = if let Some(environment_details) = &environment_details {
             environment_details
                 .environment_type
-                .get_tfvars_filenames(&self.environment_name, &self.region)
+                .get_tfvars_filenames_with_fallback(
+                    &self.environment_name,
+                    &self.region,
+                    &self.terraform_runner.working_directory_path,
+                )
         } else {
             vec![]
         };
