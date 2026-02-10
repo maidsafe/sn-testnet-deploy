@@ -318,6 +318,9 @@ pub enum Commands {
         /// The address of the data payments contract (for custom EVM networks).
         #[arg(long)]
         evm_data_payments_address: Option<String>,
+        /// The address of the merkle payments contract (for custom EVM networks).
+        #[arg(long)]
+        evm_merkle_payments_address: Option<String>,
         /// The payment token contract address (for custom EVM networks).
         #[arg(long)]
         evm_payment_token_address: Option<String>,
