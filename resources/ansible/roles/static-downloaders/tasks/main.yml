@@ -214,3 +214,18 @@
     job: "find {{ log_path }} -mindepth 1 -type d -mtime +1 -exec rm -rf {} +"
     state: present
   become: true
+
+# Telegraf on static downloader machines consistently stops transmitting metrics
+# after a few days. A daily restart prevents prolonged gaps in monitoring data.
+- name: cron job to restart telegraf daily
+  ansible.builtin.cron:
+    name: "restart telegraf"
+    minute: "0"
+    hour: "0"
+    day: "*"
+    month: "*"
+    weekday: "*"
+    user: root
+    job: "systemctl restart telegraf"
+    state: present
+  become: true
