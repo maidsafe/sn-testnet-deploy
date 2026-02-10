@@ -39,6 +39,9 @@ ARGS+=("${EVM_NETWORK}")
 {% if evm_data_payments_address != "" %}
 ARGS+=(--data-payments-address "{{ evm_data_payments_address }}")
 {% endif %}
+{% if evm_merkle_payments_address is defined and evm_merkle_payments_address != "" %}
+ARGS+=(--merkle-payments-address "{{ evm_merkle_payments_address }}")
+{% endif %}
 {% if evm_payment_token_address != "" %}
 ARGS+=(--payment-token-address "{{ evm_payment_token_address }}")
 {% endif %}

@@ -840,6 +840,7 @@ pub fn build_symlinked_antnode_extra_vars(
     rewards_address: &str,
     evm_network_type: EvmNetwork,
     evm_data_payments_address: Option<String>,
+    evm_merkle_payments_address: Option<String>,
     evm_payment_token_address: Option<String>,
     evm_rpc_url: Option<String>,
     peer: Option<String>,
@@ -862,6 +863,9 @@ pub fn build_symlinked_antnode_extra_vars(
     if evm_network_type == EvmNetwork::Custom {
         if let Some(addr) = evm_data_payments_address {
             extra_vars.add_variable("evm_data_payments_address", &addr);
+        }
+        if let Some(addr) = evm_merkle_payments_address {
+            extra_vars.add_variable("evm_merkle_payments_address", &addr);
         }
         if let Some(addr) = evm_payment_token_address {
             extra_vars.add_variable("evm_payment_token_address", &addr);
