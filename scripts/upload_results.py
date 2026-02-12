@@ -20,6 +20,24 @@ class UploadAttempt:
     successful_chunks: Optional[int] = None
 
 
+def detect_payment_type(log_path: Path) -> str:
+    """
+    Auto-detect the payment type from log file content.
+
+    Looks for 'single-node' or 'Merkle Tree' patterns in the log.
+
+    Returns:
+        'single-node' or 'merkle'
+    """
+    with open(log_path, 'r') as f:
+        for line in f:
+            if 'single-node' in line:
+                return 'single-node'
+            if 'Merkle Tree' in line:
+                return 'merkle'
+    return 'single-node'
+
+
 def parse_log_file(log_path: Path, payment_type: str) -> List[UploadAttempt]:
     """
     Parse the upload log file and extract upload attempts.
@@ -72,6 +90,7 @@ def parse_upload_attempt(lines: List[str], start_idx: int, payment_type: str) ->
     start_time = None
     total_chunks = None
     successful_chunk_addresses = set()
+    failed_chunk_addresses = set()
     all_chunks_already_exist = False
 
     timestamp_match = re.match(r'^(\w{3}\s+\d{1,2}\s+\d{2}:\d{2}:\d{2})', lines[start_idx])
@@ -150,6 +169,11 @@ def parse_upload_attempt(lines: List[str], start_idx: int, payment_type: str) ->
         if retry_match:
             successful_chunk_addresses.add(retry_match.group(1))
 
+        # Track chunks that failed to store
+        failed_match = re.search(r'Chunk failed to be stored at: ([a-f0-9]{64})', line)
+        if failed_match:
+            failed_chunk_addresses.add(failed_match.group(1))
+
         # Detect when all chunks already exist on network (nothing to upload)
         if 'chunks already exist on the network' in line and 'nothing to upload' in line:
             all_chunks_already_exist = True
@@ -168,8 +192,9 @@ def parse_upload_attempt(lines: List[str], start_idx: int, payment_type: str) ->
                 # All chunks were already on the network
                 successful_chunks = total_chunks
             else:
-                # Cap at total_chunks to handle cases where "already exists" chunks + new chunks > total
-                successful_chunks = min(len(successful_chunk_addresses), total_chunks)
+                # Remove failed chunks from the successful set, then cap at total_chunks
+                net_successful = successful_chunk_addresses - failed_chunk_addresses
+                successful_chunks = min(len(net_successful), total_chunks)
         else:
             successful_chunks = None
         return UploadAttempt(
@@ -289,17 +314,10 @@ def main():
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Example:
-  upload_results.py static-upload-results/DEV_01-2025_12_27/DEV-01-ant-client-1/service_log --payment-type single-node
+  upload_results.py static-upload-results/DEV_01-2025_12_27/DEV-01-ant-client-1/service_log
         """
     )
     parser.add_argument('log_file_path', type=str, help='Path to the log file')
-    parser.add_argument(
-        '--payment-type',
-        type=str,
-        required=True,
-        choices=['single-node', 'merkle'],
-        help='Payment type used in the upload (single-node or merkle)'
-    )
 
     args = parser.parse_args()
 
@@ -309,10 +327,12 @@ Example:
         print(f"Error: Log file not found: {log_path}")
         sys.exit(1)
 
-    print(f"Parsing log file: {log_path}")
-    print(f"Payment type: {args.payment_type}")
+    payment_type = detect_payment_type(log_path)
 
-    attempts = parse_log_file(log_path, args.payment_type)
+    print(f"Parsing log file: {log_path}")
+    print(f"Payment type: {payment_type}")
+
+    attempts = parse_log_file(log_path, payment_type)
 
     if not attempts:
         print("No upload attempts found in log file.")
