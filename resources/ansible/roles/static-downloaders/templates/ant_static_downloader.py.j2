@@ -640,9 +640,9 @@ class AntDownloader:
         elif self.mode == DownloadMode.DELAYED:
             if self.current_address_index >= len(self.addresses):
                 self.current_address_index = 0
-                print(f"Completed full cycle: sleeping for {self.sleep_duration // 60} minutes...")
+                print("Completed full cycle: sleeping for 24 hours before next cycle...")
                 print("Returning to beginning of addresses")
-                time.sleep(self.sleep_duration)
+                time.sleep(86400)
             
             print(f"Processing address {self.current_address_index + 1} of {len(self.addresses)}")
             record = self.addresses[self.current_address_index]
